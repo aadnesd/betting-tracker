@@ -20,12 +20,16 @@ import { ChatSDKError } from "../errors";
 import type { AppUsage } from "../usage";
 import { generateUUID } from "../utils";
 import {
+  backBet,
   type Chat,
   chat,
   type DBMessage,
   document,
+  layBet,
+  matchedBet,
   message,
   type Suggestion,
+  screenshotUpload,
   stream,
   suggestion,
   type User,
@@ -134,7 +138,7 @@ export async function deleteAllChatsByUserId({ userId }: { userId: string }) {
       return { deletedCount: 0 };
     }
 
-    const chatIds = userChats.map(c => c.id);
+    const chatIds = userChats.map((c) => c.id);
 
     await db.delete(vote).where(inArray(vote.chatId, chatIds));
     await db.delete(message).where(inArray(message.chatId, chatIds));
@@ -588,6 +592,282 @@ export async function getStreamIdsByChatId({ chatId }: { chatId: string }) {
     throw new ChatSDKError(
       "bad_request:database",
       "Failed to get stream ids by chat id"
+    );
+  }
+}
+
+type BetInputBase = {
+  market: string;
+  selection: string;
+  odds: number;
+  stake: number;
+  exchange: string;
+  potentialReturn?: number | null;
+  betReference?: string | null;
+  placedAt?: Date | null;
+  confidence?: Record<string, number> | null;
+  error?: string | null;
+  status?: "parsed" | "needs_review" | "error" | "saved";
+};
+
+export async function saveScreenshotUpload({
+  userId,
+  kind,
+  url,
+  filename,
+  contentType,
+  size,
+}: {
+  userId: string;
+  kind: "back" | "lay";
+  url: string;
+  filename?: string | null;
+  contentType?: string | null;
+  size?: number | null;
+}) {
+  try {
+    const values: typeof screenshotUpload.$inferInsert = {
+      createdAt: new Date(),
+      userId,
+      kind,
+      url,
+      filename: filename ?? null,
+      contentType: contentType ?? null,
+      size: size ? size.toString() : null,
+      status: "uploaded",
+    };
+
+    const [row] = await db.insert(screenshotUpload).values(values).returning();
+    return row;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to persist screenshot metadata"
+    );
+  }
+}
+
+export async function getScreenshotById({
+  id,
+  userId,
+}: {
+  id: string;
+  userId: string;
+}) {
+  try {
+    const [row] = await db
+      .select()
+      .from(screenshotUpload)
+      .where(
+        and(eq(screenshotUpload.id, id), eq(screenshotUpload.userId, userId))
+      )
+      .limit(1);
+    return row ?? null;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to fetch screenshot"
+    );
+  }
+}
+
+export async function updateScreenshotStatus({
+  id,
+  status,
+  error,
+}: {
+  id: string;
+  status: "uploaded" | "parsed" | "error";
+  error?: string | null;
+}) {
+  try {
+    await db
+      .update(screenshotUpload)
+      .set({ status, error: error ?? null })
+      .where(eq(screenshotUpload.id, id));
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to update screenshot status"
+    );
+  }
+}
+
+export async function saveBackBet({
+  userId,
+  screenshotId,
+  ...bet
+}: BetInputBase & { userId: string; screenshotId: string }) {
+  try {
+    const values: typeof backBet.$inferInsert = {
+      createdAt: new Date(),
+      userId,
+      screenshotId,
+      market: bet.market,
+      selection: bet.selection,
+      odds: bet.odds.toString(),
+      stake: bet.stake.toString(),
+      exchange: bet.exchange,
+      potentialReturn:
+        bet.potentialReturn === undefined || bet.potentialReturn === null
+          ? null
+          : bet.potentialReturn.toString(),
+      betReference: bet.betReference ?? null,
+      placedAt: bet.placedAt ?? null,
+      confidence: bet.confidence ?? null,
+      status: bet.status ?? "parsed",
+      error: bet.error ?? null,
+    };
+
+    const [row] = await db.insert(backBet).values(values).returning();
+    return row;
+  } catch (_error) {
+    throw new ChatSDKError("bad_request:database", "Failed to save back bet");
+  }
+}
+
+export async function saveLayBet({
+  userId,
+  screenshotId,
+  ...bet
+}: BetInputBase & { userId: string; screenshotId: string }) {
+  try {
+    const values: typeof layBet.$inferInsert = {
+      createdAt: new Date(),
+      userId,
+      screenshotId,
+      market: bet.market,
+      selection: bet.selection,
+      odds: bet.odds.toString(),
+      stake: bet.stake.toString(),
+      exchange: bet.exchange,
+      potentialReturn:
+        bet.potentialReturn === undefined || bet.potentialReturn === null
+          ? null
+          : bet.potentialReturn.toString(),
+      betReference: bet.betReference ?? null,
+      placedAt: bet.placedAt ?? null,
+      confidence: bet.confidence ?? null,
+      status: bet.status ?? "parsed",
+      error: bet.error ?? null,
+    };
+
+    const [row] = await db.insert(layBet).values(values).returning();
+    return row;
+  } catch (_error) {
+    throw new ChatSDKError("bad_request:database", "Failed to save lay bet");
+  }
+}
+
+export async function createMatchedBetRecord({
+  userId,
+  backBetId,
+  layBetId,
+  market,
+  selection,
+  status,
+  netExposure,
+  notes,
+  lastError,
+}: {
+  userId: string;
+  backBetId: string;
+  layBetId: string;
+  market: string;
+  selection: string;
+  status?: "pending" | "matched" | "needs_review" | "error";
+  netExposure?: number | null;
+  notes?: string | null;
+  lastError?: string | null;
+}) {
+  try {
+    const values: typeof matchedBet.$inferInsert = {
+      createdAt: new Date(),
+      userId,
+      backBetId,
+      layBetId,
+      market,
+      selection,
+      status: status ?? "pending",
+      netExposure:
+        netExposure === undefined || netExposure === null
+          ? null
+          : netExposure.toString(),
+      notes: notes ?? null,
+      lastError: lastError ?? null,
+    };
+
+    const [row] = await db.insert(matchedBet).values(values).returning();
+    return row;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to create matched bet"
+    );
+  }
+}
+
+export async function listMatchedBetsByUser({
+  userId,
+  limit = 50,
+}: {
+  userId: string;
+  limit?: number;
+}) {
+  try {
+    return await db
+      .select({
+        id: matchedBet.id,
+        market: matchedBet.market,
+        selection: matchedBet.selection,
+        status: matchedBet.status,
+        netExposure: matchedBet.netExposure,
+        createdAt: matchedBet.createdAt,
+        backBetId: matchedBet.backBetId,
+        layBetId: matchedBet.layBetId,
+      })
+      .from(matchedBet)
+      .where(eq(matchedBet.userId, userId))
+      .orderBy(desc(matchedBet.createdAt))
+      .limit(limit);
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to list matched bets"
+    );
+  }
+}
+
+export async function getMatchedBetWithParts({
+  id,
+  userId,
+}: {
+  id: string;
+  userId: string;
+}) {
+  try {
+    const [row] = await db
+      .select({
+        matched: matchedBet,
+        back: backBet,
+        lay: layBet,
+        backScreenshot: screenshotUpload,
+        layScreenshot: screenshotUpload,
+      })
+      .from(matchedBet)
+      .leftJoin(backBet, eq(matchedBet.backBetId, backBet.id))
+      .leftJoin(layBet, eq(matchedBet.layBetId, layBet.id))
+      .where(eq(matchedBet.id, id));
+
+    if (!row || row.matched.userId !== userId) {
+      return null;
+    }
+
+    return row;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to fetch matched bet details"
     );
   }
 }

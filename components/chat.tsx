@@ -166,14 +166,13 @@ export function Chat({
         <Messages
           chatId={id}
           isArtifactVisible={isArtifactVisible}
-          isReadonly={isReadonly}
-          messages={messages}
-          regenerate={regenerate}
-          selectedModelId={initialChatModel}
-          setMessages={setMessages}
-          status={status}
-          votes={votes}
-        />
+        isReadonly={isReadonly}
+        messages={messages}
+        regenerate={regenerate}
+        setMessages={setMessages}
+        status={status}
+        votes={votes}
+      />
 
         <div className="sticky bottom-0 z-1 mx-auto flex w-full max-w-4xl gap-2 border-t-0 bg-background px-2 pb-3 md:px-4 md:pb-4">
           {!isReadonly && (
