@@ -10,8 +10,7 @@ export type ParsedBet = {
   odds: number;
   stake: number;
   exchange: string;
-  potentialReturn?: number | null;
-  betReference?: string | null;
+  currency?: string | null;
   placedAt?: string | null;
   confidence?: Record<string, number>;
 };
@@ -34,8 +33,7 @@ const betSchema = z.object({
   odds: z.number(),
   stake: z.number(),
   exchange: z.string(),
-  potentialReturn: z.number().optional().nullable(),
-  betReference: z.string().optional().nullable(),
+  currency: z.string().length(3).optional().nullable(),
   placedAt: z.string().optional().nullable(),
   confidence: confidenceShape,
 });
@@ -52,10 +50,6 @@ function normalizeNumbers(bet: ParsedBet): ParsedBet {
     ...bet,
     odds: Number(bet.odds),
     stake: Number(bet.stake),
-    potentialReturn:
-      bet.potentialReturn === undefined || bet.potentialReturn === null
-        ? null
-        : Number(bet.potentialReturn),
   };
 }
 
@@ -83,7 +77,8 @@ async function callModelWithRetry(params: {
             content: [
               {
                 type: "text",
-                text: "Parse the BACK bet screenshot. Return numeric odds/stake as numbers, include betReference if present.",
+                text:
+                  "Parse the BACK bet screenshot. Return numeric odds/stake, bookmaker/exchange name, and ISO-4217 currency code (e.g. EUR, USD, NOK) for the stake.",
               },
               { type: "image", image: params.backImageUrl },
             ],
@@ -93,7 +88,8 @@ async function callModelWithRetry(params: {
             content: [
               {
                 type: "text",
-                text: "Parse the LAY bet screenshot from the exchange. Ensure market and selection align with the back bet if visible.",
+                text:
+                  "Parse the LAY bet (exchange) screenshot. Ensure market and selection align with the back bet if visible. Currency should be NOK.",
               },
               { type: "image", image: params.layImageUrl },
             ],
@@ -138,8 +134,7 @@ export async function parseMatchedBetFromScreenshots({
         odds: 2.4,
         stake: 20,
         exchange: "Bet365",
-        potentialReturn: 48,
-        betReference: "BACK-STUB",
+        currency: "EUR",
         placedAt: new Date().toISOString(),
         confidence: {
           market: 0.9,
@@ -147,6 +142,7 @@ export async function parseMatchedBetFromScreenshots({
           odds: 0.95,
           stake: 0.95,
           exchange: 0.8,
+          currency: 0.75,
         },
       },
       lay: {
@@ -155,9 +151,8 @@ export async function parseMatchedBetFromScreenshots({
         selection: "Arsenal",
         odds: 2.32,
         stake: 21,
-        exchange: "Betfair Exchange",
-        potentialReturn: 21,
-        betReference: "LAY-STUB",
+        exchange: "bfb247",
+        currency: "NOK",
         placedAt: new Date().toISOString(),
         confidence: {
           market: 0.9,
@@ -165,22 +160,29 @@ export async function parseMatchedBetFromScreenshots({
           odds: 0.9,
           stake: 0.9,
           exchange: 0.85,
+          currency: 1,
         },
       },
     };
   }
 
   const parsed = await callModelWithRetry({ backImageUrl, layImageUrl });
+  const layWithDefaults: ParsedBet = {
+    ...parsed.lay,
+    exchange: "bfb247",
+    currency: "NOK",
+  };
 
   // Cross-validate the pair; flag needsReview when markets diverge.
   const marketsAlign =
     parsed.back.market.toLowerCase().trim() ===
-      parsed.lay.market.toLowerCase().trim() &&
+      layWithDefaults.market.toLowerCase().trim() &&
     parsed.back.selection.toLowerCase().trim() ===
-      parsed.lay.selection.toLowerCase().trim();
+      layWithDefaults.selection.toLowerCase().trim();
 
   return {
-    ...parsed,
+    back: parsed.back,
+    lay: layWithDefaults,
     needsReview: parsed.needsReview || !marketsAlign,
     notes: marketsAlign
       ? parsed.notes

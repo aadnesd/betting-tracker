@@ -247,6 +247,7 @@ export function BetIngestForm() {
             <>
               <BetFields
                 label="Back bet"
+                allowCurrencyEdit
                 onChange={(val) =>
                   setParsed((prev) => (prev ? { ...prev, back: val } : prev))
                 }
@@ -257,6 +258,7 @@ export function BetIngestForm() {
                 onChange={(val) =>
                   setParsed((prev) => (prev ? { ...prev, lay: val } : prev))
                 }
+                readOnlyCurrency="NOK"
                 value={parsed.lay}
               />
             </>
@@ -266,7 +268,7 @@ export function BetIngestForm() {
               <div className="flex items-center justify-between">
                 <span>Computed net exposure</span>
                 <span className="font-semibold">
-                  {netExposure !== null ? `£${netExposure}` : "—"}
+                  {netExposure !== null ? `kr ${netExposure}` : "—"}
                 </span>
               </div>
               {parsed.needsReview && (
@@ -293,17 +295,23 @@ function BetFields({
   label,
   value,
   onChange,
+  allowCurrencyEdit,
+  readOnlyCurrency,
 }: {
   label: string;
   value: ParsedPair["back"];
   onChange: (value: ParsedPair["back"]) => void;
+  allowCurrencyEdit?: boolean;
+  readOnlyCurrency?: string;
 }) {
+  const currencyValue = readOnlyCurrency ?? value.currency ?? "";
+
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <Label>{label}</Label>
         <span className="text-muted-foreground text-xs">
-          {value.exchange} · conf {value.confidence?.odds ?? 0.8}
+          {value.exchange} · {currencyValue || "Currency unknown"}
         </span>
       </div>
       <div className="grid gap-2 md:grid-cols-2">
@@ -329,9 +337,15 @@ function BetFields({
           value={value.exchange}
         />
         <Input
-          onChange={(e) => onChange({ ...value, betReference: e.target.value })}
-          placeholder="Bet slip reference"
-          value={value.betReference ?? ""}
+          disabled={!allowCurrencyEdit}
+          onChange={(e) =>
+            onChange({
+              ...value,
+              currency: e.target.value ? e.target.value.toUpperCase() : null,
+            })
+          }
+          placeholder="Currency (e.g. EUR)"
+          value={currencyValue}
         />
       </div>
     </div>

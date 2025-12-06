@@ -57,6 +57,20 @@
       "when": 1757362773211,
       "tag": "0007_flowery_ben_parker",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1763923479000,
+      "tag": "0008_matched_bets",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1763925000000,
+      "tag": "0009_fx_currency",
+      "breakpoints": true
     }
   ]
 }

@@ -210,8 +210,7 @@ export const backBet = pgTable("BackBet", {
   odds: numeric("odds", { precision: 12, scale: 4 }).notNull(),
   stake: numeric("stake", { precision: 12, scale: 2 }).notNull(),
   exchange: text("exchange").notNull(),
-  potentialReturn: numeric("potentialReturn", { precision: 14, scale: 2 }),
-  betReference: text("betReference"),
+  currency: varchar("currency", { length: 3 }),
   placedAt: timestamp("placedAt"),
   confidence: jsonb("confidence"),
   status: varchar("status", { enum: betStatusEnum })
@@ -236,8 +235,7 @@ export const layBet = pgTable("LayBet", {
   odds: numeric("odds", { precision: 12, scale: 4 }).notNull(),
   stake: numeric("stake", { precision: 12, scale: 2 }).notNull(),
   exchange: text("exchange").notNull(),
-  potentialReturn: numeric("potentialReturn", { precision: 14, scale: 2 }),
-  betReference: text("betReference"),
+  currency: varchar("currency", { length: 3 }),
   placedAt: timestamp("placedAt"),
   confidence: jsonb("confidence"),
   status: varchar("status", { enum: betStatusEnum })

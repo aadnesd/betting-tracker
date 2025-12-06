@@ -7,15 +7,15 @@ import {
   saveBackBet,
   saveLayBet,
 } from "@/lib/db/queries";
+import { convertAmountToNok } from "@/lib/fx-rates";
 
 const betPartSchema = z.object({
   market: z.string().min(1),
   selection: z.string().min(1),
   odds: z.number(),
   stake: z.number(),
-  exchange: z.string().min(1),
-  potentialReturn: z.number().optional().nullable(),
-  betReference: z.string().optional().nullable(),
+  exchange: z.string().optional().nullable(),
+  currency: z.string().length(3).optional().nullable(),
   placedAt: z.string().optional().nullable(),
   confidence: z.record(z.string(), z.number()).optional(),
   status: z.enum(["parsed", "needs_review", "error", "saved"]).optional(),
@@ -53,7 +53,7 @@ function computeNetExposure({
 }) {
   const backProfit = backStake * (backOdds - 1);
   const layLiability = layStake * (layOdds - 1);
-  return layLiability - backProfit;
+  return { backProfit, layLiability };
 }
 
 export async function POST(request: Request) {
@@ -90,6 +90,12 @@ export async function POST(request: Request) {
       );
     }
 
+    const layExchange = "bfb247";
+    const layCurrency = "NOK";
+    const backCurrency = body.back.currency
+      ? body.back.currency.toUpperCase()
+      : "NOK";
+
     const backBetRow = await saveBackBet({
       userId: session.user.id,
       screenshotId: backShot.id,
@@ -97,9 +103,8 @@ export async function POST(request: Request) {
       selection: body.back.selection,
       odds: body.back.odds,
       stake: body.back.stake,
-      exchange: body.back.exchange,
-      potentialReturn: body.back.potentialReturn ?? null,
-      betReference: body.back.betReference ?? null,
+      exchange: body.back.exchange ?? "unknown",
+      currency: backCurrency,
       placedAt: safeDate(body.back.placedAt),
       confidence: body.back.confidence ?? null,
       status: body.back.status ?? (body.needsReview ? "needs_review" : "saved"),
@@ -112,20 +117,24 @@ export async function POST(request: Request) {
       selection: body.lay.selection,
       odds: body.lay.odds,
       stake: body.lay.stake,
-      exchange: body.lay.exchange,
-      potentialReturn: body.lay.potentialReturn ?? null,
-      betReference: body.lay.betReference ?? null,
+      exchange: layExchange,
+      currency: layCurrency,
       placedAt: safeDate(body.lay.placedAt),
       confidence: body.lay.confidence ?? null,
       status: body.lay.status ?? (body.needsReview ? "needs_review" : "saved"),
     });
 
-    const netExposure = computeNetExposure({
+    const { backProfit, layLiability } = computeNetExposure({
       backStake: body.back.stake,
       backOdds: body.back.odds,
       layStake: body.lay.stake,
       layOdds: body.lay.odds,
     });
+
+    const [backProfitNok, layLiabilityNok] = await Promise.all([
+      convertAmountToNok(backProfit, backCurrency),
+      convertAmountToNok(layLiability, layCurrency),
+    ]);
 
     const matched = await createMatchedBetRecord({
       userId: session.user.id,
@@ -134,7 +143,7 @@ export async function POST(request: Request) {
       market: body.market,
       selection: body.selection,
       status: body.needsReview ? "needs_review" : "matched",
-      netExposure,
+      netExposure: layLiabilityNok - backProfitNok,
       notes: body.notes ?? null,
     });
 

@@ -602,8 +602,7 @@ type BetInputBase = {
   odds: number;
   stake: number;
   exchange: string;
-  potentialReturn?: number | null;
-  betReference?: string | null;
+  currency?: string | null;
   placedAt?: Date | null;
   confidence?: Record<string, number> | null;
   error?: string | null;
@@ -708,11 +707,7 @@ export async function saveBackBet({
       odds: bet.odds.toString(),
       stake: bet.stake.toString(),
       exchange: bet.exchange,
-      potentialReturn:
-        bet.potentialReturn === undefined || bet.potentialReturn === null
-          ? null
-          : bet.potentialReturn.toString(),
-      betReference: bet.betReference ?? null,
+      currency: bet.currency ?? null,
       placedAt: bet.placedAt ?? null,
       confidence: bet.confidence ?? null,
       status: bet.status ?? "parsed",
@@ -741,11 +736,7 @@ export async function saveLayBet({
       odds: bet.odds.toString(),
       stake: bet.stake.toString(),
       exchange: bet.exchange,
-      potentialReturn:
-        bet.potentialReturn === undefined || bet.potentialReturn === null
-          ? null
-          : bet.potentialReturn.toString(),
-      betReference: bet.betReference ?? null,
+      currency: bet.currency ?? null,
       placedAt: bet.placedAt ?? null,
       confidence: bet.confidence ?? null,
       status: bet.status ?? "parsed",

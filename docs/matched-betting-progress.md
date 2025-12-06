@@ -8,7 +8,7 @@
 - API routes for upload, auto-parse, and create-matched.
 
 ## What’s done
-- **Data layer**: New tables & queries for ScreenshotUpload, BackBet, LayBet, MatchedBet; migration `0008_matched_bets.sql`.
+- **Data layer**: New tables & queries for ScreenshotUpload, BackBet, LayBet, MatchedBet; follow-up currency/fx migration `0009_fx_currency.sql`.
 - **AI parser**: `lib/bet-parser.ts` (vision model with retry; test stub).
 - **APIs**: `/api/bets/screenshots`, `/api/bets/autoparse`, `/api/bets/create-matched`.
 - **UI**: `/bets/new` upload & review flow; `/bets` dashboard; sidebar link; status badges.
@@ -34,8 +34,10 @@
 - Build: `pnpm build` (runs migrations)
 - Tests: `pnpm test` (uses parser stub; requires Playwright browsers already installed)
 
+- **FX plumbing**: `lib/fx-rates.ts` converts back bets into NOK before computing exposure.
+
 ## Relevant files
-- Data/queries: `lib/db/schema.ts`, `lib/db/queries.ts`, `lib/db/migrations/0008_matched_bets.sql`
+- Data/queries: `lib/db/schema.ts`, `lib/db/queries.ts`, migrations `0008_matched_bets.sql`, `0009_fx_currency.sql`
 - Parser: `lib/bet-parser.ts`
 - APIs: `app/(chat)/api/bets/{screenshots,autoparse,create-matched}/route.ts`
 - UI: `app/(chat)/bets/page.tsx`, `app/(chat)/bets/new/page.tsx`, `components/bets/*`

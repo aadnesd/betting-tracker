@@ -36,7 +36,7 @@
 ## Database & Configuration
 - Drizzle schema: `lib/db/schema.ts`; queries: `lib/db/queries.ts`; helpers: `lib/db/helpers/`.
 - Migrations are TypeScript—do not hand-edit generated SQL. Regenerate with `pnpm db:generate` and apply with `pnpm db:migrate`.
-- Never commit secrets; use `.env.local` (ignored). Document new env keys in `README.md` or a commit note.
+- Never commit secrets; use `.env.local` (ignored). Document new env keys (e.g., `AI_GATEWAY_API_KEY`, `FXRATES_API_KEY`) in `README.md` or a commit note.
 
 ## Commit & Pull Request Guidelines
 - Use concise, present-tense messages; Conventional Commit prefixes (`feat:`, `fix:`, `chore:`, `test:`, `docs:`) are preferred.

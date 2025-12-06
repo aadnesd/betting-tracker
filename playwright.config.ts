@@ -10,14 +10,15 @@ config({
   path: ".env.local",
 });
 
-/* Use process.env.PORT by default and fallback to port 3000 */
+/* Respect explicit PORT/HOST, defaulting to a local-only dev server */
 const PORT = process.env.PORT || 3000;
+const HOST = process.env.HOST || "127.0.0.1";
 
 /**
  * Set webServer.url and use.baseURL with the location
  * of the WebServer respecting the correct set port
  */
-const baseURL = `http://localhost:${PORT}`;
+const baseURL = `http://${HOST}:${PORT}`;
 
 /**
  * See https://playwright.dev/docs/test-configuration.
@@ -99,7 +100,7 @@ export default defineConfig({
 
   /* Run your local dev server before starting the tests */
   webServer: {
-    command: "pnpm dev",
+    command: `HOST=${HOST} PORT=${PORT} pnpm dev --hostname ${HOST} --port ${PORT}`,
     url: `${baseURL}/ping`,
     timeout: 120 * 1000,
     reuseExistingServer: !process.env.CI,
