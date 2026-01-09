@@ -2202,3 +2202,38 @@ export async function getDashboardSummary({
   }
 }
 
+/**
+ * Create a placeholder screenshot record for manual entry (Quick Add).
+ * This allows bets to be created without an actual uploaded screenshot.
+ */
+export async function createManualScreenshot({
+  userId,
+  kind,
+}: {
+  userId: string;
+  kind: "back" | "lay";
+}) {
+  try {
+    const now = new Date();
+    const [result] = await db
+      .insert(screenshotUpload)
+      .values({
+        createdAt: now,
+        userId,
+        kind,
+        url: `manual://quick-add/${now.getTime()}-${generateUUID()}`,
+        filename: "manual-entry",
+        contentType: "application/x-manual",
+        status: "parsed",
+        parsedOutput: { source: "quick_add", createdAt: now.toISOString() },
+      })
+      .returning();
+    return result;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to create manual screenshot"
+    );
+  }
+}
+

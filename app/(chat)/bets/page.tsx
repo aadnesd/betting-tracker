@@ -60,6 +60,9 @@ export default async function Page() {
               )}
             </Link>
           </Button>
+          <Button asChild variant="outline">
+            <Link href="/bets/quick-add">Quick Add</Link>
+          </Button>
           <Button asChild>
             <Link href="/bets/new">New matched bet</Link>
           </Button>

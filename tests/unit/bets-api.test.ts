@@ -4,6 +4,7 @@ import { POST as screenshotsRoute } from "@/app/(chat)/api/bets/screenshots/rout
 import { POST as autoparseRoute } from "@/app/(chat)/api/bets/autoparse/route";
 import { POST as createMatchedRoute } from "@/app/(chat)/api/bets/create-matched/route";
 import { PATCH as updateMatchedRoute } from "@/app/(chat)/api/bets/update-matched/route";
+import { POST as quickAddRoute } from "@/app/(chat)/api/bets/quick-add/route";
 import * as authModule from "@/app/(auth)/auth";
 import * as dbQueries from "@/lib/db/queries";
 import { parseMatchedBetFromScreenshots } from "@/lib/bet-parser";
@@ -47,6 +48,7 @@ vi.mock("@/lib/db/queries", () => ({
   listAuditEntriesByEntity: vi.fn(),
   listMatchedBetsByStatus: vi.fn(),
   countMatchedBetsByStatus: vi.fn(),
+  createManualScreenshot: vi.fn(),
 }));
 
 const makeBlob = (content = "stub") =>
@@ -659,5 +661,156 @@ describe("bets API routes (unit)", () => {
     expect(res.status).toBe(404);
     const json = await res.json();
     expect(json.error).toBe("Matched bet not found");
+  });
+
+  describe("quick-add route", () => {
+    it("creates matched bet without screenshots", async () => {
+      (dbQueries.createManualScreenshot as vi.Mock).mockResolvedValueOnce({
+        id: "manual-back-1",
+      });
+      (dbQueries.createManualScreenshot as vi.Mock).mockResolvedValueOnce({
+        id: "manual-lay-1",
+      });
+      (dbQueries.getOrCreateAccount as vi.Mock).mockResolvedValueOnce({
+        id: "acc-back",
+      });
+      (dbQueries.getOrCreateAccount as vi.Mock).mockResolvedValueOnce({
+        id: "acc-lay",
+      });
+      (dbQueries.saveBackBet as vi.Mock).mockResolvedValue({ id: "bb1" });
+      (dbQueries.saveLayBet as vi.Mock).mockResolvedValue({ id: "lb1" });
+      (dbQueries.createMatchedBetRecord as vi.Mock).mockResolvedValue({
+        id: "mb1",
+        status: "matched",
+      });
+      (dbQueries.createAuditEntry as vi.Mock).mockResolvedValue({ id: "audit-1" });
+
+      const payload = {
+        market: "Premier League",
+        selection: "Arsenal to Win",
+        promoType: "Free Bet",
+        back: {
+          odds: 2.5,
+          stake: 100,
+          bookmaker: "bet365",
+          currency: "NOK",
+        },
+        lay: {
+          odds: 2.52,
+          stake: 99.2,
+          exchange: "bfb247",
+          currency: "NOK",
+        },
+        notes: "Test bet",
+      };
+
+      const res = await quickAddRoute(
+        new Request("http://localhost/api/bets/quick-add", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        })
+      );
+
+      expect(res.status).toBe(200);
+      const json = await res.json();
+      expect(json.success).toBe(true);
+      expect(json.matched.id).toBe("mb1");
+
+      // Verify manual screenshots were created
+      expect(dbQueries.createManualScreenshot).toHaveBeenCalledTimes(2);
+      expect(dbQueries.createManualScreenshot).toHaveBeenCalledWith({
+        userId: user.id,
+        kind: "back",
+      });
+      expect(dbQueries.createManualScreenshot).toHaveBeenCalledWith({
+        userId: user.id,
+        kind: "lay",
+      });
+
+      // Verify bets were saved with manual screenshot IDs
+      expect(dbQueries.saveBackBet).toHaveBeenCalledWith(
+        expect.objectContaining({
+          screenshotId: "manual-back-1",
+          odds: 2.5,
+          stake: 100,
+          status: "matched",
+        })
+      );
+      expect(dbQueries.saveLayBet).toHaveBeenCalledWith(
+        expect.objectContaining({
+          screenshotId: "manual-lay-1",
+          odds: 2.52,
+          stake: 99.2,
+          status: "matched",
+        })
+      );
+
+      // Verify promo was resolved
+      expect(dbQueries.getOrCreatePromoByType).toHaveBeenCalledWith({
+        userId: user.id,
+        type: "Free Bet",
+      });
+
+      // Verify matched bet was created with "matched" status
+      expect(dbQueries.createMatchedBetRecord).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: "matched",
+          notes: expect.stringContaining("[Manual Entry]"),
+        })
+      );
+
+      // Verify audit entries were created
+      expect(dbQueries.createAuditEntry).toHaveBeenCalledTimes(3);
+    });
+
+    it("rejects invalid payload with missing required fields", async () => {
+      const payload = {
+        market: "",
+        selection: "Arsenal",
+        back: {
+          odds: 2.5,
+          stake: 100,
+          bookmaker: "bet365",
+        },
+        lay: {
+          odds: 2.52,
+          stake: 99.2,
+        },
+      };
+
+      const res = await quickAddRoute(
+        new Request("http://localhost/api/bets/quick-add", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        })
+      );
+
+      expect(res.status).toBe(400);
+      const json = await res.json();
+      expect(json.error).toBe("Invalid payload");
+      expect(json.details).toBeDefined();
+    });
+
+    it("rejects unauthenticated requests", async () => {
+      (authModule.auth as vi.Mock).mockResolvedValueOnce(null);
+
+      const payload = {
+        market: "Premier League",
+        selection: "Arsenal",
+        back: { odds: 2.5, stake: 100, bookmaker: "bet365" },
+        lay: { odds: 2.52, stake: 99.2, exchange: "bfb247" },
+      };
+
+      const res = await quickAddRoute(
+        new Request("http://localhost/api/bets/quick-add", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        })
+      );
+
+      expect(res.status).toBe(401);
+      const json = await res.json();
+      expect(json.error).toBe("Unauthorized");
+    });
   });
 });

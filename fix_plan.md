@@ -15,12 +15,13 @@ Prioritized implementation tasks. Check off when complete with tests passing.
 
 ## P3 — Import/Export + UX
 
-- [ ] **Quick Add flow**: Minimal manual entry for common matched bet. DoD: route + form persists a matched set without screenshots.
 - [ ] **Calculation transparency + mobile**: Tooltips for liability/commission/FX and responsive layouts. DoD: tooltips exist and mobile layout passes QA.
 
 ---
 
 ## Completed
+
+- [x] **Quick Add flow**: Minimal manual entry for common matched bet. DoD: route + form persists a matched set without screenshots. Implementation: Created `/api/bets/quick-add` POST endpoint with zod schema validation for market, selection, back bet (odds, stake, bookmaker, currency), lay bet (odds, stake, exchange, currency), optional promoType and notes. Added `createManualScreenshot` query in `lib/db/queries.ts` that creates placeholder screenshot records for manual entries. Created `/bets/quick-add` page with full form UI including: market/selection inputs, promo type dropdown, back bet section (bookmaker selector, currency, odds, stake), lay bet section (exchange selector, currency, odds, stake, liability calculation), notes textarea, and validation. Added "Quick Add" button to dashboard. Tests: 3 tests in `tests/unit/bets-api.test.ts` for quick-add route (creates matched bet, rejects invalid payload, rejects unauthenticated). Build passes with all 78 tests passing.
 
 - [x] **Dashboard summary**: Recent activity, open exposure, pending reviews. DoD: dashboard cards render real data. Implementation: Query `getDashboardSummary` in `lib/db/queries.ts` returns `DashboardSummary` interface with: totalProfit, settledCount, openExposure, openPositions, pendingReviewCount, recentActivityCount, roi. Component `components/bets/dashboard-summary-cards.tsx` with `DashboardSummaryCards` component showing 4 cards (Total Profit with ROI, Open Exposure, Pending Review with link, Recent Activity). Dashboard `app/(chat)/bets/page.tsx` updated to fetch summary data and display cards above recent bets list. Visual cues: Colored icons, profit/loss indicators, exposure warnings, pending review highlights. Tests: Dashboard query aggregates data correctly; build passes. Why: Provides at-a-glance overview of key metrics for quick decision making.
 
