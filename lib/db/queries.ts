@@ -1293,13 +1293,12 @@ export async function getMatchedBetWithParts({
   userId: string;
 }) {
   try {
+    // First get the matched bet with back/lay bets joined
     const [row] = await db
       .select({
         matched: matchedBet,
         back: backBet,
         lay: layBet,
-        backScreenshot: screenshotUpload,
-        layScreenshot: screenshotUpload,
       })
       .from(matchedBet)
       .leftJoin(backBet, eq(matchedBet.backBetId, backBet.id))
@@ -1310,7 +1309,35 @@ export async function getMatchedBetWithParts({
       return null;
     }
 
-    return row;
+    // Fetch screenshots separately using the screenshot IDs from bets
+    let backScreenshot = null;
+    let layScreenshot = null;
+
+    if (row.back?.screenshotId) {
+      const [backSs] = await db
+        .select()
+        .from(screenshotUpload)
+        .where(eq(screenshotUpload.id, row.back.screenshotId))
+        .limit(1);
+      backScreenshot = backSs ?? null;
+    }
+
+    if (row.lay?.screenshotId) {
+      const [laySs] = await db
+        .select()
+        .from(screenshotUpload)
+        .where(eq(screenshotUpload.id, row.lay.screenshotId))
+        .limit(1);
+      layScreenshot = laySs ?? null;
+    }
+
+    return {
+      matched: row.matched,
+      back: row.back,
+      lay: row.lay,
+      backScreenshot,
+      layScreenshot,
+    };
   } catch (_error) {
     throw new ChatSDKError(
       "bad_request:database",

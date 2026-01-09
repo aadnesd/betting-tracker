@@ -82,37 +82,40 @@ export default async function Page() {
               : null;
 
             return (
-              <div
-                className="flex flex-col gap-2 rounded-md border p-3 md:flex-row md:items-center md:justify-between"
+              <Link
+                className="block rounded-md border p-3 transition-colors hover:bg-muted/50"
+                href={`/bets/${bet.id}`}
                 key={bet.id}
               >
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold">{bet.selection}</span>
-                    <Separator className="h-4" orientation="vertical" />
-                    <span className="text-muted-foreground text-sm">
-                      {bet.market}
-                    </span>
+                <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold">{bet.selection}</span>
+                      <Separator className="h-4" orientation="vertical" />
+                      <span className="text-muted-foreground text-sm">
+                        {bet.market}
+                      </span>
+                    </div>
+                    <p className="text-muted-foreground text-xs">
+                      Created{" "}
+                      {format(new Date(bet.createdAt), "dd MMM yyyy, HH:mm")}
+                    </p>
                   </div>
-                  <p className="text-muted-foreground text-xs">
-                    Created{" "}
-                    {format(new Date(bet.createdAt), "dd MMM yyyy, HH:mm")}
-                  </p>
+                  <div className="flex flex-wrap items-center gap-3">
+                    {bet.netExposure && (
+                      <span className="font-semibold text-sm">
+                        Exposure: NOK {Number(bet.netExposure).toFixed(2)}
+                      </span>
+                    )}
+                    {missingLabel && (
+                      <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-amber-800 text-xs">
+                        {missingLabel}
+                      </span>
+                    )}
+                    <BetStatusBadge status={bet.status} />
+                  </div>
                 </div>
-                <div className="flex flex-wrap items-center gap-3">
-                  {bet.netExposure && (
-                    <span className="font-semibold text-sm">
-                      Exposure: £{Number(bet.netExposure).toFixed(2)}
-                    </span>
-                  )}
-                  {missingLabel && (
-                    <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-amber-800 text-xs">
-                      {missingLabel}
-                    </span>
-                  )}
-                  <BetStatusBadge status={bet.status} />
-                </div>
-              </div>
+              </Link>
             );
           })}
         </CardContent>

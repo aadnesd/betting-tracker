@@ -1,0 +1,393 @@
+import { format } from "date-fns";
+import Image from "next/image";
+import Link from "next/link";
+import { notFound, redirect } from "next/navigation";
+import { auth } from "@/app/(auth)/auth";
+import { BetStatusBadge } from "@/components/bets/bet-status-badge";
+import { MatchedBetDetailActions } from "@/components/bets/matched-bet-detail-actions";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import {
+  getMatchedBetWithParts,
+  listAuditEntriesByEntity,
+} from "@/lib/db/queries";
+import type { BackBet, LayBet, ScreenshotUpload } from "@/lib/db/schema";
+
+export const metadata = {
+  title: "Matched bet detail",
+};
+
+interface PageProps {
+  params: Promise<{ id: string }>;
+}
+
+export default async function Page({ params }: PageProps) {
+  const { id } = await params;
+  const session = await auth();
+
+  if (!session) {
+    redirect("/api/auth/guest");
+  }
+
+  const userId = session.user.id;
+
+  const data = await getMatchedBetWithParts({ id, userId });
+
+  if (!data) {
+    notFound();
+  }
+
+  const { matched, back, lay, backScreenshot, layScreenshot } = data;
+
+  // Fetch audit history for this matched bet
+  const auditEntries = await listAuditEntriesByEntity({
+    entityType: "matched_bet",
+    entityId: matched.id,
+    limit: 50,
+  });
+
+  // Detect mismatches
+  const mismatches = detectMismatches(back, lay);
+
+  return (
+    <div className="space-y-6 p-4 md:p-8">
+      {/* Header */}
+      <div className="flex flex-col items-start justify-between gap-3 md:flex-row md:items-center">
+        <div>
+          <p className="font-medium text-muted-foreground text-sm">
+            Matched betting
+          </p>
+          <div className="flex items-center gap-3">
+            <h1 className="font-semibold text-2xl">{matched.selection}</h1>
+            <BetStatusBadge status={matched.status} />
+          </div>
+          <p className="text-muted-foreground text-sm">{matched.market}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button asChild variant="outline">
+            <Link href="/bets/review">← Review queue</Link>
+          </Button>
+          <Button asChild variant="outline">
+            <Link href="/bets">Dashboard</Link>
+          </Button>
+        </div>
+      </div>
+
+      {/* Mismatch alerts */}
+      {mismatches.length > 0 && (
+        <div className="rounded-md border border-amber-200 bg-amber-50 p-4">
+          <p className="mb-2 font-medium text-amber-800">
+            ⚠️ Issues detected
+          </p>
+          <ul className="space-y-1">
+            {mismatches.map((issue, i) => (
+              <li className="text-amber-700 text-sm" key={i}>
+                • {issue.label}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Summary row */}
+      <div className="flex flex-wrap gap-4">
+        {matched.netExposure && (
+          <div className="rounded-lg border bg-muted/50 px-4 py-3">
+            <p className="text-muted-foreground text-xs uppercase tracking-wide">
+              Net exposure
+            </p>
+            <p className="font-semibold text-lg">
+              NOK {Number(matched.netExposure).toFixed(2)}
+            </p>
+          </div>
+        )}
+        {matched.promoType && (
+          <div className="rounded-lg border bg-purple-50 px-4 py-3">
+            <p className="text-muted-foreground text-xs uppercase tracking-wide">
+              Promo type
+            </p>
+            <p className="font-semibold text-purple-800">{matched.promoType}</p>
+          </div>
+        )}
+        <div className="rounded-lg border bg-muted/50 px-4 py-3">
+          <p className="text-muted-foreground text-xs uppercase tracking-wide">
+            Created
+          </p>
+          <p className="font-medium">
+            {format(new Date(matched.createdAt), "dd MMM yyyy, HH:mm")}
+          </p>
+        </div>
+      </div>
+
+      {/* Two-column layout for back and lay */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <BetCard
+          bet={back}
+          label="Back bet"
+          screenshot={backScreenshot}
+          type="back"
+        />
+        <BetCard
+          bet={lay}
+          label="Lay bet"
+          screenshot={layScreenshot}
+          type="lay"
+        />
+      </div>
+
+      {/* Notes */}
+      {matched.notes && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Notes</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="whitespace-pre-wrap text-sm">{matched.notes}</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Actions */}
+      <MatchedBetDetailActions
+        matchedBetId={matched.id}
+        currentStatus={matched.status}
+        hasBothLegs={!!back && !!lay}
+        mismatches={mismatches}
+      />
+
+      {/* Audit history */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Status history</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {auditEntries.length === 0 ? (
+            <p className="text-muted-foreground text-sm">No history yet.</p>
+          ) : (
+            <ul className="space-y-3">
+              {auditEntries.map((entry) => {
+                const hasChanges = entry.changes !== null && entry.changes !== undefined;
+                return (
+                <li
+                  className="flex items-start gap-3 border-l-2 border-muted pl-3"
+                  key={entry.id}
+                >
+                  <div className="flex-1">
+                    <p className="font-medium text-sm">
+                      {formatAction(entry.action)}
+                    </p>
+                    {entry.notes && (
+                      <p className="text-muted-foreground text-sm">
+                        {entry.notes}
+                      </p>
+                    )}
+                    {hasChanges && (
+                      <pre className="mt-1 overflow-x-auto rounded bg-muted/50 p-2 text-xs">
+                        {JSON.stringify(entry.changes as Record<string, unknown>, null, 2)}
+                      </pre>
+                    )}
+                  </div>
+                  <p className="text-muted-foreground text-xs">
+                    {format(new Date(entry.createdAt), "dd MMM HH:mm")}
+                  </p>
+                </li>
+              );
+              })}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function BetCard({
+  label,
+  type,
+  bet,
+  screenshot,
+}: {
+  label: string;
+  type: "back" | "lay";
+  bet: BackBet | LayBet | null;
+  screenshot: ScreenshotUpload | null;
+}) {
+  const borderColor = type === "back" ? "border-sky-200" : "border-emerald-200";
+  const bgColor = type === "back" ? "bg-sky-50/50" : "bg-emerald-50/50";
+
+  if (!bet) {
+    return (
+      <Card className={`${borderColor} ${bgColor}`}>
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            {label}
+            <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 font-normal text-amber-800 text-xs">
+              Missing
+            </span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-muted-foreground text-sm">
+            No {type} bet attached. Use attach leg action to complete.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className={borderColor}>
+      <CardHeader>
+        <CardTitle className="flex items-center justify-between">
+          {label}
+          <BetStatusBadge status={bet.status} />
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Screenshot */}
+        {screenshot?.url && (
+          <div className="overflow-hidden rounded-md border">
+            <Image
+              alt={`${label} screenshot`}
+              className="h-48 w-full object-cover"
+              height={192}
+              src={screenshot.url}
+              width={320}
+            />
+          </div>
+        )}
+
+        {/* Parsed data */}
+        <div className="grid grid-cols-2 gap-3 text-sm">
+          <Field label="Market" value={bet.market} />
+          <Field label="Selection" value={bet.selection} />
+          <Field label="Odds" value={bet.odds} highlight />
+          <Field label="Stake" value={`${bet.stake} ${bet.currency ?? ""}`} highlight />
+          <Field label="Exchange" value={bet.exchange} />
+          <Field
+            label="Placed at"
+            value={
+              bet.placedAt
+                ? format(new Date(bet.placedAt), "dd MMM yyyy, HH:mm")
+                : "—"
+            }
+          />
+        </div>
+
+        {/* Confidence indicators */}
+        {bet.confidence !== null && bet.confidence !== undefined && (
+          <div className="rounded-md bg-muted/50 p-3">
+            <p className="mb-1 font-medium text-muted-foreground text-xs uppercase tracking-wide">
+              Confidence scores
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {Object.entries(bet.confidence as Record<string, number>).map(
+                ([field, score]) => (
+                  <span
+                    className={`rounded px-2 py-0.5 text-xs ${
+                      score < 0.8
+                        ? "bg-amber-100 text-amber-800"
+                        : "bg-emerald-100 text-emerald-800"
+                    }`}
+                    key={field}
+                  >
+                    {field}: {score.toFixed(2)}
+                  </span>
+                )
+              )}
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function Field({
+  label,
+  value,
+  highlight,
+}: {
+  label: string;
+  value: string | number | null;
+  highlight?: boolean;
+}) {
+  return (
+    <div>
+      <p className="text-muted-foreground text-xs">{label}</p>
+      <p className={highlight ? "font-semibold" : ""}>{value ?? "—"}</p>
+    </div>
+  );
+}
+
+function formatAction(action: string) {
+  const labels: Record<string, string> = {
+    create: "Created",
+    update: "Updated",
+    delete: "Deleted",
+    status_change: "Status changed",
+    reconcile: "Reconciled",
+    attach_leg: "Leg attached",
+  };
+  return labels[action] ?? action;
+}
+
+type MismatchIssue = {
+  type: "missing_leg" | "odds_drift" | "currency_mismatch" | "market_mismatch";
+  label: string;
+};
+
+function detectMismatches(
+  back: BackBet | null,
+  lay: LayBet | null
+): MismatchIssue[] {
+  const issues: MismatchIssue[] = [];
+
+  // Missing leg detection
+  if (!back) {
+    issues.push({ type: "missing_leg", label: "Missing back bet" });
+  }
+  if (!lay) {
+    issues.push({ type: "missing_leg", label: "Missing lay bet" });
+  }
+
+  if (!back || !lay) {
+    return issues;
+  }
+
+  // Odds drift >10%
+  const backOdds = Number(back.odds);
+  const layOdds = Number(lay.odds);
+  if (backOdds > 0 && layOdds > 0) {
+    const drift = Math.abs((layOdds - backOdds) / backOdds);
+    if (drift > 0.1) {
+      issues.push({
+        type: "odds_drift",
+        label: `Odds drift: back ${backOdds.toFixed(2)} vs lay ${layOdds.toFixed(2)} (${(drift * 100).toFixed(1)}%)`,
+      });
+    }
+  }
+
+  // Currency mismatch
+  const backCurrency = back.currency?.toUpperCase();
+  const layCurrency = lay.currency?.toUpperCase();
+  if (backCurrency && layCurrency && backCurrency !== layCurrency) {
+    issues.push({
+      type: "currency_mismatch",
+      label: `Currency mismatch: back ${backCurrency} vs lay ${layCurrency}`,
+    });
+  }
+
+  // Market mismatch
+  const normalizedBackMarket = back.market.trim().toLowerCase();
+  const normalizedLayMarket = lay.market.trim().toLowerCase();
+  if (normalizedBackMarket !== normalizedLayMarket) {
+    issues.push({
+      type: "market_mismatch",
+      label: `Market mismatch: "${back.market}" vs "${lay.market}"`,
+    });
+  }
+
+  return issues;
+}
