@@ -3,6 +3,10 @@
 import { cn } from "@/lib/utils";
 import type { ReportingSummary } from "@/lib/reporting";
 import { formatNOK, formatPercentage } from "@/lib/reporting";
+import {
+  CalculationTooltip,
+  type CalculationType,
+} from "@/components/bets/calculation-tooltip";
 
 type Props = {
   summary: ReportingSummary;
@@ -28,12 +32,14 @@ export function ReportingSummaryCard({ summary, className }: Props) {
         value={formatPercentage(summary.roi)}
         trend={summary.roi >= 0 ? "positive" : "negative"}
         subtitle="Return on investment"
+        tooltipType="roi"
       />
       <StatCard
         title="Open Exposure"
         value={formatNOK(summary.openExposure)}
         trend={summary.openExposure > 0 ? "negative" : "neutral"}
         subtitle="Current risk"
+        tooltipType="netExposure"
       />
     </div>
   );
@@ -44,9 +50,10 @@ type StatCardProps = {
   value: string;
   trend?: "positive" | "negative" | "neutral";
   subtitle?: string;
+  tooltipType?: CalculationType;
 };
 
-function StatCard({ title, value, trend = "neutral", subtitle }: StatCardProps) {
+function StatCard({ title, value, trend = "neutral", subtitle, tooltipType }: StatCardProps) {
   const trendColors = {
     positive: "text-emerald-600",
     negative: "text-rose-600",
@@ -55,7 +62,10 @@ function StatCard({ title, value, trend = "neutral", subtitle }: StatCardProps) 
 
   return (
     <div className="rounded-lg border bg-card p-4">
-      <p className="font-medium text-muted-foreground text-sm">{title}</p>
+      <p className="font-medium text-muted-foreground text-sm inline-flex items-center gap-1">
+        {title}
+        {tooltipType && <CalculationTooltip type={tooltipType} />}
+      </p>
       <p className={cn("mt-1 font-bold text-2xl", trendColors[trend])}>
         {value}
       </p>

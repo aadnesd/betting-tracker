@@ -15,11 +15,13 @@ Prioritized implementation tasks. Check off when complete with tests passing.
 
 ## P3 — Import/Export + UX
 
-- [ ] **Calculation transparency + mobile**: Tooltips for liability/commission/FX and responsive layouts. DoD: tooltips exist and mobile layout passes QA.
+(All P3 items completed)
 
 ---
 
 ## Completed
+
+- [x] **Calculation transparency + mobile**: Tooltips for liability/commission/FX and responsive layouts. DoD: tooltips exist and mobile layout passes QA. Implementation: Created `components/bets/calculation-tooltip.tsx` with `CalculationTooltip` and `ValueWithTooltip` components supporting 6 calculation types: layLiability, netExposure, qualifyingLoss, commission, roi, fxConversion. Each tooltip shows title, formula, and description. Added tooltips to: Quick Add page (lay liability), bet detail page (net exposure), dashboard summary cards (ROI, open exposure), reports summary card (ROI, exposure). Improved mobile responsiveness: dashboard buttons now wrap with `flex-wrap`, use smaller size on mobile, abbreviated labels. Existing responsive patterns confirmed: sm/md/lg breakpoints for grid layouts, flex column/row switches, proper padding adjustments. Build passes with all 78 tests passing.
 
 - [x] **Quick Add flow**: Minimal manual entry for common matched bet. DoD: route + form persists a matched set without screenshots. Implementation: Created `/api/bets/quick-add` POST endpoint with zod schema validation for market, selection, back bet (odds, stake, bookmaker, currency), lay bet (odds, stake, exchange, currency), optional promoType and notes. Added `createManualScreenshot` query in `lib/db/queries.ts` that creates placeholder screenshot records for manual entries. Created `/bets/quick-add` page with full form UI including: market/selection inputs, promo type dropdown, back bet section (bookmaker selector, currency, odds, stake), lay bet section (exchange selector, currency, odds, stake, liability calculation), notes textarea, and validation. Added "Quick Add" button to dashboard. Tests: 3 tests in `tests/unit/bets-api.test.ts` for quick-add route (creates matched bet, rejects invalid payload, rejects unauthenticated). Build passes with all 78 tests passing.
 

@@ -46,13 +46,13 @@ export default async function Page() {
             Review parsed bets and jump into a new upload flow.
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button asChild variant="outline">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button asChild variant="outline" size="sm" className="md:size-default">
             <Link href="/bets/reports">Reports</Link>
           </Button>
-          <Button asChild variant={summary.pendingReviewCount > 0 ? "outline" : "ghost"}>
+          <Button asChild variant={summary.pendingReviewCount > 0 ? "outline" : "ghost"} size="sm" className="md:size-default">
             <Link href="/bets/review" className="flex items-center gap-2">
-              Review queue
+              Review
               {summary.pendingReviewCount > 0 && (
                 <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-500 px-1.5 font-semibold text-white text-xs">
                   {summary.pendingReviewCount}
@@ -60,11 +60,11 @@ export default async function Page() {
               )}
             </Link>
           </Button>
-          <Button asChild variant="outline">
+          <Button asChild variant="outline" size="sm" className="md:size-default">
             <Link href="/bets/quick-add">Quick Add</Link>
           </Button>
-          <Button asChild>
-            <Link href="/bets/new">New matched bet</Link>
+          <Button asChild size="sm" className="md:size-default">
+            <Link href="/bets/new">New bet</Link>
           </Button>
         </div>
       </div>

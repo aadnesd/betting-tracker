@@ -7,6 +7,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import Link from "next/link";
+import { CalculationTooltip } from "@/components/bets/calculation-tooltip";
 import { Card, CardContent } from "@/components/ui/card";
 import { formatNOK, formatPercentage } from "@/lib/reporting";
 import { cn } from "@/lib/utils";
@@ -74,6 +75,7 @@ export function DashboardSummaryCards({
               >
                 <TrendingUp className="mr-0.5 h-3 w-3" />
                 {formatPercentage(roi)}
+                <CalculationTooltip type="roi" className="ml-1" />
               </span>
             )}
           </div>
@@ -114,6 +116,7 @@ export function DashboardSummaryCards({
               <span className="font-medium text-muted-foreground text-sm">
                 Open Exposure
               </span>
+              <CalculationTooltip type="netExposure" />
             </div>
           </div>
           <div className="mt-3">

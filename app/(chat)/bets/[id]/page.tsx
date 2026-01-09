@@ -4,6 +4,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/app/(auth)/auth";
 import { BetStatusBadge } from "@/components/bets/bet-status-badge";
+import { ValueWithTooltip } from "@/components/bets/calculation-tooltip";
 import { MatchedBetDetailActions } from "@/components/bets/matched-bet-detail-actions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -95,7 +96,9 @@ export default async function Page({ params }: PageProps) {
         {matched.netExposure && (
           <div className="rounded-lg border bg-muted/50 px-4 py-3">
             <p className="text-muted-foreground text-xs uppercase tracking-wide">
-              Net exposure
+              <ValueWithTooltip type="netExposure" side="right">
+                Net exposure
+              </ValueWithTooltip>
             </p>
             <p className="font-semibold text-lg">
               NOK {Number(matched.netExposure).toFixed(2)}

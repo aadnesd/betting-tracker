@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
+import { ValueWithTooltip } from "@/components/bets/calculation-tooltip";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -434,10 +435,12 @@ export default function QuickAddPage() {
               </div>
               {layLiability !== null && (
                 <p className="text-sm text-muted-foreground">
-                  Lay Liability:{" "}
-                  <span className="font-medium">
-                    {formData.layCurrency} {layLiability.toFixed(2)}
-                  </span>
+                  <ValueWithTooltip type="layLiability">
+                    Lay Liability:{" "}
+                    <span className="font-medium">
+                      {formData.layCurrency} {layLiability.toFixed(2)}
+                    </span>
+                  </ValueWithTooltip>
                 </p>
               )}
             </div>
