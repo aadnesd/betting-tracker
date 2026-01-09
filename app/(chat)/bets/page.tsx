@@ -3,13 +3,13 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/app/(auth)/auth";
 import { BetStatusBadge } from "@/components/bets/bet-status-badge";
+import { DashboardSummaryCards } from "@/components/bets/dashboard-summary-cards";
 import { ExposureAlertBanner } from "@/components/bets/exposure-alert-banner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import {
-  countMatchedBetsByStatus,
-  getOpenExposure,
+  getDashboardSummary,
   listMatchedBetsByUser,
 } from "@/lib/db/queries";
 
@@ -26,16 +26,12 @@ export default async function Page() {
 
   const userId = session.user.id;
 
-  const [bets, pendingCount, exposureData] = await Promise.all([
+  const [bets, summary] = await Promise.all([
     listMatchedBetsByUser({
       userId,
       limit: 50,
     }),
-    countMatchedBetsByStatus({
-      userId,
-      statuses: ["needs_review", "draft"],
-    }),
-    getOpenExposure({ userId }),
+    getDashboardSummary({ userId }),
   ]);
 
   return (
@@ -54,12 +50,12 @@ export default async function Page() {
           <Button asChild variant="outline">
             <Link href="/bets/reports">Reports</Link>
           </Button>
-          <Button asChild variant={pendingCount > 0 ? "outline" : "ghost"}>
+          <Button asChild variant={summary.pendingReviewCount > 0 ? "outline" : "ghost"}>
             <Link href="/bets/review" className="flex items-center gap-2">
               Review queue
-              {pendingCount > 0 && (
+              {summary.pendingReviewCount > 0 && (
                 <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-500 px-1.5 font-semibold text-white text-xs">
-                  {pendingCount}
+                  {summary.pendingReviewCount}
                 </span>
               )}
             </Link>
@@ -71,9 +67,19 @@ export default async function Page() {
       </div>
 
       <ExposureAlertBanner
-        totalExposure={exposureData.totalExposure}
-        openPositions={exposureData.count}
+        totalExposure={summary.openExposure}
+        openPositions={summary.openPositions}
         threshold={5000}
+      />
+
+      <DashboardSummaryCards
+        totalProfit={summary.totalProfit}
+        settledCount={summary.settledCount}
+        openExposure={summary.openExposure}
+        openPositions={summary.openPositions}
+        pendingReviewCount={summary.pendingReviewCount}
+        recentActivityCount={summary.recentActivityCount}
+        roi={summary.roi}
       />
 
       <Card>

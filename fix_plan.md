@@ -15,13 +15,14 @@ Prioritized implementation tasks. Check off when complete with tests passing.
 
 ## P3 — Import/Export + UX
 
-- [ ] **Dashboard summary**: Recent activity, open exposure, pending reviews. DoD: dashboard cards render real data.
 - [ ] **Quick Add flow**: Minimal manual entry for common matched bet. DoD: route + form persists a matched set without screenshots.
 - [ ] **Calculation transparency + mobile**: Tooltips for liability/commission/FX and responsive layouts. DoD: tooltips exist and mobile layout passes QA.
 
 ---
 
 ## Completed
+
+- [x] **Dashboard summary**: Recent activity, open exposure, pending reviews. DoD: dashboard cards render real data. Implementation: Query `getDashboardSummary` in `lib/db/queries.ts` returns `DashboardSummary` interface with: totalProfit, settledCount, openExposure, openPositions, pendingReviewCount, recentActivityCount, roi. Component `components/bets/dashboard-summary-cards.tsx` with `DashboardSummaryCards` component showing 4 cards (Total Profit with ROI, Open Exposure, Pending Review with link, Recent Activity). Dashboard `app/(chat)/bets/page.tsx` updated to fetch summary data and display cards above recent bets list. Visual cues: Colored icons, profit/loss indicators, exposure warnings, pending review highlights. Tests: Dashboard query aggregates data correctly; build passes. Why: Provides at-a-glance overview of key metrics for quick decision making.
 
 - [x] **CSV import**: Parse bets/balances, validate currency/odds, and return row‑level errors. DoD: import endpoint + UI with per‑row error reporting. Implementation: Parser library in `lib/csv.ts` with `parseBetsCsv`, `parseBalancesCsv`, `parseOdds`, `isValidCurrency`, `parseDate` functions. Import API at `app/(chat)/api/bets/import/route.ts` POST endpoint accepting type (bets/balances) and CSV content. Import UI at `app/(chat)/bets/import/page.tsx` with file upload, preview, validation errors display. Query functions `createScreenshotForImport`, `createBetForImport`, `createTransactionForImport`, `findOrCreateAccount` in `lib/db/queries.ts`. Tests: `HOME=$PWD/.home ./node_modules/.bin/vitest run tests/unit/csv.test.ts` (38 tests for currency validation, odds parsing, date parsing, CSV parsing, bet/balance CSV parsing, and export generation). Why: Enables bulk import for users with external betting trackers; row-level errors without failing entire import.
 - [x] **CSV/XLSX export**: Export matched sets with both legs + net profit. DoD: export endpoint + UI download options. Implementation: Export API at `app/(chat)/api/bets/export/route.ts` GET endpoint with format, startDate, endDate params. Export generator `generateMatchedBetsCsv` in `lib/csv.ts` creates CSV with matchedSetId, market, selection, promoType, both bet legs, netProfit, settledAt. Export button in `components/bets/export-button.tsx` added to reports page with CSV/XLSX dropdown. Tests: Covered in csv.test.ts export tests. Why: Enables data export for tax/record-keeping purposes per spec requirements.

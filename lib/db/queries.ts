@@ -2101,3 +2101,104 @@ export async function findOrCreateAccount({
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Dashboard Summary
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface DashboardSummary {
+  /** Total profit/loss from all settled bets (NOK) */
+  totalProfit: number;
+  /** Number of settled bets */
+  settledCount: number;
+  /** Open exposure from non-settled bets (NOK) */
+  openExposure: number;
+  /** Number of open positions */
+  openPositions: number;
+  /** Number of bets pending review */
+  pendingReviewCount: number;
+  /** Number of bets from last 7 days */
+  recentActivityCount: number;
+  /** Total ROI percentage */
+  roi: number;
+}
+
+/**
+ * Get dashboard summary statistics for a user.
+ * Aggregates key metrics for the dashboard overview cards.
+ */
+export async function getDashboardSummary({
+  userId,
+}: {
+  userId: string;
+}): Promise<DashboardSummary> {
+  try {
+    const now = new Date();
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+    // Run all queries in parallel for performance
+    const [
+      settledStats,
+      openExposureData,
+      pendingReview,
+      recentActivity,
+    ] = await Promise.all([
+      // Total profit from settled bets (via back/lay bet profitLoss)
+      db
+        .select({
+          count: count(matchedBet.id),
+          totalBackProfit: sql<string>`COALESCE(SUM(${backBet.profitLoss}::numeric), 0)`,
+          totalLayProfit: sql<string>`COALESCE(SUM(${layBet.profitLoss}::numeric), 0)`,
+          totalBackStake: sql<string>`COALESCE(SUM(${backBet.stake}::numeric), 0)`,
+        })
+        .from(matchedBet)
+        .leftJoin(backBet, eq(matchedBet.backBetId, backBet.id))
+        .leftJoin(layBet, eq(matchedBet.layBetId, layBet.id))
+        .where(and(eq(matchedBet.userId, userId), eq(matchedBet.status, "settled"))),
+
+      // Open exposure
+      getOpenExposure({ userId }),
+
+      // Pending review count
+      db
+        .select({ count: count(matchedBet.id) })
+        .from(matchedBet)
+        .where(
+          and(
+            eq(matchedBet.userId, userId),
+            inArray(matchedBet.status, ["needs_review", "draft"])
+          )
+        ),
+
+      // Recent activity (last 7 days)
+      db
+        .select({ count: count(matchedBet.id) })
+        .from(matchedBet)
+        .where(
+          and(
+            eq(matchedBet.userId, userId),
+            gte(matchedBet.createdAt, sevenDaysAgo)
+          )
+        ),
+    ]);
+
+    const backProfit = Number.parseFloat(settledStats[0]?.totalBackProfit ?? "0");
+    const layProfit = Number.parseFloat(settledStats[0]?.totalLayProfit ?? "0");
+    const totalProfit = backProfit + layProfit;
+    const totalStake = Number.parseFloat(settledStats[0]?.totalBackStake ?? "0");
+    const settledCount = settledStats[0]?.count ?? 0;
+    const roi = totalStake > 0 ? (totalProfit / totalStake) * 100 : 0;
+
+    return {
+      totalProfit,
+      settledCount,
+      openExposure: openExposureData.totalExposure,
+      openPositions: openExposureData.count,
+      pendingReviewCount: pendingReview[0]?.count ?? 0,
+      recentActivityCount: recentActivity[0]?.count ?? 0,
+      roi,
+    };
+  } catch (_error) {
+    throw new ChatSDKError("bad_request:database", "Failed to get dashboard summary");
+  }
+}
+
