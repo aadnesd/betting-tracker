@@ -6,7 +6,7 @@ import { BetStatusBadge } from "@/components/bets/bet-status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { listMatchedBetsByUser } from "@/lib/db/queries";
+import { countMatchedBetsByStatus, listMatchedBetsByUser } from "@/lib/db/queries";
 
 export const metadata = {
   title: "Matched bets",
@@ -19,10 +19,18 @@ export default async function Page() {
     redirect("/api/auth/guest");
   }
 
-  const bets = await listMatchedBetsByUser({
-    userId: session.user.id,
-    limit: 50,
-  });
+  const userId = session.user.id;
+
+  const [bets, pendingCount] = await Promise.all([
+    listMatchedBetsByUser({
+      userId,
+      limit: 50,
+    }),
+    countMatchedBetsByStatus({
+      userId,
+      statuses: ["needs_review", "draft"],
+    }),
+  ]);
 
   return (
     <div className="space-y-6 p-4 md:p-8">
@@ -36,9 +44,21 @@ export default async function Page() {
             Review parsed bets and jump into a new upload flow.
           </p>
         </div>
-        <Button asChild>
-          <Link href="/bets/new">New matched bet</Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button asChild variant={pendingCount > 0 ? "outline" : "ghost"}>
+            <Link href="/bets/review" className="flex items-center gap-2">
+              Review queue
+              {pendingCount > 0 && (
+                <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-500 px-1.5 font-semibold text-white text-xs">
+                  {pendingCount}
+                </span>
+              )}
+            </Link>
+          </Button>
+          <Button asChild>
+            <Link href="/bets/new">New matched bet</Link>
+          </Button>
+        </div>
       </div>
 
       <Card>

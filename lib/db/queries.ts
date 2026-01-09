@@ -1418,3 +1418,75 @@ export async function listAuditEntriesByUser({
     );
   }
 }
+
+// Reconciliation queue: list matched bets by status filter
+type MatchedBetStatus = "draft" | "matched" | "settled" | "needs_review";
+
+export async function listMatchedBetsByStatus({
+  userId,
+  statuses,
+  limit = 100,
+}: {
+  userId: string;
+  statuses: MatchedBetStatus[];
+  limit?: number;
+}) {
+  try {
+    return await db
+      .select({
+        id: matchedBet.id,
+        market: matchedBet.market,
+        selection: matchedBet.selection,
+        status: matchedBet.status,
+        netExposure: matchedBet.netExposure,
+        createdAt: matchedBet.createdAt,
+        backBetId: matchedBet.backBetId,
+        layBetId: matchedBet.layBetId,
+        promoId: matchedBet.promoId,
+        promoType: matchedBet.promoType,
+        notes: matchedBet.notes,
+        lastError: matchedBet.lastError,
+      })
+      .from(matchedBet)
+      .where(
+        and(
+          eq(matchedBet.userId, userId),
+          inArray(matchedBet.status, statuses)
+        )
+      )
+      .orderBy(desc(matchedBet.createdAt))
+      .limit(limit);
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to list matched bets by status"
+    );
+  }
+}
+
+// Count matched bets by status (for queue badges)
+export async function countMatchedBetsByStatus({
+  userId,
+  statuses,
+}: {
+  userId: string;
+  statuses: MatchedBetStatus[];
+}) {
+  try {
+    const [result] = await db
+      .select({ count: count(matchedBet.id) })
+      .from(matchedBet)
+      .where(
+        and(
+          eq(matchedBet.userId, userId),
+          inArray(matchedBet.status, statuses)
+        )
+      );
+    return result?.count ?? 0;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to count matched bets by status"
+    );
+  }
+}

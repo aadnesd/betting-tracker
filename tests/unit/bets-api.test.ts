@@ -45,6 +45,8 @@ vi.mock("@/lib/db/queries", () => ({
   getMatchedBetById: vi.fn(),
   updateMatchedBetRecord: vi.fn(),
   listAuditEntriesByEntity: vi.fn(),
+  listMatchedBetsByStatus: vi.fn(),
+  countMatchedBetsByStatus: vi.fn(),
 }));
 
 const makeBlob = (content = "stub") =>
