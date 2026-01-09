@@ -3,10 +3,15 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/app/(auth)/auth";
 import { BetStatusBadge } from "@/components/bets/bet-status-badge";
+import { ExposureAlertBanner } from "@/components/bets/exposure-alert-banner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { countMatchedBetsByStatus, listMatchedBetsByUser } from "@/lib/db/queries";
+import {
+  countMatchedBetsByStatus,
+  getOpenExposure,
+  listMatchedBetsByUser,
+} from "@/lib/db/queries";
 
 export const metadata = {
   title: "Matched bets",
@@ -21,7 +26,7 @@ export default async function Page() {
 
   const userId = session.user.id;
 
-  const [bets, pendingCount] = await Promise.all([
+  const [bets, pendingCount, exposureData] = await Promise.all([
     listMatchedBetsByUser({
       userId,
       limit: 50,
@@ -30,6 +35,7 @@ export default async function Page() {
       userId,
       statuses: ["needs_review", "draft"],
     }),
+    getOpenExposure({ userId }),
   ]);
 
   return (
@@ -45,6 +51,9 @@ export default async function Page() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Button asChild variant="outline">
+            <Link href="/bets/reports">Reports</Link>
+          </Button>
           <Button asChild variant={pendingCount > 0 ? "outline" : "ghost"}>
             <Link href="/bets/review" className="flex items-center gap-2">
               Review queue
@@ -60,6 +69,12 @@ export default async function Page() {
           </Button>
         </div>
       </div>
+
+      <ExposureAlertBanner
+        totalExposure={exposureData.totalExposure}
+        openPositions={exposureData.count}
+        threshold={5000}
+      />
 
       <Card>
         <CardHeader>

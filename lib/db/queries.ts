@@ -10,6 +10,9 @@ import {
   gte,
   inArray,
   lt,
+  lte,
+  sql,
+  sum,
   type SQL,
 } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
@@ -1514,6 +1517,392 @@ export async function countMatchedBetsByStatus({
     throw new ChatSDKError(
       "bad_request:database",
       "Failed to count matched bets by status"
+    );
+  }
+}
+
+// ============================================================================
+// REPORTING QUERIES
+// ============================================================================
+
+export type ReportingDateRange = {
+  startDate: Date;
+  endDate: Date;
+};
+
+/**
+ * Get all settled matched bets with their back/lay legs for reporting.
+ * Includes all data needed for profit, ROI, and qualifying loss calculations.
+ */
+export async function getSettledMatchedBetsForReporting({
+  userId,
+  startDate,
+  endDate,
+}: {
+  userId: string;
+  startDate?: Date | null;
+  endDate?: Date | null;
+}) {
+  try {
+    const conditions: SQL<unknown>[] = [
+      eq(matchedBet.userId, userId),
+      eq(matchedBet.status, "settled"),
+    ];
+
+    if (startDate) {
+      conditions.push(gte(matchedBet.createdAt, startDate));
+    }
+    if (endDate) {
+      conditions.push(lte(matchedBet.createdAt, endDate));
+    }
+
+    const rows = await db
+      .select({
+        matched: matchedBet,
+        back: backBet,
+        lay: layBet,
+      })
+      .from(matchedBet)
+      .leftJoin(backBet, eq(matchedBet.backBetId, backBet.id))
+      .leftJoin(layBet, eq(matchedBet.layBetId, layBet.id))
+      .where(and(...conditions))
+      .orderBy(desc(matchedBet.createdAt));
+
+    return rows;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get settled matched bets for reporting"
+    );
+  }
+}
+
+/**
+ * Get all matched bets (any status) for exposure and activity reporting.
+ */
+export async function getMatchedBetsForReporting({
+  userId,
+  startDate,
+  endDate,
+  statuses,
+}: {
+  userId: string;
+  startDate?: Date | null;
+  endDate?: Date | null;
+  statuses?: MatchedBetStatus[];
+}) {
+  try {
+    const conditions: SQL<unknown>[] = [eq(matchedBet.userId, userId)];
+
+    if (startDate) {
+      conditions.push(gte(matchedBet.createdAt, startDate));
+    }
+    if (endDate) {
+      conditions.push(lte(matchedBet.createdAt, endDate));
+    }
+    if (statuses && statuses.length > 0) {
+      conditions.push(inArray(matchedBet.status, statuses));
+    }
+
+    const rows = await db
+      .select({
+        matched: matchedBet,
+        back: backBet,
+        lay: layBet,
+        backAccount: account,
+      })
+      .from(matchedBet)
+      .leftJoin(backBet, eq(matchedBet.backBetId, backBet.id))
+      .leftJoin(layBet, eq(matchedBet.layBetId, layBet.id))
+      .leftJoin(account, eq(backBet.accountId, account.id))
+      .where(and(...conditions))
+      .orderBy(desc(matchedBet.createdAt));
+
+    return rows;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get matched bets for reporting"
+    );
+  }
+}
+
+/**
+ * Get aggregate statistics for matched bets in a date range.
+ * Returns counts by status and total net exposure.
+ */
+export async function getMatchedBetAggregates({
+  userId,
+  startDate,
+  endDate,
+}: {
+  userId: string;
+  startDate?: Date | null;
+  endDate?: Date | null;
+}) {
+  try {
+    const conditions: SQL<unknown>[] = [eq(matchedBet.userId, userId)];
+
+    if (startDate) {
+      conditions.push(gte(matchedBet.createdAt, startDate));
+    }
+    if (endDate) {
+      conditions.push(lte(matchedBet.createdAt, endDate));
+    }
+
+    const [result] = await db
+      .select({
+        totalCount: count(matchedBet.id),
+        totalNetExposure: sum(matchedBet.netExposure),
+      })
+      .from(matchedBet)
+      .where(and(...conditions));
+
+    // Get counts by status
+    const statusCounts = await db
+      .select({
+        status: matchedBet.status,
+        count: count(matchedBet.id),
+      })
+      .from(matchedBet)
+      .where(and(...conditions))
+      .groupBy(matchedBet.status);
+
+    return {
+      totalCount: result?.totalCount ?? 0,
+      totalNetExposure: result?.totalNetExposure
+        ? Number.parseFloat(result.totalNetExposure)
+        : 0,
+      statusCounts: statusCounts.reduce(
+        (acc, row) => {
+          acc[row.status] = row.count;
+          return acc;
+        },
+        {} as Record<string, number>
+      ),
+    };
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get matched bet aggregates"
+    );
+  }
+}
+
+/**
+ * Get profit/loss aggregates by promo type.
+ */
+export async function getProfitByPromoType({
+  userId,
+  startDate,
+  endDate,
+}: {
+  userId: string;
+  startDate?: Date | null;
+  endDate?: Date | null;
+}) {
+  try {
+    const conditions: SQL<unknown>[] = [
+      eq(matchedBet.userId, userId),
+      eq(matchedBet.status, "settled"),
+    ];
+
+    if (startDate) {
+      conditions.push(gte(matchedBet.createdAt, startDate));
+    }
+    if (endDate) {
+      conditions.push(lte(matchedBet.createdAt, endDate));
+    }
+
+    // Sum profitLoss from back and lay bets grouped by promo type
+    const rows = await db
+      .select({
+        promoType: matchedBet.promoType,
+        count: count(matchedBet.id),
+        totalBackProfitLoss: sum(backBet.profitLoss),
+        totalLayProfitLoss: sum(layBet.profitLoss),
+        totalBackStake: sum(backBet.stake),
+        totalLayStake: sum(layBet.stake),
+      })
+      .from(matchedBet)
+      .leftJoin(backBet, eq(matchedBet.backBetId, backBet.id))
+      .leftJoin(layBet, eq(matchedBet.layBetId, layBet.id))
+      .where(and(...conditions))
+      .groupBy(matchedBet.promoType);
+
+    return rows.map((row) => ({
+      promoType: row.promoType ?? "Unspecified",
+      count: row.count,
+      totalProfitLoss:
+        (row.totalBackProfitLoss
+          ? Number.parseFloat(row.totalBackProfitLoss)
+          : 0) +
+        (row.totalLayProfitLoss
+          ? Number.parseFloat(row.totalLayProfitLoss)
+          : 0),
+      totalStake:
+        (row.totalBackStake ? Number.parseFloat(row.totalBackStake) : 0) +
+        (row.totalLayStake ? Number.parseFloat(row.totalLayStake) : 0),
+    }));
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get profit by promo type"
+    );
+  }
+}
+
+/**
+ * Get profit/loss aggregates by bookmaker (back bet account).
+ */
+export async function getProfitByBookmaker({
+  userId,
+  startDate,
+  endDate,
+}: {
+  userId: string;
+  startDate?: Date | null;
+  endDate?: Date | null;
+}) {
+  try {
+    const conditions: SQL<unknown>[] = [
+      eq(matchedBet.userId, userId),
+      eq(matchedBet.status, "settled"),
+    ];
+
+    if (startDate) {
+      conditions.push(gte(matchedBet.createdAt, startDate));
+    }
+    if (endDate) {
+      conditions.push(lte(matchedBet.createdAt, endDate));
+    }
+
+    // Join with account for bookmaker name
+    const rows = await db
+      .select({
+        accountId: backBet.accountId,
+        accountName: account.name,
+        count: count(matchedBet.id),
+        totalBackProfitLoss: sum(backBet.profitLoss),
+        totalBackStake: sum(backBet.stake),
+      })
+      .from(matchedBet)
+      .leftJoin(backBet, eq(matchedBet.backBetId, backBet.id))
+      .leftJoin(account, eq(backBet.accountId, account.id))
+      .where(and(...conditions))
+      .groupBy(backBet.accountId, account.name);
+
+    return rows.map((row) => ({
+      accountId: row.accountId,
+      accountName: row.accountName ?? "Unknown Bookmaker",
+      count: row.count,
+      totalProfitLoss: row.totalBackProfitLoss
+        ? Number.parseFloat(row.totalBackProfitLoss)
+        : 0,
+      totalStake: row.totalBackStake
+        ? Number.parseFloat(row.totalBackStake)
+        : 0,
+    }));
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get profit by bookmaker"
+    );
+  }
+}
+
+/**
+ * Get profit/loss aggregates by exchange (lay bet account).
+ */
+export async function getProfitByExchange({
+  userId,
+  startDate,
+  endDate,
+}: {
+  userId: string;
+  startDate?: Date | null;
+  endDate?: Date | null;
+}) {
+  try {
+    const conditions: SQL<unknown>[] = [
+      eq(matchedBet.userId, userId),
+      eq(matchedBet.status, "settled"),
+    ];
+
+    if (startDate) {
+      conditions.push(gte(matchedBet.createdAt, startDate));
+    }
+    if (endDate) {
+      conditions.push(lte(matchedBet.createdAt, endDate));
+    }
+
+    // Join with lay bet's account for exchange name
+    const layAccount = account;
+    const rows = await db
+      .select({
+        accountId: layBet.accountId,
+        accountName: layAccount.name,
+        count: count(matchedBet.id),
+        totalLayProfitLoss: sum(layBet.profitLoss),
+        totalLayStake: sum(layBet.stake),
+      })
+      .from(matchedBet)
+      .leftJoin(layBet, eq(matchedBet.layBetId, layBet.id))
+      .leftJoin(layAccount, eq(layBet.accountId, layAccount.id))
+      .where(and(...conditions))
+      .groupBy(layBet.accountId, layAccount.name);
+
+    return rows.map((row) => ({
+      accountId: row.accountId,
+      accountName: row.accountName ?? "Unknown Exchange",
+      count: row.count,
+      totalProfitLoss: row.totalLayProfitLoss
+        ? Number.parseFloat(row.totalLayProfitLoss)
+        : 0,
+      totalStake: row.totalLayStake
+        ? Number.parseFloat(row.totalLayStake)
+        : 0,
+    }));
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get profit by exchange"
+    );
+  }
+}
+
+/**
+ * Get total open exposure (non-settled matched bets).
+ */
+export async function getOpenExposure({
+  userId,
+}: {
+  userId: string;
+}) {
+  try {
+    const [result] = await db
+      .select({
+        totalExposure: sum(matchedBet.netExposure),
+        count: count(matchedBet.id),
+      })
+      .from(matchedBet)
+      .where(
+        and(
+          eq(matchedBet.userId, userId),
+          inArray(matchedBet.status, ["draft", "matched", "needs_review"])
+        )
+      );
+
+    return {
+      totalExposure: result?.totalExposure
+        ? Number.parseFloat(result.totalExposure)
+        : 0,
+      count: result?.count ?? 0,
+    };
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get open exposure"
     );
   }
 }
