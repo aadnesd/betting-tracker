@@ -1,7 +1,9 @@
+import { Download, Upload } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { auth } from "@/app/(auth)/auth";
+import { ExportButton } from "@/components/bets/export-button";
 import { ReportingBreakdownTable } from "@/components/bets/reporting-breakdown-table";
 import { ReportingDateFilter } from "@/components/bets/reporting-date-filter";
 import { ReportingSummaryCard } from "@/components/bets/reporting-summary-card";
@@ -53,6 +55,13 @@ export default async function Page(props: Props) {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Button asChild variant="outline" size="sm">
+            <Link href="/bets/import">
+              <Upload className="mr-2 h-4 w-4" />
+              Import
+            </Link>
+          </Button>
+          <ExportButton startDate={startDate} endDate={endDate} />
           <Button asChild variant="outline">
             <Link href="/bets">← Dashboard</Link>
           </Button>

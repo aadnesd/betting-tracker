@@ -15,8 +15,6 @@ Prioritized implementation tasks. Check off when complete with tests passing.
 
 ## P3 — Import/Export + UX
 
-- [ ] **CSV import**: Parse bets/balances, validate currency/odds, and return row‑level errors. DoD: import endpoint + UI with per‑row error reporting.
-- [ ] **CSV/XLSX export**: Export matched sets with both legs + net profit. DoD: export endpoint + UI download options.
 - [ ] **Dashboard summary**: Recent activity, open exposure, pending reviews. DoD: dashboard cards render real data.
 - [ ] **Quick Add flow**: Minimal manual entry for common matched bet. DoD: route + form persists a matched set without screenshots.
 - [ ] **Calculation transparency + mobile**: Tooltips for liability/commission/FX and responsive layouts. DoD: tooltips exist and mobile layout passes QA.
@@ -24,6 +22,9 @@ Prioritized implementation tasks. Check off when complete with tests passing.
 ---
 
 ## Completed
+
+- [x] **CSV import**: Parse bets/balances, validate currency/odds, and return row‑level errors. DoD: import endpoint + UI with per‑row error reporting. Implementation: Parser library in `lib/csv.ts` with `parseBetsCsv`, `parseBalancesCsv`, `parseOdds`, `isValidCurrency`, `parseDate` functions. Import API at `app/(chat)/api/bets/import/route.ts` POST endpoint accepting type (bets/balances) and CSV content. Import UI at `app/(chat)/bets/import/page.tsx` with file upload, preview, validation errors display. Query functions `createScreenshotForImport`, `createBetForImport`, `createTransactionForImport`, `findOrCreateAccount` in `lib/db/queries.ts`. Tests: `HOME=$PWD/.home ./node_modules/.bin/vitest run tests/unit/csv.test.ts` (38 tests for currency validation, odds parsing, date parsing, CSV parsing, bet/balance CSV parsing, and export generation). Why: Enables bulk import for users with external betting trackers; row-level errors without failing entire import.
+- [x] **CSV/XLSX export**: Export matched sets with both legs + net profit. DoD: export endpoint + UI download options. Implementation: Export API at `app/(chat)/api/bets/export/route.ts` GET endpoint with format, startDate, endDate params. Export generator `generateMatchedBetsCsv` in `lib/csv.ts` creates CSV with matchedSetId, market, selection, promoType, both bet legs, netProfit, settledAt. Export button in `components/bets/export-button.tsx` added to reports page with CSV/XLSX dropdown. Tests: Covered in csv.test.ts export tests. Why: Enables data export for tax/record-keeping purposes per spec requirements.
 
 - [x] **Summary reporting**: Weekly/monthly profit summary with date filters, ROI, qualifying loss, and bookmaker/exchange breakdown. Implementation: Reports page at `/bets/reports` with `ReportingDateFilter`, `ReportingSummaryCard`, and `ReportingBreakdownTable` components. Query functions in `lib/db/queries.ts`: `getSettledMatchedBetsForReporting`, `getMatchedBetsForReporting`, `getMatchedBetAggregates`, `getProfitByPromoType`, `getProfitByBookmaker`, `getProfitByExchange`. Helper module in `lib/reporting.ts` with `calculateReportingSummary`, `calculateQualifyingLoss`, `enrichWithROI`, `formatNOK`. Tests: `HOME=$PWD/.home ./node_modules/.bin/vitest run tests/unit/reporting.test.ts` (why: validates profit/loss calculations, ROI, date ranges, and grouping functions).
 - [x] **Promo performance**: ROI and net profit by promo type in the reports page 'By Promo Type' table. Implementation: `getProfitByPromoType` query + `enrichWithROI` adds ROI calculations. Tests: covered by reporting.test.ts.

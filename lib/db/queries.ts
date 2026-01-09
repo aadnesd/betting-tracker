@@ -1906,3 +1906,198 @@ export async function getOpenExposure({
     );
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Import Operations
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type CreateScreenshotForImportParams = {
+  userId: string;
+  kind: "back" | "lay";
+  parsedData: {
+    source: string;
+    market: string;
+    selection: string;
+    odds: number;
+    stake: number;
+    exchange: string;
+    currency: string;
+  };
+};
+
+/**
+ * Create a placeholder screenshot for imported bet data.
+ * Screenshots are required by the bet schema, so we create a "parsed" placeholder.
+ */
+export async function createScreenshotForImport({
+  userId,
+  kind,
+  parsedData,
+}: CreateScreenshotForImportParams) {
+  try {
+    const now = new Date();
+    const [result] = await db
+      .insert(screenshotUpload)
+      .values({
+        createdAt: now,
+        userId,
+        kind,
+        url: `import://csv/${now.getTime()}-${generateUUID()}`,
+        filename: "csv-import",
+        contentType: "text/csv",
+        status: "parsed",
+        parsedOutput: parsedData,
+      })
+      .returning();
+    return result;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to create screenshot for import"
+    );
+  }
+}
+
+export type CreateBetForImportParams = {
+  userId: string;
+  kind: "back" | "lay";
+  screenshotId: string;
+  market: string;
+  selection: string;
+  odds: string;
+  stake: string;
+  exchange: string;
+  currency: string;
+  placedAt?: Date | null;
+  notes?: string | null;
+};
+
+/**
+ * Create a back or lay bet from imported data with status "placed".
+ */
+export async function createBetForImport(params: CreateBetForImportParams) {
+  try {
+    const now = new Date();
+    const table = params.kind === "back" ? backBet : layBet;
+
+    const [result] = await db
+      .insert(table)
+      .values({
+        createdAt: now,
+        userId: params.userId,
+        screenshotId: params.screenshotId,
+        market: params.market,
+        selection: params.selection,
+        odds: params.odds,
+        stake: params.stake,
+        exchange: params.exchange,
+        currency: params.currency,
+        placedAt: params.placedAt,
+        status: "placed",
+      })
+      .returning();
+
+    // Create audit entry
+    await db.insert(auditLog).values({
+      createdAt: now,
+      userId: params.userId,
+      entityType: params.kind === "back" ? "back_bet" : "lay_bet",
+      entityId: result.id,
+      action: "create",
+      changes: { source: "csv_import" },
+      notes: params.notes,
+    });
+
+    return result;
+  } catch (_error) {
+    throw new ChatSDKError("bad_request:database", "Failed to create bet from import");
+  }
+}
+
+export type CreateTransactionForImportParams = {
+  userId: string;
+  accountId: string;
+  type: "deposit" | "withdrawal" | "bonus" | "adjustment";
+  amount: string;
+  currency: string;
+  occurredAt: Date;
+  notes?: string | null;
+};
+
+/**
+ * Create a transaction from imported balance data.
+ */
+export async function createTransactionForImport(
+  params: CreateTransactionForImportParams
+) {
+  try {
+    const [result] = await db
+      .insert(accountTransaction)
+      .values({
+        createdAt: new Date(),
+        userId: params.userId,
+        accountId: params.accountId,
+        type: params.type,
+        amount: params.amount,
+        currency: params.currency,
+        occurredAt: params.occurredAt,
+        notes: params.notes,
+      })
+      .returning();
+    return result;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to create transaction from import"
+    );
+  }
+}
+
+/**
+ * Find or create an account by normalized name.
+ */
+export async function findOrCreateAccount({
+  userId,
+  name,
+  currency,
+}: {
+  userId: string;
+  name: string;
+  currency: string;
+}) {
+  try {
+    const normalized = normalizeAccountName(name);
+
+    // Check for existing account
+    const existing = await db
+      .select()
+      .from(account)
+      .where(
+        and(eq(account.userId, userId), eq(account.nameNormalized, normalized))
+      )
+      .limit(1);
+
+    if (existing.length > 0) {
+      return existing[0];
+    }
+
+    // Create new account
+    const [newAccount] = await db
+      .insert(account)
+      .values({
+        createdAt: new Date(),
+        userId,
+        name,
+        nameNormalized: normalized,
+        kind: "bookmaker",
+        currency,
+        status: "active",
+      })
+      .returning();
+
+    return newAccount;
+  } catch (_error) {
+    throw new ChatSDKError("bad_request:database", "Failed to find or create account");
+  }
+}
+
