@@ -22,6 +22,7 @@ import { generateUUID } from "../utils";
 import {
   account,
   accountTransaction,
+  auditLog,
   backBet,
   type Chat,
   chat,
@@ -1191,6 +1192,99 @@ export async function listMatchedBetsByUser({
   }
 }
 
+export async function getMatchedBetById({
+  id,
+  userId,
+}: {
+  id: string;
+  userId: string;
+}) {
+  try {
+    const [row] = await db
+      .select()
+      .from(matchedBet)
+      .where(and(eq(matchedBet.id, id), eq(matchedBet.userId, userId)))
+      .limit(1);
+    return row ?? null;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to fetch matched bet"
+    );
+  }
+}
+
+export async function updateMatchedBetRecord({
+  id,
+  userId,
+  status,
+  notes,
+  netExposure,
+  backBetId,
+  layBetId,
+  promoId,
+  promoType,
+  lastError,
+  confirmedAt,
+}: {
+  id: string;
+  userId: string;
+  status?: "draft" | "matched" | "settled" | "needs_review";
+  notes?: string | null;
+  netExposure?: number | null;
+  backBetId?: string | null;
+  layBetId?: string | null;
+  promoId?: string | null;
+  promoType?: string | null;
+  lastError?: string | null;
+  confirmedAt?: Date | null;
+}) {
+  try {
+    const values: Partial<typeof matchedBet.$inferInsert> = {};
+
+    if (status !== undefined) {
+      values.status = status;
+    }
+    if (notes !== undefined) {
+      values.notes = notes;
+    }
+    if (netExposure !== undefined) {
+      values.netExposure = netExposure === null ? null : netExposure.toString();
+    }
+    if (backBetId !== undefined) {
+      values.backBetId = backBetId;
+    }
+    if (layBetId !== undefined) {
+      values.layBetId = layBetId;
+    }
+    if (promoId !== undefined) {
+      values.promoId = promoId;
+    }
+    if (promoType !== undefined) {
+      values.promoType = promoType;
+    }
+    if (lastError !== undefined) {
+      values.lastError = lastError;
+    }
+    if (confirmedAt !== undefined) {
+      values.confirmedAt = confirmedAt;
+    }
+
+    const [row] = await db
+      .update(matchedBet)
+      .set(values)
+      .where(and(eq(matchedBet.id, id), eq(matchedBet.userId, userId)))
+      .returning();
+
+    return row ?? null;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to update matched bet"
+    );
+  }
+}
+
 export async function getMatchedBetWithParts({
   id,
   userId,
@@ -1221,6 +1315,106 @@ export async function getMatchedBetWithParts({
     throw new ChatSDKError(
       "bad_request:database",
       "Failed to fetch matched bet details"
+    );
+  }
+}
+
+// Audit log type definitions
+export type AuditEntityType =
+  | "back_bet"
+  | "lay_bet"
+  | "matched_bet"
+  | "account"
+  | "screenshot";
+
+export type AuditAction =
+  | "create"
+  | "update"
+  | "delete"
+  | "status_change"
+  | "reconcile"
+  | "attach_leg";
+
+export async function createAuditEntry({
+  userId,
+  entityType,
+  entityId,
+  action,
+  changes,
+  notes,
+}: {
+  userId: string;
+  entityType: AuditEntityType;
+  entityId: string;
+  action: AuditAction;
+  changes?: Record<string, unknown> | null;
+  notes?: string | null;
+}) {
+  try {
+    const values: typeof auditLog.$inferInsert = {
+      createdAt: new Date(),
+      userId,
+      entityType,
+      entityId,
+      action,
+      changes: changes ?? null,
+      notes: notes ?? null,
+    };
+
+    const [row] = await db.insert(auditLog).values(values).returning();
+    return row;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to create audit entry"
+    );
+  }
+}
+
+export async function listAuditEntriesByEntity({
+  entityType,
+  entityId,
+  limit = 100,
+}: {
+  entityType: AuditEntityType;
+  entityId: string;
+  limit?: number;
+}) {
+  try {
+    return await db
+      .select()
+      .from(auditLog)
+      .where(
+        and(eq(auditLog.entityType, entityType), eq(auditLog.entityId, entityId))
+      )
+      .orderBy(desc(auditLog.createdAt))
+      .limit(limit);
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to list audit entries"
+    );
+  }
+}
+
+export async function listAuditEntriesByUser({
+  userId,
+  limit = 100,
+}: {
+  userId: string;
+  limit?: number;
+}) {
+  try {
+    return await db
+      .select()
+      .from(auditLog)
+      .where(eq(auditLog.userId, userId))
+      .orderBy(desc(auditLog.createdAt))
+      .limit(limit);
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to list audit entries by user"
     );
   }
 }

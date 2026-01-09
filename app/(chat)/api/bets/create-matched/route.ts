@@ -6,6 +6,7 @@ import {
   formatNeedsReviewNote,
 } from "@/lib/bet-review";
 import {
+  createAuditEntry,
   createMatchedBetRecord,
   getAccountById,
   getOrCreateAccount,
@@ -333,6 +334,73 @@ export async function POST(request: Request) {
       netExposure,
       notes: mergedNotes || null,
     });
+
+    // Create audit entries for each created entity
+    const auditPromises: Promise<unknown>[] = [];
+
+    if (backBetRow) {
+      auditPromises.push(
+        createAuditEntry({
+          userId: session.user.id,
+          entityType: "back_bet",
+          entityId: backBetRow.id,
+          action: "create",
+          changes: {
+            market: body.back?.market,
+            selection: body.back?.selection,
+            odds: body.back?.odds,
+            stake: body.back?.stake,
+            exchange: backExchange,
+            currency: backCurrency,
+            status: body.back?.status ?? betStatusFallback,
+          },
+          notes: needsReview ? auditNote : null,
+        })
+      );
+    }
+
+    if (layBetRow) {
+      auditPromises.push(
+        createAuditEntry({
+          userId: session.user.id,
+          entityType: "lay_bet",
+          entityId: layBetRow.id,
+          action: "create",
+          changes: {
+            market: body.lay?.market,
+            selection: body.lay?.selection,
+            odds: body.lay?.odds,
+            stake: body.lay?.stake,
+            exchange: layExchange,
+            currency: layCurrency,
+            status: body.lay?.status ?? betStatusFallback,
+          },
+          notes: needsReview ? auditNote : null,
+        })
+      );
+    }
+
+    auditPromises.push(
+      createAuditEntry({
+        userId: session.user.id,
+        entityType: "matched_bet",
+        entityId: matched.id,
+        action: "create",
+        changes: {
+          market: body.market,
+          selection: body.selection,
+          promoType: body.promoType ?? null,
+          status: matched.status,
+          netExposure,
+          backBetId: backBetRow?.id ?? null,
+          layBetId: layBetRow?.id ?? null,
+        },
+        notes: mergedNotes || null,
+      })
+    );
+
+    // Run all audit entries in parallel; failures are logged but don't fail the request
+    await Promise.allSettled(auditPromises);
 
     return NextResponse.json({
       matched,

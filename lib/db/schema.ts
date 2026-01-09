@@ -348,3 +348,35 @@ export const matchedBet = pgTable("MatchedBet", {
 });
 
 export type MatchedBet = InferSelectModel<typeof matchedBet>;
+
+const auditEntityTypeEnum = [
+  "back_bet",
+  "lay_bet",
+  "matched_bet",
+  "account",
+  "screenshot",
+] as const;
+
+const auditActionEnum = [
+  "create",
+  "update",
+  "delete",
+  "status_change",
+  "reconcile",
+  "attach_leg",
+] as const;
+
+export const auditLog = pgTable("AuditLog", {
+  id: uuid("id").primaryKey().notNull().defaultRandom(),
+  createdAt: timestamp("createdAt").notNull(),
+  userId: uuid("userId")
+    .notNull()
+    .references(() => user.id),
+  entityType: varchar("entityType", { enum: auditEntityTypeEnum }).notNull(),
+  entityId: uuid("entityId").notNull(),
+  action: varchar("action", { enum: auditActionEnum }).notNull(),
+  changes: jsonb("changes"),
+  notes: text("notes"),
+});
+
+export type AuditLog = InferSelectModel<typeof auditLog>;

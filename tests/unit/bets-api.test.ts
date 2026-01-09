@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { POST as screenshotsRoute } from "@/app/(chat)/api/bets/screenshots/route";
 import { POST as autoparseRoute } from "@/app/(chat)/api/bets/autoparse/route";
 import { POST as createMatchedRoute } from "@/app/(chat)/api/bets/create-matched/route";
+import { PATCH as updateMatchedRoute } from "@/app/(chat)/api/bets/update-matched/route";
 import * as authModule from "@/app/(auth)/auth";
 import * as dbQueries from "@/lib/db/queries";
 import { parseMatchedBetFromScreenshots } from "@/lib/bet-parser";
@@ -40,6 +41,10 @@ vi.mock("@/lib/db/queries", () => ({
   saveBackBet: vi.fn(),
   saveLayBet: vi.fn(),
   createMatchedBetRecord: vi.fn(),
+  createAuditEntry: vi.fn(),
+  getMatchedBetById: vi.fn(),
+  updateMatchedBetRecord: vi.fn(),
+  listAuditEntriesByEntity: vi.fn(),
 }));
 
 const makeBlob = (content = "stub") =>
@@ -390,5 +395,267 @@ describe("bets API routes (unit)", () => {
         notes: expect.stringContaining("Needs review:"),
       })
     );
+  });
+
+  it("create matched creates audit entries for all entities", async () => {
+    (dbQueries.getScreenshotById as vi.Mock).mockResolvedValueOnce({
+      id: "back-1",
+      url: "http://blob/back",
+      userId: user.id,
+    });
+    (dbQueries.getScreenshotById as vi.Mock).mockResolvedValueOnce({
+      id: "lay-1",
+      url: "http://blob/lay",
+      userId: user.id,
+    });
+    (dbQueries.getOrCreateAccount as vi.Mock).mockResolvedValueOnce({
+      id: "acc-back",
+    });
+    (dbQueries.getOrCreateAccount as vi.Mock).mockResolvedValueOnce({
+      id: "acc-lay",
+    });
+    (dbQueries.saveBackBet as vi.Mock).mockResolvedValue({ id: "bb1" });
+    (dbQueries.saveLayBet as vi.Mock).mockResolvedValue({ id: "lb1" });
+    (dbQueries.createMatchedBetRecord as vi.Mock).mockResolvedValue({
+      id: "mb1",
+      status: "matched",
+    });
+    (dbQueries.createAuditEntry as vi.Mock).mockResolvedValue({ id: "audit-1" });
+
+    const payload = {
+      backScreenshotId: "11111111-1111-1111-1111-111111111111",
+      layScreenshotId: "22222222-2222-2222-2222-222222222222",
+      market: "Premier League",
+      selection: "Arsenal",
+      needsReview: false,
+      back: {
+        market: "Premier League",
+        selection: "Arsenal",
+        odds: 2.4,
+        stake: 20,
+        exchange: "Bet365",
+        currency: "EUR",
+      },
+      lay: {
+        market: "Premier League",
+        selection: "Arsenal",
+        odds: 2.32,
+        stake: 21,
+        exchange: "bfb247",
+        currency: "NOK",
+      },
+    };
+
+    const res = await createMatchedRoute(
+      new Request("http://localhost/api/bets/create-matched", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      })
+    );
+
+    expect(res.status).toBe(200);
+
+    // Should create 3 audit entries: back bet, lay bet, matched bet
+    expect(dbQueries.createAuditEntry).toHaveBeenCalledTimes(3);
+
+    // Verify back bet audit entry
+    expect(dbQueries.createAuditEntry).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: user.id,
+        entityType: "back_bet",
+        entityId: "bb1",
+        action: "create",
+        changes: expect.objectContaining({
+          market: "Premier League",
+          selection: "Arsenal",
+          odds: 2.4,
+          stake: 20,
+        }),
+      })
+    );
+
+    // Verify lay bet audit entry
+    expect(dbQueries.createAuditEntry).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: user.id,
+        entityType: "lay_bet",
+        entityId: "lb1",
+        action: "create",
+      })
+    );
+
+    // Verify matched bet audit entry
+    expect(dbQueries.createAuditEntry).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: user.id,
+        entityType: "matched_bet",
+        entityId: "mb1",
+        action: "create",
+        changes: expect.objectContaining({
+          market: "Premier League",
+          selection: "Arsenal",
+          status: "matched",
+        }),
+      })
+    );
+  });
+
+  it("update matched creates audit entry with changes", async () => {
+    const existingBet = {
+      id: "11111111-1111-1111-1111-111111111111",
+      userId: user.id,
+      status: "draft",
+      notes: null,
+      netExposure: null,
+      backBetId: "22222222-2222-2222-2222-222222222222",
+      layBetId: null,
+      promoId: null,
+      promoType: null,
+      lastError: null,
+      confirmedAt: null,
+    };
+
+    const updatedBet = {
+      ...existingBet,
+      status: "matched",
+      layBetId: "33333333-3333-3333-3333-333333333333",
+      notes: "Attached lay leg",
+    };
+
+    (dbQueries.getMatchedBetById as vi.Mock).mockResolvedValue(existingBet);
+    (dbQueries.updateMatchedBetRecord as vi.Mock).mockResolvedValue(updatedBet);
+    (dbQueries.createAuditEntry as vi.Mock).mockResolvedValue({ id: "audit-1" });
+
+    const res = await updateMatchedRoute(
+      new Request("http://localhost/api/bets/update-matched", {
+        method: "PATCH",
+        body: JSON.stringify({
+          id: "11111111-1111-1111-1111-111111111111",
+          status: "matched",
+          layBetId: "33333333-3333-3333-3333-333333333333",
+          notes: "Attached lay leg",
+        }),
+      })
+    );
+
+    const json = await res.json();
+    expect(res.status).toBe(200);
+    expect(json.matched.status).toBe("matched");
+
+    // Verify audit entry was created with attach_leg action (since we're attaching a missing leg)
+    expect(dbQueries.createAuditEntry).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: user.id,
+        entityType: "matched_bet",
+        entityId: "11111111-1111-1111-1111-111111111111",
+        action: "attach_leg",
+        changes: expect.objectContaining({
+          status: { from: "draft", to: "matched" },
+          layBetId: { from: null, to: "33333333-3333-3333-3333-333333333333" },
+        }),
+      })
+    );
+  });
+
+  it("update matched uses status_change action when only status changes", async () => {
+    const existingBet = {
+      id: "11111111-1111-1111-1111-111111111111",
+      userId: user.id,
+      status: "matched",
+      notes: null,
+      netExposure: "100",
+      backBetId: "22222222-2222-2222-2222-222222222222",
+      layBetId: "33333333-3333-3333-3333-333333333333",
+      promoId: null,
+      promoType: null,
+      lastError: null,
+      confirmedAt: null,
+    };
+
+    const updatedBet = {
+      ...existingBet,
+      status: "settled",
+    };
+
+    (dbQueries.getMatchedBetById as vi.Mock).mockResolvedValue(existingBet);
+    (dbQueries.updateMatchedBetRecord as vi.Mock).mockResolvedValue(updatedBet);
+    (dbQueries.createAuditEntry as vi.Mock).mockResolvedValue({ id: "audit-1" });
+
+    const res = await updateMatchedRoute(
+      new Request("http://localhost/api/bets/update-matched", {
+        method: "PATCH",
+        body: JSON.stringify({
+          id: "11111111-1111-1111-1111-111111111111",
+          status: "settled",
+        }),
+      })
+    );
+
+    expect(res.status).toBe(200);
+
+    // Verify audit entry was created with status_change action
+    expect(dbQueries.createAuditEntry).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: user.id,
+        entityType: "matched_bet",
+        entityId: "11111111-1111-1111-1111-111111111111",
+        action: "status_change",
+        changes: {
+          status: { from: "matched", to: "settled" },
+        },
+      })
+    );
+  });
+
+  it("update matched does not create audit entry when no changes", async () => {
+    const existingBet = {
+      id: "11111111-1111-1111-1111-111111111111",
+      userId: user.id,
+      status: "matched",
+      notes: null,
+      netExposure: "100",
+      backBetId: "22222222-2222-2222-2222-222222222222",
+      layBetId: "33333333-3333-3333-3333-333333333333",
+      promoId: null,
+      promoType: null,
+      lastError: null,
+      confirmedAt: null,
+    };
+
+    (dbQueries.getMatchedBetById as vi.Mock).mockResolvedValue(existingBet);
+    (dbQueries.updateMatchedBetRecord as vi.Mock).mockResolvedValue(existingBet);
+
+    const res = await updateMatchedRoute(
+      new Request("http://localhost/api/bets/update-matched", {
+        method: "PATCH",
+        body: JSON.stringify({
+          id: "11111111-1111-1111-1111-111111111111",
+          status: "matched", // Same as existing
+        }),
+      })
+    );
+
+    expect(res.status).toBe(200);
+
+    // No audit entry when nothing changed
+    expect(dbQueries.createAuditEntry).not.toHaveBeenCalled();
+  });
+
+  it("update matched returns 404 when bet not found", async () => {
+    (dbQueries.getMatchedBetById as vi.Mock).mockResolvedValue(null);
+
+    const res = await updateMatchedRoute(
+      new Request("http://localhost/api/bets/update-matched", {
+        method: "PATCH",
+        body: JSON.stringify({
+          id: "11111111-1111-1111-1111-111111111111",
+          status: "matched",
+        }),
+      })
+    );
+
+    expect(res.status).toBe(404);
+    const json = await res.json();
+    expect(json.error).toBe("Matched bet not found");
   });
 });
