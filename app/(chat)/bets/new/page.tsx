@@ -1,3 +1,4 @@
+import { connection } from "next/server";
 import { redirect } from "next/navigation";
 import { auth } from "@/app/(auth)/auth";
 import { BetIngestForm } from "@/components/bets/bet-ingest-form";
@@ -6,10 +7,8 @@ export const metadata = {
   title: "New matched bet",
 };
 
-// Force dynamic rendering so build doesn't attempt to pre-render auth-protected page data.
-export const dynamic = "force-dynamic";
-
 export default async function Page() {
+  await connection();
   const session = await auth();
 
   if (!session) {
