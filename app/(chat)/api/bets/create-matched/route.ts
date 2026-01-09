@@ -23,6 +23,8 @@ const betPartSchema = z.object({
   selection: z.string().min(1),
   odds: z.number(),
   stake: z.number(),
+  /** For lay bets, the liability shown on exchange (stake × (odds - 1)). If provided, used directly instead of computing. */
+  liability: z.number().optional().nullable(),
   exchange: z.string().optional().nullable(),
   accountId: z.string().uuid().optional().nullable(),
   currency: z.string().length(3).optional().nullable(),
@@ -84,14 +86,20 @@ function computeNetExposure({
   backOdds,
   layStake,
   layOdds,
+  layLiabilityProvided,
 }: {
   backStake: number;
   backOdds: number;
   layStake: number;
   layOdds: number;
+  /** If the liability was directly extracted from the exchange, use it instead of computing */
+  layLiabilityProvided?: number | null;
 }) {
   const backProfit = backStake * (backOdds - 1);
-  const layLiability = layStake * (layOdds - 1);
+  // Use provided liability if available (from exchange screenshot), otherwise compute from stake
+  const layLiability = layLiabilityProvided != null && layLiabilityProvided > 0
+    ? layLiabilityProvided
+    : layStake * (layOdds - 1);
   return { backProfit, layLiability };
 }
 
@@ -307,6 +315,7 @@ export async function POST(request: Request) {
         backOdds: body.back.odds,
         layStake: body.lay.stake,
         layOdds: body.lay.odds,
+        layLiabilityProvided: body.lay.liability,
       });
 
       const [backProfitNok, layLiabilityNok] = await Promise.all([

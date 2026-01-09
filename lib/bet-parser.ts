@@ -9,6 +9,8 @@ export type ParsedBet = {
   selection: string;
   odds: number;
   stake: number;
+  /** For lay bets, the liability shown on the exchange (stake × (odds - 1)) */
+  liability?: number | null;
   exchange: string;
   currency?: string | null;
   placedAt?: string | null;
@@ -32,6 +34,7 @@ const betSchema = z.object({
   selection: z.string(),
   odds: z.number(),
   stake: z.number(),
+  liability: z.number().optional().nullable(),
   exchange: z.string(),
   currency: z.string().length(3).optional().nullable(),
   placedAt: z.string().optional().nullable(),
@@ -50,6 +53,7 @@ function normalizeNumbers(bet: ParsedBet): ParsedBet {
     ...bet,
     odds: Number(bet.odds),
     stake: Number(bet.stake),
+    liability: bet.liability != null ? Number(bet.liability) : null,
   };
 }
 
@@ -89,7 +93,7 @@ async function callModelWithRetry(params: {
               {
                 type: "text",
                 text:
-                  "Parse the LAY bet (exchange) screenshot. Ensure market and selection align with the back bet if visible. Currency should be NOK.",
+                  "Parse the LAY bet (exchange) screenshot. IMPORTANT: Exchanges show both STAKE (backer's stake) and LIABILITY (stake × (odds-1)). Extract the STAKE into 'stake' field and the LIABILITY into 'liability' field. If only liability is visible, compute stake = liability ÷ (odds - 1). Currency should be NOK. Ensure market and selection align with the back bet.",
               },
               { type: "image", image: params.layImageUrl },
             ],
