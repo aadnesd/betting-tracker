@@ -185,16 +185,88 @@ export const screenshotUpload = pgTable("ScreenshotUpload", {
   contentType: varchar("contentType", { length: 64 }),
   size: numeric("size", { precision: 12, scale: 0 }),
   status: varchar("status", {
-    enum: ["uploaded", "parsed", "error"],
+    enum: ["uploaded", "parsed", "needs_review", "error"],
   })
     .notNull()
     .default("uploaded"),
+  parsedOutput: jsonb("parsedOutput"),
+  confidence: jsonb("confidence"),
   error: text("error"),
 });
 
 export type ScreenshotUpload = InferSelectModel<typeof screenshotUpload>;
 
-const betStatusEnum = ["parsed", "needs_review", "error", "saved"] as const;
+const accountKindEnum = ["bookmaker", "exchange"] as const;
+const accountStatusEnum = ["active", "archived"] as const;
+
+export const account = pgTable("Account", {
+  id: uuid("id").primaryKey().notNull().defaultRandom(),
+  createdAt: timestamp("createdAt").notNull(),
+  userId: uuid("userId")
+    .notNull()
+    .references(() => user.id),
+  name: text("name").notNull(),
+  nameNormalized: text("nameNormalized").notNull(),
+  kind: varchar("kind", { enum: accountKindEnum }).notNull(),
+  currency: varchar("currency", { length: 3 }),
+  commission: numeric("commission", { precision: 6, scale: 4 }),
+  status: varchar("status", { enum: accountStatusEnum })
+    .notNull()
+    .default("active"),
+  limits: jsonb("limits"),
+});
+
+export type Account = InferSelectModel<typeof account>;
+
+export const promo = pgTable("Promo", {
+  id: uuid("id").primaryKey().notNull().defaultRandom(),
+  createdAt: timestamp("createdAt").notNull(),
+  userId: uuid("userId")
+    .notNull()
+    .references(() => user.id),
+  type: text("type").notNull(),
+  typeNormalized: text("typeNormalized").notNull(),
+  minOdds: numeric("minOdds", { precision: 12, scale: 4 }),
+  maxStake: numeric("maxStake", { precision: 12, scale: 2 }),
+  expiry: timestamp("expiry"),
+  terms: text("terms"),
+});
+
+export type Promo = InferSelectModel<typeof promo>;
+
+const transactionTypeEnum = [
+  "deposit",
+  "withdrawal",
+  "bonus",
+  "adjustment",
+] as const;
+
+export const accountTransaction = pgTable("AccountTransaction", {
+  id: uuid("id").primaryKey().notNull().defaultRandom(),
+  createdAt: timestamp("createdAt").notNull(),
+  userId: uuid("userId")
+    .notNull()
+    .references(() => user.id),
+  accountId: uuid("accountId")
+    .notNull()
+    .references(() => account.id),
+  type: varchar("type", { enum: transactionTypeEnum }).notNull(),
+  amount: numeric("amount", { precision: 14, scale: 2 }).notNull(),
+  currency: varchar("currency", { length: 3 }).notNull(),
+  occurredAt: timestamp("occurredAt").notNull(),
+  notes: text("notes"),
+});
+
+export type AccountTransaction = InferSelectModel<typeof accountTransaction>;
+
+const betStatusEnum = [
+  "draft",
+  "placed",
+  "matched",
+  "settled",
+  "needs_review",
+  "error",
+] as const;
 
 export const backBet = pgTable("BackBet", {
   id: uuid("id").primaryKey().notNull().defaultRandom(),
@@ -202,6 +274,7 @@ export const backBet = pgTable("BackBet", {
   userId: uuid("userId")
     .notNull()
     .references(() => user.id),
+  accountId: uuid("accountId").references(() => account.id),
   screenshotId: uuid("screenshotId")
     .references(() => screenshotUpload.id)
     .notNull(),
@@ -212,10 +285,12 @@ export const backBet = pgTable("BackBet", {
   exchange: text("exchange").notNull(),
   currency: varchar("currency", { length: 3 }),
   placedAt: timestamp("placedAt"),
+  settledAt: timestamp("settledAt"),
+  profitLoss: numeric("profitLoss", { precision: 14, scale: 2 }),
   confidence: jsonb("confidence"),
   status: varchar("status", { enum: betStatusEnum })
     .notNull()
-    .default("parsed"),
+    .default("draft"),
   error: text("error"),
 });
 
@@ -227,6 +302,7 @@ export const layBet = pgTable("LayBet", {
   userId: uuid("userId")
     .notNull()
     .references(() => user.id),
+  accountId: uuid("accountId").references(() => account.id),
   screenshotId: uuid("screenshotId")
     .references(() => screenshotUpload.id)
     .notNull(),
@@ -237,10 +313,12 @@ export const layBet = pgTable("LayBet", {
   exchange: text("exchange").notNull(),
   currency: varchar("currency", { length: 3 }),
   placedAt: timestamp("placedAt"),
+  settledAt: timestamp("settledAt"),
+  profitLoss: numeric("profitLoss", { precision: 14, scale: 2 }),
   confidence: jsonb("confidence"),
   status: varchar("status", { enum: betStatusEnum })
     .notNull()
-    .default("parsed"),
+    .default("draft"),
   error: text("error"),
 });
 
@@ -252,19 +330,17 @@ export const matchedBet = pgTable("MatchedBet", {
   userId: uuid("userId")
     .notNull()
     .references(() => user.id),
-  backBetId: uuid("backBetId")
-    .references(() => backBet.id)
-    .notNull(),
-  layBetId: uuid("layBetId")
-    .references(() => layBet.id)
-    .notNull(),
+  backBetId: uuid("backBetId").references(() => backBet.id),
+  layBetId: uuid("layBetId").references(() => layBet.id),
   market: text("market").notNull(),
   selection: text("selection").notNull(),
+  promoId: uuid("promoId").references(() => promo.id),
+  promoType: text("promoType"),
   status: varchar("status", {
-    enum: ["pending", "matched", "needs_review", "error"],
+    enum: ["draft", "matched", "settled", "needs_review"],
   })
     .notNull()
-    .default("pending"),
+    .default("draft"),
   netExposure: numeric("netExposure", { precision: 14, scale: 2 }),
   notes: text("notes"),
   confirmedAt: timestamp("confirmedAt"),

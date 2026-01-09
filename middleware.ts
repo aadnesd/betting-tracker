@@ -1,9 +1,11 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { getToken } from "next-auth/jwt";
-import { guestRegex, isDevelopmentEnvironment } from "./lib/constants";
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  const guestRegex = /^guest-\d+$/;
+  const isDevelopmentEnvironment = process.env.NODE_ENV === "development";
 
   /*
    * Playwright starts the dev server and requires a 200 status to

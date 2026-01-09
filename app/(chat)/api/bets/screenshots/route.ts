@@ -47,7 +47,11 @@ export async function POST(request: Request) {
 
       if (isTestEnvironment) {
         const base64 = Buffer.from(arrayBuffer).toString("base64");
-        return { url: `data:${file.type};base64,${base64}`, file };
+        const encodedName = encodeURIComponent(file.name);
+        return {
+          url: `data:${file.type};name=${encodedName};base64,${base64}`,
+          file,
+        };
       }
 
       const key = `${session.user.id}/${Date.now()}-${file.name}`;

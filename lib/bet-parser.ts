@@ -124,9 +124,40 @@ export async function parseMatchedBetFromScreenshots({
   layImageUrl: string;
 }): Promise<ParsedPair> {
   if (isTestEnvironment) {
+    const backName = extractFilenameFromDataUrl(backImageUrl);
+    const layName = extractFilenameFromDataUrl(layImageUrl);
+    const scenario = resolveTestScenario(backName, layName);
+
+    if (scenario === "error") {
+      throw new Error("Unable to parse betting slip");
+    }
+
+    const lowConfidence = scenario === "low";
+    const confidence = lowConfidence
+      ? {
+          market: 0.62,
+          selection: 0.66,
+          odds: 0.58,
+          stake: 0.63,
+          exchange: 0.69,
+          currency: 0.6,
+          placedAt: 0.55,
+        }
+      : {
+          market: 0.92,
+          selection: 0.9,
+          odds: 0.94,
+          stake: 0.93,
+          exchange: 0.88,
+          currency: 0.86,
+          placedAt: 0.9,
+        };
+
     return {
-      needsReview: false,
-      notes: "Test environment stub response",
+      needsReview: lowConfidence,
+      notes: lowConfidence
+        ? "Test environment stub response (low confidence)"
+        : "Test environment stub response",
       back: {
         type: "back",
         market: "Premier League - Match Odds",
@@ -136,14 +167,7 @@ export async function parseMatchedBetFromScreenshots({
         exchange: "Bet365",
         currency: "EUR",
         placedAt: new Date().toISOString(),
-        confidence: {
-          market: 0.9,
-          selection: 0.92,
-          odds: 0.95,
-          stake: 0.95,
-          exchange: 0.8,
-          currency: 0.75,
-        },
+        confidence,
       },
       lay: {
         type: "lay",
@@ -154,14 +178,7 @@ export async function parseMatchedBetFromScreenshots({
         exchange: "bfb247",
         currency: "NOK",
         placedAt: new Date().toISOString(),
-        confidence: {
-          market: 0.9,
-          selection: 0.92,
-          odds: 0.9,
-          stake: 0.9,
-          exchange: 0.85,
-          currency: 1,
-        },
+        confidence,
       },
     };
   }
@@ -188,4 +205,39 @@ export async function parseMatchedBetFromScreenshots({
       ? parsed.notes
       : "Markets or selections differ between back and lay slips.",
   };
+}
+
+function extractFilenameFromDataUrl(value: string) {
+  if (!value.startsWith("data:")) {
+    return null;
+  }
+
+  const match = value.match(/;name=([^;]+);/);
+
+  if (!match) {
+    return null;
+  }
+
+  try {
+    return decodeURIComponent(match[1]);
+  } catch {
+    return match[1];
+  }
+}
+
+function resolveTestScenario(backName?: string | null, layName?: string | null) {
+  const combined = [backName, layName]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  if (combined.includes("cat") || combined.includes("non-bet")) {
+    return "error";
+  }
+
+  if (combined.includes("bet3") || combined.includes("low")) {
+    return "low";
+  }
+
+  return "happy";
 }

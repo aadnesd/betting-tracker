@@ -1,14 +1,22 @@
 import { cn } from "@/lib/utils";
 
 type Props = {
-  status: "pending" | "matched" | "needs_review" | "error";
+  status:
+    | "draft"
+    | "placed"
+    | "matched"
+    | "settled"
+    | "needs_review"
+    | "error";
   className?: string;
 };
 
 const colorMap: Record<Props["status"], string> = {
-  pending: "bg-amber-100 text-amber-800 border-amber-200",
+  draft: "bg-slate-100 text-slate-800 border-slate-200",
+  placed: "bg-sky-100 text-sky-800 border-sky-200",
   matched: "bg-emerald-100 text-emerald-800 border-emerald-200",
-  needs_review: "bg-blue-100 text-blue-800 border-blue-200",
+  settled: "bg-indigo-100 text-indigo-800 border-indigo-200",
+  needs_review: "bg-amber-100 text-amber-800 border-amber-200",
   error: "bg-rose-100 text-rose-800 border-rose-200",
 };
 

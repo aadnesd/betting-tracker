@@ -20,6 +20,8 @@ import { ChatSDKError } from "../errors";
 import type { AppUsage } from "../usage";
 import { generateUUID } from "../utils";
 import {
+  account,
+  accountTransaction,
   backBet,
   type Chat,
   chat,
@@ -28,6 +30,7 @@ import {
   layBet,
   matchedBet,
   message,
+  promo,
   type Suggestion,
   screenshotUpload,
   stream,
@@ -45,6 +48,9 @@ import { generateHashedPassword } from "./utils";
 // biome-ignore lint: Forbidden non-null assertion.
 const client = postgres(process.env.POSTGRES_URL!);
 const db = drizzle(client);
+
+const normalizeAccountName = (name: string) => name.trim().toLowerCase();
+const normalizePromoType = (type: string) => type.trim().toLowerCase();
 
 export async function getUser(email: string): Promise<User[]> {
   try {
@@ -596,17 +602,337 @@ export async function getStreamIdsByChatId({ chatId }: { chatId: string }) {
   }
 }
 
+export async function getAccountById({
+  id,
+  userId,
+}: {
+  id: string;
+  userId: string;
+}) {
+  try {
+    const [row] = await db
+      .select()
+      .from(account)
+      .where(and(eq(account.id, id), eq(account.userId, userId)))
+      .limit(1);
+    return row ?? null;
+  } catch (_error) {
+    throw new ChatSDKError("bad_request:database", "Failed to fetch account");
+  }
+}
+
+export async function getAccountByName({
+  userId,
+  name,
+  kind,
+}: {
+  userId: string;
+  name: string;
+  kind: "bookmaker" | "exchange";
+}) {
+  try {
+    const normalized = normalizeAccountName(name);
+    const [row] = await db
+      .select()
+      .from(account)
+      .where(
+        and(
+          eq(account.userId, userId),
+          eq(account.nameNormalized, normalized),
+          eq(account.kind, kind)
+        )
+      )
+      .limit(1);
+    return row ?? null;
+  } catch (_error) {
+    throw new ChatSDKError("bad_request:database", "Failed to fetch account");
+  }
+}
+
+export async function createAccount({
+  userId,
+  name,
+  kind,
+  currency,
+  commission,
+  limits,
+  status,
+}: {
+  userId: string;
+  name: string;
+  kind: "bookmaker" | "exchange";
+  currency?: string | null;
+  commission?: number | null;
+  limits?: Record<string, unknown> | null;
+  status?: "active" | "archived";
+}) {
+  try {
+    const normalizedName = normalizeAccountName(name);
+    const values: typeof account.$inferInsert = {
+      createdAt: new Date(),
+      userId,
+      name: name.trim(),
+      nameNormalized: normalizedName,
+      kind,
+      currency: currency ?? null,
+      commission:
+        commission === undefined || commission === null
+          ? null
+          : commission.toString(),
+      status: status ?? "active",
+      limits: limits ?? null,
+    };
+
+    const [row] = await db.insert(account).values(values).returning();
+    return row;
+  } catch (_error) {
+    throw new ChatSDKError("bad_request:database", "Failed to create account");
+  }
+}
+
+export async function getOrCreateAccount({
+  userId,
+  name,
+  kind,
+  currency,
+}: {
+  userId: string;
+  name: string;
+  kind: "bookmaker" | "exchange";
+  currency?: string | null;
+}) {
+  const trimmed = name.trim();
+  const safeName = trimmed.length > 0 ? trimmed : "Unknown";
+  const existing = await getAccountByName({
+    userId,
+    name: safeName,
+    kind,
+  });
+  if (existing) {
+    return existing;
+  }
+  return createAccount({ userId, name: safeName, kind, currency });
+}
+
+export async function listAccountsByUser({
+  userId,
+  limit = 200,
+}: {
+  userId: string;
+  limit?: number;
+}) {
+  try {
+    return await db
+      .select()
+      .from(account)
+      .where(eq(account.userId, userId))
+      .orderBy(desc(account.createdAt))
+      .limit(limit);
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to list accounts"
+    );
+  }
+}
+
+export async function getPromoById({
+  id,
+  userId,
+}: {
+  id: string;
+  userId: string;
+}) {
+  try {
+    const [row] = await db
+      .select()
+      .from(promo)
+      .where(and(eq(promo.id, id), eq(promo.userId, userId)))
+      .limit(1);
+    return row ?? null;
+  } catch (_error) {
+    throw new ChatSDKError("bad_request:database", "Failed to fetch promo");
+  }
+}
+
+export async function getPromoByType({
+  userId,
+  type,
+}: {
+  userId: string;
+  type: string;
+}) {
+  try {
+    const normalized = normalizePromoType(type);
+    const [row] = await db
+      .select()
+      .from(promo)
+      .where(
+        and(eq(promo.userId, userId), eq(promo.typeNormalized, normalized))
+      )
+      .limit(1);
+    return row ?? null;
+  } catch (_error) {
+    throw new ChatSDKError("bad_request:database", "Failed to fetch promo");
+  }
+}
+
+export async function createPromo({
+  userId,
+  type,
+  minOdds,
+  maxStake,
+  expiry,
+  terms,
+}: {
+  userId: string;
+  type: string;
+  minOdds?: number | null;
+  maxStake?: number | null;
+  expiry?: Date | null;
+  terms?: string | null;
+}) {
+  try {
+    const normalizedType = normalizePromoType(type);
+    const values: typeof promo.$inferInsert = {
+      createdAt: new Date(),
+      userId,
+      type: type.trim(),
+      typeNormalized: normalizedType,
+      minOdds:
+        minOdds === undefined || minOdds === null ? null : minOdds.toString(),
+      maxStake:
+        maxStake === undefined || maxStake === null
+          ? null
+          : maxStake.toString(),
+      expiry: expiry ?? null,
+      terms: terms ?? null,
+    };
+
+    const [row] = await db.insert(promo).values(values).returning();
+    return row;
+  } catch (_error) {
+    throw new ChatSDKError("bad_request:database", "Failed to create promo");
+  }
+}
+
+export async function getOrCreatePromoByType({
+  userId,
+  type,
+}: {
+  userId: string;
+  type: string;
+}) {
+  const trimmed = type.trim();
+  const safeType = trimmed.length > 0 ? trimmed : "Unspecified";
+  const existing = await getPromoByType({ userId, type: safeType });
+  if (existing) {
+    return existing;
+  }
+  return createPromo({ userId, type: safeType });
+}
+
+export async function listPromosByUser({
+  userId,
+  limit = 200,
+}: {
+  userId: string;
+  limit?: number;
+}) {
+  try {
+    return await db
+      .select()
+      .from(promo)
+      .where(eq(promo.userId, userId))
+      .orderBy(desc(promo.createdAt))
+      .limit(limit);
+  } catch (_error) {
+    throw new ChatSDKError("bad_request:database", "Failed to list promos");
+  }
+}
+
+export async function createAccountTransaction({
+  userId,
+  accountId,
+  type,
+  amount,
+  currency,
+  occurredAt,
+  notes,
+}: {
+  userId: string;
+  accountId: string;
+  type: "deposit" | "withdrawal" | "bonus" | "adjustment";
+  amount: number;
+  currency: string;
+  occurredAt?: Date | null;
+  notes?: string | null;
+}) {
+  try {
+    const values: typeof accountTransaction.$inferInsert = {
+      createdAt: new Date(),
+      userId,
+      accountId,
+      type,
+      amount: amount.toString(),
+      currency: currency.toUpperCase(),
+      occurredAt: occurredAt ?? new Date(),
+      notes: notes ?? null,
+    };
+
+    const [row] = await db.insert(accountTransaction).values(values).returning();
+    return row;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to create transaction"
+    );
+  }
+}
+
+export async function listTransactionsByAccount({
+  userId,
+  accountId,
+  limit = 200,
+}: {
+  userId: string;
+  accountId: string;
+  limit?: number;
+}) {
+  try {
+    return await db
+      .select()
+      .from(accountTransaction)
+      .where(
+        and(
+          eq(accountTransaction.accountId, accountId),
+          eq(accountTransaction.userId, userId)
+        )
+      )
+      .orderBy(desc(accountTransaction.occurredAt))
+      .limit(limit);
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to list transactions"
+    );
+  }
+}
+
 type BetInputBase = {
   market: string;
   selection: string;
   odds: number;
   stake: number;
   exchange: string;
+  accountId?: string | null;
   currency?: string | null;
   placedAt?: Date | null;
+  settledAt?: Date | null;
+  profitLoss?: number | null;
   confidence?: Record<string, number> | null;
   error?: string | null;
-  status?: "parsed" | "needs_review" | "error" | "saved";
+  status?: "draft" | "placed" | "matched" | "settled" | "needs_review" | "error";
 };
 
 export async function saveScreenshotUpload({
@@ -674,15 +1000,32 @@ export async function updateScreenshotStatus({
   id,
   status,
   error,
+  parsedOutput,
+  confidence,
 }: {
   id: string;
-  status: "uploaded" | "parsed" | "error";
+  status: "uploaded" | "parsed" | "needs_review" | "error";
   error?: string | null;
+  parsedOutput?: unknown | null;
+  confidence?: Record<string, number> | null;
 }) {
   try {
+    const values: Partial<typeof screenshotUpload.$inferInsert> = {
+      status,
+      error: error ?? null,
+    };
+
+    if (parsedOutput !== undefined) {
+      values.parsedOutput = parsedOutput;
+    }
+
+    if (confidence !== undefined) {
+      values.confidence = confidence;
+    }
+
     await db
       .update(screenshotUpload)
-      .set({ status, error: error ?? null })
+      .set(values)
       .where(eq(screenshotUpload.id, id));
   } catch (_error) {
     throw new ChatSDKError(
@@ -701,6 +1044,7 @@ export async function saveBackBet({
     const values: typeof backBet.$inferInsert = {
       createdAt: new Date(),
       userId,
+      accountId: bet.accountId ?? null,
       screenshotId,
       market: bet.market,
       selection: bet.selection,
@@ -709,8 +1053,13 @@ export async function saveBackBet({
       exchange: bet.exchange,
       currency: bet.currency ?? null,
       placedAt: bet.placedAt ?? null,
+      settledAt: bet.settledAt ?? null,
+      profitLoss:
+        bet.profitLoss === undefined || bet.profitLoss === null
+          ? null
+          : bet.profitLoss.toString(),
       confidence: bet.confidence ?? null,
-      status: bet.status ?? "parsed",
+      status: bet.status ?? "draft",
       error: bet.error ?? null,
     };
 
@@ -730,6 +1079,7 @@ export async function saveLayBet({
     const values: typeof layBet.$inferInsert = {
       createdAt: new Date(),
       userId,
+      accountId: bet.accountId ?? null,
       screenshotId,
       market: bet.market,
       selection: bet.selection,
@@ -738,8 +1088,13 @@ export async function saveLayBet({
       exchange: bet.exchange,
       currency: bet.currency ?? null,
       placedAt: bet.placedAt ?? null,
+      settledAt: bet.settledAt ?? null,
+      profitLoss:
+        bet.profitLoss === undefined || bet.profitLoss === null
+          ? null
+          : bet.profitLoss.toString(),
       confidence: bet.confidence ?? null,
-      status: bet.status ?? "parsed",
+      status: bet.status ?? "draft",
       error: bet.error ?? null,
     };
 
@@ -756,17 +1111,21 @@ export async function createMatchedBetRecord({
   layBetId,
   market,
   selection,
+  promoId,
+  promoType,
   status,
   netExposure,
   notes,
   lastError,
 }: {
   userId: string;
-  backBetId: string;
-  layBetId: string;
+  backBetId?: string | null;
+  layBetId?: string | null;
   market: string;
   selection: string;
-  status?: "pending" | "matched" | "needs_review" | "error";
+  promoId?: string | null;
+  promoType?: string | null;
+  status?: "draft" | "matched" | "settled" | "needs_review";
   netExposure?: number | null;
   notes?: string | null;
   lastError?: string | null;
@@ -775,11 +1134,13 @@ export async function createMatchedBetRecord({
     const values: typeof matchedBet.$inferInsert = {
       createdAt: new Date(),
       userId,
-      backBetId,
-      layBetId,
+      backBetId: backBetId ?? null,
+      layBetId: layBetId ?? null,
       market,
       selection,
-      status: status ?? "pending",
+      promoId: promoId ?? null,
+      promoType: promoType ?? null,
+      status: status ?? "draft",
       netExposure:
         netExposure === undefined || netExposure === null
           ? null
@@ -816,6 +1177,7 @@ export async function listMatchedBetsByUser({
         createdAt: matchedBet.createdAt,
         backBetId: matchedBet.backBetId,
         layBetId: matchedBet.layBetId,
+        promoId: matchedBet.promoId,
       })
       .from(matchedBet)
       .where(eq(matchedBet.userId, userId))

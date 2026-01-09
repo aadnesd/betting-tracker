@@ -71,6 +71,41 @@
       "when": 1763925000000,
       "tag": "0009_fx_currency",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1767966276406,
+      "tag": "0010_foamy_randall_flagg",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1767966467110,
+      "tag": "0011_add_screenshot_parse_fields",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1767967307150,
+      "tag": "0012_high_thena",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1767967946266,
+      "tag": "0013_oval_darkstar",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1767969976737,
+      "tag": "0014_jazzy_venom",
+      "breakpoints": true
     }
   ]
 }

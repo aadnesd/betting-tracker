@@ -33,6 +33,10 @@ vi.mock("@/lib/db/queries", () => ({
   saveScreenshotUpload: vi.fn(),
   getScreenshotById: vi.fn(),
   updateScreenshotStatus: vi.fn(),
+  getAccountById: vi.fn(),
+  getOrCreateAccount: vi.fn(),
+  getPromoById: vi.fn(),
+  getOrCreatePromoByType: vi.fn(),
   saveBackBet: vi.fn(),
   saveLayBet: vi.fn(),
   createMatchedBetRecord: vi.fn(),
@@ -88,7 +92,7 @@ describe("bets API routes (unit)", () => {
       userId: user.id,
     });
 
-    (parseMatchedBetFromScreenshots as vi.Mock).mockResolvedValue({
+    const parsedPair = {
       back: {
         type: "back",
         market: "M",
@@ -106,7 +110,9 @@ describe("bets API routes (unit)", () => {
         exchange: "Betfair",
       },
       needsReview: false,
-    });
+    };
+
+    (parseMatchedBetFromScreenshots as vi.Mock).mockResolvedValue(parsedPair);
 
     const res = await autoparseRoute(
       new Request("http://localhost/api/bets/autoparse", {
@@ -122,6 +128,70 @@ describe("bets API routes (unit)", () => {
     expect(res.status).toBe(200);
     expect(json.back?.selection).toBe(json.lay?.selection);
     expect(typeof json.needsReview === "boolean").toBe(true);
+    expect(dbQueries.updateScreenshotStatus).toHaveBeenCalledTimes(2);
+    expect(dbQueries.updateScreenshotStatus).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: "back-1",
+        status: "parsed",
+        parsedOutput: parsedPair.back,
+        confidence: null,
+      })
+    );
+  });
+
+  it("autoparse flags needs_review when confidence is low", async () => {
+    (dbQueries.getScreenshotById as vi.Mock).mockResolvedValueOnce({
+      id: "back-1",
+      url: "http://blob/back",
+      userId: user.id,
+    });
+    (dbQueries.getScreenshotById as vi.Mock).mockResolvedValueOnce({
+      id: "lay-1",
+      url: "http://blob/lay",
+      userId: user.id,
+    });
+
+    (parseMatchedBetFromScreenshots as vi.Mock).mockResolvedValue({
+      back: {
+        type: "back",
+        market: "M",
+        selection: "Arsenal",
+        odds: 2.4,
+        stake: 10,
+        exchange: "Bet365",
+        confidence: { odds: 0.6 },
+      },
+      lay: {
+        type: "lay",
+        market: "M",
+        selection: "Arsenal",
+        odds: 2.3,
+        stake: 11,
+        exchange: "Betfair",
+        confidence: { odds: 0.95 },
+      },
+      needsReview: false,
+    });
+
+    const res = await autoparseRoute(
+      new Request("http://localhost/api/bets/autoparse", {
+        method: "POST",
+        body: JSON.stringify({
+          backScreenshotId: "11111111-1111-1111-1111-111111111111",
+          layScreenshotId: "22222222-2222-2222-2222-222222222222",
+        }),
+      })
+    );
+
+    const json = await res.json();
+    expect(res.status).toBe(200);
+    expect(json.needsReview).toBe(true);
+    expect(dbQueries.updateScreenshotStatus).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "back-1", status: "needs_review" })
+    );
+    expect(dbQueries.updateScreenshotStatus).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "lay-1", status: "needs_review" })
+    );
   });
 
   it("create matched persists bets and returns matched record", async () => {
@@ -134,6 +204,12 @@ describe("bets API routes (unit)", () => {
       id: "lay-1",
       url: "http://blob/lay",
       userId: user.id,
+    });
+    (dbQueries.getOrCreateAccount as vi.Mock).mockResolvedValueOnce({
+      id: "acc-back",
+    });
+    (dbQueries.getOrCreateAccount as vi.Mock).mockResolvedValueOnce({
+      id: "acc-lay",
     });
     (dbQueries.saveBackBet as vi.Mock).mockResolvedValue({ id: "bb1" });
     (dbQueries.saveLayBet as vi.Mock).mockResolvedValue({ id: "lb1" });
@@ -178,6 +254,141 @@ describe("bets API routes (unit)", () => {
     expect(json.matched?.id).toBe("mb1");
     expect(dbQueries.saveBackBet).toHaveBeenCalled();
     expect(dbQueries.saveLayBet).toHaveBeenCalled();
+    expect(dbQueries.saveBackBet).toHaveBeenCalledWith(
+      expect.objectContaining({ accountId: "acc-back" })
+    );
+    expect(dbQueries.saveLayBet).toHaveBeenCalledWith(
+      expect.objectContaining({ accountId: "acc-lay" })
+    );
     expect(convertAmountToNok).toHaveBeenCalled();
+  });
+
+  it("create matched allows draft with missing leg", async () => {
+    (dbQueries.getScreenshotById as vi.Mock).mockResolvedValueOnce({
+      id: "back-1",
+      url: "http://blob/back",
+      userId: user.id,
+    });
+    (dbQueries.getOrCreateAccount as vi.Mock).mockResolvedValueOnce({
+      id: "acc-back",
+    });
+    (dbQueries.saveBackBet as vi.Mock).mockResolvedValue({ id: "bb1" });
+    (dbQueries.createMatchedBetRecord as vi.Mock).mockResolvedValue({
+      id: "mb1",
+      status: "draft",
+    });
+
+    const payload = {
+      backScreenshotId: "11111111-1111-1111-1111-111111111111",
+      market: "Premier League",
+      selection: "Arsenal",
+      needsReview: false,
+      back: {
+        market: "Premier League",
+        selection: "Arsenal",
+        odds: 2.4,
+        stake: 20,
+        exchange: "Bet365",
+        currency: "EUR",
+      },
+    };
+
+    const res = await createMatchedRoute(
+      new Request("http://localhost/api/bets/create-matched", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      })
+    );
+
+    const json = await res.json();
+    expect(res.status).toBe(200);
+    expect(json.matched?.status).toBe("draft");
+    expect(dbQueries.saveBackBet).toHaveBeenCalled();
+    expect(dbQueries.saveLayBet).not.toHaveBeenCalled();
+    expect(dbQueries.saveBackBet).toHaveBeenCalledWith(
+      expect.objectContaining({ accountId: "acc-back" })
+    );
+    expect(dbQueries.createMatchedBetRecord).toHaveBeenCalledWith(
+      expect.objectContaining({
+        backBetId: "bb1",
+        layBetId: null,
+        status: "draft",
+      })
+    );
+    expect(convertAmountToNok).not.toHaveBeenCalled();
+  });
+
+  it("create matched flags needs_review on low confidence and adds audit note", async () => {
+    (dbQueries.getScreenshotById as vi.Mock).mockResolvedValueOnce({
+      id: "back-1",
+      url: "http://blob/back",
+      userId: user.id,
+    });
+    (dbQueries.getScreenshotById as vi.Mock).mockResolvedValueOnce({
+      id: "lay-1",
+      url: "http://blob/lay",
+      userId: user.id,
+    });
+    (dbQueries.getOrCreateAccount as vi.Mock).mockResolvedValueOnce({
+      id: "acc-back",
+    });
+    (dbQueries.getOrCreateAccount as vi.Mock).mockResolvedValueOnce({
+      id: "acc-lay",
+    });
+    (dbQueries.saveBackBet as vi.Mock).mockResolvedValue({ id: "bb1" });
+    (dbQueries.saveLayBet as vi.Mock).mockResolvedValue({ id: "lb1" });
+    (dbQueries.createMatchedBetRecord as vi.Mock).mockResolvedValue({
+      id: "mb1",
+      status: "needs_review",
+    });
+
+    const payload = {
+      backScreenshotId: "11111111-1111-1111-1111-111111111111",
+      layScreenshotId: "22222222-2222-2222-2222-222222222222",
+      market: "Premier League",
+      selection: "Arsenal",
+      needsReview: false,
+      back: {
+        market: "Premier League",
+        selection: "Arsenal",
+        odds: 2.4,
+        stake: 20,
+        exchange: "Bet365",
+        currency: "EUR",
+        confidence: { odds: 0.6 },
+      },
+      lay: {
+        market: "Premier League",
+        selection: "Arsenal",
+        odds: 2.32,
+        stake: 21,
+        exchange: "bfb247",
+        currency: "NOK",
+        confidence: { odds: 0.95 },
+      },
+    };
+
+    const res = await createMatchedRoute(
+      new Request("http://localhost/api/bets/create-matched", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      })
+    );
+
+    const json = await res.json();
+    expect(res.status).toBe(200);
+    expect(json.matched?.status).toBe("needs_review");
+    expect(dbQueries.saveBackBet).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "needs_review", accountId: "acc-back" })
+    );
+    expect(dbQueries.saveLayBet).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "needs_review", accountId: "acc-lay" })
+    );
+    expect(dbQueries.createMatchedBetRecord).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: "needs_review",
+        notes: expect.stringContaining("Needs review:"),
+      })
+    );
   });
 });
