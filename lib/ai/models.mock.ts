@@ -1,6 +1,6 @@
-import type { LanguageModel } from "ai";
+import type { LanguageModelV2 } from "@ai-sdk/provider";
 
-const createMockModel = (): LanguageModel => {
+const createMockModel = (): LanguageModelV2 => {
   return {
     specificationVersion: "v2",
     provider: "mock",
@@ -11,9 +11,9 @@ const createMockModel = (): LanguageModel => {
     supportsStructuredOutputs: false,
     doGenerate: async () => ({
       rawCall: { rawPrompt: null, rawSettings: {} },
-      finishReason: "stop",
+      finishReason: "stop" as const,
       usage: { inputTokens: 10, outputTokens: 20, totalTokens: 30 },
-      content: [{ type: "text", text: "Hello, world!" }],
+      text: "Hello, world!",
       warnings: [],
     }),
     doStream: async () => ({
@@ -21,15 +21,14 @@ const createMockModel = (): LanguageModel => {
         start(controller) {
           controller.enqueue({
             type: "text-delta",
-            id: "mock-id",
-            delta: "Mock response",
+            textDelta: "Mock response",
           });
           controller.close();
         },
       }),
       rawCall: { rawPrompt: null, rawSettings: {} },
     }),
-  } as unknown as LanguageModel;
+  } as unknown as LanguageModelV2;
 };
 
 export const chatModel = createMockModel();

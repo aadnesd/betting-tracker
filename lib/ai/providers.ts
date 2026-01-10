@@ -5,24 +5,22 @@ import {
   wrapLanguageModel,
 } from "ai";
 import { isTestEnvironment } from "../constants";
+import {
+  chatModel as mockChatModel,
+  reasoningModel as mockReasoningModel,
+  titleModel as mockTitleModel,
+  artifactModel as mockArtifactModel,
+} from "./models.mock";
 
 export const myProvider = isTestEnvironment
-  ? (() => {
-      const {
-        artifactModel,
-        chatModel,
-        reasoningModel,
-        titleModel,
-      } = require("./models.mock");
-      return customProvider({
-        languageModels: {
-          "chat-model": chatModel,
-          "chat-model-reasoning": reasoningModel,
-          "title-model": titleModel,
-          "artifact-model": artifactModel,
-        },
-      });
-    })()
+  ? customProvider({
+      languageModels: {
+        "chat-model": mockChatModel,
+        "chat-model-reasoning": mockReasoningModel,
+        "title-model": mockTitleModel,
+        "artifact-model": mockArtifactModel,
+      },
+    })
   : customProvider({
       languageModels: {
         "chat-model": gateway.languageModel("openai/gpt-5-nano"),

@@ -4,6 +4,7 @@ Prioritized implementation tasks. Check off when complete with tests passing.
 
 ## P0 — Critical Path (AI Intake + Schema Alignment)
 
+(All P0 items completed)
 
 ## P1 — Data Model & Reconciliation
 
@@ -17,9 +18,31 @@ Prioritized implementation tasks. Check off when complete with tests passing.
 
 (All P3 items completed)
 
+## P4 — Account & Bookmaker Management
+
+- [ ] **Create/edit account form**: Modal or page form to create new bookmaker/exchange accounts with fields: name, kind (bookmaker/exchange), currency, commission (for exchanges). DoD: form validates, persists to `Account` table, and appears in list. Why: Users need to add their own bookies rather than relying on hardcoded list.
+
+- [ ] **Account balance tracking**: Add computed `currentBalance` to account queries by summing transactions + bet settlements. Display balance on account list and detail. DoD: balance updates when deposits/withdrawals/settlements occur. Why: Users need to see how much money they have in each account.
+
+- [ ] **Deposit/withdrawal transactions**: UI on account detail to record deposits and withdrawals. DoD: form creates `AccountTransaction` with type deposit/withdrawal, amount, currency, date, notes. Why: Track money flow in/out of accounts.
+
+- [ ] **Bonus/reward transactions**: Extend transaction form to support bonus type with optional terms/expiry fields. Display bonus history on account. DoD: bonuses recorded as transactions, visible in account history. Why: Deposit bonuses and rewards are key to matched betting profit.
+
+- [ ] **Account transaction history**: List all transactions for an account with date, type, amount, notes. Support filtering by type. DoD: transaction list renders with proper formatting and pagination. Why: Audit trail for account money movement.
+
+- [ ] **Dynamic bookmaker dropdown**: Replace hardcoded `POPULAR_BOOKMAKERS` and `EXCHANGES` in Quick Add with user's accounts. DoD: dropdown shows user accounts filtered by kind, plus "Add new" option. Why: Consistency between accounts and bet entry.
+
+- [ ] **AI parser account matching**: Update bet parser to match parsed exchange/bookmaker name against user's accounts (case-insensitive). If no match, flag for review and suggest creating account. DoD: parsed bets link to `accountId` when matched. Why: Automatic linking improves workflow.
+
+- [ ] **Account balance update on settlement**: When matched bet settles, update back/lay account balances based on outcome. DoD: settling a bet adjusts both account balances correctly. Why: Keep balances accurate without manual entry.
+
+- [ ] **Account limits and warnings**: Allow setting stake limits per account. Warn when placing bet exceeds remaining limit or balance. DoD: limits stored in Account.limits JSONB, warnings shown in Quick Add. Why: Risk management and gubbing prevention.
+
 ---
 
 ## Completed
+
+- [x] **Account settings page**: Create `/bets/settings/accounts` page listing user's bookmaker and exchange accounts with name, kind, currency, current balance, and status. DoD: page renders real data from `Account` table, supports empty state, links to create/edit. Implementation: Created `getAccountBalance` and `listAccountsWithBalances` queries in `lib/db/queries.ts` to compute current balance by summing transactions. Created `/bets/settings/accounts` page that lists user's bookmaker and exchange accounts with name, kind, currency, current balance, and status. Added empty state support and links to create/edit accounts. Added "Accounts" link to the dashboard header. Fixed tsconfig.json to exclude vitest.config.ts from Next.js build. Tests: 8 unit tests in `tests/unit/account-queries.test.ts` (why: validates balance computation from transactions and account listing).
 
 - [x] **Calculation transparency + mobile**: Tooltips for liability/commission/FX and responsive layouts. DoD: tooltips exist and mobile layout passes QA. Implementation: Created `components/bets/calculation-tooltip.tsx` with `CalculationTooltip` and `ValueWithTooltip` components supporting 6 calculation types: layLiability, netExposure, qualifyingLoss, commission, roi, fxConversion. Each tooltip shows title, formula, and description. Added tooltips to: Quick Add page (lay liability), bet detail page (net exposure), dashboard summary cards (ROI, open exposure), reports summary card (ROI, exposure). Improved mobile responsiveness: dashboard buttons now wrap with `flex-wrap`, use smaller size on mobile, abbreviated labels. Existing responsive patterns confirmed: sm/md/lg breakpoints for grid layouts, flex column/row switches, proper padding adjustments. Build passes with all 78 tests passing.
 

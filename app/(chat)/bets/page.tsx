@@ -60,6 +60,9 @@ export default async function Page() {
               )}
             </Link>
           </Button>
+          <Button asChild variant="ghost" size="sm" className="md:size-default">
+            <Link href="/bets/settings/accounts">Accounts</Link>
+          </Button>
           <Button asChild variant="outline" size="sm" className="md:size-default">
             <Link href="/bets/quick-add">Quick Add</Link>
           </Button>

@@ -740,6 +740,138 @@ export async function listAccountsByUser({
   }
 }
 
+/**
+ * Calculate current balance for a single account by summing all transactions.
+ * Deposits and bonuses add, withdrawals and adjustments (negative) subtract.
+ */
+export async function getAccountBalance({
+  userId,
+  accountId,
+}: {
+  userId: string;
+  accountId: string;
+}): Promise<number> {
+  try {
+    const result = await db
+      .select({
+        // Deposits and bonuses add to balance, withdrawals subtract
+        balance: sql<string>`COALESCE(
+          SUM(
+            CASE 
+              WHEN ${accountTransaction.type} = 'withdrawal' THEN -1 * ${accountTransaction.amount}::numeric
+              ELSE ${accountTransaction.amount}::numeric
+            END
+          ), 0
+        )`,
+      })
+      .from(accountTransaction)
+      .where(
+        and(
+          eq(accountTransaction.accountId, accountId),
+          eq(accountTransaction.userId, userId)
+        )
+      );
+    return Number.parseFloat(result[0]?.balance ?? "0");
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get account balance"
+    );
+  }
+}
+
+export interface AccountWithBalance {
+  id: string;
+  createdAt: Date;
+  userId: string;
+  name: string;
+  nameNormalized: string;
+  kind: "bookmaker" | "exchange";
+  currency: string | null;
+  commission: string | null;
+  status: "active" | "archived";
+  limits: unknown;
+  currentBalance: number;
+  transactionCount: number;
+}
+
+/**
+ * List all accounts for a user with computed balance from transactions.
+ * Returns account info plus currentBalance (sum of transactions).
+ */
+export async function listAccountsWithBalances({
+  userId,
+  kind,
+  status,
+  limit = 200,
+}: {
+  userId: string;
+  kind?: "bookmaker" | "exchange";
+  status?: "active" | "archived";
+  limit?: number;
+}): Promise<AccountWithBalance[]> {
+  try {
+    const conditions: SQL[] = [eq(account.userId, userId)];
+    if (kind) {
+      conditions.push(eq(account.kind, kind));
+    }
+    if (status) {
+      conditions.push(eq(account.status, status));
+    }
+
+    // Subquery to get transaction sums per account
+    const balanceSubquery = db
+      .select({
+        accountId: accountTransaction.accountId,
+        balance: sql<string>`COALESCE(
+          SUM(
+            CASE 
+              WHEN ${accountTransaction.type} = 'withdrawal' THEN -1 * ${accountTransaction.amount}::numeric
+              ELSE ${accountTransaction.amount}::numeric
+            END
+          ), 0
+        )`.as("balance"),
+        txCount: count(accountTransaction.id).as("tx_count"),
+      })
+      .from(accountTransaction)
+      .where(eq(accountTransaction.userId, userId))
+      .groupBy(accountTransaction.accountId)
+      .as("balance_agg");
+
+    const rows = await db
+      .select({
+        id: account.id,
+        createdAt: account.createdAt,
+        userId: account.userId,
+        name: account.name,
+        nameNormalized: account.nameNormalized,
+        kind: account.kind,
+        currency: account.currency,
+        commission: account.commission,
+        status: account.status,
+        limits: account.limits,
+        currentBalance: sql<string>`COALESCE(${balanceSubquery.balance}, '0')`,
+        transactionCount: sql<number>`COALESCE(${balanceSubquery.txCount}, 0)`,
+      })
+      .from(account)
+      .leftJoin(balanceSubquery, eq(account.id, balanceSubquery.accountId))
+      .where(and(...conditions))
+      .orderBy(asc(account.kind), asc(account.name))
+      .limit(limit);
+
+    return rows.map((row) => ({
+      ...row,
+      currentBalance: Number.parseFloat(String(row.currentBalance) || "0"),
+      transactionCount: Number(row.transactionCount || 0),
+    }));
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to list accounts with balances"
+    );
+  }
+}
+
 export async function getPromoById({
   id,
   userId,

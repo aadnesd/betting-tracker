@@ -17,17 +17,19 @@ import { describe, expect, it, beforeAll } from "vitest";
 
 const TEST_IMAGES_DIR = path.join(__dirname, "..", "test-images");
 
-// Check for real AI availability - need API key and NOT be in Playwright mode
+// Check for real AI availability - need API key and NOT be in stub mode
 const hasApiKey = Boolean(
   process.env.AI_GATEWAY_API_KEY || process.env.OPENAI_API_KEY
 );
 
-// If PLAYWRIGHT is set, we're in stub mode - disable real AI tests
-const isPlaywrightMode = Boolean(
-  process.env.PLAYWRIGHT_TEST_BASE_URL
+// If PLAYWRIGHT* env vars are set, we're in stub mode - disable real AI tests
+const isStubMode = Boolean(
+  process.env.PLAYWRIGHT_TEST_BASE_URL ||
+    process.env.PLAYWRIGHT ||
+    process.env.CI_PLAYWRIGHT
 );
 
-const canRunRealAI = hasApiKey && !isPlaywrightMode;
+const canRunRealAI = hasApiKey && !isStubMode;
 
 function readImageAsBase64(filename: string): string {
   const imagePath = path.join(TEST_IMAGES_DIR, filename);
@@ -39,10 +41,10 @@ function readImageAsBase64(filename: string): string {
 
 describe("AI Bet Parsing Integration", () => {
   beforeAll(() => {
-    if (isPlaywrightMode) {
+    if (isStubMode) {
       console.warn(
-        "⚠️ PLAYWRIGHT_TEST_BASE_URL is set - AI calls will use stubs. " +
-          "For real AI tests, unset this variable."
+        "⚠️ Running in stub mode (PLAYWRIGHT* env set) - AI calls will use stubs. " +
+          "Set REAL_AI=true to test with real AI."
       );
     }
 
