@@ -24,7 +24,13 @@ Prioritized implementation tasks. Check off when complete with tests passing.
 
 - [x] **Account balance update on settlement**: When matched bet settles, update back/lay account balances based on outcome. DoD: settling a bet adjusts both account balances correctly. Implementation: Modified `app/(chat)/api/bets/update-matched/route.ts` to detect status transitions TO 'settled'. When settling, fetches full bet with parts via `getMatchedBetWithParts`, then creates adjustment transactions for each bet leg that has both accountId and profitLoss. Uses `createAccountTransaction` with type 'adjustment' and notes referencing the settlement. Tests: 5 new tests in `tests/unit/bets-api.test.ts` covering: transactions created on settlement, no transactions when already settled, no transactions without accountId, no transactions without profitLoss, single transaction when only one leg has account. Why: Keep balances accurate without manual entry.
 
-- [ ] **Account limits and warnings**: Allow setting stake limits per account. Warn when placing bet exceeds remaining limit or balance. DoD: limits stored in Account.limits JSONB, warnings shown in Quick Add. Why: Risk management and gubbing prevention.
+## P5 — Visualization & Analytics
+
+- [x] **Profit/loss chart**: Add interactive line or area chart showing cumulative profit over time on the reports page. DoD: chart renders with settled bets data, supports date range filtering, displays profit trend with hover tooltips showing exact values. Why: Visual representation of performance helps users identify trends and patterns. Implementation: Installed Recharts library. Created `calculateCumulativeProfitData` function in `lib/reporting.ts` that computes cumulative profit data points with day/week/month grouping options. Created `components/bets/profit-chart.tsx` with `ProfitChart` and `ProfitChartWithControls` components featuring: interactive area chart with cumulative profit line, day/week/month toggle controls, custom tooltip showing period profit, cumulative profit, and bet count, responsive layout, color-coded (green for profit, red for loss), Y-axis with padding. Integrated chart into `app/(chat)/bets/reports/page.tsx` below the summary card. Tests: 6 new tests in `tests/unit/reporting.test.ts` covering: empty data, non-settled bets filtered, cumulative calculation, week grouping, month grouping, chronological sorting.
+
+- [ ] **Performance breakdown charts**: Add bar/pie charts for profit by promo type, bookmaker, and exchange on reports page. DoD: charts visualize existing breakdown table data with clickable segments. Why: Graphical breakdown makes it easier to identify best-performing promos and bookmakers.
+
+- [ ] **Exposure timeline**: Add chart showing open exposure over time on dashboard. DoD: chart shows exposure fluctuations with current level highlighted. Why: Helps users track risk levels and plan bankroll.
 
 ---
 

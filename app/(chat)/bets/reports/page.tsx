@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { auth } from "@/app/(auth)/auth";
 import { ExportButton } from "@/components/bets/export-button";
+import { ProfitChartWithControls } from "@/components/bets/profit-chart";
 import { ReportingBreakdownTable } from "@/components/bets/reporting-breakdown-table";
 import { ReportingDateFilter } from "@/components/bets/reporting-date-filter";
 import { ReportingSummaryCard } from "@/components/bets/reporting-summary-card";
@@ -17,6 +18,7 @@ import {
   getProfitByPromoType,
 } from "@/lib/db/queries";
 import {
+  calculateCumulativeProfitData,
   calculateReportingSummary,
   enrichWithROI,
   getDateRange,
@@ -116,6 +118,11 @@ async function ReportingContent({
 
   const summary = calculateReportingSummary(betsWithLegs, openExposureData.totalExposure);
 
+  // Calculate cumulative profit data for the chart at different granularities
+  const dayChartData = calculateCumulativeProfitData(betsWithLegs, "day");
+  const weekChartData = calculateCumulativeProfitData(betsWithLegs, "week");
+  const monthChartData = calculateCumulativeProfitData(betsWithLegs, "month");
+
   // Enrich breakdown data with ROI
   const bookmakerBreakdown = enrichWithROI(
     bookmakerData.map((row) => ({
@@ -147,6 +154,13 @@ async function ReportingContent({
   return (
     <div className="space-y-6">
       <ReportingSummaryCard summary={summary} />
+
+      <ProfitChartWithControls
+        dayData={dayChartData}
+        weekData={weekChartData}
+        monthData={monthChartData}
+        title="Cumulative Profit"
+      />
 
       <div className="grid gap-6 lg:grid-cols-2">
         <ReportingBreakdownTable

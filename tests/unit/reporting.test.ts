@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 import {
+  calculateCumulativeProfitData,
   calculateQualifyingLoss,
   calculateReportingSummary,
   calculateROI,
@@ -328,5 +329,162 @@ describe("groupByMonth", () => {
     expect(groups.size).toBe(2);
     expect(groups.get("2025-01")?.length).toBe(2);
     expect(groups.get("2025-02")?.length).toBe(1);
+  });
+});
+
+describe("calculateCumulativeProfitData", () => {
+  /**
+   * WHY: Cumulative profit visualization helps users see their profit trend over time.
+   * These tests verify the data points are correctly computed for charting.
+   */
+
+  test("returns empty array for no bets", () => {
+    const result = calculateCumulativeProfitData([]);
+    expect(result).toEqual([]);
+  });
+
+  test("returns empty array for non-settled bets", () => {
+    const bets = [
+      createMockMatchedBet({
+        matched: { status: "draft" },
+        back: { profitLoss: "50.00" },
+      }),
+      createMockMatchedBet({
+        matched: { status: "matched" },
+        back: { profitLoss: "100.00" },
+      }),
+    ];
+
+    const result = calculateCumulativeProfitData(bets);
+    expect(result).toEqual([]);
+  });
+
+  test("calculates cumulative profit correctly for settled bets", () => {
+    const bets = [
+      createMockMatchedBet({
+        matched: { status: "settled", createdAt: new Date("2025-01-01") },
+        back: { profitLoss: "50.00", settledAt: new Date("2025-01-01") },
+        lay: { profitLoss: "-10.00" },
+      }),
+      createMockMatchedBet({
+        matched: { status: "settled", createdAt: new Date("2025-01-02") },
+        back: { profitLoss: "30.00", settledAt: new Date("2025-01-02") },
+        lay: { profitLoss: "-5.00" },
+      }),
+      createMockMatchedBet({
+        matched: { status: "settled", createdAt: new Date("2025-01-03") },
+        back: { profitLoss: "-20.00", settledAt: new Date("2025-01-03") },
+        lay: { profitLoss: "100.00" },
+      }),
+    ];
+
+    const result = calculateCumulativeProfitData(bets, "day");
+
+    expect(result.length).toBe(3);
+    // Day 1: profit 40 (50-10), cumulative 40
+    expect(result[0].profit).toBe(40);
+    expect(result[0].cumulative).toBe(40);
+    expect(result[0].count).toBe(1);
+    // Day 2: profit 25 (30-5), cumulative 65
+    expect(result[1].profit).toBe(25);
+    expect(result[1].cumulative).toBe(65);
+    expect(result[1].count).toBe(1);
+    // Day 3: profit 80 (-20+100), cumulative 145
+    expect(result[2].profit).toBe(80);
+    expect(result[2].cumulative).toBe(145);
+    expect(result[2].count).toBe(1);
+  });
+
+  test("groups by week correctly", () => {
+    const bets = [
+      createMockMatchedBet({
+        matched: { status: "settled", createdAt: new Date("2025-01-06") }, // Monday
+        back: { profitLoss: "50.00", settledAt: new Date("2025-01-06") },
+        lay: { profitLoss: "0" },
+      }),
+      createMockMatchedBet({
+        matched: { status: "settled", createdAt: new Date("2025-01-08") }, // Wednesday same week
+        back: { profitLoss: "30.00", settledAt: new Date("2025-01-08") },
+        lay: { profitLoss: "0" },
+      }),
+      createMockMatchedBet({
+        matched: { status: "settled", createdAt: new Date("2025-01-13") }, // Next Monday
+        back: { profitLoss: "20.00", settledAt: new Date("2025-01-13") },
+        lay: { profitLoss: "0" },
+      }),
+    ];
+
+    const result = calculateCumulativeProfitData(bets, "week");
+
+    expect(result.length).toBe(2);
+    // Week 1: profit 80 (50+30), cumulative 80, count 2
+    expect(result[0].profit).toBe(80);
+    expect(result[0].cumulative).toBe(80);
+    expect(result[0].count).toBe(2);
+    // Week 2: profit 20, cumulative 100, count 1
+    expect(result[1].profit).toBe(20);
+    expect(result[1].cumulative).toBe(100);
+    expect(result[1].count).toBe(1);
+  });
+
+  test("groups by month correctly", () => {
+    const bets = [
+      createMockMatchedBet({
+        matched: { status: "settled", createdAt: new Date("2025-01-15") },
+        back: { profitLoss: "100.00", settledAt: new Date("2025-01-15") },
+        lay: { profitLoss: "0" },
+      }),
+      createMockMatchedBet({
+        matched: { status: "settled", createdAt: new Date("2025-01-20") },
+        back: { profitLoss: "50.00", settledAt: new Date("2025-01-20") },
+        lay: { profitLoss: "0" },
+      }),
+      createMockMatchedBet({
+        matched: { status: "settled", createdAt: new Date("2025-02-10") },
+        back: { profitLoss: "75.00", settledAt: new Date("2025-02-10") },
+        lay: { profitLoss: "0" },
+      }),
+    ];
+
+    const result = calculateCumulativeProfitData(bets, "month");
+
+    expect(result.length).toBe(2);
+    // Jan: profit 150, cumulative 150, count 2
+    expect(result[0].profit).toBe(150);
+    expect(result[0].cumulative).toBe(150);
+    expect(result[0].count).toBe(2);
+    // Feb: profit 75, cumulative 225, count 1
+    expect(result[1].profit).toBe(75);
+    expect(result[1].cumulative).toBe(225);
+    expect(result[1].count).toBe(1);
+  });
+
+  test("sorts bets chronologically", () => {
+    // Create bets out of order
+    const bets = [
+      createMockMatchedBet({
+        matched: { status: "settled", createdAt: new Date("2025-01-03") },
+        back: { profitLoss: "30.00", settledAt: new Date("2025-01-03") },
+        lay: { profitLoss: "0" },
+      }),
+      createMockMatchedBet({
+        matched: { status: "settled", createdAt: new Date("2025-01-01") },
+        back: { profitLoss: "10.00", settledAt: new Date("2025-01-01") },
+        lay: { profitLoss: "0" },
+      }),
+      createMockMatchedBet({
+        matched: { status: "settled", createdAt: new Date("2025-01-02") },
+        back: { profitLoss: "20.00", settledAt: new Date("2025-01-02") },
+        lay: { profitLoss: "0" },
+      }),
+    ];
+
+    const result = calculateCumulativeProfitData(bets, "day");
+
+    expect(result.length).toBe(3);
+    // Should be sorted: Day 1 (10), Day 2 (20), Day 3 (30)
+    expect(result[0].cumulative).toBe(10);
+    expect(result[1].cumulative).toBe(30);
+    expect(result[2].cumulative).toBe(60);
   });
 });

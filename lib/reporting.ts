@@ -239,3 +239,119 @@ export function groupByMonth(bets: MatchedBetWithLegs[]): Map<string, MatchedBet
 
   return groups;
 }
+
+/**
+ * Data point for profit chart visualization.
+ */
+export type ProfitDataPoint = {
+  /** Date string for the x-axis (ISO format date) */
+  date: string;
+  /** Display label for the date */
+  label: string;
+  /** Profit/loss for this period */
+  profit: number;
+  /** Cumulative profit up to and including this period */
+  cumulative: number;
+  /** Number of bets settled in this period */
+  count: number;
+};
+
+/**
+ * Calculate cumulative profit data points for chart visualization.
+ * Returns data points sorted chronologically with cumulative profit.
+ */
+export function calculateCumulativeProfitData(
+  bets: MatchedBetWithLegs[],
+  grouping: "day" | "week" | "month" = "day"
+): ProfitDataPoint[] {
+  // Filter to only settled bets and sort by settled date
+  const settledBets = bets
+    .filter((bet) => bet.matched.status === "settled")
+    .sort((a, b) => {
+      // Use the back bet's settledAt, or fall back to matched createdAt
+      const dateA = a.back?.settledAt ?? a.matched.createdAt;
+      const dateB = b.back?.settledAt ?? b.matched.createdAt;
+      return new Date(dateA).getTime() - new Date(dateB).getTime();
+    });
+
+  if (settledBets.length === 0) {
+    return [];
+  }
+
+  // Group bets by the specified period
+  const groups = new Map<string, { profit: number; count: number }>();
+
+  for (const bet of settledBets) {
+    // Use back bet's settledAt, or matched createdAt as fallback
+    const date = new Date(bet.back?.settledAt ?? bet.matched.createdAt);
+    let key: string;
+    let label: string;
+
+    switch (grouping) {
+      case "week": {
+        // Get the Monday of the week
+        const day = date.getDay();
+        const diff = date.getDate() - day + (day === 0 ? -6 : 1);
+        const monday = new Date(date);
+        monday.setDate(diff);
+        key = monday.toISOString().split("T")[0];
+        label = `Week of ${monday.toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`;
+        break;
+      }
+      case "month": {
+        key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-01`;
+        label = date.toLocaleDateString("en-GB", { month: "short", year: "numeric" });
+        break;
+      }
+      default: {
+        // day
+        key = date.toISOString().split("T")[0];
+        label = date.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+      }
+    }
+
+    // Calculate profit for this bet
+    const backPL = bet.back?.profitLoss ? Number.parseFloat(bet.back.profitLoss) : 0;
+    const layPL = bet.lay?.profitLoss ? Number.parseFloat(bet.lay.profitLoss) : 0;
+    const betProfit = backPL + layPL;
+
+    const existing = groups.get(key) ?? { profit: 0, count: 0 };
+    existing.profit += betProfit;
+    existing.count += 1;
+    groups.set(key, existing);
+  }
+
+  // Convert to sorted array with cumulative values
+  const sortedKeys = Array.from(groups.keys()).sort();
+  let cumulative = 0;
+  const dataPoints: ProfitDataPoint[] = [];
+
+  for (const key of sortedKeys) {
+    const data = groups.get(key)!;
+    cumulative += data.profit;
+
+    // Generate label based on grouping
+    const date = new Date(key);
+    let label: string;
+    switch (grouping) {
+      case "week":
+        label = `Week of ${date.toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`;
+        break;
+      case "month":
+        label = date.toLocaleDateString("en-GB", { month: "short", year: "numeric" });
+        break;
+      default:
+        label = date.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+    }
+
+    dataPoints.push({
+      date: key,
+      label,
+      profit: Math.round(data.profit * 100) / 100,
+      cumulative: Math.round(cumulative * 100) / 100,
+      count: data.count,
+    });
+  }
+
+  return dataPoints;
+}
