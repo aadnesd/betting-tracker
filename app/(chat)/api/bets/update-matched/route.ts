@@ -2,8 +2,10 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/app/(auth)/auth";
 import {
+  createAccountTransaction,
   createAuditEntry,
   getMatchedBetById,
+  getMatchedBetWithParts,
   updateMatchedBetRecord,
 } from "@/lib/db/queries";
 
@@ -146,6 +148,64 @@ export async function PATCH(request: Request) {
     };
 
     const changes = computeChanges(beforeState, afterState);
+
+    // Handle settlement: create adjustment transactions for account balances
+    const isSettling =
+      existing.status !== "settled" && updated.status === "settled";
+
+    if (isSettling) {
+      // Fetch the full matched bet with back/lay legs to get profitLoss and accountId
+      const fullBet = await getMatchedBetWithParts({
+        id: updated.id,
+        userId: session.user.id,
+      });
+
+      if (fullBet) {
+        const transactionPromises: Promise<unknown>[] = [];
+        const now = new Date();
+
+        // Create adjustment for back bet account if profitLoss and accountId exist
+        if (fullBet.back?.accountId && fullBet.back.profitLoss !== null) {
+          const backProfitLoss = Number.parseFloat(fullBet.back.profitLoss);
+          if (!Number.isNaN(backProfitLoss)) {
+            transactionPromises.push(
+              createAccountTransaction({
+                userId: session.user.id,
+                accountId: fullBet.back.accountId,
+                type: "adjustment",
+                amount: backProfitLoss,
+                currency: fullBet.back.currency ?? "NOK",
+                occurredAt: now,
+                notes: `Settlement: ${fullBet.matched.market} - ${fullBet.matched.selection}`,
+              })
+            );
+          }
+        }
+
+        // Create adjustment for lay bet account if profitLoss and accountId exist
+        if (fullBet.lay?.accountId && fullBet.lay.profitLoss !== null) {
+          const layProfitLoss = Number.parseFloat(fullBet.lay.profitLoss);
+          if (!Number.isNaN(layProfitLoss)) {
+            transactionPromises.push(
+              createAccountTransaction({
+                userId: session.user.id,
+                accountId: fullBet.lay.accountId,
+                type: "adjustment",
+                amount: layProfitLoss,
+                currency: fullBet.lay.currency ?? "NOK",
+                occurredAt: now,
+                notes: `Settlement: ${fullBet.matched.market} - ${fullBet.matched.selection}`,
+              })
+            );
+          }
+        }
+
+        // Execute all transaction creations in parallel
+        if (transactionPromises.length > 0) {
+          await Promise.allSettled(transactionPromises);
+        }
+      }
+    }
 
     // Determine action type based on what changed
     let action: "update" | "status_change" | "attach_leg" = "update";
