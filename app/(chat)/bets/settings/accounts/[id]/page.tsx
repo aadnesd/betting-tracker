@@ -1,4 +1,14 @@
-import { ArrowLeft, Building2, CreditCard, Pencil } from "lucide-react";
+import {
+  ArrowDownCircle,
+  ArrowLeft,
+  ArrowUpCircle,
+  Building2,
+  CreditCard,
+  Gift,
+  Pencil,
+  Plus,
+  Settings2,
+} from "lucide-react";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/app/(auth)/auth";
@@ -6,7 +16,11 @@ import { AccountEditForm } from "@/components/bets/account-edit-form";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getAccountBalance, getAccountById } from "@/lib/db/queries";
+import {
+  getAccountBalance,
+  getAccountById,
+  listTransactionsByAccount,
+} from "@/lib/db/queries";
 
 export const metadata = {
   title: "Account Details",
@@ -36,6 +50,12 @@ export default async function AccountDetailPage({
   const balance = await getAccountBalance({
     userId: session.user.id,
     accountId: id,
+  });
+
+  const transactions = await listTransactionsByAccount({
+    userId: session.user.id,
+    accountId: id,
+    limit: 50,
   });
 
   const commission = account.commission
@@ -117,20 +137,70 @@ export default async function AccountDetailPage({
       {/* Transactions Section - Placeholder for future */}
       <Card className="mt-6">
         <CardHeader>
-          <CardTitle>Transaction History</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="py-8 text-center text-muted-foreground">
-            <p className="mb-2">No transactions recorded yet</p>
-            <p className="text-sm">
-              Record deposits, withdrawals, and bonuses to track your balance.
-            </p>
-            <Button asChild variant="outline" className="mt-4">
+          <div className="flex items-center justify-between">
+            <CardTitle>Transaction History</CardTitle>
+            <Button asChild size="sm">
               <Link href={`/bets/settings/accounts/${id}/transactions/new`}>
-                Add Transaction
+                <Plus className="mr-1 h-4 w-4" />
+                Add
               </Link>
             </Button>
           </div>
+        </CardHeader>
+        <CardContent>
+          {transactions.length === 0 ? (
+            <div className="py-8 text-center text-muted-foreground">
+              <p className="mb-2">No transactions recorded yet</p>
+              <p className="text-sm">
+                Record deposits, withdrawals, and bonuses to track your balance.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {transactions.map((tx) => {
+                const amount = Number.parseFloat(tx.amount);
+                const isPositive = tx.type !== "withdrawal";
+                const occurredAt = new Date(tx.occurredAt);
+                
+                const icon = {
+                  deposit: <ArrowDownCircle className="h-5 w-5 text-green-600" />,
+                  withdrawal: <ArrowUpCircle className="h-5 w-5 text-red-600" />,
+                  bonus: <Gift className="h-5 w-5 text-blue-600" />,
+                  adjustment: <Settings2 className="h-5 w-5 text-gray-600" />,
+                }[tx.type];
+
+                return (
+                  <div
+                    key={tx.id}
+                    className="flex items-center justify-between rounded-md border p-3"
+                  >
+                    <div className="flex items-center gap-3">
+                      {icon}
+                      <div>
+                        <p className="font-medium capitalize">{tx.type}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {occurredAt.toLocaleDateString("en-GB", {
+                            day: "numeric",
+                            month: "short",
+                            year: "numeric",
+                          })}
+                          {tx.notes && ` • ${tx.notes}`}
+                        </p>
+                      </div>
+                    </div>
+                    <p
+                      className={`font-semibold ${
+                        isPositive ? "text-green-600" : "text-red-600"
+                      }`}
+                    >
+                      {isPositive ? "+" : "-"}
+                      {tx.currency} {amount.toFixed(2)}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
