@@ -36,6 +36,7 @@ vi.mock("@/lib/db/queries", () => ({
   getScreenshotById: vi.fn(),
   updateScreenshotStatus: vi.fn(),
   getAccountById: vi.fn(),
+  getAccountByName: vi.fn(),
   getOrCreateAccount: vi.fn(),
   getPromoById: vi.fn(),
   getOrCreatePromoByType: vi.fn(),
@@ -103,6 +104,19 @@ describe("bets API routes (unit)", () => {
       userId: user.id,
     });
 
+    // Mock matching accounts so test can pass without triggering needsReview
+    (dbQueries.getAccountByName as vi.Mock).mockImplementation(
+      async ({ kind }: { kind: string }) => {
+        if (kind === "bookmaker") {
+          return { id: "acc-bookmaker", name: "Bet365", kind: "bookmaker" };
+        }
+        if (kind === "exchange") {
+          return { id: "acc-exchange", name: "Betfair", kind: "exchange" };
+        }
+        return null;
+      }
+    );
+
     const parsedPair = {
       back: {
         type: "back",
@@ -144,7 +158,11 @@ describe("bets API routes (unit)", () => {
       expect.objectContaining({
         id: "back-1",
         status: "parsed",
-        parsedOutput: parsedPair.back,
+        parsedOutput: expect.objectContaining({
+          ...parsedPair.back,
+          accountId: "acc-bookmaker",
+          unmatchedAccount: false,
+        }),
         confidence: null,
       })
     );
@@ -161,6 +179,19 @@ describe("bets API routes (unit)", () => {
       url: "http://blob/lay",
       userId: user.id,
     });
+
+    // Mock matching accounts so we isolate the confidence test
+    (dbQueries.getAccountByName as vi.Mock).mockImplementation(
+      async ({ kind }: { kind: string }) => {
+        if (kind === "bookmaker") {
+          return { id: "acc-bookmaker", name: "Bet365", kind: "bookmaker" };
+        }
+        if (kind === "exchange") {
+          return { id: "acc-exchange", name: "Betfair", kind: "exchange" };
+        }
+        return null;
+      }
+    );
 
     (parseMatchedBetFromScreenshots as vi.Mock).mockResolvedValue({
       back: {
@@ -203,6 +234,199 @@ describe("bets API routes (unit)", () => {
     expect(dbQueries.updateScreenshotStatus).toHaveBeenCalledWith(
       expect.objectContaining({ id: "lay-1", status: "needs_review" })
     );
+  });
+
+  it("autoparse returns accountId when accounts match parsed exchange names", async () => {
+    (dbQueries.getScreenshotById as vi.Mock).mockResolvedValueOnce({
+      id: "back-1",
+      url: "http://blob/back",
+      userId: user.id,
+    });
+    (dbQueries.getScreenshotById as vi.Mock).mockResolvedValueOnce({
+      id: "lay-1",
+      url: "http://blob/lay",
+      userId: user.id,
+    });
+
+    // Mock matching accounts exist
+    (dbQueries.getAccountByName as vi.Mock).mockImplementation(
+      async ({ name, kind }: { name: string; kind: string }) => {
+        if (kind === "bookmaker" && name.toLowerCase() === "bet365") {
+          return { id: "acc-bookmaker-1", name: "Bet365", kind: "bookmaker" };
+        }
+        if (kind === "exchange" && name.toLowerCase() === "betfair") {
+          return { id: "acc-exchange-1", name: "Betfair", kind: "exchange" };
+        }
+        return null;
+      }
+    );
+
+    (parseMatchedBetFromScreenshots as vi.Mock).mockResolvedValue({
+      back: {
+        type: "back",
+        market: "M",
+        selection: "Arsenal",
+        odds: 2.4,
+        stake: 10,
+        exchange: "Bet365",
+      },
+      lay: {
+        type: "lay",
+        market: "M",
+        selection: "Arsenal",
+        odds: 2.3,
+        stake: 11,
+        exchange: "Betfair",
+      },
+      needsReview: false,
+    });
+
+    const res = await autoparseRoute(
+      new Request("http://localhost/api/bets/autoparse", {
+        method: "POST",
+        body: JSON.stringify({
+          backScreenshotId: "11111111-1111-1111-1111-111111111111",
+          layScreenshotId: "22222222-2222-2222-2222-222222222222",
+        }),
+      })
+    );
+
+    const json = await res.json();
+    expect(res.status).toBe(200);
+    // Account IDs should be included in response
+    expect(json.back.accountId).toBe("acc-bookmaker-1");
+    expect(json.lay.accountId).toBe("acc-exchange-1");
+    // No unmatched flags when accounts exist
+    expect(json.back.unmatchedAccount).toBe(false);
+    expect(json.lay.unmatchedAccount).toBe(false);
+    // Should not need review when accounts are matched
+    expect(json.needsReview).toBe(false);
+  });
+
+  it("autoparse flags needsReview when no account matches parsed exchange", async () => {
+    (dbQueries.getScreenshotById as vi.Mock).mockResolvedValueOnce({
+      id: "back-1",
+      url: "http://blob/back",
+      userId: user.id,
+    });
+    (dbQueries.getScreenshotById as vi.Mock).mockResolvedValueOnce({
+      id: "lay-1",
+      url: "http://blob/lay",
+      userId: user.id,
+    });
+
+    // No matching accounts found
+    (dbQueries.getAccountByName as vi.Mock).mockResolvedValue(null);
+
+    (parseMatchedBetFromScreenshots as vi.Mock).mockResolvedValue({
+      back: {
+        type: "back",
+        market: "M",
+        selection: "Arsenal",
+        odds: 2.4,
+        stake: 10,
+        exchange: "UnknownBookmaker",
+      },
+      lay: {
+        type: "lay",
+        market: "M",
+        selection: "Arsenal",
+        odds: 2.3,
+        stake: 11,
+        exchange: "UnknownExchange",
+      },
+      needsReview: false,
+    });
+
+    const res = await autoparseRoute(
+      new Request("http://localhost/api/bets/autoparse", {
+        method: "POST",
+        body: JSON.stringify({
+          backScreenshotId: "11111111-1111-1111-1111-111111111111",
+          layScreenshotId: "22222222-2222-2222-2222-222222222222",
+        }),
+      })
+    );
+
+    const json = await res.json();
+    expect(res.status).toBe(200);
+    // Account IDs should be null when no match
+    expect(json.back.accountId).toBeNull();
+    expect(json.lay.accountId).toBeNull();
+    // Unmatched flags should be set
+    expect(json.back.unmatchedAccount).toBe(true);
+    expect(json.lay.unmatchedAccount).toBe(true);
+    // Should need review when accounts are not matched
+    expect(json.needsReview).toBe(true);
+    // Notes should suggest creating accounts
+    expect(json.notes).toContain('Bookmaker "UnknownBookmaker" not found');
+    expect(json.notes).toContain('Exchange "UnknownExchange" not found');
+  });
+
+  it("autoparse matches accounts case-insensitively", async () => {
+    (dbQueries.getScreenshotById as vi.Mock).mockResolvedValueOnce({
+      id: "back-1",
+      url: "http://blob/back",
+      userId: user.id,
+    });
+    (dbQueries.getScreenshotById as vi.Mock).mockResolvedValueOnce({
+      id: "lay-1",
+      url: "http://blob/lay",
+      userId: user.id,
+    });
+
+    // Mock accounts matching with different casing
+    (dbQueries.getAccountByName as vi.Mock).mockImplementation(
+      async ({ name, kind }: { name: string; kind: string }) => {
+        // The getAccountByName function normalizes names internally
+        if (kind === "bookmaker") {
+          return { id: "acc-bookmaker-1", name: "bet365", kind: "bookmaker" };
+        }
+        if (kind === "exchange") {
+          return { id: "acc-exchange-1", name: "BFB247", kind: "exchange" };
+        }
+        return null;
+      }
+    );
+
+    (parseMatchedBetFromScreenshots as vi.Mock).mockResolvedValue({
+      back: {
+        type: "back",
+        market: "M",
+        selection: "Arsenal",
+        odds: 2.4,
+        stake: 10,
+        exchange: "BET365", // Different casing
+      },
+      lay: {
+        type: "lay",
+        market: "M",
+        selection: "Arsenal",
+        odds: 2.3,
+        stake: 11,
+        exchange: "bfb247", // Different casing
+      },
+      needsReview: false,
+    });
+
+    const res = await autoparseRoute(
+      new Request("http://localhost/api/bets/autoparse", {
+        method: "POST",
+        body: JSON.stringify({
+          backScreenshotId: "11111111-1111-1111-1111-111111111111",
+          layScreenshotId: "22222222-2222-2222-2222-222222222222",
+        }),
+      })
+    );
+
+    const json = await res.json();
+    expect(res.status).toBe(200);
+    // Should match despite case differences
+    expect(json.back.accountId).toBe("acc-bookmaker-1");
+    expect(json.lay.accountId).toBe("acc-exchange-1");
+    expect(json.back.unmatchedAccount).toBe(false);
+    expect(json.lay.unmatchedAccount).toBe(false);
+    expect(json.needsReview).toBe(false);
   });
 
   it("create matched persists bets and returns matched record", async () => {

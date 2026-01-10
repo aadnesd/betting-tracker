@@ -15,6 +15,10 @@ export type ParsedBet = {
   currency?: string | null;
   placedAt?: string | null;
   confidence?: Record<string, number>;
+  /** Matched account ID from user's accounts (populated by autoparse) */
+  accountId?: string | null;
+  /** Flag indicating the parsed exchange name did not match any user account */
+  unmatchedAccount?: boolean;
 };
 
 export type ParsedPair = {
