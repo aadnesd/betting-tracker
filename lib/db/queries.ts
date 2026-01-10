@@ -740,6 +740,63 @@ export async function listAccountsByUser({
   }
 }
 
+export async function updateAccount({
+  id,
+  userId,
+  name,
+  kind,
+  currency,
+  commission,
+  status,
+  limits,
+}: {
+  id: string;
+  userId: string;
+  name?: string;
+  kind?: "bookmaker" | "exchange";
+  currency?: string | null;
+  commission?: number | null;
+  status?: "active" | "archived";
+  limits?: Record<string, unknown> | null;
+}) {
+  try {
+    const updates: Partial<typeof account.$inferInsert> = {};
+    if (name !== undefined) {
+      updates.name = name.trim();
+      updates.nameNormalized = normalizeAccountName(name);
+    }
+    if (kind !== undefined) {
+      updates.kind = kind;
+    }
+    if (currency !== undefined) {
+      updates.currency = currency;
+    }
+    if (commission !== undefined) {
+      updates.commission = commission === null ? null : commission.toString();
+    }
+    if (status !== undefined) {
+      updates.status = status;
+    }
+    if (limits !== undefined) {
+      updates.limits = limits;
+    }
+
+    if (Object.keys(updates).length === 0) {
+      const existing = await getAccountById({ id, userId });
+      return existing;
+    }
+
+    const [row] = await db
+      .update(account)
+      .set(updates)
+      .where(and(eq(account.id, id), eq(account.userId, userId)))
+      .returning();
+    return row ?? null;
+  } catch (_error) {
+    throw new ChatSDKError("bad_request:database", "Failed to update account");
+  }
+}
+
 /**
  * Calculate current balance for a single account by summing all transactions.
  * Deposits and bonuses add, withdrawals and adjustments (negative) subtract.

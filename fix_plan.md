@@ -20,8 +20,6 @@ Prioritized implementation tasks. Check off when complete with tests passing.
 
 ## P4 — Account & Bookmaker Management
 
-- [ ] **Create/edit account form**: Modal or page form to create new bookmaker/exchange accounts with fields: name, kind (bookmaker/exchange), currency, commission (for exchanges). DoD: form validates, persists to `Account` table, and appears in list. Why: Users need to add their own bookies rather than relying on hardcoded list.
-
 - [ ] **Account balance tracking**: Add computed `currentBalance` to account queries by summing transactions + bet settlements. Display balance on account list and detail. DoD: balance updates when deposits/withdrawals/settlements occur. Why: Users need to see how much money they have in each account.
 
 - [ ] **Deposit/withdrawal transactions**: UI on account detail to record deposits and withdrawals. DoD: form creates `AccountTransaction` with type deposit/withdrawal, amount, currency, date, notes. Why: Track money flow in/out of accounts.
@@ -41,6 +39,8 @@ Prioritized implementation tasks. Check off when complete with tests passing.
 ---
 
 ## Completed
+
+- [x] **Create/edit account form**: Modal or page form to create new bookmaker/exchange accounts with fields: name, kind (bookmaker/exchange), currency, commission (for exchanges). DoD: form validates, persists to `Account` table, and appears in list. Implementation: Created `updateAccount` query function in `lib/db/queries.ts`. Added `app/(chat)/api/bets/accounts/route.ts` with POST (create), PATCH (update), and GET endpoints. Created `/bets/settings/accounts/new` page with form to create new accounts. Created `/bets/settings/accounts/[id]` detail/edit page with `AccountEditForm` component. All forms validate, persist to Account table, and accounts appear in list. Tests: 14 tests in `tests/unit/accounts-api.test.ts` (why: validates create, update, get, error handling, and auth for account CRUD operations). Build passes with all 100 tests passing.
 
 - [x] **Account settings page**: Create `/bets/settings/accounts` page listing user's bookmaker and exchange accounts with name, kind, currency, current balance, and status. DoD: page renders real data from `Account` table, supports empty state, links to create/edit. Implementation: Created `getAccountBalance` and `listAccountsWithBalances` queries in `lib/db/queries.ts` to compute current balance by summing transactions. Created `/bets/settings/accounts` page that lists user's bookmaker and exchange accounts with name, kind, currency, current balance, and status. Added empty state support and links to create/edit accounts. Added "Accounts" link to the dashboard header. Fixed tsconfig.json to exclude vitest.config.ts from Next.js build. Tests: 8 unit tests in `tests/unit/account-queries.test.ts` (why: validates balance computation from transactions and account listing).
 
