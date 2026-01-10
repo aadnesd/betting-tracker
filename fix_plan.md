@@ -26,8 +26,6 @@ Prioritized implementation tasks. Check off when complete with tests passing.
 
 - [ ] **Account transaction history**: List all transactions for an account with date, type, amount, notes. Support filtering by type. DoD: transaction list renders with proper formatting and pagination. Why: Audit trail for account money movement.
 
-- [ ] **Dynamic bookmaker dropdown**: Replace hardcoded `POPULAR_BOOKMAKERS` and `EXCHANGES` in Quick Add with user's accounts. DoD: dropdown shows user accounts filtered by kind, plus "Add new" option. Why: Consistency between accounts and bet entry.
-
 - [ ] **AI parser account matching**: Update bet parser to match parsed exchange/bookmaker name against user's accounts (case-insensitive). If no match, flag for review and suggest creating account. DoD: parsed bets link to `accountId` when matched. Why: Automatic linking improves workflow.
 
 - [ ] **Account balance update on settlement**: When matched bet settles, update back/lay account balances based on outcome. DoD: settling a bet adjusts both account balances correctly. Why: Keep balances accurate without manual entry.
@@ -37,6 +35,8 @@ Prioritized implementation tasks. Check off when complete with tests passing.
 ---
 
 ## Completed
+
+- [x] **Dynamic bookmaker dropdown**: Replace hardcoded `POPULAR_BOOKMAKERS` and `EXCHANGES` in Quick Add with user's accounts. DoD: dropdown shows user accounts filtered by kind, plus "Add new" option. Why: Consistency between accounts and bet entry. Implementation: Refactored Quick Add page to be a server component that fetches user's accounts via `listAccountsByUser`. Created `components/bets/quick-add-form.tsx` client component that receives bookmakers and exchanges arrays as props. Replaced hardcoded `POPULAR_BOOKMAKERS` and `EXCHANGES` with dynamic dropdowns populated from user's active accounts. Added "Add new bookmaker" and "Add new exchange" options in dropdowns that navigate to account creation page. When selecting an account, automatically updates currency field to match the account's default currency. Shows warning banner if user has no bookmaker or exchange accounts, with link to add accounts. Disables submit button if no accounts configured. API already links bets to accounts via `getOrCreateAccount` - accounts are now pre-populated from user's list. DoD met: dropdown shows user accounts filtered by kind (bookmaker/exchange), plus "Add new" option. Build passes with all 111 tests passing.
 
 - [x] **Create/edit account form**: Modal or page form to create new bookmaker/exchange accounts with fields: name, kind (bookmaker/exchange), currency, commission (for exchanges). DoD: form validates, persists to `Account` table, and appears in list. Implementation: Created `updateAccount` query function in `lib/db/queries.ts`. Added `app/(chat)/api/bets/accounts/route.ts` with POST (create), PATCH (update), and GET endpoints. Created `/bets/settings/accounts/new` page with form to create new accounts. Created `/bets/settings/accounts/[id]` detail/edit page with `AccountEditForm` component. All forms validate, persist to Account table, and accounts appear in list. Tests: 14 tests in `tests/unit/accounts-api.test.ts` (why: validates create, update, get, error handling, and auth for account CRUD operations). Build passes with all 100 tests passing.
 
