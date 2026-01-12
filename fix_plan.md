@@ -34,6 +34,48 @@ Prioritized implementation tasks. Check off when complete with tests passing.
 
 - [x] **Exposure timeline**: Add chart showing open exposure over time on dashboard. DoD: chart shows exposure fluctuations with current level highlighted. Why: Helps users track risk levels and plan bankroll. Implementation: Created `getExposureTimeline` query in `lib/db/queries.ts` that computes running exposure over time by tracking bet creation (adds exposure) and settlement (removes exposure) events. Returns `ExposureDataPoint[]` with date, label, exposure, openPositions, and change fields. Created `components/bets/exposure-timeline-chart.tsx` with `ExposureTimelineChart` and `ExposureTimelineWithControls` components featuring: interactive area chart with amber color theme (exposure = risk), 7/14/30/90 day toggle controls, current exposure highlight, custom tooltip showing exposure level, open positions, and daily change, responsive layout. Integrated chart into dashboard `/bets/page.tsx` below summary cards. Tests: 13 tests in `tests/unit/exposure-timeline.test.ts` covering: ExposureDataPoint interface structure, data point sorting, exposure increase/decrease scenarios, carry-forward behavior, edge cases (empty data, single day, same-day settlement).
 
+## P6 — Promo & Free Bet Tracking
+
+- [ ] **Promo schema extension**: Add `FreeBet` table with fields: id, userId, accountId, name, value, currency, minOdds, expiresAt, status (active/used/expired), usedInMatchedBetId, createdAt, notes. DoD: schema + migration + basic CRUD queries. Why: Enables tracking of free bet inventory separately from transactions.
+
+- [ ] **Promo settings page**: Create `/bets/settings/promos` page listing active promotions and free bets per bookmaker with value, expiry date, and status. DoD: page shows real data, supports empty state, links to create/edit. Why: Central view of available promos.
+
+- [ ] **Promo/free bet form**: Modal or page to record a new free bet or promotion with fields: bookmaker (account), name, value, currency, minOdds, expiry date, terms/notes. DoD: form validates, persists to DB, appears in list. Why: Manual entry for promos received.
+
+- [ ] **Expiry warnings**: Dashboard banner and/or notification for promos expiring within 7 days. DoD: warning shows with count and links to promo list filtered by expiring. Why: Prevents missed free bets.
+
+- [ ] **Link promo to matched bet**: When creating a matched bet (Quick Add or AI flow), allow selecting an active free bet to use. DoD: matched bet links to promo, promo status updates to "used" on save. Why: Tracks which promos have been utilized.
+
+- [ ] **Promo progress tracking**: For recurring promos (e.g., "Bet £50 to unlock £10 free bet"), track progress toward unlock. DoD: promo detail shows progress bar and linked qualifying bets. Why: Helps complete multi-step promos.
+
+## P7 — Match Data & Auto-Settlement
+
+- [ ] **Match schema**: Add `FootballMatch` table with fields: id, externalId (football-data.org match ID), homeTeam, awayTeam, competition, competitionId, matchDate, status (SCHEDULED/IN_PLAY/FINISHED/POSTPONED/CANCELLED), homeScore, awayScore, lastSyncedAt. DoD: schema + migration + basic queries. Why: Local cache of match data for linking bets and auto-settlement.
+
+- [ ] **Match sync job**: Create `/api/cron/sync-matches` endpoint (or server action) that fetches matches from football-data.org API (v4) for configured competitions. Uses `FOOTBALL_DATA_API_TOKEN` env var. Syncs: upcoming matches (next 14 days) and recently finished matches (last 3 days). Updates status and scores. DoD: endpoint syncs matches to DB, handles rate limits, logs errors. Run via Vercel cron once daily. Why: Keeps match data fresh without per-request API calls. API docs: `GET /v4/matches?dateFrom=X&dateTo=Y&status=SCHEDULED,FINISHED`.
+
+- [ ] **Competition configuration**: Settings page or config to select which competitions to sync (e.g., Premier League PL, Champions League CL, La Liga, etc.). DoD: user can enable/disable competitions, sync respects selection. Why: Reduces API usage and noise.
+
+- [ ] **Match picker in bet creation**: When adding a bet via Quick Add, show autocomplete/dropdown to select a match from synced `FootballMatch` table. Store `matchId` on MatchedBet. DoD: bet links to specific match, match info displays on bet detail. Why: Enables automatic result lookup.
+
+- [ ] **Pending settlement queue**: Dashboard widget showing matched bets awaiting settlement, grouped by match date. Filter by today/this week. Quick-settle actions. DoD: queue shows real data with match info, links to detail. Why: Streamlines settlement workflow.
+
+- [ ] **Auto-settlement detection**: After match sync, check for matched bets linked to FINISHED matches. Flag or auto-settle based on result (home/away/draw outcome). DoD: system detects finished matches with linked bets, suggests settlement or auto-applies with audit log. Why: Reduces manual settlement work.
+
+- [ ] **Settlement outcome logic**: For matched bets linked to a match, determine win/loss/push based on selection (home win, away win, draw, over/under goals). DoD: core outcome resolver function with tests. Why: Accurate P&L calculation from match result.
+
+## P8 — Bankroll Management
+
+- [ ] **Bankroll dashboard**: New page `/bets/bankroll` showing total capital across all accounts, breakdown by bookmaker vs exchange, deposit/withdrawal trends. DoD: page renders real aggregated data. Why: Holistic view of funds.
+
+- [ ] **Account targets**: Per-account deposit/withdrawal targets to manage gubbing risk (e.g., "withdraw max £500/month from Bet365"). DoD: targets stored on Account, warnings shown when approaching limits. Why: Avoids account restrictions.
+
+- [ ] **Stake pattern analysis**: Track stake patterns per bookmaker (average stake, variance, max stake). Flag unusual patterns that might trigger gubbing. DoD: report shows stake distribution per account. Why: Proactive gubbing avoidance.
+
+- [ ] **Mug betting suggestions**: Based on stake patterns, suggest "mug bets" (recreational-looking bets) to place at bookmakers. Track mug bet P&L separately. DoD: suggestions shown on account detail, mug bet flag on bets. Why: Account longevity.
+
+- [ ] **Recommended bankroll allocation**: Based on current exposure and account balances, suggest optimal fund distribution. DoD: allocation recommendations displayed with reasoning. Why: Better capital efficiency.
+
 ---
 
 ## Completed
