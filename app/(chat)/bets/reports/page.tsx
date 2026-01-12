@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { auth } from "@/app/(auth)/auth";
 import { BookmakerProfitWithBonusesTable } from "@/components/bets/bookmaker-profit-with-bonuses-table";
+import { BreakdownChartWithToggle } from "@/components/bets/breakdown-charts";
 import { ExportButton } from "@/components/bets/export-button";
 import { ProfitChartWithControls } from "@/components/bets/profit-chart";
 import { ReportingBreakdownTable } from "@/components/bets/reporting-breakdown-table";
@@ -164,6 +165,25 @@ async function ReportingContent({
         monthData={monthChartData}
         title="Cumulative Profit"
       />
+
+      {/* Performance Breakdown Charts */}
+      <div className="grid gap-6 lg:grid-cols-3">
+        <BreakdownChartWithToggle
+          title="By Promo Type"
+          data={promoBreakdown}
+          emptyMessage="No promo data"
+        />
+        <BreakdownChartWithToggle
+          title="By Bookmaker"
+          data={bookmakerBreakdown}
+          emptyMessage="No bookmaker data"
+        />
+        <BreakdownChartWithToggle
+          title="By Exchange"
+          data={exchangeBreakdown}
+          emptyMessage="No exchange data"
+        />
+      </div>
 
       <BookmakerProfitWithBonusesTable
         data={bookmakerWithBonuses}
