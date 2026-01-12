@@ -2060,6 +2060,164 @@ export async function getProfitByExchange({
   }
 }
 
+export type BookmakerProfitWithBonuses = {
+  accountId: string;
+  accountName: string;
+  /** Number of settled bets */
+  betCount: number;
+  /** Profit/loss from betting (sum of profitLoss on back bets) */
+  bettingProfit: number;
+  /** Total stake wagered */
+  totalStake: number;
+  /** Total bonus/reward transaction amounts */
+  bonusTotal: number;
+  /** Combined total (bettingProfit + bonusTotal) */
+  totalProfit: number;
+  /** ROI percentage based on total profit and stake */
+  roi: number;
+};
+
+/**
+ * Get bookmaker profit/loss including bonus/reward transactions.
+ * Combines betting profit from matched bets with bonus transactions from accounts.
+ * This allows users to see which bookmaker reward programs offer the best ROI.
+ */
+export async function getBookmakerProfitWithBonuses({
+  userId,
+  startDate,
+  endDate,
+}: {
+  userId: string;
+  startDate?: Date | null;
+  endDate?: Date | null;
+}): Promise<BookmakerProfitWithBonuses[]> {
+  try {
+    // Get betting profit per bookmaker account
+    const bettingConditions: SQL<unknown>[] = [
+      eq(matchedBet.userId, userId),
+      eq(matchedBet.status, "settled"),
+    ];
+
+    if (startDate) {
+      bettingConditions.push(gte(matchedBet.createdAt, startDate));
+    }
+    if (endDate) {
+      bettingConditions.push(lte(matchedBet.createdAt, endDate));
+    }
+
+    const bettingRows = await db
+      .select({
+        accountId: backBet.accountId,
+        accountName: account.name,
+        count: count(matchedBet.id),
+        totalProfitLoss: sum(backBet.profitLoss),
+        totalStake: sum(backBet.stake),
+      })
+      .from(matchedBet)
+      .leftJoin(backBet, eq(matchedBet.backBetId, backBet.id))
+      .leftJoin(account, eq(backBet.accountId, account.id))
+      .where(and(...bettingConditions))
+      .groupBy(backBet.accountId, account.name);
+
+    // Get bonus transactions per bookmaker account
+    const bonusConditions: SQL<unknown>[] = [
+      eq(accountTransaction.userId, userId),
+      eq(accountTransaction.type, "bonus"),
+      eq(account.kind, "bookmaker"),
+    ];
+
+    if (startDate) {
+      bonusConditions.push(gte(accountTransaction.occurredAt, startDate));
+    }
+    if (endDate) {
+      bonusConditions.push(lte(accountTransaction.occurredAt, endDate));
+    }
+
+    const bonusRows = await db
+      .select({
+        accountId: accountTransaction.accountId,
+        accountName: account.name,
+        bonusTotal: sum(accountTransaction.amount),
+      })
+      .from(accountTransaction)
+      .innerJoin(account, eq(accountTransaction.accountId, account.id))
+      .where(and(...bonusConditions))
+      .groupBy(accountTransaction.accountId, account.name);
+
+    // Combine betting and bonus data
+    const accountMap = new Map<
+      string,
+      {
+        accountId: string;
+        accountName: string;
+        betCount: number;
+        bettingProfit: number;
+        totalStake: number;
+        bonusTotal: number;
+      }
+    >();
+
+    // Add betting data
+    for (const row of bettingRows) {
+      if (row.accountId) {
+        accountMap.set(row.accountId, {
+          accountId: row.accountId,
+          accountName: row.accountName ?? "Unknown Bookmaker",
+          betCount: row.count,
+          bettingProfit: row.totalProfitLoss
+            ? Number.parseFloat(row.totalProfitLoss)
+            : 0,
+          totalStake: row.totalStake ? Number.parseFloat(row.totalStake) : 0,
+          bonusTotal: 0,
+        });
+      }
+    }
+
+    // Add bonus data
+    for (const row of bonusRows) {
+      const existing = accountMap.get(row.accountId);
+      const bonusTotal = row.bonusTotal
+        ? Number.parseFloat(row.bonusTotal)
+        : 0;
+      if (existing) {
+        existing.bonusTotal = bonusTotal;
+      } else {
+        // Account has bonuses but no betting activity
+        accountMap.set(row.accountId, {
+          accountId: row.accountId,
+          accountName: row.accountName ?? "Unknown Bookmaker",
+          betCount: 0,
+          bettingProfit: 0,
+          totalStake: 0,
+          bonusTotal,
+        });
+      }
+    }
+
+    // Calculate totals and ROI
+    const results: BookmakerProfitWithBonuses[] = [];
+    for (const data of accountMap.values()) {
+      const totalProfit = data.bettingProfit + data.bonusTotal;
+      const roi = data.totalStake > 0 ? (totalProfit / data.totalStake) * 100 : 0;
+      results.push({
+        ...data,
+        totalProfit,
+        roi,
+      });
+    }
+
+    // Sort by total profit descending
+    results.sort((a, b) => b.totalProfit - a.totalProfit);
+
+    return results;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get bookmaker profit with bonuses"
+    );
+  }
+}
+
 /**
  * Get total open exposure (non-settled matched bets).
  */

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { auth } from "@/app/(auth)/auth";
+import { BookmakerProfitWithBonusesTable } from "@/components/bets/bookmaker-profit-with-bonuses-table";
 import { ExportButton } from "@/components/bets/export-button";
 import { ProfitChartWithControls } from "@/components/bets/profit-chart";
 import { ReportingBreakdownTable } from "@/components/bets/reporting-breakdown-table";
@@ -11,6 +12,7 @@ import { ReportingSummaryCard } from "@/components/bets/reporting-summary-card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+  getBookmakerProfitWithBonuses,
   getMatchedBetsForReporting,
   getOpenExposure,
   getProfitByBookmaker,
@@ -95,7 +97,7 @@ async function ReportingContent({
   endDate: Date;
 }) {
   // Fetch all data in parallel
-  const [matchedBets, openExposureData, bookmakerData, exchangeData, promoData] =
+  const [matchedBets, openExposureData, bookmakerData, exchangeData, promoData, bookmakerWithBonuses] =
     await Promise.all([
       getMatchedBetsForReporting({
         userId,
@@ -107,6 +109,7 @@ async function ReportingContent({
       getProfitByBookmaker({ userId, startDate, endDate }),
       getProfitByExchange({ userId, startDate, endDate }),
       getProfitByPromoType({ userId, startDate, endDate }),
+      getBookmakerProfitWithBonuses({ userId, startDate, endDate }),
     ]);
 
   // Transform matched bets to the format expected by calculateReportingSummary
@@ -160,6 +163,11 @@ async function ReportingContent({
         weekData={weekChartData}
         monthData={monthChartData}
         title="Cumulative Profit"
+      />
+
+      <BookmakerProfitWithBonusesTable
+        data={bookmakerWithBonuses}
+        emptyMessage="No bookmaker data. Settle bets or add bonus transactions to see performance."
       />
 
       <div className="grid gap-6 lg:grid-cols-2">

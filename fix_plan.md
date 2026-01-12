@@ -30,6 +30,8 @@ Prioritized implementation tasks. Check off when complete with tests passing.
 
 - [ ] **Performance breakdown charts**: Add bar/pie charts for profit by promo type, bookmaker, and exchange on reports page. DoD: charts visualize existing breakdown table data with clickable segments. Why: Graphical breakdown makes it easier to identify best-performing promos and bookmakers.
 
+- [ ] **Bookmaker profit/loss with bonuses**: Add dedicated view showing total profit/loss per bookmaker including betting profit AND bonus/reward transactions from accounts. DoD: reports page shows per-bookmaker summary combining matched bet profits with bonus transactions, sortable by total ROI or profit. Why: Enables comparison of bookmaker reward programs to identify which has best overall ROI when factoring in bonuses, free bets, and promotions.
+
 - [ ] **Exposure timeline**: Add chart showing open exposure over time on dashboard. DoD: chart shows exposure fluctuations with current level highlighted. Why: Helps users track risk levels and plan bankroll.
 
 ---
