@@ -3122,7 +3122,7 @@ export async function deleteFreeBet({
 
     if (existing.status === "used") {
       throw new ChatSDKError(
-        "bad_request:validation",
+        "bad_request:api",
         "Cannot delete a used free bet"
       );
     }

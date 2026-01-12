@@ -6,10 +6,12 @@ import { BetStatusBadge } from "@/components/bets/bet-status-badge";
 import { DashboardSummaryCards } from "@/components/bets/dashboard-summary-cards";
 import { ExposureAlertBanner } from "@/components/bets/exposure-alert-banner";
 import { ExposureTimelineWithControls } from "@/components/bets/exposure-timeline-chart";
+import { FreeBetExpiryBanner } from "@/components/bets/free-bet-expiry-banner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import {
+  countExpiringFreeBets,
   getDashboardSummary,
   getExposureTimeline,
   listMatchedBetsByUser,
@@ -28,12 +30,13 @@ export default async function Page() {
 
   const userId = session.user.id;
 
-  const [bets, summary, exposureData7, exposureData14, exposureData30, exposureData90] = await Promise.all([
+  const [bets, summary, expiringFreeBetsCount, exposureData7, exposureData14, exposureData30, exposureData90] = await Promise.all([
     listMatchedBetsByUser({
       userId,
       limit: 50,
     }),
     getDashboardSummary({ userId }),
+    countExpiringFreeBets({ userId, daysUntilExpiry: 7 }),
     getExposureTimeline({ userId, daysBack: 7 }),
     getExposureTimeline({ userId, daysBack: 14 }),
     getExposureTimeline({ userId, daysBack: 30 }),
@@ -85,6 +88,11 @@ export default async function Page() {
         totalExposure={summary.openExposure}
         openPositions={summary.openPositions}
         threshold={5000}
+      />
+
+      <FreeBetExpiryBanner
+        expiringCount={expiringFreeBetsCount}
+        daysThreshold={7}
       />
 
       <DashboardSummaryCards

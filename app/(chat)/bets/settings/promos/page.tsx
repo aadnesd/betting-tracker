@@ -1,9 +1,11 @@
 import {
   AlertTriangle,
   Calendar,
+  Filter,
   Gift,
   Plus,
   Tag,
+  X,
 } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -71,7 +73,11 @@ function FreeBetStatusBadge({
   }
 }
 
-export default async function PromosSettingsPage() {
+export default async function PromosSettingsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ filter?: string }>;
+}) {
   const session = await auth();
 
   if (!session) {
@@ -79,6 +85,8 @@ export default async function PromosSettingsPage() {
   }
 
   const userId = session.user.id;
+  const params = await searchParams;
+  const filterExpiring = params.filter === "expiring";
 
   // Fetch all data in parallel
   const [freeBets, summary, expiringCount] = await Promise.all([
@@ -87,7 +95,13 @@ export default async function PromosSettingsPage() {
     countExpiringFreeBets({ userId, daysUntilExpiry: 7 }),
   ]);
 
-  const activeFreeBets = freeBets.filter((fb) => fb.status === "active");
+  let activeFreeBets = freeBets.filter((fb) => fb.status === "active");
+  
+  // Apply filter if requested - uses isExpiringSoon helper defined above
+  if (filterExpiring) {
+    activeFreeBets = activeFreeBets.filter((fb) => isExpiringSoon(fb.expiresAt));
+  }
+  
   const usedFreeBets = freeBets.filter((fb) => fb.status === "used");
   const expiredFreeBets = freeBets.filter((fb) => fb.status === "expired");
 
@@ -106,6 +120,14 @@ export default async function PromosSettingsPage() {
           <Button asChild variant="outline">
             <Link href="/bets">← Back to dashboard</Link>
           </Button>
+          {expiringCount > 0 && !filterExpiring && (
+            <Button asChild variant="outline">
+              <Link href="/bets/settings/promos?filter=expiring" className="flex items-center gap-1">
+                <AlertTriangle className="h-4 w-4" />
+                Expiring ({expiringCount})
+              </Link>
+            </Button>
+          )}
           <Button asChild>
             <Link href="/bets/settings/promos/new">
               <Plus className="mr-2 h-4 w-4" />
@@ -116,7 +138,7 @@ export default async function PromosSettingsPage() {
       </div>
 
       {/* Expiring Soon Warning */}
-      {expiringCount > 0 && (
+      {expiringCount > 0 && !filterExpiring && (
         <div className="flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4">
           <AlertTriangle className="h-5 w-5 text-amber-600" />
           <div>
@@ -128,6 +150,29 @@ export default async function PromosSettingsPage() {
               Use them before they expire to maximize your value.
             </p>
           </div>
+        </div>
+      )}
+
+      {/* Filter Indicator */}
+      {filterExpiring && (
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-blue-200 bg-blue-50 p-4">
+          <div className="flex items-center gap-3">
+            <Filter className="h-5 w-5 text-blue-600" />
+            <div>
+              <p className="font-medium text-blue-900">
+                Showing {activeFreeBets.length} free bet{activeFreeBets.length !== 1 ? "s" : ""} expiring within 7 days
+              </p>
+              <p className="text-blue-700 text-sm">
+                Use these before they expire to maximize your value.
+              </p>
+            </div>
+          </div>
+          <Button asChild variant="outline" size="sm">
+            <Link href="/bets/settings/promos" className="flex items-center gap-1">
+              <X className="h-4 w-4" />
+              Clear filter
+            </Link>
+          </Button>
         </div>
       )}
 
