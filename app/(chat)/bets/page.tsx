@@ -5,11 +5,13 @@ import { auth } from "@/app/(auth)/auth";
 import { BetStatusBadge } from "@/components/bets/bet-status-badge";
 import { DashboardSummaryCards } from "@/components/bets/dashboard-summary-cards";
 import { ExposureAlertBanner } from "@/components/bets/exposure-alert-banner";
+import { ExposureTimelineWithControls } from "@/components/bets/exposure-timeline-chart";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import {
   getDashboardSummary,
+  getExposureTimeline,
   listMatchedBetsByUser,
 } from "@/lib/db/queries";
 
@@ -26,12 +28,16 @@ export default async function Page() {
 
   const userId = session.user.id;
 
-  const [bets, summary] = await Promise.all([
+  const [bets, summary, exposureData7, exposureData14, exposureData30, exposureData90] = await Promise.all([
     listMatchedBetsByUser({
       userId,
       limit: 50,
     }),
     getDashboardSummary({ userId }),
+    getExposureTimeline({ userId, daysBack: 7 }),
+    getExposureTimeline({ userId, daysBack: 14 }),
+    getExposureTimeline({ userId, daysBack: 30 }),
+    getExposureTimeline({ userId, daysBack: 90 }),
   ]);
 
   return (
@@ -86,6 +92,14 @@ export default async function Page() {
         pendingReviewCount={summary.pendingReviewCount}
         recentActivityCount={summary.recentActivityCount}
         roi={summary.roi}
+      />
+
+      <ExposureTimelineWithControls
+        data7={exposureData7}
+        data14={exposureData14}
+        data30={exposureData30}
+        data90={exposureData90}
+        currentExposure={summary.openExposure}
       />
 
       <Card>

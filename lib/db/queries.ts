@@ -9,6 +9,7 @@ import {
   gt,
   gte,
   inArray,
+  isNotNull,
   lt,
   lte,
   sql,
@@ -2250,6 +2251,191 @@ export async function getOpenExposure({
     throw new ChatSDKError(
       "bad_request:database",
       "Failed to get open exposure"
+    );
+  }
+}
+
+/**
+ * Exposure data point for timeline visualization.
+ */
+export type ExposureDataPoint = {
+  /** Date string in ISO format */
+  date: string;
+  /** Display label for the date */
+  label: string;
+  /** Total open exposure at end of this period */
+  exposure: number;
+  /** Number of open positions at end of this period */
+  openPositions: number;
+  /** Change in exposure during this period */
+  change: number;
+};
+
+/**
+ * Get exposure timeline data for chart visualization.
+ * Returns exposure levels over time based on matched bet creation and settlement dates.
+ * 
+ * Algorithm:
+ * 1. Get all matched bets with exposure
+ * 2. Create events for bet creation (adds exposure) and settlement (removes exposure)
+ * 3. Process events chronologically to compute running exposure
+ * 4. Group by day to create data points
+ */
+export async function getExposureTimeline({
+  userId,
+  daysBack = 30,
+}: {
+  userId: string;
+  daysBack?: number;
+}): Promise<ExposureDataPoint[]> {
+  try {
+    // Get all matched bets that have netExposure
+    const bets = await db
+      .select({
+        id: matchedBet.id,
+        createdAt: matchedBet.createdAt,
+        status: matchedBet.status,
+        netExposure: matchedBet.netExposure,
+        confirmedAt: matchedBet.confirmedAt,
+      })
+      .from(matchedBet)
+      .where(
+        and(
+          eq(matchedBet.userId, userId),
+          isNotNull(matchedBet.netExposure)
+        )
+      )
+      .orderBy(matchedBet.createdAt);
+
+    if (bets.length === 0) {
+      return [];
+    }
+
+    // Create exposure events: each bet creates exposure when created
+    // and removes exposure when settled
+    type ExposureEvent = {
+      date: Date;
+      exposureChange: number;
+      type: "add" | "remove";
+    };
+
+    const events: ExposureEvent[] = [];
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - daysBack);
+    startDate.setHours(0, 0, 0, 0);
+
+    for (const bet of bets) {
+      const exposure = bet.netExposure
+        ? Number.parseFloat(bet.netExposure)
+        : 0;
+
+      if (exposure === 0) continue;
+
+      // Add event when bet was created
+      const createdDate = new Date(bet.createdAt);
+      events.push({
+        date: createdDate,
+        exposureChange: exposure,
+        type: "add",
+      });
+
+      // Add event when bet was settled (removes exposure)
+      if (bet.status === "settled" && bet.confirmedAt) {
+        const settledDate = new Date(bet.confirmedAt);
+        events.push({
+          date: settledDate,
+          exposureChange: -exposure,
+          type: "remove",
+        });
+      }
+    }
+
+    // Sort events by date
+    events.sort((a, b) => a.date.getTime() - b.date.getTime());
+
+    // Calculate running exposure by day
+    const dailyExposure = new Map<string, { exposure: number; change: number; openPositions: number }>();
+    let runningExposure = 0;
+    let openPositions = 0;
+
+    // Process all events to build up the exposure state
+    for (const event of events) {
+      const dayKey = event.date.toISOString().split("T")[0];
+      
+      runningExposure += event.exposureChange;
+      if (event.type === "add") {
+        openPositions += 1;
+      } else {
+        openPositions -= 1;
+      }
+
+      const existing = dailyExposure.get(dayKey) ?? { exposure: 0, change: 0, openPositions: 0 };
+      existing.exposure = runningExposure;
+      existing.change += event.exposureChange;
+      existing.openPositions = openPositions;
+      dailyExposure.set(dayKey, existing);
+    }
+
+    // Generate data points for the date range
+    const result: ExposureDataPoint[] = [];
+    const today = new Date();
+    today.setHours(23, 59, 59, 999);
+
+    // Get all days in range
+    const allDays: string[] = [];
+    const currentDate = new Date(startDate);
+    while (currentDate <= today) {
+      allDays.push(currentDate.toISOString().split("T")[0]);
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+
+    // Fill in the data points, carrying forward exposure from previous days
+    let lastExposure = 0;
+    let lastOpenPositions = 0;
+
+    // First, find the exposure state at the start date
+    for (const event of events) {
+      if (event.date < startDate) {
+        lastExposure += event.exposureChange;
+        if (event.type === "add") {
+          lastOpenPositions += 1;
+        } else {
+          lastOpenPositions -= 1;
+        }
+      }
+    }
+
+    for (const day of allDays) {
+      const dayData = dailyExposure.get(day);
+      const date = new Date(day);
+
+      if (dayData) {
+        result.push({
+          date: day,
+          label: date.toLocaleDateString("en-GB", { day: "numeric", month: "short" }),
+          exposure: Math.round(dayData.exposure * 100) / 100,
+          openPositions: dayData.openPositions,
+          change: Math.round(dayData.change * 100) / 100,
+        });
+        lastExposure = dayData.exposure;
+        lastOpenPositions = dayData.openPositions;
+      } else {
+        // Carry forward the previous day's exposure
+        result.push({
+          date: day,
+          label: date.toLocaleDateString("en-GB", { day: "numeric", month: "short" }),
+          exposure: Math.round(lastExposure * 100) / 100,
+          openPositions: lastOpenPositions,
+          change: 0,
+        });
+      }
+    }
+
+    return result;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get exposure timeline"
     );
   }
 }
