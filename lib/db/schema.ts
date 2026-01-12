@@ -380,3 +380,28 @@ export const auditLog = pgTable("AuditLog", {
 });
 
 export type AuditLog = InferSelectModel<typeof auditLog>;
+
+const freeBetStatusEnum = ["active", "used", "expired"] as const;
+
+export const freeBet = pgTable("FreeBet", {
+  id: uuid("id").primaryKey().notNull().defaultRandom(),
+  createdAt: timestamp("createdAt").notNull(),
+  userId: uuid("userId")
+    .notNull()
+    .references(() => user.id),
+  accountId: uuid("accountId")
+    .notNull()
+    .references(() => account.id),
+  name: text("name").notNull(),
+  value: numeric("value", { precision: 14, scale: 2 }).notNull(),
+  currency: varchar("currency", { length: 3 }).notNull(),
+  minOdds: numeric("minOdds", { precision: 12, scale: 4 }),
+  expiresAt: timestamp("expiresAt"),
+  status: varchar("status", { enum: freeBetStatusEnum })
+    .notNull()
+    .default("active"),
+  usedInMatchedBetId: uuid("usedInMatchedBetId").references(() => matchedBet.id),
+  notes: text("notes"),
+});
+
+export type FreeBet = InferSelectModel<typeof freeBet>;

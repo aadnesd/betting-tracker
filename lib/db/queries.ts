@@ -32,6 +32,7 @@ import {
   chat,
   type DBMessage,
   document,
+  freeBet,
   layBet,
   matchedBet,
   message,
@@ -2766,6 +2767,337 @@ export async function createManualScreenshot({
     throw new ChatSDKError(
       "bad_request:database",
       "Failed to create manual screenshot"
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Free Bet / Promo Inventory
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type FreeBetStatus = "active" | "used" | "expired";
+
+export type CreateFreeBetParams = {
+  userId: string;
+  accountId: string;
+  name: string;
+  value: number;
+  currency: string;
+  minOdds?: number | null;
+  expiresAt?: Date | null;
+  notes?: string | null;
+};
+
+/**
+ * Create a new free bet record.
+ * Free bets track promotional credits received from bookmakers.
+ */
+export async function createFreeBet(params: CreateFreeBetParams) {
+  try {
+    const [result] = await db
+      .insert(freeBet)
+      .values({
+        createdAt: new Date(),
+        userId: params.userId,
+        accountId: params.accountId,
+        name: params.name,
+        value: params.value.toString(),
+        currency: params.currency.toUpperCase(),
+        minOdds: params.minOdds != null ? params.minOdds.toString() : null,
+        expiresAt: params.expiresAt ?? null,
+        status: "active",
+        notes: params.notes ?? null,
+      })
+      .returning();
+
+    // Create audit entry
+    await db.insert(auditLog).values({
+      createdAt: new Date(),
+      userId: params.userId,
+      entityType: "account",
+      entityId: params.accountId,
+      action: "create",
+      changes: { freeBetId: result.id, value: params.value },
+      notes: `Created free bet: ${params.name}`,
+    });
+
+    return result;
+  } catch (_error) {
+    throw new ChatSDKError("bad_request:database", "Failed to create free bet");
+  }
+}
+
+/**
+ * Get a free bet by ID.
+ */
+export async function getFreeBetById({
+  id,
+  userId,
+}: {
+  id: string;
+  userId: string;
+}) {
+  try {
+    const [row] = await db
+      .select()
+      .from(freeBet)
+      .where(and(eq(freeBet.id, id), eq(freeBet.userId, userId)))
+      .limit(1);
+    return row ?? null;
+  } catch (_error) {
+    throw new ChatSDKError("bad_request:database", "Failed to fetch free bet");
+  }
+}
+
+/**
+ * List all free bets for a user.
+ * Can optionally filter by status.
+ */
+export async function listFreeBetsByUser({
+  userId,
+  status,
+  limit = 100,
+}: {
+  userId: string;
+  status?: FreeBetStatus;
+  limit?: number;
+}) {
+  try {
+    const conditions: SQL[] = [eq(freeBet.userId, userId)];
+    if (status) {
+      conditions.push(eq(freeBet.status, status));
+    }
+
+    return await db
+      .select({
+        id: freeBet.id,
+        createdAt: freeBet.createdAt,
+        userId: freeBet.userId,
+        accountId: freeBet.accountId,
+        name: freeBet.name,
+        value: freeBet.value,
+        currency: freeBet.currency,
+        minOdds: freeBet.minOdds,
+        expiresAt: freeBet.expiresAt,
+        status: freeBet.status,
+        usedInMatchedBetId: freeBet.usedInMatchedBetId,
+        notes: freeBet.notes,
+        accountName: account.name,
+      })
+      .from(freeBet)
+      .leftJoin(account, eq(freeBet.accountId, account.id))
+      .where(and(...conditions))
+      .orderBy(asc(freeBet.expiresAt), desc(freeBet.createdAt))
+      .limit(limit);
+  } catch (_error) {
+    throw new ChatSDKError("bad_request:database", "Failed to list free bets");
+  }
+}
+
+/**
+ * List free bets for a specific account.
+ */
+export async function listFreeBetsByAccount({
+  userId,
+  accountId,
+  status,
+  limit = 100,
+}: {
+  userId: string;
+  accountId: string;
+  status?: FreeBetStatus;
+  limit?: number;
+}) {
+  try {
+    const conditions: SQL[] = [
+      eq(freeBet.userId, userId),
+      eq(freeBet.accountId, accountId),
+    ];
+    if (status) {
+      conditions.push(eq(freeBet.status, status));
+    }
+
+    return await db
+      .select()
+      .from(freeBet)
+      .where(and(...conditions))
+      .orderBy(asc(freeBet.expiresAt), desc(freeBet.createdAt))
+      .limit(limit);
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to list free bets by account"
+    );
+  }
+}
+
+export type UpdateFreeBetParams = {
+  id: string;
+  userId: string;
+  name?: string;
+  value?: number;
+  currency?: string;
+  minOdds?: number | null;
+  expiresAt?: Date | null;
+  status?: FreeBetStatus;
+  notes?: string | null;
+};
+
+/**
+ * Update a free bet's details.
+ */
+export async function updateFreeBet(params: UpdateFreeBetParams) {
+  try {
+    const updates: Partial<typeof freeBet.$inferInsert> = {};
+
+    if (params.name !== undefined) {
+      updates.name = params.name;
+    }
+    if (params.value !== undefined) {
+      updates.value = params.value.toString();
+    }
+    if (params.currency !== undefined) {
+      updates.currency = params.currency.toUpperCase();
+    }
+    if (params.minOdds !== undefined) {
+      updates.minOdds = params.minOdds === null ? null : params.minOdds.toString();
+    }
+    if (params.expiresAt !== undefined) {
+      updates.expiresAt = params.expiresAt;
+    }
+    if (params.status !== undefined) {
+      updates.status = params.status;
+    }
+    if (params.notes !== undefined) {
+      updates.notes = params.notes;
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return await getFreeBetById({ id: params.id, userId: params.userId });
+    }
+
+    const [result] = await db
+      .update(freeBet)
+      .set(updates)
+      .where(and(eq(freeBet.id, params.id), eq(freeBet.userId, params.userId)))
+      .returning();
+
+    return result ?? null;
+  } catch (_error) {
+    throw new ChatSDKError("bad_request:database", "Failed to update free bet");
+  }
+}
+
+/**
+ * Mark a free bet as used and link it to a matched bet.
+ * This is called when a matched bet is created using a free bet.
+ */
+export async function markFreeBetAsUsed({
+  id,
+  userId,
+  matchedBetId,
+}: {
+  id: string;
+  userId: string;
+  matchedBetId: string;
+}) {
+  try {
+    const [result] = await db
+      .update(freeBet)
+      .set({
+        status: "used",
+        usedInMatchedBetId: matchedBetId,
+      })
+      .where(and(eq(freeBet.id, id), eq(freeBet.userId, userId)))
+      .returning();
+
+    if (result) {
+      // Create audit entry
+      await db.insert(auditLog).values({
+        createdAt: new Date(),
+        userId,
+        entityType: "matched_bet",
+        entityId: matchedBetId,
+        action: "update",
+        changes: { freeBetId: id, freeBetValue: result.value },
+        notes: `Used free bet: ${result.name}`,
+      });
+    }
+
+    return result ?? null;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to mark free bet as used"
+    );
+  }
+}
+
+/**
+ * Count active free bets that are expiring within the given number of days.
+ * Used for dashboard warnings.
+ */
+export async function countExpiringFreeBets({
+  userId,
+  daysUntilExpiry = 7,
+}: {
+  userId: string;
+  daysUntilExpiry?: number;
+}) {
+  try {
+    const now = new Date();
+    const expiryThreshold = new Date(
+      now.getTime() + daysUntilExpiry * 24 * 60 * 60 * 1000
+    );
+
+    const [result] = await db
+      .select({ count: count(freeBet.id) })
+      .from(freeBet)
+      .where(
+        and(
+          eq(freeBet.userId, userId),
+          eq(freeBet.status, "active"),
+          lte(freeBet.expiresAt, expiryThreshold)
+        )
+      );
+
+    return result?.count ?? 0;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to count expiring free bets"
+    );
+  }
+}
+
+/**
+ * Get total value of active free bets for a user.
+ * Used for dashboard summary.
+ */
+export async function getActiveFreeBetsSummary({
+  userId,
+}: {
+  userId: string;
+}) {
+  try {
+    const [result] = await db
+      .select({
+        count: count(freeBet.id),
+        totalValue: sum(freeBet.value),
+      })
+      .from(freeBet)
+      .where(and(eq(freeBet.userId, userId), eq(freeBet.status, "active")));
+
+    return {
+      count: result?.count ?? 0,
+      totalValue: result?.totalValue
+        ? Number.parseFloat(result.totalValue)
+        : 0,
+    };
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get active free bets summary"
     );
   }
 }

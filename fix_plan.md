@@ -36,7 +36,7 @@ Prioritized implementation tasks. Check off when complete with tests passing.
 
 ## P6 — Promo & Free Bet Tracking
 
-- [ ] **Promo schema extension**: Add `FreeBet` table with fields: id, userId, accountId, name, value, currency, minOdds, expiresAt, status (active/used/expired), usedInMatchedBetId, createdAt, notes. DoD: schema + migration + basic CRUD queries. Why: Enables tracking of free bet inventory separately from transactions.
+- [x] **Promo schema extension**: Add `FreeBet` table with fields: id, userId, accountId, name, value, currency, minOdds, expiresAt, status (active/used/expired), usedInMatchedBetId, createdAt, notes. DoD: schema + migration + basic CRUD queries. Why: Enables tracking of free bet inventory separately from transactions. Implementation: Added `FreeBet` table to `lib/db/schema.ts` with all required fields. Generated migration `lib/db/migrations/0016_hard_vargas.sql`. Added CRUD queries to `lib/db/queries.ts`: `createFreeBet`, `getFreeBetById`, `listFreeBetsByUser`, `listFreeBetsByAccount`, `updateFreeBet`, `markFreeBetAsUsed`, `countExpiringFreeBets`, `getActiveFreeBetsSummary`. Exported types `FreeBetStatus`, `CreateFreeBetParams`, `UpdateFreeBetParams`. Tests: 19 tests in `tests/unit/free-bet-queries.test.ts` covering function signatures, type correctness, all CRUD operations, status filters, and schema alignment with spec.
 
 - [ ] **Promo settings page**: Create `/bets/settings/promos` page listing active promotions and free bets per bookmaker with value, expiry date, and status. DoD: page shows real data, supports empty state, links to create/edit. Why: Central view of available promos.
 
