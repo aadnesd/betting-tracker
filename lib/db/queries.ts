@@ -3102,3 +3102,52 @@ export async function getActiveFreeBetsSummary({
   }
 }
 
+/**
+ * Delete a free bet by ID.
+ * Only allows deletion of active or expired free bets, not used ones.
+ */
+export async function deleteFreeBet({
+  id,
+  userId,
+}: {
+  id: string;
+  userId: string;
+}) {
+  try {
+    // Verify the free bet exists and belongs to user
+    const existing = await getFreeBetById({ id, userId });
+    if (!existing) {
+      return null;
+    }
+
+    if (existing.status === "used") {
+      throw new ChatSDKError(
+        "bad_request:validation",
+        "Cannot delete a used free bet"
+      );
+    }
+
+    await db
+      .delete(freeBet)
+      .where(and(eq(freeBet.id, id), eq(freeBet.userId, userId)));
+
+    // Create audit entry
+    await db.insert(auditLog).values({
+      createdAt: new Date(),
+      userId,
+      entityType: "account",
+      entityId: existing.accountId,
+      action: "delete",
+      changes: { freeBetId: id, value: existing.value },
+      notes: `Deleted free bet: ${existing.name}`,
+    });
+
+    return { success: true };
+  } catch (error) {
+    if (error instanceof ChatSDKError) {
+      throw error;
+    }
+    throw new ChatSDKError("bad_request:database", "Failed to delete free bet");
+  }
+}
+

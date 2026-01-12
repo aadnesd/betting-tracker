@@ -38,9 +38,18 @@ Prioritized implementation tasks. Check off when complete with tests passing.
 
 - [x] **Promo schema extension**: Add `FreeBet` table with fields: id, userId, accountId, name, value, currency, minOdds, expiresAt, status (active/used/expired), usedInMatchedBetId, createdAt, notes. DoD: schema + migration + basic CRUD queries. Why: Enables tracking of free bet inventory separately from transactions. Implementation: Added `FreeBet` table to `lib/db/schema.ts` with all required fields. Generated migration `lib/db/migrations/0016_hard_vargas.sql`. Added CRUD queries to `lib/db/queries.ts`: `createFreeBet`, `getFreeBetById`, `listFreeBetsByUser`, `listFreeBetsByAccount`, `updateFreeBet`, `markFreeBetAsUsed`, `countExpiringFreeBets`, `getActiveFreeBetsSummary`. Exported types `FreeBetStatus`, `CreateFreeBetParams`, `UpdateFreeBetParams`. Tests: 19 tests in `tests/unit/free-bet-queries.test.ts` covering function signatures, type correctness, all CRUD operations, status filters, and schema alignment with spec.
 
-- [ ] **Promo settings page**: Create `/bets/settings/promos` page listing active promotions and free bets per bookmaker with value, expiry date, and status. DoD: page shows real data, supports empty state, links to create/edit. Why: Central view of available promos.
+- [x] **Promo settings page**: Create `/bets/settings/promos` page listing active promotions and free bets per bookmaker with value, expiry date, and status. DoD: page shows real data, supports empty state, links to create/edit. Why: Central view of available promos. Implementation: Created full free bet management UI:
+  - `app/(chat)/bets/settings/promos/page.tsx` - List page with summary cards (active count, total value, expiring soon, used count), active free bets list with account name and expiry, history section for used/expired, expiry warning banner, and empty state support.
+  - `app/(chat)/bets/settings/promos/new/page.tsx` - Create new free bet page with `FreeBetForm` component.
+  - `app/(chat)/bets/settings/promos/[id]/page.tsx` - Detail/edit page showing summary and edit form for active free bets.
+  - `components/bets/free-bet-form.tsx` - Reusable client form component with account selection, name, value, currency, minOdds, expiresAt, notes fields. Auto-updates currency when account changes. Supports create/edit modes.
+  - `app/(chat)/api/bets/free-bets/route.ts` - API endpoints for POST (create) and GET (list with optional status filter).
+  - `app/(chat)/api/bets/free-bets/[id]/route.ts` - API endpoints for GET, PATCH, DELETE individual free bets.
+  - Added `deleteFreeBet` query function to `lib/db/queries.ts`.
+  - Added "Free Bets" navigation link to dashboard header.
+  All 168 tests passing.
 
-- [ ] **Promo/free bet form**: Modal or page to record a new free bet or promotion with fields: bookmaker (account), name, value, currency, minOdds, expiry date, terms/notes. DoD: form validates, persists to DB, appears in list. Why: Manual entry for promos received.
+- [x] **Promo/free bet form**: Modal or page to record a new free bet or promotion with fields: bookmaker (account), name, value, currency, minOdds, expiry date, terms/notes. DoD: form validates, persists to DB, appears in list. Why: Manual entry for promos received. Implementation: Completed as part of Promo settings page above - FreeBetForm component at `components/bets/free-bet-form.tsx` includes all fields with validation. New free bet page at `/bets/settings/promos/new` provides the creation UI.
 
 - [ ] **Expiry warnings**: Dashboard banner and/or notification for promos expiring within 7 days. DoD: warning shows with count and links to promo list filtered by expiring. Why: Prevents missed free bets.
 
