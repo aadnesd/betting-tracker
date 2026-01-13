@@ -3,12 +3,12 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/app/(auth)/auth";
 import { BetStatusBadge } from "@/components/bets/bet-status-badge";
+import { DashboardActions } from "@/components/bets/dashboard-actions";
 import { DashboardSummaryCards } from "@/components/bets/dashboard-summary-cards";
 import { ExposureAlertBanner } from "@/components/bets/exposure-alert-banner";
 import { ExposureTimelineWithControls } from "@/components/bets/exposure-timeline-chart";
 import { FreeBetExpiryBanner } from "@/components/bets/free-bet-expiry-banner";
 import { PendingSettlementCard } from "@/components/bets/pending-settlement-card";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -17,6 +17,7 @@ import {
   getDashboardSummary,
   getExposureTimeline,
   getPendingSettlementBets,
+  listAccountsWithBalances,
   listMatchedBetsByUser,
 } from "@/lib/db/queries";
 
@@ -33,7 +34,7 @@ export default async function Page() {
 
   const userId = session.user.id;
 
-  const [bets, summary, expiringFreeBetsCount, exposureData7, exposureData14, exposureData30, exposureData90, pendingSettlementBets, pendingSettlementCount] = await Promise.all([
+  const [bets, summary, expiringFreeBetsCount, exposureData7, exposureData14, exposureData30, exposureData90, pendingSettlementBets, pendingSettlementCount, accountsWithBalances] = await Promise.all([
     listMatchedBetsByUser({
       userId,
       limit: 50,
@@ -46,7 +47,22 @@ export default async function Page() {
     getExposureTimeline({ userId, daysBack: 90 }),
     getPendingSettlementBets({ userId, filter: "all", limit: 10 }),
     countPendingSettlementBets({ userId }),
+    listAccountsWithBalances({ userId }),
   ]);
+
+  // Helper to check if an account is active (treats null/undefined as active for backwards compatibility)
+  const isActive = (status: string | null | undefined) => !status || status === "active";
+  
+  // Transform accounts for QuickTransactionSheet
+  const accounts = accountsWithBalances
+    .filter((a) => isActive(a.status))
+    .map((a) => ({
+      id: a.id,
+      name: a.name,
+      kind: a.kind,
+      currency: a.currency || "NOK",
+      currentBalance: String(a.currentBalance),
+    }));
 
   return (
     <div className="space-y-6 p-4 md:p-8">
@@ -60,39 +76,10 @@ export default async function Page() {
             Review parsed bets and jump into a new upload flow.
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button asChild variant="outline" size="sm" className="md:size-default">
-            <Link href="/bets/reports">Reports</Link>
-          </Button>
-          <Button asChild variant="outline" size="sm" className="md:size-default">
-            <Link href="/bets/bankroll">Bankroll</Link>
-          </Button>
-          <Button asChild variant={summary.pendingReviewCount > 0 ? "outline" : "ghost"} size="sm" className="md:size-default">
-            <Link href="/bets/review" className="flex items-center gap-2">
-              Review
-              {summary.pendingReviewCount > 0 && (
-                <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-500 px-1.5 font-semibold text-white text-xs">
-                  {summary.pendingReviewCount}
-                </span>
-              )}
-            </Link>
-          </Button>
-          <Button asChild variant="ghost" size="sm" className="md:size-default">
-            <Link href="/bets/settings/accounts">Accounts</Link>
-          </Button>
-          <Button asChild variant="ghost" size="sm" className="md:size-default">
-            <Link href="/bets/settings/promos">Free Bets</Link>
-          </Button>
-          <Button asChild variant="ghost" size="sm" className="md:size-default">
-            <Link href="/bets/settings/competitions">Competitions</Link>
-          </Button>
-          <Button asChild variant="outline" size="sm" className="md:size-default">
-            <Link href="/bets/quick-add">Quick Add</Link>
-          </Button>
-          <Button asChild size="sm" className="md:size-default">
-            <Link href="/bets/new">New bet</Link>
-          </Button>
-        </div>
+        <DashboardActions 
+          pendingReviewCount={summary.pendingReviewCount} 
+          accounts={accounts}
+        />
       </div>
 
       <ExposureAlertBanner
