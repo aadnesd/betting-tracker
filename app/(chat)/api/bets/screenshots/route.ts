@@ -6,6 +6,31 @@ import { auth } from "@/app/(auth)/auth";
 import { isTestEnvironment } from "@/lib/constants";
 import { saveScreenshotUpload } from "@/lib/db/queries";
 
+/**
+ * Performance timer utility for diagnosing API slowness.
+ * Records elapsed time for named phases.
+ */
+function createTimer() {
+  const startTime = Date.now();
+  const phases: Record<string, number> = {};
+  let lastMark = startTime;
+
+  return {
+    mark(name: string) {
+      const now = Date.now();
+      phases[name] = now - lastMark;
+      lastMark = now;
+    },
+    log(prefix: string) {
+      const totalMs = Date.now() - startTime;
+      const phaseStr = Object.entries(phases)
+        .map(([name, ms]) => `${name}=${ms}ms`)
+        .join(", ");
+      console.log(`[${prefix}] Total: ${totalMs}ms | Phases: ${phaseStr}`);
+    },
+  };
+}
+
 const FileSchema = z.instanceof(Blob).refine((file) => {
   return (
     file.size <= 8 * 1024 * 1024 &&
@@ -14,7 +39,9 @@ const FileSchema = z.instanceof(Blob).refine((file) => {
 });
 
 export async function POST(request: Request) {
+  const timer = createTimer();
   const session = await auth();
+  timer.mark("auth");
 
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -22,6 +49,7 @@ export async function POST(request: Request) {
 
   try {
     const formData = await request.formData();
+    timer.mark("parseFormData");
     const back = formData.get("back");
     const lay = formData.get("lay");
 
@@ -63,6 +91,7 @@ export async function POST(request: Request) {
     };
 
     const [backUrl, layUrl] = await Promise.all([toUrl(back), toUrl(lay)]);
+    timer.mark("blobUpload");
 
     const [backRow, layRow] = await Promise.all([
       saveScreenshotUpload({
@@ -82,6 +111,8 @@ export async function POST(request: Request) {
         size: layUrl.file.size,
       }),
     ]);
+    timer.mark("dbSave");
+    timer.log("screenshots/upload");
 
     return NextResponse.json({
       back: backRow,

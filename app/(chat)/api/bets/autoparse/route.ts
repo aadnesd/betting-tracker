@@ -10,6 +10,31 @@ import {
   updateScreenshotStatus,
 } from "@/lib/db/queries";
 
+/**
+ * Performance timer utility for diagnosing API slowness.
+ * Records elapsed time for named phases.
+ */
+function createTimer() {
+  const startTime = Date.now();
+  const phases: Record<string, number> = {};
+  let lastMark = startTime;
+
+  return {
+    mark(name: string) {
+      const now = Date.now();
+      phases[name] = now - lastMark;
+      lastMark = now;
+    },
+    log(prefix: string) {
+      const totalMs = Date.now() - startTime;
+      const phaseStr = Object.entries(phases)
+        .map(([name, ms]) => `${name}=${ms}ms`)
+        .join(", ");
+      console.log(`[${prefix}] Total: ${totalMs}ms | Phases: ${phaseStr}`);
+    },
+  };
+}
+
 const bodySchema = z.object({
   backScreenshotId: z.string().uuid(),
   layScreenshotId: z.string().uuid(),
@@ -57,7 +82,9 @@ function enrichBetWithAccountMatch(
 }
 
 export async function POST(request: Request) {
+  const timer = createTimer();
   const session = await auth();
+  timer.mark("auth");
 
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -71,6 +98,7 @@ export async function POST(request: Request) {
   } catch {
     return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
   }
+  timer.mark("parsePayload");
 
   const [backShot, layShot] = await Promise.all([
     getScreenshotById({
@@ -82,6 +110,7 @@ export async function POST(request: Request) {
       userId: session.user.id,
     }),
   ]);
+  timer.mark("fetchScreenshots");
 
   if (!backShot || !layShot) {
     return NextResponse.json({ error: "Screenshots not found" }, { status: 404 });
@@ -92,6 +121,7 @@ export async function POST(request: Request) {
       backImageUrl: backShot.url,
       layImageUrl: layShot.url,
     });
+    timer.mark("aiParsing");
 
     // Match parsed exchange/bookmaker names against user's existing accounts
     const [backAccountId, layAccountId] = await Promise.all([
@@ -106,6 +136,7 @@ export async function POST(request: Request) {
         kind: "exchange",
       }),
     ]);
+    timer.mark("accountMatching");
 
     // Enrich bets with account matching results
     const enrichedBack = enrichBetWithAccountMatch(parsed.back, backAccountId);
@@ -156,6 +187,8 @@ export async function POST(request: Request) {
         error: null,
       }),
     ]);
+    timer.mark("updateStatus");
+    timer.log("bets/autoparse");
 
     return NextResponse.json({
       back: enrichedBack,

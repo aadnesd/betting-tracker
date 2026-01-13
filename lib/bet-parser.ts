@@ -70,6 +70,7 @@ async function callModelWithRetry(params: {
   let lastError: unknown;
 
   for (let i = 0; i < attempts; i++) {
+    const attemptStart = Date.now();
     try {
       const { object } = await generateObject({
         model: myProvider.languageModel("chat-model"),
@@ -78,7 +79,10 @@ async function callModelWithRetry(params: {
           {
             role: "system",
             content:
-              "You are a precise matched-betting parser. Extract exact numbers from the screenshots. If data is missing, set a conservative default and mark needsReview.",
+              "You are a precise matched-betting parser. Extract exact numbers from betting slip screenshots. " +
+              "For lay bets (exchanges), distinguish between STAKE (backer's stake) and LIABILITY (stake × (odds-1)). " +
+              "If data is missing, set a conservative default and mark needsReview. " +
+              "Return JSON with confidence scores (0-1) per field.",
           },
           {
             role: "user",
@@ -86,37 +90,30 @@ async function callModelWithRetry(params: {
               {
                 type: "text",
                 text:
-                  "Parse the BACK bet screenshot. Return numeric odds/stake, bookmaker/exchange name, and ISO-4217 currency code (e.g. EUR, USD, NOK) for the stake.",
+                  "Parse these two betting screenshots:\n\n" +
+                  "BACK BET (Image 1): Extract market, selection, odds, stake, bookmaker name, and ISO-4217 currency code.\n\n" +
+                  "LAY BET (Image 2): Extract market, selection, odds, stake (NOT liability), bookmaker/exchange name. " +
+                  "If only liability is shown, compute stake = liability ÷ (odds - 1). Currency is typically NOK.\n\n" +
+                  "Ensure market and selection align between both bets. Flag needsReview=true if uncertain or misaligned.",
               },
               { type: "image", image: params.backImageUrl },
-            ],
-          },
-          {
-            role: "user",
-            content: [
-              {
-                type: "text",
-                text:
-                  "Parse the LAY bet (exchange) screenshot. IMPORTANT: Exchanges show both STAKE (backer's stake) and LIABILITY (stake × (odds-1)). Extract the STAKE into 'stake' field and the LIABILITY into 'liability' field. If only liability is visible, compute stake = liability ÷ (odds - 1). Currency should be NOK. Ensure market and selection align with the back bet.",
-              },
               { type: "image", image: params.layImageUrl },
             ],
-          },
-          {
-            role: "user",
-            content:
-              "Return JSON only. Include confidence per field between 0-1. Flag needsReview=true if anything is uncertain or the markets do not align.",
           },
         ],
       });
 
       const pair = pairSchema.parse(object);
+      const attemptMs = Date.now() - attemptStart;
+      console.log(`[bet-parser] AI model call attempt ${i + 1} completed in ${attemptMs}ms`);
       return {
         ...pair,
         back: normalizeNumbers(pair.back),
         lay: normalizeNumbers(pair.lay),
       };
     } catch (err) {
+      const attemptMs = Date.now() - attemptStart;
+      console.log(`[bet-parser] AI model call attempt ${i + 1} failed after ${attemptMs}ms`);
       lastError = err;
     }
   }
