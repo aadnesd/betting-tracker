@@ -4,7 +4,21 @@ Prioritized implementation tasks. Check off when complete with tests passing.
 
 ## Bugs — Active Issues
 
-(No active bugs)
+- [ ] **Quick Add not showing existing accounts**: The Quick Add page filters accounts by `status === "active"`, but accounts like "Stake" that exist are not appearing in the bookmaker/exchange dropdowns. Possible causes: 1) Account was created with null/undefined status, 2) Account `kind` is incorrect (bookmaker vs exchange mismatch), 3) Account belongs to a different user (guest vs logged in). DoD: All active accounts for the current user appear in the appropriate dropdown. Implementation plan:
+  1. Debug by logging accounts returned from `listAccountsByUser` in Quick Add page
+  2. Check if account status is properly set to 'active' on creation in `createAccount` query
+  3. Verify account kind (bookmaker vs exchange) matches the expected dropdown
+  4. Add fallback to show accounts with null status as active
+  5. Add test to verify account appears in Quick Add after creation
+
+## P9 — UX Improvements
+
+- [ ] **Quick transaction from dashboard**: Add ability to quickly add bonus/deposit/withdrawal transactions from the dashboard without navigating through Accounts → Account → Add Transaction. DoD: Dashboard has a "Quick Transaction" button that opens a modal or flyout with account selector, transaction type, amount, and notes. Why: Reduces friction for common operations like recording a bonus received. Implementation plan:
+  1. Create `QuickTransactionModal` component with form: account dropdown, type (deposit/withdrawal/bonus), amount, currency, notes
+  2. Add "Quick Transaction" button to dashboard header next to existing buttons
+  3. On submit, call existing `/api/bets/accounts/[id]/transactions` POST endpoint
+  4. Show success toast and optionally refresh dashboard data
+  5. Consider adding shortcut for "Add Bonus" specifically since it's most common
 
 ## P0 — Critical Path (AI Intake + Schema Alignment)
 
