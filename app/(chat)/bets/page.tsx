@@ -7,13 +7,16 @@ import { DashboardSummaryCards } from "@/components/bets/dashboard-summary-cards
 import { ExposureAlertBanner } from "@/components/bets/exposure-alert-banner";
 import { ExposureTimelineWithControls } from "@/components/bets/exposure-timeline-chart";
 import { FreeBetExpiryBanner } from "@/components/bets/free-bet-expiry-banner";
+import { PendingSettlementCard } from "@/components/bets/pending-settlement-card";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import {
   countExpiringFreeBets,
+  countPendingSettlementBets,
   getDashboardSummary,
   getExposureTimeline,
+  getPendingSettlementBets,
   listMatchedBetsByUser,
 } from "@/lib/db/queries";
 
@@ -30,7 +33,7 @@ export default async function Page() {
 
   const userId = session.user.id;
 
-  const [bets, summary, expiringFreeBetsCount, exposureData7, exposureData14, exposureData30, exposureData90] = await Promise.all([
+  const [bets, summary, expiringFreeBetsCount, exposureData7, exposureData14, exposureData30, exposureData90, pendingSettlementBets, pendingSettlementCount] = await Promise.all([
     listMatchedBetsByUser({
       userId,
       limit: 50,
@@ -41,6 +44,8 @@ export default async function Page() {
     getExposureTimeline({ userId, daysBack: 14 }),
     getExposureTimeline({ userId, daysBack: 30 }),
     getExposureTimeline({ userId, daysBack: 90 }),
+    getPendingSettlementBets({ userId, filter: "all", limit: 10 }),
+    countPendingSettlementBets({ userId }),
   ]);
 
   return (
@@ -117,6 +122,11 @@ export default async function Page() {
         data30={exposureData30}
         data90={exposureData90}
         currentExposure={summary.openExposure}
+      />
+
+      <PendingSettlementCard
+        bets={pendingSettlementBets}
+        totalCount={pendingSettlementCount}
       />
 
       <Card>

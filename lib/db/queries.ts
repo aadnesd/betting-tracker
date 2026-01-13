@@ -10,8 +10,10 @@ import {
   gte,
   inArray,
   isNotNull,
+  isNull,
   lt,
   lte,
+  or,
   sql,
   sum,
   type SQL,
@@ -1714,6 +1716,196 @@ export async function getMatchedBetWithParts({
     throw new ChatSDKError(
       "bad_request:database",
       "Failed to fetch matched bet details"
+    );
+  }
+}
+
+/**
+ * Result type for pending settlement query.
+ * Includes matched bet info with optional linked football match data.
+ */
+export type PendingSettlementBet = {
+  id: string;
+  market: string;
+  selection: string;
+  status: string;
+  netExposure: string | null;
+  createdAt: Date;
+  promoType: string | null;
+  matchId: string | null;
+  // Linked football match info (null if bet not linked to match)
+  footballMatch: {
+    id: string;
+    homeTeam: string;
+    awayTeam: string;
+    competition: string;
+    matchDate: Date;
+    status: string;
+    homeScore: string | null;
+    awayScore: string | null;
+  } | null;
+};
+
+/**
+ * Get matched bets awaiting settlement, optionally filtered by match date range.
+ * Bets are considered pending settlement when status is 'matched' (not draft, settled, or needs_review).
+ * 
+ * Results include linked football match info for display in the pending settlement queue.
+ * Groups bets by match date to streamline the settlement workflow.
+ * 
+ * @param userId - User ID to filter bets
+ * @param filter - Optional filter: 'today', 'thisWeek', or 'all' (default: 'all')
+ * @param limit - Maximum number of bets to return (default: 50)
+ */
+export async function getPendingSettlementBets({
+  userId,
+  filter = "all",
+  limit = 50,
+}: {
+  userId: string;
+  filter?: "today" | "thisWeek" | "all";
+  limit?: number;
+}): Promise<PendingSettlementBet[]> {
+  try {
+    // Build date filter conditions based on filter type
+    const now = new Date();
+    const conditions: SQL<unknown>[] = [
+      eq(matchedBet.userId, userId),
+      eq(matchedBet.status, "matched"),
+    ];
+
+    if (filter === "today") {
+      const startOfDay = new Date(now);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(now);
+      endOfDay.setHours(23, 59, 59, 999);
+      // Filter by football match date if linked, otherwise by bet creation date
+      conditions.push(
+        or(
+          and(
+            isNotNull(matchedBet.matchId),
+            gte(footballMatch.matchDate, startOfDay),
+            lte(footballMatch.matchDate, endOfDay)
+          ),
+          and(
+            isNull(matchedBet.matchId),
+            gte(matchedBet.createdAt, startOfDay),
+            lte(matchedBet.createdAt, endOfDay)
+          )
+        )!
+      );
+    } else if (filter === "thisWeek") {
+      // Start of current week (Monday)
+      const startOfWeek = new Date(now);
+      const dayOfWeek = startOfWeek.getDay();
+      const diff = startOfWeek.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
+      startOfWeek.setDate(diff);
+      startOfWeek.setHours(0, 0, 0, 0);
+      // End of week (Sunday)
+      const endOfWeek = new Date(startOfWeek);
+      endOfWeek.setDate(endOfWeek.getDate() + 6);
+      endOfWeek.setHours(23, 59, 59, 999);
+      
+      conditions.push(
+        or(
+          and(
+            isNotNull(matchedBet.matchId),
+            gte(footballMatch.matchDate, startOfWeek),
+            lte(footballMatch.matchDate, endOfWeek)
+          ),
+          and(
+            isNull(matchedBet.matchId),
+            gte(matchedBet.createdAt, startOfWeek),
+            lte(matchedBet.createdAt, endOfWeek)
+          )
+        )!
+      );
+    }
+
+    const rows = await db
+      .select({
+        id: matchedBet.id,
+        market: matchedBet.market,
+        selection: matchedBet.selection,
+        status: matchedBet.status,
+        netExposure: matchedBet.netExposure,
+        createdAt: matchedBet.createdAt,
+        promoType: matchedBet.promoType,
+        matchId: matchedBet.matchId,
+        footballMatchId: footballMatch.id,
+        homeTeam: footballMatch.homeTeam,
+        awayTeam: footballMatch.awayTeam,
+        competition: footballMatch.competition,
+        matchDate: footballMatch.matchDate,
+        matchStatus: footballMatch.status,
+        homeScore: footballMatch.homeScore,
+        awayScore: footballMatch.awayScore,
+      })
+      .from(matchedBet)
+      .leftJoin(footballMatch, eq(matchedBet.matchId, footballMatch.id))
+      .where(and(...conditions))
+      .orderBy(
+        // Order by match date if available, otherwise by bet creation date
+        asc(footballMatch.matchDate),
+        desc(matchedBet.createdAt)
+      )
+      .limit(limit);
+
+    // Transform to result type
+    return rows.map((row) => ({
+      id: row.id,
+      market: row.market,
+      selection: row.selection,
+      status: row.status,
+      netExposure: row.netExposure,
+      createdAt: row.createdAt,
+      promoType: row.promoType,
+      matchId: row.matchId,
+      footballMatch: row.footballMatchId
+        ? {
+            id: row.footballMatchId,
+            homeTeam: row.homeTeam!,
+            awayTeam: row.awayTeam!,
+            competition: row.competition!,
+            matchDate: row.matchDate!,
+            status: row.matchStatus!,
+            homeScore: row.homeScore,
+            awayScore: row.awayScore,
+          }
+        : null,
+    }));
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get pending settlement bets"
+    );
+  }
+}
+
+/**
+ * Count matched bets awaiting settlement.
+ * Used for dashboard badge display.
+ */
+export async function countPendingSettlementBets({
+  userId,
+}: {
+  userId: string;
+}): Promise<number> {
+  try {
+    const [result] = await db
+      .select({ count: count(matchedBet.id) })
+      .from(matchedBet)
+      .where(
+        and(
+          eq(matchedBet.userId, userId),
+          eq(matchedBet.status, "matched")
+        )
+      );
+    return result?.count ?? 0;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to count pending settlement bets"
     );
   }
 }
