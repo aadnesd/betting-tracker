@@ -87,13 +87,7 @@ Prioritized implementation tasks. Check off when complete with tests passing.
 
 ## Future Enhancements
 
-- [ ] **Partial match detection** (Medium priority) - When back stake doesn't properly match lay stake accounting for odds (backStake vs layStake × (layOdds - 1)), show a warning. DoD: >5% variance displays warning on bet detail page. Why: Prevents users from entering mismatched stakes without realizing it.
-
-- [ ] **Expandable matched sets on list view** (Low priority) - Add accordion/expand functionality on the dashboard matched sets list to show both legs inline without navigating to detail page. DoD: Click on row expands to show back/lay bet details. Why: Faster review without navigation.
-
-- [ ] **Invalid screenshot upload test** (Low priority) - Add test coverage for rejecting screenshots >10MB or invalid file types. DoD: Unit/integration test in tests/routes/ directory.
-
-- [ ] **Additional E2E test scenarios** (Low priority) - Add E2E tests for: odds drift warning display, exposure threshold alert, FX conversion display, low confidence highlighting. DoD: Playwright tests in tests/e2e/ directory.
+- [ ] **API slowness** (High priority) - Investigate and fix why the bets/screenshots endpoint takes so long (test it with tests/test-images/bet2.png and tests/test-images/bet3.png). Also do the same for the autparse endpoint.
 
 ---
 
