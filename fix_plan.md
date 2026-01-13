@@ -75,7 +75,7 @@ Prioritized implementation tasks. Check off when complete with tests passing.
 
 ## P8 — Bankroll Management
 
-- [ ] **Bankroll dashboard**: New page `/bets/bankroll` showing total capital across all accounts, breakdown by bookmaker vs exchange, deposit/withdrawal trends. DoD: page renders real aggregated data. Why: Holistic view of funds.
+- [x] **Bankroll dashboard**: New page `/bets/bankroll` showing total capital across all accounts, breakdown by bookmaker vs exchange, deposit/withdrawal trends. DoD: page renders real aggregated data. Why: Holistic view of funds. Implementation: Created `getBankrollSummary` query in `lib/db/queries.ts` that aggregates: totalCapital (sum of all account balances), bookmakerBalance/exchangeBalance (by account kind), depositTotal/withdrawalTotal/bonusTotal (summed from transactions). Created `getTransactionTrends` query that groups transactions by day (30d) or week (90d) for charting deposits, withdrawals, and bonuses over time. Created `app/(chat)/bets/bankroll/page.tsx` with: 4 summary cards (Total Capital, Bookmaker Balance, Exchange Balance, Net Deposits), 3 transaction flow cards (Deposits, Withdrawals, Bonuses), account breakdown lists for bookmakers and exchanges sorted by balance. Created `components/bets/bankroll-transaction-chart.tsx` client component with bar/area chart toggle and 30d/90d time range toggle using Recharts. Added "Bankroll" navigation link to dashboard header. Build passes with all 170 tests passing.
 
 - [ ] **Account targets**: Per-account deposit/withdrawal targets to manage gubbing risk (e.g., "withdraw max £500/month from Bet365"). DoD: targets stored on Account, warnings shown when approaching limits. Why: Avoids account restrictions.
 
