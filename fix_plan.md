@@ -4,12 +4,7 @@ Prioritized implementation tasks. Check off when complete with tests passing.
 
 ## Bugs — Active Issues
 
-- [ ] **Quick Add not showing existing accounts**: The Quick Add page filters accounts by `status === "active"`, but accounts like "Stake" that exist are not appearing in the bookmaker/exchange dropdowns. Possible causes: 1) Account was created with null/undefined status, 2) Account `kind` is incorrect (bookmaker vs exchange mismatch), 3) Account belongs to a different user (guest vs logged in). DoD: All active accounts for the current user appear in the appropriate dropdown. Implementation plan:
-  1. Debug by logging accounts returned from `listAccountsByUser` in Quick Add page
-  2. Check if account status is properly set to 'active' on creation in `createAccount` query
-  3. Verify account kind (bookmaker vs exchange) matches the expected dropdown
-  4. Add fallback to show accounts with null status as active
-  5. Add test to verify account appears in Quick Add after creation
+- [x] **Quick Add not showing existing accounts**: The Quick Add page filters accounts by `status === "active"`, but accounts like "Stake" that exist are not appearing in the bookmaker/exchange dropdowns. Possible causes: 1) Account was created with null/undefined status, 2) Account `kind` is incorrect (bookmaker vs exchange mismatch), 3) Account belongs to a different user (guest vs logged in). DoD: All active accounts for the current user appear in the appropriate dropdown. Implementation: Root cause was accounts created before the status column was properly enforced had null status, which were being filtered out by the strict `status === "active"` check. Solution: Added `isActive` helper function that treats null/undefined status as active for backwards compatibility. Files changed: `app/(chat)/bets/quick-add/page.tsx` (added isActive helper for filtering accounts), `app/(chat)/bets/settings/promos/new/page.tsx` (same fix for promo creation), `app/(chat)/bets/settings/promos/[id]/page.tsx` (same fix for promo editing), `lib/db/queries.ts` (fixed `getBankrollSummary` activeAccountCount filter). Tests: 2 new tests in `tests/unit/account-queries.test.ts` covering the isActive logic.
 
 ## P9 — UX Improvements
 

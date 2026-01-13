@@ -21,8 +21,11 @@ export default async function NewFreeBetPage() {
   const userId = session.user.id;
 
   const accounts = await listAccountsByUser({ userId });
+  // Treat null/undefined status as active for backwards compatibility
+  const isActive = (status: string | null | undefined) =>
+    status === "active" || !status;
   const bookmakers = accounts
-    .filter((a) => a.kind === "bookmaker" && a.status === "active")
+    .filter((a) => a.kind === "bookmaker" && isActive(a.status))
     .map((a) => ({
       id: a.id,
       name: a.name,

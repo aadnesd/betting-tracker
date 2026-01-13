@@ -996,12 +996,16 @@ export async function getBankrollSummary({
     const totalWithdrawals = Number.parseFloat(String(txTotals?.totalWithdrawals || "0"));
     const totalBonuses = Number.parseFloat(String(txTotals?.totalBonuses || "0"));
 
+    // Treat null/undefined status as active for backwards compatibility
+    const isActive = (status: string | null | undefined) =>
+      status === "active" || !status;
+
     return {
       totalCapital: bookmakerBalance + exchangeBalance,
       bookmakerBalance,
       exchangeBalance,
       accountCount: accounts.length,
-      activeAccountCount: accounts.filter((a) => a.status === "active").length,
+      activeAccountCount: accounts.filter((a) => isActive(a.status)).length,
       totalDeposits,
       totalWithdrawals,
       totalBonuses,

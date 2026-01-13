@@ -199,4 +199,49 @@ describe("account balance queries", () => {
       expect(exchangeAccount.commission).toBe("0.02");
     });
   });
+
+  describe("isActive helper logic", () => {
+    // Test the isActive logic that treats null/undefined status as active
+    // This is used in Quick Add page and other places to filter accounts
+    
+    it("treats null status as active for backwards compatibility", () => {
+      // The isActive function used in Quick Add and other pages should treat
+      // null or undefined status as active, since older accounts may not have
+      // had status properly set.
+      const isActive = (status: string | null | undefined) =>
+        status === "active" || !status;
+
+      expect(isActive("active")).toBe(true);
+      expect(isActive("archived")).toBe(false);
+      expect(isActive(null)).toBe(true);
+      expect(isActive(undefined)).toBe(true);
+      expect(isActive("")).toBe(true); // Empty string is falsy
+    });
+
+    it("filters accounts correctly with null status fallback", () => {
+      const accounts = [
+        { id: "1", name: "Active Account", kind: "bookmaker", status: "active" },
+        { id: "2", name: "Archived Account", kind: "bookmaker", status: "archived" },
+        { id: "3", name: "Legacy Account", kind: "bookmaker", status: null },
+        { id: "4", name: "Exchange", kind: "exchange", status: "active" },
+        { id: "5", name: "Legacy Exchange", kind: "exchange", status: null },
+      ] as const;
+
+      const isActive = (status: string | null | undefined) =>
+        status === "active" || !status;
+
+      const activeBookmakers = accounts.filter(
+        (a) => a.kind === "bookmaker" && isActive(a.status)
+      );
+      const activeExchanges = accounts.filter(
+        (a) => a.kind === "exchange" && isActive(a.status)
+      );
+
+      expect(activeBookmakers).toHaveLength(2); // Active Account + Legacy Account
+      expect(activeExchanges).toHaveLength(2); // Exchange + Legacy Exchange
+      expect(activeBookmakers.map((a) => a.name)).toContain("Active Account");
+      expect(activeBookmakers.map((a) => a.name)).toContain("Legacy Account");
+      expect(activeBookmakers.map((a) => a.name)).not.toContain("Archived Account");
+    });
+  });
 });

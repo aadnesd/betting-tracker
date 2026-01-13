@@ -23,8 +23,13 @@ export default async function QuickAddPage() {
     }),
   ]);
 
+  // Treat null/undefined status as active for backwards compatibility
+  // (accounts created before status column was properly enforced)
+  const isActive = (status: string | null | undefined) =>
+    status === "active" || !status;
+
   const bookmakers = accounts
-    .filter((a) => a.kind === "bookmaker" && a.status === "active")
+    .filter((a) => a.kind === "bookmaker" && isActive(a.status))
     .map((a) => ({
       id: a.id,
       name: a.name,
@@ -33,7 +38,7 @@ export default async function QuickAddPage() {
     }));
 
   const exchanges = accounts
-    .filter((a) => a.kind === "exchange" && a.status === "active")
+    .filter((a) => a.kind === "exchange" && isActive(a.status))
     .map((a) => ({
       id: a.id,
       name: a.name,
