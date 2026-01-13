@@ -2,6 +2,16 @@
 
 Prioritized implementation tasks. Check off when complete with tests passing.
 
+## Bugs — Active Issues
+
+- [ ] **Reports summary should include bonus transactions**: The main summary cards on `/bets/reports` (Net Profit, Total Stake, ROI) only count profit/loss from settled matched bet legs, but bonus transactions added via Account → Add Transaction → Bonus are not included. The "Bookmaker Performance (incl. Bonuses)" table correctly shows bonuses, but the headline profit figure excludes them. DoD: Reports summary card shows total profit = betting profit + bonuses; ROI calculation uses combined profit. Why: Bonuses are real profit that should be reflected in the overall performance metrics. Implementation plan: 
+  1. Create `getTotalBonusesForUser` query in `lib/db/queries.ts` that sums all bonus-type transactions for user within date range
+  2. Update `ReportingContent` in `app/(chat)/bets/reports/page.tsx` to fetch total bonuses alongside other data
+  3. Update `calculateReportingSummary` in `lib/reporting.ts` to accept optional `bonusTotal` parameter and add to `netProfit`
+  4. Update `ReportingSummary` interface to include `bonusTotal` field
+  5. Update `ReportingSummaryCard` component to show "Betting P/L" and "Bonuses" breakdown if bonuses > 0
+  6. Tests: Add tests for new query, update reporting.test.ts for bonus inclusion in summary
+
 ## P0 — Critical Path (AI Intake + Schema Alignment)
 
 (All P0 items completed)
@@ -77,13 +87,6 @@ Prioritized implementation tasks. Check off when complete with tests passing.
 
 - [x] **Bankroll dashboard**: New page `/bets/bankroll` showing total capital across all accounts, breakdown by bookmaker vs exchange, deposit/withdrawal trends. DoD: page renders real aggregated data. Why: Holistic view of funds. Implementation: Created `getBankrollSummary` query in `lib/db/queries.ts` that aggregates: totalCapital (sum of all account balances), bookmakerBalance/exchangeBalance (by account kind), depositTotal/withdrawalTotal/bonusTotal (summed from transactions). Created `getTransactionTrends` query that groups transactions by day (30d) or week (90d) for charting deposits, withdrawals, and bonuses over time. Created `app/(chat)/bets/bankroll/page.tsx` with: 4 summary cards (Total Capital, Bookmaker Balance, Exchange Balance, Net Deposits), 3 transaction flow cards (Deposits, Withdrawals, Bonuses), account breakdown lists for bookmakers and exchanges sorted by balance. Created `components/bets/bankroll-transaction-chart.tsx` client component with bar/area chart toggle and 30d/90d time range toggle using Recharts. Added "Bankroll" navigation link to dashboard header. Build passes with all 170 tests passing.
 
-- [ ] **Account targets**: Per-account deposit/withdrawal targets to manage gubbing risk (e.g., "withdraw max £500/month from Bet365"). DoD: targets stored on Account, warnings shown when approaching limits. Why: Avoids account restrictions.
-
-- [ ] **Stake pattern analysis**: Track stake patterns per bookmaker (average stake, variance, max stake). Flag unusual patterns that might trigger gubbing. DoD: report shows stake distribution per account. Why: Proactive gubbing avoidance.
-
-- [ ] **Mug betting suggestions**: Based on stake patterns, suggest "mug bets" (recreational-looking bets) to place at bookmakers. Track mug bet P&L separately. DoD: suggestions shown on account detail, mug bet flag on bets. Why: Account longevity.
-
-- [ ] **Recommended bankroll allocation**: Based on current exposure and account balances, suggest optimal fund distribution. DoD: allocation recommendations displayed with reasoning. Why: Better capital efficiency.
 
 ---
 
