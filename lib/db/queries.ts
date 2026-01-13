@@ -37,6 +37,7 @@ import {
   matchedBet,
   message,
   promo,
+  qualifyingBet,
   type Suggestion,
   screenshotUpload,
   stream,
@@ -3050,6 +3051,11 @@ export async function listFreeBetsByUser({
         usedInMatchedBetId: freeBet.usedInMatchedBetId,
         notes: freeBet.notes,
         accountName: account.name,
+        // Unlock requirement fields
+        unlockType: freeBet.unlockType,
+        unlockTarget: freeBet.unlockTarget,
+        unlockMinOdds: freeBet.unlockMinOdds,
+        unlockProgress: freeBet.unlockProgress,
       })
       .from(freeBet)
       .leftJoin(account, eq(freeBet.accountId, account.id))
@@ -3315,6 +3321,416 @@ export async function deleteFreeBet({
       throw error;
     }
     throw new ChatSDKError("bad_request:database", "Failed to delete free bet");
+  }
+}
+
+// ============================================================================
+// Promo Progress Tracking Queries
+// ============================================================================
+
+export type FreeBetWithProgress = {
+  id: string;
+  name: string;
+  value: string;
+  currency: string;
+  status: string;
+  expiresAt: Date | null;
+  accountId: string;
+  accountName: string;
+  unlockType: "stake" | "bets" | null;
+  unlockTarget: string | null;
+  unlockMinOdds: string | null;
+  unlockProgress: string;
+  progressPercent: number;
+  isLocked: boolean;
+};
+
+/**
+ * List free bets with their unlock progress for a user.
+ * Includes computed progress percentage and lock status.
+ */
+export async function listFreeBetsWithProgress({
+  userId,
+  status,
+}: {
+  userId: string;
+  status?: "active" | "locked" | "used" | "expired";
+}): Promise<FreeBetWithProgress[]> {
+  try {
+    const conditions: SQL[] = [eq(freeBet.userId, userId)];
+    if (status) {
+      conditions.push(eq(freeBet.status, status));
+    }
+
+    const rows = await db
+      .select({
+        id: freeBet.id,
+        name: freeBet.name,
+        value: freeBet.value,
+        currency: freeBet.currency,
+        status: freeBet.status,
+        expiresAt: freeBet.expiresAt,
+        accountId: freeBet.accountId,
+        accountName: account.name,
+        unlockType: freeBet.unlockType,
+        unlockTarget: freeBet.unlockTarget,
+        unlockMinOdds: freeBet.unlockMinOdds,
+        unlockProgress: freeBet.unlockProgress,
+      })
+      .from(freeBet)
+      .innerJoin(account, eq(freeBet.accountId, account.id))
+      .where(and(...conditions))
+      .orderBy(desc(freeBet.createdAt));
+
+    return rows.map((row) => {
+      const target = row.unlockTarget
+        ? Number.parseFloat(row.unlockTarget)
+        : 0;
+      const progress = row.unlockProgress
+        ? Number.parseFloat(row.unlockProgress)
+        : 0;
+      const progressPercent = target > 0 ? Math.min((progress / target) * 100, 100) : 100;
+      const isLocked = row.unlockType !== null && progress < target;
+
+      return {
+        id: row.id,
+        name: row.name,
+        value: row.value,
+        currency: row.currency,
+        status: row.status,
+        expiresAt: row.expiresAt,
+        accountId: row.accountId,
+        accountName: row.accountName,
+        unlockType: row.unlockType as "stake" | "bets" | null,
+        unlockTarget: row.unlockTarget,
+        unlockMinOdds: row.unlockMinOdds,
+        unlockProgress: row.unlockProgress ?? "0",
+        progressPercent,
+        isLocked,
+      };
+    });
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to list free bets with progress"
+    );
+  }
+}
+
+export interface QualifyingBetInfo {
+  id: string;
+  createdAt: Date;
+  matchedBetId: string;
+  contribution: string;
+  market: string | null;
+  selection: string | null;
+  backStake: string | null;
+  backOdds: string | null;
+}
+
+/**
+ * List qualifying bets for a specific free bet/promo.
+ * Returns the bets that contribute to unlocking the promo.
+ */
+export async function listQualifyingBetsForPromo({
+  freeBetId,
+  userId,
+}: {
+  freeBetId: string;
+  userId: string;
+}): Promise<QualifyingBetInfo[]> {
+  try {
+    // Verify ownership
+    const fb = await getFreeBetById({ id: freeBetId, userId });
+    if (!fb) {
+      throw new ChatSDKError(
+        "bad_request:api",
+        "Free bet not found or access denied"
+      );
+    }
+
+    const rows = await db
+      .select({
+        id: qualifyingBet.id,
+        createdAt: qualifyingBet.createdAt,
+        matchedBetId: qualifyingBet.matchedBetId,
+        contribution: qualifyingBet.contribution,
+        market: matchedBet.market,
+        selection: matchedBet.selection,
+        backStake: backBet.stake,
+        backOdds: backBet.odds,
+      })
+      .from(qualifyingBet)
+      .innerJoin(matchedBet, eq(qualifyingBet.matchedBetId, matchedBet.id))
+      .leftJoin(backBet, eq(matchedBet.backBetId, backBet.id))
+      .where(eq(qualifyingBet.freeBetId, freeBetId))
+      .orderBy(desc(qualifyingBet.createdAt));
+
+    return rows.map((row) => ({
+      id: row.id,
+      createdAt: row.createdAt,
+      matchedBetId: row.matchedBetId,
+      contribution: row.contribution,
+      market: row.market,
+      selection: row.selection,
+      backStake: row.backStake,
+      backOdds: row.backOdds,
+    }));
+  } catch (error) {
+    if (error instanceof ChatSDKError) {
+      throw error;
+    }
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to list qualifying bets"
+    );
+  }
+}
+
+/**
+ * Add a qualifying bet to a promo, updating its progress.
+ * This is called when a bet is placed that contributes to unlocking a promo.
+ */
+export async function addQualifyingBet({
+  freeBetId,
+  matchedBetId,
+  userId,
+  contribution,
+}: {
+  freeBetId: string;
+  matchedBetId: string;
+  userId: string;
+  contribution: number;
+}) {
+  try {
+    // Verify ownership and get current progress
+    const fb = await getFreeBetById({ id: freeBetId, userId });
+    if (!fb) {
+      throw new ChatSDKError(
+        "bad_request:api",
+        "Free bet not found or access denied"
+      );
+    }
+
+    if (fb.status !== "locked") {
+      throw new ChatSDKError(
+        "bad_request:api",
+        "Can only add qualifying bets to locked promos"
+      );
+    }
+
+    // Insert qualifying bet record
+    const [qb] = await db
+      .insert(qualifyingBet)
+      .values({
+        createdAt: new Date(),
+        freeBetId,
+        matchedBetId,
+        contribution: String(contribution),
+      })
+      .returning();
+
+    // Update progress
+    const currentProgress = fb.unlockProgress
+      ? Number.parseFloat(fb.unlockProgress)
+      : 0;
+    const newProgress = currentProgress + contribution;
+    const target = fb.unlockTarget
+      ? Number.parseFloat(fb.unlockTarget)
+      : 0;
+
+    // Check if unlocked
+    const isUnlocked = newProgress >= target;
+
+    await db
+      .update(freeBet)
+      .set({
+        unlockProgress: String(newProgress),
+        status: isUnlocked ? "active" : "locked",
+      })
+      .where(eq(freeBet.id, freeBetId));
+
+    // Create audit entry
+    await db.insert(auditLog).values({
+      createdAt: new Date(),
+      userId,
+      entityType: "free_bet",
+      entityId: freeBetId,
+      action: "update",
+      changes: {
+        qualifyingBetId: qb.id,
+        contribution,
+        newProgress,
+        unlocked: isUnlocked,
+      },
+      notes: isUnlocked
+        ? `Promo unlocked! Progress: ${newProgress}/${target}`
+        : `Added qualifying bet. Progress: ${newProgress}/${target}`,
+    });
+
+    return {
+      qualifyingBet: qb,
+      newProgress,
+      isUnlocked,
+    };
+  } catch (error) {
+    if (error instanceof ChatSDKError) {
+      throw error;
+    }
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to add qualifying bet"
+    );
+  }
+}
+
+/**
+ * Remove a qualifying bet from a promo, updating its progress.
+ * Called when a bet is voided or deleted.
+ */
+export async function removeQualifyingBet({
+  qualifyingBetId,
+  userId,
+}: {
+  qualifyingBetId: string;
+  userId: string;
+}) {
+  try {
+    // Get the qualifying bet
+    const [qb] = await db
+      .select()
+      .from(qualifyingBet)
+      .where(eq(qualifyingBet.id, qualifyingBetId));
+
+    if (!qb) {
+      throw new ChatSDKError("bad_request:api", "Qualifying bet not found");
+    }
+
+    // Verify ownership via the free bet
+    const fb = await getFreeBetById({ id: qb.freeBetId, userId });
+    if (!fb) {
+      throw new ChatSDKError("bad_request:api", "Access denied");
+    }
+
+    // Remove the qualifying bet
+    await db
+      .delete(qualifyingBet)
+      .where(eq(qualifyingBet.id, qualifyingBetId));
+
+    // Update progress
+    const currentProgress = fb.unlockProgress
+      ? Number.parseFloat(fb.unlockProgress)
+      : 0;
+    const contribution = Number.parseFloat(qb.contribution);
+    const newProgress = Math.max(0, currentProgress - contribution);
+
+    await db
+      .update(freeBet)
+      .set({
+        unlockProgress: String(newProgress),
+        status: "locked", // If we removed a qualifying bet, it's likely locked again
+      })
+      .where(eq(freeBet.id, qb.freeBetId));
+
+    // Create audit entry
+    await db.insert(auditLog).values({
+      createdAt: new Date(),
+      userId,
+      entityType: "free_bet",
+      entityId: qb.freeBetId,
+      action: "update",
+      changes: {
+        qualifyingBetId,
+        removedContribution: contribution,
+        newProgress,
+      },
+      notes: `Removed qualifying bet. Progress: ${newProgress}`,
+    });
+
+    return { success: true, newProgress };
+  } catch (error) {
+    if (error instanceof ChatSDKError) {
+      throw error;
+    }
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to remove qualifying bet"
+    );
+  }
+}
+
+/**
+ * Create a locked promo with unlock requirements.
+ * Different from createFreeBet as this creates a promo that must be unlocked.
+ */
+export async function createLockedPromo({
+  userId,
+  accountId,
+  name,
+  value,
+  currency,
+  minOdds,
+  expiresAt,
+  notes,
+  unlockType,
+  unlockTarget,
+  unlockMinOdds,
+}: {
+  userId: string;
+  accountId: string;
+  name: string;
+  value: number;
+  currency: string;
+  minOdds?: number;
+  expiresAt?: Date;
+  notes?: string;
+  unlockType: "stake" | "bets";
+  unlockTarget: number;
+  unlockMinOdds?: number;
+}) {
+  try {
+    const [result] = await db
+      .insert(freeBet)
+      .values({
+        createdAt: new Date(),
+        userId,
+        accountId,
+        name,
+        value: String(value),
+        currency,
+        minOdds: minOdds ? String(minOdds) : null,
+        expiresAt: expiresAt ?? null,
+        notes: notes ?? null,
+        status: "locked",
+        unlockType,
+        unlockTarget: String(unlockTarget),
+        unlockMinOdds: unlockMinOdds ? String(unlockMinOdds) : null,
+        unlockProgress: "0",
+      })
+      .returning();
+
+    // Create audit entry
+    await db.insert(auditLog).values({
+      createdAt: new Date(),
+      userId,
+      entityType: "free_bet",
+      entityId: result.id,
+      action: "create",
+      changes: {
+        name,
+        value,
+        unlockType,
+        unlockTarget,
+      },
+      notes: `Created locked promo: ${name} (unlock: ${unlockType} ${unlockTarget})`,
+    });
+
+    return result;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to create locked promo"
+    );
   }
 }
 

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/app/(auth)/auth";
-import { createFreeBet, listFreeBetsByUser, getAccountById } from "@/lib/db/queries";
+import { createFreeBet, createLockedPromo, listFreeBetsByUser, getAccountById } from "@/lib/db/queries";
 
 const createFreeBetSchema = z.object({
   accountId: z.string().uuid(),
@@ -11,6 +11,10 @@ const createFreeBetSchema = z.object({
   minOdds: z.number().positive().optional().nullable(),
   expiresAt: z.string().datetime().optional().nullable(),
   notes: z.string().max(500).optional().nullable(),
+  // Unlock requirements (optional - for promos that need to be unlocked)
+  unlockType: z.enum(["stake", "bets"]).optional(),
+  unlockTarget: z.number().positive().optional(),
+  unlockMinOdds: z.number().positive().optional().nullable(),
 });
 
 export async function POST(request: NextRequest) {
@@ -42,16 +46,36 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const freeBet = await createFreeBet({
-      userId,
-      accountId: parsed.data.accountId,
-      name: parsed.data.name,
-      value: parsed.data.value,
-      currency: parsed.data.currency,
-      minOdds: parsed.data.minOdds,
-      expiresAt: parsed.data.expiresAt ? new Date(parsed.data.expiresAt) : null,
-      notes: parsed.data.notes || null,
-    });
+    // Create either a locked promo or a regular free bet
+    let freeBet;
+    if (parsed.data.unlockType && parsed.data.unlockTarget) {
+      // Create a locked promo with unlock requirements
+      freeBet = await createLockedPromo({
+        userId,
+        accountId: parsed.data.accountId,
+        name: parsed.data.name,
+        value: parsed.data.value,
+        currency: parsed.data.currency,
+        minOdds: parsed.data.minOdds ?? undefined,
+        expiresAt: parsed.data.expiresAt ? new Date(parsed.data.expiresAt) : undefined,
+        notes: parsed.data.notes ?? undefined,
+        unlockType: parsed.data.unlockType,
+        unlockTarget: parsed.data.unlockTarget,
+        unlockMinOdds: parsed.data.unlockMinOdds ?? undefined,
+      });
+    } else {
+      // Create a regular free bet (already unlocked)
+      freeBet = await createFreeBet({
+        userId,
+        accountId: parsed.data.accountId,
+        name: parsed.data.name,
+        value: parsed.data.value,
+        currency: parsed.data.currency,
+        minOdds: parsed.data.minOdds,
+        expiresAt: parsed.data.expiresAt ? new Date(parsed.data.expiresAt) : null,
+        notes: parsed.data.notes || null,
+      });
+    }
 
     return NextResponse.json(freeBet, { status: 201 });
   } catch (error) {

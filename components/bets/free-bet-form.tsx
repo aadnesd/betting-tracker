@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2 } from "lucide-react";
+import { ChevronDown, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -15,6 +15,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
 interface Account {
   id: string;
@@ -33,7 +38,10 @@ interface FreeBetFormProps {
     minOdds: string;
     expiresAt: string;
     notes: string;
-    status?: "active" | "used" | "expired";
+    status?: "active" | "used" | "expired" | "locked";
+    unlockType?: "stake" | "bets" | null;
+    unlockTarget?: string;
+    unlockMinOdds?: string;
   };
   mode: "create" | "edit";
 }
@@ -46,12 +54,17 @@ interface FormData {
   minOdds: string;
   expiresAt: string;
   notes: string;
+  hasUnlockRequirements: boolean;
+  unlockType: "stake" | "bets";
+  unlockTarget: string;
+  unlockMinOdds: string;
 }
 
 const CURRENCIES = ["NOK", "EUR", "GBP", "USD", "SEK", "DKK"] as const;
 
 export function FreeBetForm({ accounts, initialData, mode }: FreeBetFormProps) {
   const router = useRouter();
+  const hasExistingUnlock = initialData?.unlockType != null;
   const [formData, setFormData] = useState<FormData>({
     accountId: initialData?.accountId ?? "",
     name: initialData?.name ?? "",
@@ -60,8 +73,13 @@ export function FreeBetForm({ accounts, initialData, mode }: FreeBetFormProps) {
     minOdds: initialData?.minOdds ?? "",
     expiresAt: initialData?.expiresAt ?? "",
     notes: initialData?.notes ?? "",
+    hasUnlockRequirements: hasExistingUnlock,
+    unlockType: initialData?.unlockType ?? "stake",
+    unlockTarget: initialData?.unlockTarget ?? "",
+    unlockMinOdds: initialData?.unlockMinOdds ?? "",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showUnlockSection, setShowUnlockSection] = useState(hasExistingUnlock);
   const [errors, setErrors] = useState<Partial<Record<keyof FormData, string>>>(
     {}
   );
@@ -114,6 +132,23 @@ export function FreeBetForm({ accounts, initialData, mode }: FreeBetFormProps) {
       }
     }
 
+    // Validate unlock requirements if enabled
+    if (formData.hasUnlockRequirements) {
+      const target = Number.parseFloat(formData.unlockTarget);
+      if (!formData.unlockTarget || Number.isNaN(target)) {
+        newErrors.unlockTarget = "Unlock target is required";
+      } else if (target <= 0) {
+        newErrors.unlockTarget = "Target must be positive";
+      }
+
+      if (formData.unlockMinOdds) {
+        const unlockOdds = Number.parseFloat(formData.unlockMinOdds);
+        if (Number.isNaN(unlockOdds) || unlockOdds < 1) {
+          newErrors.unlockMinOdds = "Min odds must be at least 1.0";
+        }
+      }
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -139,6 +174,14 @@ export function FreeBetForm({ accounts, initialData, mode }: FreeBetFormProps) {
           : null,
         expiresAt: formData.expiresAt ? new Date(formData.expiresAt).toISOString() : null,
         notes: formData.notes.trim() || null,
+        // Unlock requirements (only if enabled)
+        ...(formData.hasUnlockRequirements && {
+          unlockType: formData.unlockType,
+          unlockTarget: Number.parseFloat(formData.unlockTarget),
+          unlockMinOdds: formData.unlockMinOdds
+            ? Number.parseFloat(formData.unlockMinOdds)
+            : null,
+        }),
       };
 
       const url =
@@ -317,6 +360,146 @@ export function FreeBetForm({ accounts, initialData, mode }: FreeBetFormProps) {
           rows={3}
         />
       </div>
+
+      {/* Unlock Requirements (Collapsible) */}
+      {mode === "create" && (
+        <Collapsible open={showUnlockSection} onOpenChange={setShowUnlockSection}>
+          <CollapsibleTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              className="flex w-full items-center justify-between p-0 hover:bg-transparent"
+            >
+              <span className="font-medium text-sm">
+                Unlock Requirements (optional)
+              </span>
+              <ChevronDown
+                className={`h-4 w-4 transition-transform ${showUnlockSection ? "rotate-180" : ""}`}
+              />
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="mt-4 space-y-4 rounded-lg border bg-muted/30 p-4">
+            <p className="text-muted-foreground text-sm">
+              If this free bet requires placing qualifying bets first (e.g., "Bet £50 to unlock £10 free bet"),
+              enter the requirements below to track your progress.
+            </p>
+
+            {/* Enable unlock tracking */}
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="hasUnlockRequirements"
+                checked={formData.hasUnlockRequirements}
+                onChange={(e) =>
+                  updateField("hasUnlockRequirements", e.target.checked)
+                }
+                className="h-4 w-4 rounded border-gray-300"
+              />
+              <Label htmlFor="hasUnlockRequirements" className="text-sm">
+                This promo has unlock requirements
+              </Label>
+            </div>
+
+            {formData.hasUnlockRequirements && (
+              <>
+                {/* Unlock Type */}
+                <div className="space-y-2">
+                  <Label htmlFor="unlockType">Unlock Type</Label>
+                  <Select
+                    value={formData.unlockType}
+                    onValueChange={(value: "stake" | "bets") =>
+                      updateField("unlockType", value)
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="stake">
+                        Total Stake (e.g., bet £50 total)
+                      </SelectItem>
+                      <SelectItem value="bets">
+                        Number of Bets (e.g., place 3 bets)
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Unlock Target */}
+                <div className="space-y-2">
+                  <Label htmlFor="unlockTarget">
+                    {formData.unlockType === "stake"
+                      ? "Required Stake Amount"
+                      : "Required Number of Bets"}
+                  </Label>
+                  <Input
+                    id="unlockTarget"
+                    type="number"
+                    step={formData.unlockType === "stake" ? "0.01" : "1"}
+                    min={formData.unlockType === "stake" ? "0.01" : "1"}
+                    placeholder={formData.unlockType === "stake" ? "50.00" : "3"}
+                    value={formData.unlockTarget}
+                    onChange={(e) => updateField("unlockTarget", e.target.value)}
+                    className={errors.unlockTarget ? "border-destructive" : ""}
+                  />
+                  {errors.unlockTarget && (
+                    <p className="text-xs text-destructive">
+                      {errors.unlockTarget}
+                    </p>
+                  )}
+                  <p className="text-muted-foreground text-xs">
+                    {formData.unlockType === "stake"
+                      ? "Total stake required to unlock this free bet"
+                      : "Number of qualifying bets required to unlock"}
+                  </p>
+                </div>
+
+                {/* Unlock Min Odds */}
+                <div className="space-y-2">
+                  <Label htmlFor="unlockMinOdds">
+                    Minimum Odds for Qualifying Bets (optional)
+                  </Label>
+                  <Input
+                    id="unlockMinOdds"
+                    type="number"
+                    step="0.01"
+                    min="1.00"
+                    placeholder="e.g., 1.50"
+                    value={formData.unlockMinOdds}
+                    onChange={(e) => updateField("unlockMinOdds", e.target.value)}
+                    className={errors.unlockMinOdds ? "border-destructive" : ""}
+                  />
+                  {errors.unlockMinOdds && (
+                    <p className="text-xs text-destructive">
+                      {errors.unlockMinOdds}
+                    </p>
+                  )}
+                  <p className="text-muted-foreground text-xs">
+                    Minimum odds required for bets to count as qualifying
+                  </p>
+                </div>
+              </>
+            )}
+          </CollapsibleContent>
+        </Collapsible>
+      )}
+
+      {/* Show unlock info in edit mode if applicable */}
+      {mode === "edit" && initialData?.unlockType && (
+        <div className="rounded-lg border bg-muted/30 p-4">
+          <h4 className="mb-2 font-medium text-sm">Unlock Requirements</h4>
+          <p className="text-muted-foreground text-sm">
+            {initialData.unlockType === "stake"
+              ? `Stake ${initialData.unlockTarget} ${formData.currency} to unlock`
+              : `Place ${initialData.unlockTarget} qualifying bets to unlock`}
+            {initialData.unlockMinOdds &&
+              ` (min odds: ${initialData.unlockMinOdds})`}
+          </p>
+          <p className="mt-1 text-muted-foreground text-xs">
+            Note: Unlock requirements cannot be edited after creation. Track progress on the promo detail page.
+          </p>
+        </div>
+      )}
 
       {/* Actions */}
       <div className="flex gap-4 pt-4">

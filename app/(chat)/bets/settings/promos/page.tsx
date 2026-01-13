@@ -3,6 +3,7 @@ import {
   Calendar,
   Filter,
   Gift,
+  Lock,
   Plus,
   Tag,
   X,
@@ -12,6 +13,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/app/(auth)/auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 import {
   countExpiringFreeBets,
   getActiveFreeBetsSummary,
@@ -46,7 +48,7 @@ function isExpiringSoon(date: Date | null): boolean {
 function FreeBetStatusBadge({
   status,
 }: {
-  status: "active" | "used" | "expired";
+  status: "active" | "locked" | "used" | "expired";
 }) {
   switch (status) {
     case "active":
@@ -54,6 +56,13 @@ function FreeBetStatusBadge({
         <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-emerald-700 text-xs">
           <Gift className="h-3 w-3" />
           Active
+        </span>
+      );
+    case "locked":
+      return (
+        <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-amber-700 text-xs">
+          <Lock className="h-3 w-3" />
+          Locked
         </span>
       );
     case "used":
@@ -96,6 +105,7 @@ export default async function PromosSettingsPage({
   ]);
 
   let activeFreeBets = freeBets.filter((fb) => fb.status === "active");
+  const lockedFreeBets = freeBets.filter((fb) => fb.status === "locked");
   
   // Apply filter if requested - uses isExpiringSoon helper defined above
   if (filterExpiring) {
@@ -301,6 +311,84 @@ export default async function PromosSettingsPage({
           ))}
         </CardContent>
       </Card>
+
+      {/* Locked Promos (with unlock requirements) */}
+      {lockedFreeBets.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Lock className="h-5 w-5 text-amber-600" />
+              Locked Promos ({lockedFreeBets.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {lockedFreeBets.map((fb) => {
+              const unlockProgress = fb.unlockProgress
+                ? Number.parseFloat(fb.unlockProgress)
+                : 0;
+              const unlockTarget = fb.unlockTarget
+                ? Number.parseFloat(fb.unlockTarget)
+                : 0;
+              const progressPercent =
+                unlockTarget > 0
+                  ? Math.min((unlockProgress / unlockTarget) * 100, 100)
+                  : 0;
+
+              return (
+                <Link
+                  key={fb.id}
+                  href={`/bets/settings/promos/${fb.id}`}
+                  className="block rounded-md border border-amber-200 bg-amber-50/30 p-4 transition-colors hover:bg-amber-50/50"
+                >
+                  <div className="space-y-3">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold">{fb.name}</span>
+                          <FreeBetStatusBadge status={fb.status} />
+                        </div>
+                        <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+                          {fb.accountName && (
+                            <span className="flex items-center gap-1">
+                              <Tag className="h-3 w-3" />
+                              {fb.accountName}
+                            </span>
+                          )}
+                          <span>
+                            {fb.unlockType === "stake"
+                              ? `Stake ${fb.currency} ${unlockTarget.toFixed(0)}`
+                              : `Place ${unlockTarget.toFixed(0)} bets`}
+                            {fb.unlockMinOdds &&
+                              ` @ ${Number.parseFloat(fb.unlockMinOdds).toFixed(2)}+`}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-semibold text-lg text-amber-600">
+                          {formatCurrency(fb.value, fb.currency)}
+                        </p>
+                        <p className="text-muted-foreground text-xs">When unlocked</p>
+                      </div>
+                    </div>
+                    {/* Progress bar */}
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-xs text-muted-foreground">
+                        <span>
+                          {fb.unlockType === "stake"
+                            ? `${fb.currency} ${unlockProgress.toFixed(2)}`
+                            : `${unlockProgress.toFixed(0)} bets`}
+                        </span>
+                        <span>{progressPercent.toFixed(0)}%</span>
+                      </div>
+                      <Progress value={progressPercent} className="h-2 bg-amber-100" />
+                    </div>
+                  </div>
+                </Link>
+              );
+            })}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Used & Expired Free Bets */}
       {(usedFreeBets.length > 0 || expiredFreeBets.length > 0) && (

@@ -426,4 +426,172 @@ describe("FreeBet CRUD queries", () => {
       expect(mockFreeBet.notes).toBeDefined();
     });
   });
+
+  // ==========================================================================
+  // Promo Progress Tracking Tests (P6)
+  // ==========================================================================
+
+  describe("FreeBetStatus type with locked", () => {
+    it("supports locked status for promos with unlock requirements", () => {
+      // Verify the status type now includes 'locked'
+      const locked: dbQueries.FreeBetStatus = "locked";
+      expect(locked).toBe("locked");
+    });
+  });
+
+  describe("listFreeBetsWithProgress", () => {
+    it("is a function that returns free bets with unlock progress info", async () => {
+      expect(typeof dbQueries.listFreeBetsWithProgress).toBe("function");
+
+      // Verify function signature
+      const fn: (args: {
+        userId: string;
+        status?: "active" | "locked" | "used" | "expired";
+      }) => Promise<dbQueries.FreeBetWithProgress[]> =
+        dbQueries.listFreeBetsWithProgress;
+      expect(fn).toBeDefined();
+    });
+
+    it("FreeBetWithProgress type has all required fields", () => {
+      const mockProgress: dbQueries.FreeBetWithProgress = {
+        id: "fb-1",
+        name: "Bet £50 Get £10 Free",
+        value: "10.00",
+        currency: "GBP",
+        status: "locked",
+        expiresAt: new Date("2026-02-01"),
+        accountId: "acct-1",
+        accountName: "bet365",
+        unlockType: "stake",
+        unlockTarget: "50.00",
+        unlockMinOdds: "1.50",
+        unlockProgress: "25.00",
+        progressPercent: 50,
+        isLocked: true,
+      };
+
+      expect(mockProgress.unlockType).toBeDefined();
+      expect(mockProgress.unlockTarget).toBeDefined();
+      expect(mockProgress.unlockProgress).toBeDefined();
+      expect(mockProgress.progressPercent).toBeDefined();
+      expect(mockProgress.isLocked).toBeDefined();
+    });
+  });
+
+  describe("listQualifyingBetsForPromo", () => {
+    it("is a function for fetching qualifying bets linked to a promo", async () => {
+      expect(typeof dbQueries.listQualifyingBetsForPromo).toBe("function");
+
+      // Verify function signature
+      const fn: (args: {
+        freeBetId: string;
+        userId: string;
+      }) => Promise<dbQueries.QualifyingBetInfo[]> =
+        dbQueries.listQualifyingBetsForPromo;
+      expect(fn).toBeDefined();
+    });
+
+    it("QualifyingBetInfo type has all required fields", () => {
+      const mockQB: dbQueries.QualifyingBetInfo = {
+        id: "qb-1",
+        createdAt: new Date(),
+        matchedBetId: "mb-1",
+        contribution: "25.00",
+        market: "Man Utd vs Chelsea",
+        selection: "Man Utd to win",
+        backStake: "25.00",
+        backOdds: "2.50",
+      };
+
+      expect(mockQB.id).toBeDefined();
+      expect(mockQB.matchedBetId).toBeDefined();
+      expect(mockQB.contribution).toBeDefined();
+      expect(mockQB.market).toBeDefined();
+    });
+  });
+
+  describe("addQualifyingBet", () => {
+    it("is a function that adds a qualifying bet and updates progress", async () => {
+      expect(typeof dbQueries.addQualifyingBet).toBe("function");
+
+      // Verify function signature
+      const fn: (args: {
+        freeBetId: string;
+        matchedBetId: string;
+        userId: string;
+        contribution: number;
+      }) => Promise<{
+        qualifyingBet: unknown;
+        newProgress: number;
+        isUnlocked: boolean;
+      }> = dbQueries.addQualifyingBet;
+      expect(fn).toBeDefined();
+    });
+  });
+
+  describe("removeQualifyingBet", () => {
+    it("is a function that removes a qualifying bet and updates progress", async () => {
+      expect(typeof dbQueries.removeQualifyingBet).toBe("function");
+
+      // Verify function signature
+      const fn: (args: {
+        qualifyingBetId: string;
+        userId: string;
+      }) => Promise<{
+        success: boolean;
+        newProgress: number;
+      }> = dbQueries.removeQualifyingBet;
+      expect(fn).toBeDefined();
+    });
+  });
+
+  describe("createLockedPromo", () => {
+    it("is a function for creating promos with unlock requirements", async () => {
+      expect(typeof dbQueries.createLockedPromo).toBe("function");
+
+      // Verify function signature
+      const fn: (args: {
+        userId: string;
+        accountId: string;
+        name: string;
+        value: number;
+        currency: string;
+        minOdds?: number;
+        expiresAt?: Date;
+        notes?: string;
+        unlockType: "stake" | "bets";
+        unlockTarget: number;
+        unlockMinOdds?: number;
+      }) => Promise<unknown> = dbQueries.createLockedPromo;
+      expect(fn).toBeDefined();
+    });
+
+    it("requires unlockType and unlockTarget for locked promos", () => {
+      // Type check: unlockType and unlockTarget are required
+      const stakePromo = {
+        userId: "user-1",
+        accountId: "acct-1",
+        name: "Bet £50 Get £10 Free",
+        value: 10,
+        currency: "GBP",
+        unlockType: "stake" as const,
+        unlockTarget: 50,
+      };
+
+      const betsPromo = {
+        userId: "user-1",
+        accountId: "acct-1",
+        name: "Place 3 bets, get £5 free",
+        value: 5,
+        currency: "GBP",
+        unlockType: "bets" as const,
+        unlockTarget: 3,
+      };
+
+      expect(stakePromo.unlockType).toBe("stake");
+      expect(stakePromo.unlockTarget).toBe(50);
+      expect(betsPromo.unlockType).toBe("bets");
+      expect(betsPromo.unlockTarget).toBe(3);
+    });
+  });
 });

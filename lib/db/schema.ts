@@ -355,6 +355,7 @@ const auditEntityTypeEnum = [
   "matched_bet",
   "account",
   "screenshot",
+  "free_bet",
 ] as const;
 
 const auditActionEnum = [
@@ -381,7 +382,7 @@ export const auditLog = pgTable("AuditLog", {
 
 export type AuditLog = InferSelectModel<typeof auditLog>;
 
-const freeBetStatusEnum = ["active", "used", "expired"] as const;
+const freeBetStatusEnum = ["active", "used", "expired", "locked"] as const;
 
 export const freeBet = pgTable("FreeBet", {
   id: uuid("id").primaryKey().notNull().defaultRandom(),
@@ -402,6 +403,34 @@ export const freeBet = pgTable("FreeBet", {
     .default("active"),
   usedInMatchedBetId: uuid("usedInMatchedBetId").references(() => matchedBet.id),
   notes: text("notes"),
+  // Progress tracking for recurring/multi-step promos
+  // unlockType: null = already unlocked, 'stake' = total stake required, 'bets' = number of bets required
+  unlockType: varchar("unlockType", { enum: ["stake", "bets"] as const }),
+  // The target value to unlock (e.g., 50 for "Bet £50", or 3 for "Place 3 bets")
+  unlockTarget: numeric("unlockTarget", { precision: 14, scale: 2 }),
+  // Minimum odds required for qualifying bets (separate from minOdds for using the free bet)
+  unlockMinOdds: numeric("unlockMinOdds", { precision: 12, scale: 4 }),
+  // Current progress toward unlock
+  unlockProgress: numeric("unlockProgress", { precision: 14, scale: 2 }).default("0"),
 });
 
 export type FreeBet = InferSelectModel<typeof freeBet>;
+
+/**
+ * QualifyingBet - Links bets that contribute to unlocking a promo/free bet.
+ * Why: Tracks which bets count toward multi-step promo requirements.
+ */
+export const qualifyingBet = pgTable("QualifyingBet", {
+  id: uuid("id").primaryKey().notNull().defaultRandom(),
+  createdAt: timestamp("createdAt").notNull(),
+  freeBetId: uuid("freeBetId")
+    .notNull()
+    .references(() => freeBet.id),
+  matchedBetId: uuid("matchedBetId")
+    .notNull()
+    .references(() => matchedBet.id),
+  // The contribution amount (stake for 'stake' type, 1 for 'bets' type)
+  contribution: numeric("contribution", { precision: 14, scale: 2 }).notNull(),
+});
+
+export type QualifyingBet = InferSelectModel<typeof qualifyingBet>;

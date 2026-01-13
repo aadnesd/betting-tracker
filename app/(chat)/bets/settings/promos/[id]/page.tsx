@@ -1,5 +1,5 @@
 import { format } from "date-fns";
-import { ArrowLeft, CalendarDays, Gift, Trash2 } from "lucide-react";
+import { ArrowLeft, CalendarDays, Gift, Lock, Target, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/app/(auth)/auth";
@@ -13,7 +13,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { getFreeBetById, listAccountsByUser } from "@/lib/db/queries";
+import { Progress } from "@/components/ui/progress";
+import { getFreeBetById, listAccountsByUser, listQualifyingBetsForPromo } from "@/lib/db/queries";
 
 export const metadata = {
   title: "Free Bet Details",
@@ -27,6 +28,8 @@ function getStatusBadge(status: string) {
   switch (status) {
     case "active":
       return <Badge className="bg-emerald-100 text-emerald-700">Active</Badge>;
+    case "locked":
+      return <Badge className="bg-amber-100 text-amber-700">Locked</Badge>;
     case "used":
       return <Badge className="bg-blue-100 text-blue-700">Used</Badge>;
     case "expired":
@@ -64,7 +67,23 @@ export default async function FreeBetDetailPage({
     }));
 
   const account = accounts.find((a) => a.id === freeBet.accountId);
-  const isEditable = freeBet.status === "active";
+  const isEditable = freeBet.status === "active" || freeBet.status === "locked";
+
+  // Fetch qualifying bets if this is a locked promo with unlock requirements
+  const qualifyingBets = freeBet.unlockType
+    ? await listQualifyingBetsForPromo({ freeBetId: id, userId })
+    : [];
+
+  // Calculate progress
+  const hasUnlockRequirements = freeBet.unlockType !== null;
+  const unlockProgress = freeBet.unlockProgress
+    ? Number.parseFloat(freeBet.unlockProgress)
+    : 0;
+  const unlockTarget = freeBet.unlockTarget
+    ? Number.parseFloat(freeBet.unlockTarget)
+    : 0;
+  const progressPercent =
+    unlockTarget > 0 ? Math.min((unlockProgress / unlockTarget) * 100, 100) : 100;
 
   return (
     <div className="space-y-6 p-4 md:p-8">
@@ -149,6 +168,108 @@ export default async function FreeBetDetailPage({
         </CardContent>
       </Card>
 
+      {/* Progress Card (for promos with unlock requirements) */}
+      {hasUnlockRequirements && (
+        <Card className="max-w-2xl">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              {freeBet.status === "locked" ? (
+                <Lock className="h-5 w-5 text-amber-600" />
+              ) : (
+                <Target className="h-5 w-5 text-emerald-600" />
+              )}
+              Unlock Progress
+            </CardTitle>
+            <CardDescription>
+              {freeBet.status === "locked"
+                ? "Complete the requirements below to unlock this free bet."
+                : "Requirements completed! This free bet is now available."}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Progress bar */}
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">
+                  {freeBet.unlockType === "stake"
+                    ? `${freeBet.currency} ${unlockProgress.toFixed(2)} of ${unlockTarget.toFixed(2)}`
+                    : `${unlockProgress.toFixed(0)} of ${unlockTarget.toFixed(0)} bets`}
+                </span>
+                <span className="font-medium">{progressPercent.toFixed(0)}%</span>
+              </div>
+              <Progress
+                value={progressPercent}
+                className={freeBet.status === "locked" ? "bg-amber-100" : "bg-emerald-100"}
+              />
+            </div>
+
+            {/* Requirements summary */}
+            <dl className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <dt className="text-muted-foreground">Requirement</dt>
+                <dd className="font-medium">
+                  {freeBet.unlockType === "stake"
+                    ? `Stake ${freeBet.currency} ${unlockTarget.toFixed(2)}`
+                    : `Place ${unlockTarget.toFixed(0)} qualifying bets`}
+                </dd>
+              </div>
+              {freeBet.unlockMinOdds && (
+                <div>
+                  <dt className="text-muted-foreground">Min Odds</dt>
+                  <dd className="font-medium">
+                    {Number.parseFloat(freeBet.unlockMinOdds).toFixed(2)}
+                  </dd>
+                </div>
+              )}
+            </dl>
+
+            {/* Qualifying bets list */}
+            {qualifyingBets.length > 0 && (
+              <div className="mt-4 space-y-2">
+                <h4 className="font-medium text-sm">Qualifying Bets</h4>
+                <div className="space-y-2">
+                  {qualifyingBets.map((qb) => (
+                    <Link
+                      key={qb.id}
+                      href={`/bets/${qb.matchedBetId}`}
+                      className="flex items-center justify-between rounded-lg border p-3 hover:bg-muted/50"
+                    >
+                      <div>
+                        <p className="font-medium text-sm">
+                          {qb.market || "Unknown market"}
+                        </p>
+                        <p className="text-muted-foreground text-xs">
+                          {qb.selection || "Unknown selection"} •{" "}
+                          {format(new Date(qb.createdAt), "d MMM yyyy")}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-medium text-sm">
+                          {freeBet.unlockType === "stake"
+                            ? `${freeBet.currency} ${Number.parseFloat(qb.contribution).toFixed(2)}`
+                            : "+1 bet"}
+                        </p>
+                        {qb.backOdds && (
+                          <p className="text-muted-foreground text-xs">
+                            @ {Number.parseFloat(qb.backOdds).toFixed(2)}
+                          </p>
+                        )}
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {qualifyingBets.length === 0 && freeBet.status === "locked" && (
+              <p className="text-muted-foreground text-sm">
+                No qualifying bets yet. Place bets at this bookmaker to make progress toward unlocking.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Edit Form (only for active free bets) */}
       {isEditable && (
         <Card className="max-w-2xl">
@@ -174,6 +295,9 @@ export default async function FreeBetDetailPage({
                   : "",
                 notes: freeBet.notes ?? "",
                 status: freeBet.status,
+                unlockType: freeBet.unlockType as "stake" | "bets" | null,
+                unlockTarget: freeBet.unlockTarget ?? undefined,
+                unlockMinOdds: freeBet.unlockMinOdds ?? undefined,
               }}
             />
           </CardContent>
