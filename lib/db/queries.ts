@@ -46,7 +46,9 @@ import {
   suggestion,
   type User,
   user,
+  userSettings,
   vote,
+  DEFAULT_COMPETITION_CODES,
 } from "./schema";
 import { generateHashedPassword } from "./utils";
 
@@ -4089,6 +4091,118 @@ export async function searchFootballMatches({
       "bad_request:database",
       "Failed to search football matches"
     );
+  }
+}
+
+// =============================================================================
+// USER SETTINGS QUERIES
+// =============================================================================
+
+/**
+ * Get user settings by user ID.
+ * Returns null if no settings exist for the user.
+ */
+export async function getUserSettings({ userId }: { userId: string }) {
+  try {
+    const [result] = await db
+      .select()
+      .from(userSettings)
+      .where(eq(userSettings.userId, userId))
+      .limit(1);
+
+    return result ?? null;
+  } catch (_error) {
+    throw new ChatSDKError("bad_request:database", "Failed to get user settings");
+  }
+}
+
+/**
+ * Create or update user settings.
+ * Uses upsert to handle both new and existing settings.
+ */
+export async function upsertUserSettings({
+  userId,
+  enabledCompetitions,
+}: {
+  userId: string;
+  enabledCompetitions?: string[] | null;
+}) {
+  try {
+    const now = new Date();
+
+    const [result] = await db
+      .insert(userSettings)
+      .values({
+        userId,
+        enabledCompetitions,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .onConflictDoUpdate({
+        target: userSettings.userId,
+        set: {
+          enabledCompetitions,
+          updatedAt: now,
+        },
+      })
+      .returning();
+
+    return result;
+  } catch (_error) {
+    throw new ChatSDKError("bad_request:database", "Failed to upsert user settings");
+  }
+}
+
+/**
+ * Get enabled competitions for a user.
+ * Returns default competitions if user has no settings or hasn't configured any.
+ */
+export async function getEnabledCompetitions({ userId }: { userId: string }): Promise<string[]> {
+  try {
+    const settings = await getUserSettings({ userId });
+
+    // Return user's competitions if set, otherwise return defaults
+    if (settings?.enabledCompetitions && settings.enabledCompetitions.length > 0) {
+      return settings.enabledCompetitions;
+    }
+
+    return DEFAULT_COMPETITION_CODES;
+  } catch (_error) {
+    // On error, return defaults rather than failing
+    console.error("Failed to get enabled competitions, using defaults:", _error);
+    return DEFAULT_COMPETITION_CODES;
+  }
+}
+
+/**
+ * Get all unique competition codes enabled by any user.
+ * Used by the cron job to sync matches for all competitions that users care about.
+ * Falls back to defaults if no users have configured settings.
+ */
+export async function getAllEnabledCompetitions(): Promise<string[]> {
+  try {
+    const allSettings = await db.select().from(userSettings);
+
+    // Collect all unique competition codes
+    const allCodes = new Set<string>();
+
+    for (const settings of allSettings) {
+      if (settings.enabledCompetitions && Array.isArray(settings.enabledCompetitions)) {
+        for (const code of settings.enabledCompetitions) {
+          allCodes.add(code);
+        }
+      }
+    }
+
+    // If no users have settings, return defaults
+    if (allCodes.size === 0) {
+      return DEFAULT_COMPETITION_CODES;
+    }
+
+    return Array.from(allCodes);
+  } catch (_error) {
+    console.error("Failed to get all enabled competitions, using defaults:", _error);
+    return DEFAULT_COMPETITION_CODES;
   }
 }
 

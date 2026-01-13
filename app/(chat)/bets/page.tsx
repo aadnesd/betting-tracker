@@ -78,6 +78,9 @@ export default async function Page() {
           <Button asChild variant="ghost" size="sm" className="md:size-default">
             <Link href="/bets/settings/promos">Free Bets</Link>
           </Button>
+          <Button asChild variant="ghost" size="sm" className="md:size-default">
+            <Link href="/bets/settings/competitions">Competitions</Link>
+          </Button>
           <Button asChild variant="outline" size="sm" className="md:size-default">
             <Link href="/bets/quick-add">Quick Add</Link>
           </Button>

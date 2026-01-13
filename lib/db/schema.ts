@@ -473,3 +473,45 @@ export const footballMatch = pgTable("FootballMatch", {
 export type FootballMatch = InferSelectModel<typeof footballMatch>;
 
 export type FootballMatchStatus = (typeof matchStatusEnum)[number];
+
+/**
+ * UserSettings - Stores user preferences for the matched betting tracker.
+ * Why: Enables per-user configuration of features like competition sync.
+ */
+export const userSettings = pgTable("UserSettings", {
+  id: uuid("id").primaryKey().notNull().defaultRandom(),
+  userId: uuid("userId")
+    .notNull()
+    .references(() => user.id)
+    .unique(),
+  // Array of competition codes to sync (e.g., ["PL", "CL", "BL1"])
+  enabledCompetitions: jsonb("enabledCompetitions").$type<string[]>(),
+  createdAt: timestamp("createdAt").notNull(),
+  updatedAt: timestamp("updatedAt").notNull(),
+});
+
+export type UserSettings = InferSelectModel<typeof userSettings>;
+
+/**
+ * Available competitions for syncing from football-data.org.
+ * Code is the API identifier, name is for display.
+ */
+export const AVAILABLE_COMPETITIONS = [
+  { code: "PL", name: "Premier League", country: "England" },
+  { code: "CL", name: "Champions League", country: "Europe" },
+  { code: "EL", name: "Europa League", country: "Europe" },
+  { code: "EC", name: "Conference League", country: "Europe" },
+  { code: "BL1", name: "Bundesliga", country: "Germany" },
+  { code: "SA", name: "Serie A", country: "Italy" },
+  { code: "PD", name: "La Liga", country: "Spain" },
+  { code: "FL1", name: "Ligue 1", country: "France" },
+  { code: "DED", name: "Eredivisie", country: "Netherlands" },
+  { code: "PPL", name: "Primeira Liga", country: "Portugal" },
+  { code: "ELC", name: "Championship", country: "England" },
+  { code: "FAC", name: "FA Cup", country: "England" },
+  { code: "EFL", name: "EFL Cup", country: "England" },
+  { code: "WC", name: "World Cup", country: "International" },
+  { code: "CLI", name: "Copa Libertadores", country: "South America" },
+] as const;
+
+export const DEFAULT_COMPETITION_CODES = ["PL", "CL", "EL", "FL1", "BL1", "SA", "PD"];

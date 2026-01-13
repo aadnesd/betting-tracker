@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import {
   upsertFootballMatch,
+  getAllEnabledCompetitions,
   type CreateFootballMatchParams,
 } from "@/lib/db/queries";
-import type { FootballMatchStatus } from "@/lib/db/schema";
+import { DEFAULT_COMPETITION_CODES, type FootballMatchStatus } from "@/lib/db/schema";
 
 /**
  * Football-data.org API v4 response types.
@@ -55,12 +56,6 @@ interface FootballDataResponse {
     last: string;
   };
 }
-
-/**
- * Default competitions to sync if none configured.
- * Popular leagues for matched betting.
- */
-const DEFAULT_COMPETITIONS = ["PL", "CL", "EL", "FL1", "BL1", "SA", "PD"];
 
 /**
  * Parse a football-data.org match into our CreateFootballMatchParams format.
@@ -172,10 +167,20 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // Get competitions to sync from user settings (union of all users' enabled competitions)
+  // Falls back to DEFAULT_COMPETITION_CODES if no users have configured settings
+  let competitionsToSync: string[];
+  try {
+    competitionsToSync = await getAllEnabledCompetitions();
+  } catch (error) {
+    console.warn("[Match Sync] Failed to get user competitions, using defaults:", error);
+    competitionsToSync = [...DEFAULT_COMPETITION_CODES];
+  }
+
   const syncResults = {
     upcoming: { synced: 0, errors: 0 },
     finished: { synced: 0, errors: 0 },
-    competitions: DEFAULT_COMPETITIONS,
+    competitions: competitionsToSync,
     startedAt: new Date().toISOString(),
     completedAt: "",
     errors: [] as string[],
@@ -188,13 +193,13 @@ export async function GET(request: Request) {
     fourteenDaysAhead.setDate(fourteenDaysAhead.getDate() + 14);
 
     console.log(
-      `[Match Sync] Fetching upcoming matches from ${formatDate(now)} to ${formatDate(fourteenDaysAhead)}`
+      `[Match Sync] Fetching upcoming matches from ${formatDate(now)} to ${formatDate(fourteenDaysAhead)} for competitions: ${competitionsToSync.join(", ")}`
     );
 
     const upcomingMatches = await fetchMatchesFromApi({
       dateFrom: now,
       dateTo: fourteenDaysAhead,
-      competitions: DEFAULT_COMPETITIONS,
+      competitions: competitionsToSync,
       status: ["SCHEDULED", "TIMED"],
     });
 
@@ -224,7 +229,7 @@ export async function GET(request: Request) {
     const finishedMatches = await fetchMatchesFromApi({
       dateFrom: threeDaysAgo,
       dateTo: now,
-      competitions: DEFAULT_COMPETITIONS,
+      competitions: competitionsToSync,
       status: ["FINISHED"],
     });
 
