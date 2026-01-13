@@ -1914,6 +1914,178 @@ export async function countPendingSettlementBets({
   }
 }
 
+/**
+ * Result type for bets ready for auto-settlement.
+ * Contains matched bet info with the linked football match result.
+ */
+export type BetReadyForSettlement = {
+  id: string;
+  userId: string;
+  market: string;
+  selection: string;
+  status: string;
+  promoType: string | null;
+  matchId: string;
+  // Back bet info
+  backBetId: string | null;
+  backOdds: string | null;
+  backStake: string | null;
+  backAccountId: string | null;
+  // Lay bet info
+  layBetId: string | null;
+  layOdds: string | null;
+  layStake: string | null;
+  layAccountId: string | null;
+  // Football match result
+  footballMatch: {
+    id: string;
+    externalId: number;
+    homeTeam: string;
+    awayTeam: string;
+    competition: string;
+    matchDate: Date;
+    status: string;
+    homeScore: number;
+    awayScore: number;
+  };
+};
+
+/**
+ * Find matched bets ready for auto-settlement.
+ * 
+ * A bet is ready for auto-settlement when:
+ * 1. Status is 'matched' (not already settled, draft, or needs_review)
+ * 2. It's linked to a football match (has matchId)
+ * 3. The linked match has status 'FINISHED' with scores available
+ * 
+ * Returns bets with all necessary info to determine outcome and calculate P&L.
+ * 
+ * @param limit - Maximum number of bets to return (default: 100)
+ */
+export async function findBetsReadyForAutoSettlement({
+  limit = 100,
+}: {
+  limit?: number;
+} = {}): Promise<BetReadyForSettlement[]> {
+  try {
+    const rows = await db
+      .select({
+        id: matchedBet.id,
+        userId: matchedBet.userId,
+        market: matchedBet.market,
+        selection: matchedBet.selection,
+        status: matchedBet.status,
+        promoType: matchedBet.promoType,
+        matchId: matchedBet.matchId,
+        // Back bet
+        backBetId: backBet.id,
+        backOdds: backBet.odds,
+        backStake: backBet.stake,
+        backAccountId: backBet.accountId,
+        // Lay bet
+        layBetId: layBet.id,
+        layOdds: layBet.odds,
+        layStake: layBet.stake,
+        layAccountId: layBet.accountId,
+        // Football match
+        footballMatchId: footballMatch.id,
+        externalId: footballMatch.externalId,
+        homeTeam: footballMatch.homeTeam,
+        awayTeam: footballMatch.awayTeam,
+        competition: footballMatch.competition,
+        matchDate: footballMatch.matchDate,
+        matchStatus: footballMatch.status,
+        homeScore: footballMatch.homeScore,
+        awayScore: footballMatch.awayScore,
+      })
+      .from(matchedBet)
+      .innerJoin(footballMatch, eq(matchedBet.matchId, footballMatch.id))
+      .leftJoin(backBet, eq(matchedBet.backBetId, backBet.id))
+      .leftJoin(layBet, eq(matchedBet.layBetId, layBet.id))
+      .where(
+        and(
+          eq(matchedBet.status, "matched"),
+          isNotNull(matchedBet.matchId),
+          eq(footballMatch.status, "FINISHED"),
+          isNotNull(footballMatch.homeScore),
+          isNotNull(footballMatch.awayScore)
+        )
+      )
+      .orderBy(asc(footballMatch.matchDate))
+      .limit(limit);
+
+    // Transform and filter only valid rows (with scores)
+    return rows
+      .filter(
+        (row) =>
+          row.footballMatchId &&
+          row.homeScore !== null &&
+          row.awayScore !== null
+      )
+      .map((row) => ({
+        id: row.id,
+        userId: row.userId,
+        market: row.market,
+        selection: row.selection,
+        status: row.status,
+        promoType: row.promoType,
+        matchId: row.matchId!,
+        backBetId: row.backBetId,
+        backOdds: row.backOdds,
+        backStake: row.backStake,
+        backAccountId: row.backAccountId,
+        layBetId: row.layBetId,
+        layOdds: row.layOdds,
+        layStake: row.layStake,
+        layAccountId: row.layAccountId,
+        footballMatch: {
+          id: row.footballMatchId!,
+          externalId: Number.parseInt(row.externalId!, 10),
+          homeTeam: row.homeTeam!,
+          awayTeam: row.awayTeam!,
+          competition: row.competition!,
+          matchDate: row.matchDate!,
+          status: row.matchStatus!,
+          homeScore: Number.parseInt(row.homeScore!, 10),
+          awayScore: Number.parseInt(row.awayScore!, 10),
+        },
+      }));
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to find bets ready for auto-settlement"
+    );
+  }
+}
+
+/**
+ * Count bets ready for auto-settlement across all users.
+ * Used for sync job summary reporting.
+ */
+export async function countBetsReadyForAutoSettlement(): Promise<number> {
+  try {
+    const [result] = await db
+      .select({ count: count(matchedBet.id) })
+      .from(matchedBet)
+      .innerJoin(footballMatch, eq(matchedBet.matchId, footballMatch.id))
+      .where(
+        and(
+          eq(matchedBet.status, "matched"),
+          isNotNull(matchedBet.matchId),
+          eq(footballMatch.status, "FINISHED"),
+          isNotNull(footballMatch.homeScore),
+          isNotNull(footballMatch.awayScore)
+        )
+      );
+    return result?.count ?? 0;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to count bets ready for auto-settlement"
+    );
+  }
+}
+
 // Audit log type definitions
 export type AuditEntityType =
   | "back_bet"
@@ -1928,7 +2100,9 @@ export type AuditAction =
   | "delete"
   | "status_change"
   | "reconcile"
-  | "attach_leg";
+  | "attach_leg"
+  | "auto_settle_detected"
+  | "auto_settle_applied";
 
 export async function createAuditEntry({
   userId,

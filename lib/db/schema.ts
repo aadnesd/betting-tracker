@@ -367,6 +367,8 @@ const auditActionEnum = [
   "status_change",
   "reconcile",
   "attach_leg",
+  "auto_settle_detected",
+  "auto_settle_applied",
 ] as const;
 
 export const auditLog = pgTable("AuditLog", {

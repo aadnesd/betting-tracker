@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import {
   upsertFootballMatch,
   getAllEnabledCompetitions,
+  countBetsReadyForAutoSettlement,
   type CreateFootballMatchParams,
 } from "@/lib/db/queries";
 import { DEFAULT_COMPETITION_CODES, type FootballMatchStatus } from "@/lib/db/schema";
@@ -180,6 +181,7 @@ export async function GET(request: Request) {
   const syncResults = {
     upcoming: { synced: 0, errors: 0 },
     finished: { synced: 0, errors: 0 },
+    betsReadyForSettlement: 0,
     competitions: competitionsToSync,
     startedAt: new Date().toISOString(),
     completedAt: "",
@@ -246,6 +248,19 @@ export async function GET(request: Request) {
           `Failed to sync finished match ${match.id}: ${error instanceof Error ? error.message : "Unknown error"}`
         );
       }
+    }
+
+    // After syncing finished matches, check for bets ready for auto-settlement
+    // These are matched bets linked to FINISHED matches with scores available
+    try {
+      syncResults.betsReadyForSettlement = await countBetsReadyForAutoSettlement();
+      if (syncResults.betsReadyForSettlement > 0) {
+        console.log(
+          `[Match Sync] Found ${syncResults.betsReadyForSettlement} bets ready for settlement`
+        );
+      }
+    } catch (error) {
+      console.warn("[Match Sync] Failed to count bets ready for settlement:", error);
     }
 
     syncResults.completedAt = new Date().toISOString();
