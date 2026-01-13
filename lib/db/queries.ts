@@ -32,6 +32,8 @@ import {
   chat,
   type DBMessage,
   document,
+  footballMatch,
+  type FootballMatchStatus,
   freeBet,
   layBet,
   matchedBet,
@@ -3730,6 +3732,356 @@ export async function createLockedPromo({
     throw new ChatSDKError(
       "bad_request:database",
       "Failed to create locked promo"
+    );
+  }
+}
+
+// ============================================================================
+// FootballMatch Queries
+// ============================================================================
+
+/**
+ * Parameters for creating or upserting a football match.
+ */
+export interface CreateFootballMatchParams {
+  externalId: number;
+  homeTeam: string;
+  awayTeam: string;
+  competition: string;
+  competitionCode?: string;
+  matchDate: Date;
+  status?: FootballMatchStatus;
+  homeScore?: number | null;
+  awayScore?: number | null;
+}
+
+/**
+ * Create a new football match record.
+ */
+export async function createFootballMatch(params: CreateFootballMatchParams) {
+  try {
+    const now = new Date();
+    const [result] = await db
+      .insert(footballMatch)
+      .values({
+        createdAt: now,
+        externalId: String(params.externalId),
+        homeTeam: params.homeTeam,
+        awayTeam: params.awayTeam,
+        competition: params.competition,
+        competitionCode: params.competitionCode ?? null,
+        matchDate: params.matchDate,
+        status: params.status ?? "SCHEDULED",
+        homeScore: params.homeScore != null ? String(params.homeScore) : null,
+        awayScore: params.awayScore != null ? String(params.awayScore) : null,
+        lastSyncedAt: now,
+      })
+      .returning();
+    return result;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to create football match"
+    );
+  }
+}
+
+/**
+ * Get a football match by its internal UUID.
+ */
+export async function getFootballMatchById({ id }: { id: string }) {
+  try {
+    const [row] = await db
+      .select()
+      .from(footballMatch)
+      .where(eq(footballMatch.id, id))
+      .limit(1);
+    return row ?? null;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to fetch football match"
+    );
+  }
+}
+
+/**
+ * Get a football match by its external ID from football-data.org.
+ */
+export async function getFootballMatchByExternalId({
+  externalId,
+}: {
+  externalId: number;
+}) {
+  try {
+    const [row] = await db
+      .select()
+      .from(footballMatch)
+      .where(eq(footballMatch.externalId, String(externalId)))
+      .limit(1);
+    return row ?? null;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to fetch football match by external ID"
+    );
+  }
+}
+
+/**
+ * Upsert a football match - create if not exists, update if exists based on externalId.
+ */
+export async function upsertFootballMatch(params: CreateFootballMatchParams) {
+  try {
+    const now = new Date();
+    const [result] = await db
+      .insert(footballMatch)
+      .values({
+        createdAt: now,
+        externalId: String(params.externalId),
+        homeTeam: params.homeTeam,
+        awayTeam: params.awayTeam,
+        competition: params.competition,
+        competitionCode: params.competitionCode ?? null,
+        matchDate: params.matchDate,
+        status: params.status ?? "SCHEDULED",
+        homeScore: params.homeScore != null ? String(params.homeScore) : null,
+        awayScore: params.awayScore != null ? String(params.awayScore) : null,
+        lastSyncedAt: now,
+      })
+      .onConflictDoUpdate({
+        target: footballMatch.externalId,
+        set: {
+          homeTeam: params.homeTeam,
+          awayTeam: params.awayTeam,
+          competition: params.competition,
+          competitionCode: params.competitionCode ?? null,
+          matchDate: params.matchDate,
+          status: params.status ?? "SCHEDULED",
+          homeScore: params.homeScore != null ? String(params.homeScore) : null,
+          awayScore: params.awayScore != null ? String(params.awayScore) : null,
+          lastSyncedAt: now,
+        },
+      })
+      .returning();
+    return result;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to upsert football match"
+    );
+  }
+}
+
+/**
+ * List all football matches with optional filters.
+ */
+export async function listFootballMatches({
+  competitionCode,
+  status,
+  fromDate,
+  toDate,
+  limit = 100,
+}: {
+  competitionCode?: string;
+  status?: FootballMatchStatus;
+  fromDate?: Date;
+  toDate?: Date;
+  limit?: number;
+} = {}) {
+  try {
+    const conditions: SQL<unknown>[] = [];
+
+    if (competitionCode) {
+      conditions.push(eq(footballMatch.competitionCode, competitionCode));
+    }
+    if (status) {
+      conditions.push(eq(footballMatch.status, status));
+    }
+    if (fromDate) {
+      conditions.push(gte(footballMatch.matchDate, fromDate));
+    }
+    if (toDate) {
+      conditions.push(lte(footballMatch.matchDate, toDate));
+    }
+
+    const rows = await db
+      .select()
+      .from(footballMatch)
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(asc(footballMatch.matchDate))
+      .limit(limit);
+
+    return rows;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to list football matches"
+    );
+  }
+}
+
+/**
+ * List upcoming matches (next N days) that are scheduled.
+ * Used for syncing and match picker in bet creation.
+ */
+export async function listUpcomingMatches({
+  daysAhead = 14,
+  competitionCode,
+}: {
+  daysAhead?: number;
+  competitionCode?: string;
+} = {}) {
+  try {
+    const now = new Date();
+    const futureDate = new Date();
+    futureDate.setDate(futureDate.getDate() + daysAhead);
+
+    const conditions: SQL<unknown>[] = [
+      gte(footballMatch.matchDate, now),
+      lte(footballMatch.matchDate, futureDate),
+      inArray(footballMatch.status, ["SCHEDULED", "TIMED"]),
+    ];
+
+    if (competitionCode) {
+      conditions.push(eq(footballMatch.competitionCode, competitionCode));
+    }
+
+    const rows = await db
+      .select()
+      .from(footballMatch)
+      .where(and(...conditions))
+      .orderBy(asc(footballMatch.matchDate));
+
+    return rows;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to list upcoming matches"
+    );
+  }
+}
+
+/**
+ * List recently finished matches (last N days).
+ * Used for syncing results and auto-settlement detection.
+ */
+export async function listRecentlyFinishedMatches({
+  daysBack = 3,
+  competitionCode,
+}: {
+  daysBack?: number;
+  competitionCode?: string;
+} = {}) {
+  try {
+    const now = new Date();
+    const pastDate = new Date();
+    pastDate.setDate(pastDate.getDate() - daysBack);
+
+    const conditions: SQL<unknown>[] = [
+      gte(footballMatch.matchDate, pastDate),
+      lte(footballMatch.matchDate, now),
+      eq(footballMatch.status, "FINISHED"),
+    ];
+
+    if (competitionCode) {
+      conditions.push(eq(footballMatch.competitionCode, competitionCode));
+    }
+
+    const rows = await db
+      .select()
+      .from(footballMatch)
+      .where(and(...conditions))
+      .orderBy(desc(footballMatch.matchDate));
+
+    return rows;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to list recently finished matches"
+    );
+  }
+}
+
+/**
+ * Update a football match with new data (e.g., scores, status).
+ */
+export async function updateFootballMatch({
+  id,
+  status,
+  homeScore,
+  awayScore,
+}: {
+  id: string;
+  status?: FootballMatchStatus;
+  homeScore?: number | null;
+  awayScore?: number | null;
+}) {
+  try {
+    const updates: Partial<typeof footballMatch.$inferInsert> = {
+      lastSyncedAt: new Date(),
+    };
+
+    if (status !== undefined) {
+      updates.status = status;
+    }
+    if (homeScore !== undefined) {
+      updates.homeScore = homeScore != null ? String(homeScore) : null;
+    }
+    if (awayScore !== undefined) {
+      updates.awayScore = awayScore != null ? String(awayScore) : null;
+    }
+
+    const [result] = await db
+      .update(footballMatch)
+      .set(updates)
+      .where(eq(footballMatch.id, id))
+      .returning();
+
+    return result ?? null;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to update football match"
+    );
+  }
+}
+
+/**
+ * Search for matches by team name (partial match).
+ * Useful for match picker autocomplete.
+ */
+export async function searchFootballMatches({
+  searchTerm,
+  fromDate,
+  limit = 20,
+}: {
+  searchTerm: string;
+  fromDate?: Date;
+  limit?: number;
+}) {
+  try {
+    const term = `%${searchTerm.toLowerCase()}%`;
+    const conditions: SQL<unknown>[] = [
+      sql`(LOWER(${footballMatch.homeTeam}) LIKE ${term} OR LOWER(${footballMatch.awayTeam}) LIKE ${term})`,
+    ];
+
+    if (fromDate) {
+      conditions.push(gte(footballMatch.matchDate, fromDate));
+    }
+
+    const rows = await db
+      .select()
+      .from(footballMatch)
+      .where(and(...conditions))
+      .orderBy(asc(footballMatch.matchDate))
+      .limit(limit);
+
+    return rows;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to search football matches"
     );
   }
 }

@@ -127,6 +127,13 @@
       "when": 1768292335047,
       "tag": "0017_real_lady_ursula",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1768294366454,
+      "tag": "0018_chilly_ricochet",
+      "breakpoints": true
     }
   ]
 }

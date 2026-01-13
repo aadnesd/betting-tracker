@@ -332,6 +332,8 @@ export const matchedBet = pgTable("MatchedBet", {
     .references(() => user.id),
   backBetId: uuid("backBetId").references(() => backBet.id),
   layBetId: uuid("layBetId").references(() => layBet.id),
+  // Link to a football match for auto-settlement (optional until match picker is implemented)
+  matchId: uuid("matchId"),
   market: text("market").notNull(),
   selection: text("selection").notNull(),
   promoId: uuid("promoId").references(() => promo.id),
@@ -434,3 +436,40 @@ export const qualifyingBet = pgTable("QualifyingBet", {
 });
 
 export type QualifyingBet = InferSelectModel<typeof qualifyingBet>;
+
+/**
+ * FootballMatch - Local cache of match data from football-data.org.
+ * Why: Enables linking bets to specific matches for auto-settlement.
+ */
+const matchStatusEnum = [
+  "SCHEDULED",
+  "TIMED",
+  "IN_PLAY",
+  "PAUSED",
+  "FINISHED",
+  "POSTPONED",
+  "SUSPENDED",
+  "CANCELLED",
+] as const;
+
+export const footballMatch = pgTable("FootballMatch", {
+  id: uuid("id").primaryKey().notNull().defaultRandom(),
+  createdAt: timestamp("createdAt").notNull(),
+  // External ID from football-data.org API
+  externalId: numeric("externalId", { precision: 10, scale: 0 }).notNull().unique(),
+  homeTeam: text("homeTeam").notNull(),
+  awayTeam: text("awayTeam").notNull(),
+  competition: text("competition").notNull(),
+  // Competition code from football-data.org (e.g., "PL" for Premier League)
+  competitionCode: varchar("competitionCode", { length: 10 }),
+  matchDate: timestamp("matchDate").notNull(),
+  status: varchar("status", { enum: matchStatusEnum }).notNull().default("SCHEDULED"),
+  homeScore: numeric("homeScore", { precision: 3, scale: 0 }),
+  awayScore: numeric("awayScore", { precision: 3, scale: 0 }),
+  // When the match data was last synced from the API
+  lastSyncedAt: timestamp("lastSyncedAt").notNull(),
+});
+
+export type FootballMatch = InferSelectModel<typeof footballMatch>;
+
+export type FootballMatchStatus = (typeof matchStatusEnum)[number];
