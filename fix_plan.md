@@ -85,6 +85,15 @@ Prioritized implementation tasks. Check off when complete with tests passing.
 
 - [x] **Bankroll dashboard**: New page `/bets/bankroll` showing total capital across all accounts, breakdown by bookmaker vs exchange, deposit/withdrawal trends. DoD: page renders real aggregated data. Why: Holistic view of funds. Implementation: Created `getBankrollSummary` query in `lib/db/queries.ts` that aggregates: totalCapital (sum of all account balances), bookmakerBalance/exchangeBalance (by account kind), depositTotal/withdrawalTotal/bonusTotal (summed from transactions). Created `getTransactionTrends` query that groups transactions by day (30d) or week (90d) for charting deposits, withdrawals, and bonuses over time. Created `app/(chat)/bets/bankroll/page.tsx` with: 4 summary cards (Total Capital, Bookmaker Balance, Exchange Balance, Net Deposits), 3 transaction flow cards (Deposits, Withdrawals, Bonuses), account breakdown lists for bookmakers and exchanges sorted by balance. Created `components/bets/bankroll-transaction-chart.tsx` client component with bar/area chart toggle and 30d/90d time range toggle using Recharts. Added "Bankroll" navigation link to dashboard header. Build passes with all 170 tests passing.
 
+## Future Enhancements
+
+- [ ] **Partial match detection** (Medium priority) - When back stake doesn't properly match lay stake accounting for odds (backStake vs layStake × (layOdds - 1)), show a warning. DoD: >5% variance displays warning on bet detail page. Why: Prevents users from entering mismatched stakes without realizing it.
+
+- [ ] **Expandable matched sets on list view** (Low priority) - Add accordion/expand functionality on the dashboard matched sets list to show both legs inline without navigating to detail page. DoD: Click on row expands to show back/lay bet details. Why: Faster review without navigation.
+
+- [ ] **Invalid screenshot upload test** (Low priority) - Add test coverage for rejecting screenshots >10MB or invalid file types. DoD: Unit/integration test in tests/routes/ directory.
+
+- [ ] **Additional E2E test scenarios** (Low priority) - Add E2E tests for: odds drift warning display, exposure threshold alert, FX conversion display, low confidence highlighting. DoD: Playwright tests in tests/e2e/ directory.
 
 ---
 
