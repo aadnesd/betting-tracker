@@ -931,6 +931,173 @@ export async function listAccountsWithBalances({
   }
 }
 
+/**
+ * Bankroll summary type for dashboard display.
+ */
+export interface BankrollSummary {
+  totalCapital: number;
+  bookmakerBalance: number;
+  exchangeBalance: number;
+  accountCount: number;
+  activeAccountCount: number;
+  totalDeposits: number;
+  totalWithdrawals: number;
+  totalBonuses: number;
+  netDeposits: number;
+}
+
+/**
+ * Get bankroll summary aggregating all account balances and transactions.
+ * Why: Provides holistic view of funds across all accounts for bankroll management.
+ */
+export async function getBankrollSummary({
+  userId,
+}: {
+  userId: string;
+}): Promise<BankrollSummary> {
+  try {
+    // Get all accounts with balances
+    const accounts = await listAccountsWithBalances({
+      userId,
+      status: "active",
+    });
+
+    // Aggregate by kind
+    const bookmakerAccounts = accounts.filter((a) => a.kind === "bookmaker");
+    const exchangeAccounts = accounts.filter((a) => a.kind === "exchange");
+
+    const bookmakerBalance = bookmakerAccounts.reduce(
+      (sum, a) => sum + a.currentBalance,
+      0
+    );
+    const exchangeBalance = exchangeAccounts.reduce(
+      (sum, a) => sum + a.currentBalance,
+      0
+    );
+
+    // Get transaction totals
+    const [txTotals] = await db
+      .select({
+        totalDeposits: sql<string>`COALESCE(SUM(CASE WHEN ${accountTransaction.type} = 'deposit' THEN ${accountTransaction.amount}::numeric ELSE 0 END), 0)`,
+        totalWithdrawals: sql<string>`COALESCE(SUM(CASE WHEN ${accountTransaction.type} = 'withdrawal' THEN ${accountTransaction.amount}::numeric ELSE 0 END), 0)`,
+        totalBonuses: sql<string>`COALESCE(SUM(CASE WHEN ${accountTransaction.type} = 'bonus' THEN ${accountTransaction.amount}::numeric ELSE 0 END), 0)`,
+      })
+      .from(accountTransaction)
+      .where(eq(accountTransaction.userId, userId));
+
+    const totalDeposits = Number.parseFloat(String(txTotals?.totalDeposits || "0"));
+    const totalWithdrawals = Number.parseFloat(String(txTotals?.totalWithdrawals || "0"));
+    const totalBonuses = Number.parseFloat(String(txTotals?.totalBonuses || "0"));
+
+    return {
+      totalCapital: bookmakerBalance + exchangeBalance,
+      bookmakerBalance,
+      exchangeBalance,
+      accountCount: accounts.length,
+      activeAccountCount: accounts.filter((a) => a.status === "active").length,
+      totalDeposits,
+      totalWithdrawals,
+      totalBonuses,
+      netDeposits: totalDeposits - totalWithdrawals,
+    };
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get bankroll summary"
+    );
+  }
+}
+
+/**
+ * Transaction trend data point for charts.
+ */
+export interface TransactionTrendPoint {
+  date: string;
+  label: string;
+  deposits: number;
+  withdrawals: number;
+  bonuses: number;
+  net: number;
+}
+
+/**
+ * Get transaction trends grouped by day/week/month for charts.
+ * Why: Enables visualization of deposit/withdrawal patterns over time.
+ */
+export async function getTransactionTrends({
+  userId,
+  startDate,
+  endDate,
+  groupBy = "day",
+}: {
+  userId: string;
+  startDate?: Date;
+  endDate?: Date;
+  groupBy?: "day" | "week" | "month";
+}): Promise<TransactionTrendPoint[]> {
+  try {
+    const conditions: SQL[] = [eq(accountTransaction.userId, userId)];
+
+    if (startDate) {
+      conditions.push(gte(accountTransaction.createdAt, startDate));
+    }
+    if (endDate) {
+      conditions.push(lte(accountTransaction.createdAt, endDate));
+    }
+
+    // Date truncation based on groupBy
+    const dateTrunc = groupBy === "month"
+      ? sql`DATE_TRUNC('month', ${accountTransaction.createdAt})`
+      : groupBy === "week"
+        ? sql`DATE_TRUNC('week', ${accountTransaction.createdAt})`
+        : sql`DATE_TRUNC('day', ${accountTransaction.createdAt})`;
+
+    const rows = await db
+      .select({
+        periodDate: sql<string>`${dateTrunc}::date`.as("period_date"),
+        deposits: sql<string>`COALESCE(SUM(CASE WHEN ${accountTransaction.type} = 'deposit' THEN ${accountTransaction.amount}::numeric ELSE 0 END), 0)`,
+        withdrawals: sql<string>`COALESCE(SUM(CASE WHEN ${accountTransaction.type} = 'withdrawal' THEN ${accountTransaction.amount}::numeric ELSE 0 END), 0)`,
+        bonuses: sql<string>`COALESCE(SUM(CASE WHEN ${accountTransaction.type} = 'bonus' THEN ${accountTransaction.amount}::numeric ELSE 0 END), 0)`,
+      })
+      .from(accountTransaction)
+      .where(and(...conditions))
+      .groupBy(dateTrunc)
+      .orderBy(asc(sql`${dateTrunc}`));
+
+    return rows.map((row) => {
+      const deposits = Number.parseFloat(String(row.deposits || "0"));
+      const withdrawals = Number.parseFloat(String(row.withdrawals || "0"));
+      const bonuses = Number.parseFloat(String(row.bonuses || "0"));
+      const dateStr = String(row.periodDate);
+      const date = new Date(dateStr);
+
+      // Format label based on groupBy
+      let label: string;
+      if (groupBy === "month") {
+        label = date.toLocaleDateString("en-GB", { month: "short", year: "numeric" });
+      } else if (groupBy === "week") {
+        label = `Week of ${date.toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`;
+      } else {
+        label = date.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+      }
+
+      return {
+        date: dateStr,
+        label,
+        deposits,
+        withdrawals,
+        bonuses,
+        net: deposits - withdrawals + bonuses,
+      };
+    });
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get transaction trends"
+    );
+  }
+}
+
 export async function getPromoById({
   id,
   userId,

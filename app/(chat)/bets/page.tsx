@@ -59,6 +59,9 @@ export default async function Page() {
           <Button asChild variant="outline" size="sm" className="md:size-default">
             <Link href="/bets/reports">Reports</Link>
           </Button>
+          <Button asChild variant="outline" size="sm" className="md:size-default">
+            <Link href="/bets/bankroll">Bankroll</Link>
+          </Button>
           <Button asChild variant={summary.pendingReviewCount > 0 ? "outline" : "ghost"} size="sm" className="md:size-default">
             <Link href="/bets/review" className="flex items-center gap-2">
               Review
