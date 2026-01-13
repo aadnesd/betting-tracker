@@ -19,6 +19,7 @@ import {
   getProfitByBookmaker,
   getProfitByExchange,
   getProfitByPromoType,
+  getTotalBonusesForUser,
 } from "@/lib/db/queries";
 import {
   calculateCumulativeProfitData,
@@ -98,7 +99,7 @@ async function ReportingContent({
   endDate: Date;
 }) {
   // Fetch all data in parallel
-  const [matchedBets, openExposureData, bookmakerData, exchangeData, promoData, bookmakerWithBonuses] =
+  const [matchedBets, openExposureData, bookmakerData, exchangeData, promoData, bookmakerWithBonuses, totalBonuses] =
     await Promise.all([
       getMatchedBetsForReporting({
         userId,
@@ -111,6 +112,7 @@ async function ReportingContent({
       getProfitByExchange({ userId, startDate, endDate }),
       getProfitByPromoType({ userId, startDate, endDate }),
       getBookmakerProfitWithBonuses({ userId, startDate, endDate }),
+      getTotalBonusesForUser({ userId, startDate, endDate }),
     ]);
 
   // Transform matched bets to the format expected by calculateReportingSummary
@@ -120,7 +122,7 @@ async function ReportingContent({
     lay: row.lay,
   }));
 
-  const summary = calculateReportingSummary(betsWithLegs, openExposureData.totalExposure);
+  const summary = calculateReportingSummary(betsWithLegs, openExposureData.totalExposure, totalBonuses);
 
   // Calculate cumulative profit data for the chart at different granularities
   const dayChartData = calculateCumulativeProfitData(betsWithLegs, "day");

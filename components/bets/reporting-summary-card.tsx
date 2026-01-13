@@ -14,14 +14,11 @@ type Props = {
 };
 
 export function ReportingSummaryCard({ summary, className }: Props) {
+  const hasBonuses = summary.bonusTotal > 0;
+  
   return (
     <div className={cn("grid gap-4 md:grid-cols-2 lg:grid-cols-4", className)}>
-      <StatCard
-        title="Net Profit"
-        value={formatNOK(summary.netProfit)}
-        trend={summary.netProfit >= 0 ? "positive" : "negative"}
-        subtitle={`${summary.settledCount} settled bets`}
-      />
+      <NetProfitCard summary={summary} hasBonuses={hasBonuses} />
       <StatCard
         title="Total Stake"
         value={formatNOK(summary.totalStake)}
@@ -31,7 +28,7 @@ export function ReportingSummaryCard({ summary, className }: Props) {
         title="ROI"
         value={formatPercentage(summary.roi)}
         trend={summary.roi >= 0 ? "positive" : "negative"}
-        subtitle="Return on investment"
+        subtitle={hasBonuses ? "Includes bonuses" : "Return on investment"}
         tooltipType="roi"
       />
       <StatCard
@@ -41,6 +38,48 @@ export function ReportingSummaryCard({ summary, className }: Props) {
         subtitle="Current risk"
         tooltipType="netExposure"
       />
+    </div>
+  );
+}
+
+/**
+ * Net Profit card with optional betting/bonus breakdown.
+ * Shows breakdown when bonuses exist to make profit sources transparent.
+ */
+function NetProfitCard({ summary, hasBonuses }: { summary: ReportingSummary; hasBonuses: boolean }) {
+  const trend = summary.netProfit >= 0 ? "positive" : "negative";
+  const trendColors = {
+    positive: "text-emerald-600",
+    negative: "text-rose-600",
+    neutral: "text-slate-900 dark:text-slate-100",
+  };
+
+  return (
+    <div className="rounded-lg border bg-card p-4">
+      <p className="font-medium text-muted-foreground text-sm inline-flex items-center gap-1">
+        Net Profit
+      </p>
+      <p className={cn("mt-1 font-bold text-2xl", trendColors[trend])}>
+        {formatNOK(summary.netProfit)}
+      </p>
+      {hasBonuses ? (
+        <div className="mt-1 space-y-0.5 text-muted-foreground text-xs">
+          <div className="flex justify-between">
+            <span>Betting P/L:</span>
+            <span className={cn(summary.bettingProfit >= 0 ? "text-emerald-600" : "text-rose-600")}>
+              {formatNOK(summary.bettingProfit)}
+            </span>
+          </div>
+          <div className="flex justify-between">
+            <span>Bonuses:</span>
+            <span className="text-emerald-600">+{formatNOK(summary.bonusTotal)}</span>
+          </div>
+        </div>
+      ) : (
+        <p className="mt-1 text-muted-foreground text-xs">
+          {summary.settledCount} settled bets
+        </p>
+      )}
     </div>
   );
 }

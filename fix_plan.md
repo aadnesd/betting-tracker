@@ -4,13 +4,7 @@ Prioritized implementation tasks. Check off when complete with tests passing.
 
 ## Bugs — Active Issues
 
-- [ ] **Reports summary should include bonus transactions**: The main summary cards on `/bets/reports` (Net Profit, Total Stake, ROI) only count profit/loss from settled matched bet legs, but bonus transactions added via Account → Add Transaction → Bonus are not included. The "Bookmaker Performance (incl. Bonuses)" table correctly shows bonuses, but the headline profit figure excludes them. DoD: Reports summary card shows total profit = betting profit + bonuses; ROI calculation uses combined profit. Why: Bonuses are real profit that should be reflected in the overall performance metrics. Implementation plan: 
-  1. Create `getTotalBonusesForUser` query in `lib/db/queries.ts` that sums all bonus-type transactions for user within date range
-  2. Update `ReportingContent` in `app/(chat)/bets/reports/page.tsx` to fetch total bonuses alongside other data
-  3. Update `calculateReportingSummary` in `lib/reporting.ts` to accept optional `bonusTotal` parameter and add to `netProfit`
-  4. Update `ReportingSummary` interface to include `bonusTotal` field
-  5. Update `ReportingSummaryCard` component to show "Betting P/L" and "Bonuses" breakdown if bonuses > 0
-  6. Tests: Add tests for new query, update reporting.test.ts for bonus inclusion in summary
+(No active bugs)
 
 ## P0 — Critical Path (AI Intake + Schema Alignment)
 
@@ -91,6 +85,14 @@ Prioritized implementation tasks. Check off when complete with tests passing.
 ---
 
 ## Completed
+
+- [x] **Reports summary should include bonus transactions**: The main summary cards on `/bets/reports` (Net Profit, Total Stake, ROI) only count profit/loss from settled matched bet legs, but bonus transactions added via Account → Add Transaction → Bonus are not included. The "Bookmaker Performance (incl. Bonuses)" table correctly shows bonuses, but the headline profit figure excludes them. DoD: Reports summary card shows total profit = betting profit + bonuses; ROI calculation uses combined profit. Why: Bonuses are real profit that should be reflected in the overall performance metrics. Implementation:
+  1. Created `getTotalBonusesForUser` query in `lib/db/queries.ts` that sums all bonus-type transactions for user within date range
+  2. Extended `ReportingSummary` interface in `lib/reporting.ts` with `bonusTotal` and `bettingProfit` fields
+  3. Updated `calculateReportingSummary` to accept optional `bonusTotal` parameter; adds bonuses to `netProfit` and uses combined profit for ROI
+  4. Updated `ReportingContent` in `app/(chat)/bets/reports/page.tsx` to fetch `getTotalBonusesForUser` and pass to `calculateReportingSummary`
+  5. Updated `ReportingSummaryCard` component to show "Betting P/L" and "Bonuses" breakdown when bonuses > 0; ROI subtitle indicates "Includes bonuses"
+  6. Tests: Added 10 new tests in `tests/unit/total-bonuses-query.test.ts` for new query; updated 6 tests in `tests/unit/reporting.test.ts` for bonus inclusion in summary (new fields, bonus inclusion, negative betting with positive bonuses scenario). Total: 281 tests passing.
 
 - [x] **Account balance tracking**: Already implemented - `getAccountBalance` and `listAccountsWithBalances` queries in `lib/db/queries.ts` compute balance by summing transactions. Account settings list page `/bets/settings/accounts` displays current balance for each account. Account detail page `/bets/settings/accounts/[id]` shows balance prominently at the top. DoD met: balance updates when deposits/withdrawals occur (transactions are summed). Tests: 8 tests in account-queries.test.ts cover balance computation.
 

@@ -152,6 +152,8 @@ describe("calculateReportingSummary", () => {
       roi: 0,
       settledCount: 0,
       openExposure: 0,
+      bonusTotal: 0,
+      bettingProfit: 0,
     });
   });
 
@@ -172,6 +174,8 @@ describe("calculateReportingSummary", () => {
     const summary = calculateReportingSummary(bets);
 
     expect(summary.totalProfit).toBe(5); // 50 - 45
+    expect(summary.bettingProfit).toBe(5); // Same as totalProfit
+    expect(summary.netProfit).toBe(5); // No bonuses, so same as totalProfit
     expect(summary.totalStake).toBeCloseTo(195.24); // 100 + 95.24
     expect(summary.settledCount).toBe(1);
   });
@@ -196,6 +200,62 @@ describe("calculateReportingSummary", () => {
     // Total stake: 100 + 100 = 200
     // ROI: 5 / 200 * 100 = 2.5%
     expect(summary.roi).toBe(2.5);
+  });
+
+  test("includes bonus total in net profit calculation", () => {
+    const bets: MatchedBetWithLegs[] = [
+      createMockMatchedBet({
+        matched: { status: "settled" },
+        back: { profitLoss: "50.00", stake: "100.00" },
+        lay: { profitLoss: "-45.00", stake: "100.00" },
+      }),
+    ];
+
+    // Add 100 NOK in bonuses
+    const summary = calculateReportingSummary(bets, 0, 100);
+
+    expect(summary.bettingProfit).toBe(5); // 50 - 45
+    expect(summary.bonusTotal).toBe(100);
+    expect(summary.netProfit).toBe(105); // 5 + 100 bonuses
+    // ROI should use net profit (including bonuses)
+    // ROI: 105 / 200 * 100 = 52.5%
+    expect(summary.roi).toBe(52.5);
+  });
+
+  test("handles negative betting profit with positive bonuses", () => {
+    const bets: MatchedBetWithLegs[] = [
+      createMockMatchedBet({
+        matched: { status: "settled" },
+        back: { profitLoss: "-20.00", stake: "100.00" },
+        lay: { profitLoss: "-10.00", stake: "100.00" },
+      }),
+    ];
+
+    // Add 50 NOK in bonuses
+    const summary = calculateReportingSummary(bets, 0, 50);
+
+    expect(summary.bettingProfit).toBe(-30); // -20 - 10
+    expect(summary.bonusTotal).toBe(50);
+    expect(summary.netProfit).toBe(20); // -30 + 50 bonuses = positive overall
+    expect(summary.roi).toBe(10); // 20 / 200 * 100 = 10%
+  });
+
+  test("zero bonuses does not affect calculations", () => {
+    const bets: MatchedBetWithLegs[] = [
+      createMockMatchedBet({
+        matched: { status: "settled" },
+        back: { profitLoss: "100.00", stake: "500.00" },
+        lay: { profitLoss: "-50.00", stake: "500.00" },
+      }),
+    ];
+
+    const summaryWithoutBonuses = calculateReportingSummary(bets, 0, 0);
+    const summaryDefaultBonuses = calculateReportingSummary(bets, 0);
+
+    expect(summaryWithoutBonuses.netProfit).toBe(50);
+    expect(summaryDefaultBonuses.netProfit).toBe(50);
+    expect(summaryWithoutBonuses.bonusTotal).toBe(0);
+    expect(summaryDefaultBonuses.bonusTotal).toBe(0);
   });
 });
 

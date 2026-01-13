@@ -20,7 +20,7 @@ export type ReportingSummary = {
   totalProfit: number;
   /** Total qualifying loss (negative profit on qualifying bets) */
   qualifyingLoss: number;
-  /** Net profit (totalProfit - qualifyingLoss if already negative) */
+  /** Net profit (betting profit + bonuses) */
   netProfit: number;
   /** Total stake wagered */
   totalStake: number;
@@ -30,6 +30,10 @@ export type ReportingSummary = {
   settledCount: number;
   /** Total net exposure on open positions */
   openExposure: number;
+  /** Total bonus/reward transactions (optional, 0 if not provided) */
+  bonusTotal: number;
+  /** Betting profit/loss only (before bonuses) - same as totalProfit */
+  bettingProfit: number;
 };
 
 export type BookmakerSummary = {
@@ -77,10 +81,14 @@ export function calculateQualifyingLoss(bet: MatchedBetWithLegs): number {
 
 /**
  * Calculate reporting summary from an array of matched bets with their legs.
+ * @param bets - Array of matched bets with back/lay legs
+ * @param openExposure - Total open exposure from non-settled bets (optional, defaults to 0)
+ * @param bonusTotal - Total bonus/reward transactions (optional, defaults to 0)
  */
 export function calculateReportingSummary(
   bets: MatchedBetWithLegs[],
-  openExposure = 0
+  openExposure = 0,
+  bonusTotal = 0
 ): ReportingSummary {
   let totalProfit = 0;
   let qualifyingLoss = 0;
@@ -108,8 +116,11 @@ export function calculateReportingSummary(
     qualifyingLoss += calculateQualifyingLoss(bet);
   }
 
-  // Net profit is total profit (qualifying losses are already included as negative profit)
-  const netProfit = totalProfit;
+  // Betting profit is the raw profit from bets only
+  const bettingProfit = totalProfit;
+
+  // Net profit includes bonuses: betting profit + bonus transactions
+  const netProfit = totalProfit + bonusTotal;
 
   // ROI = net profit / total stake * 100
   const roi = totalStake > 0 ? (netProfit / totalStake) * 100 : 0;
@@ -122,6 +133,8 @@ export function calculateReportingSummary(
     roi,
     settledCount,
     openExposure,
+    bonusTotal,
+    bettingProfit,
   };
 }
 

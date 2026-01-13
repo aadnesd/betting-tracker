@@ -2399,6 +2399,48 @@ export async function getBookmakerProfitWithBonuses({
 }
 
 /**
+ * Get total bonus/reward transactions for a user within a date range.
+ * Used to include bonuses in the overall reporting summary alongside betting profit.
+ */
+export async function getTotalBonusesForUser({
+  userId,
+  startDate,
+  endDate,
+}: {
+  userId: string;
+  startDate?: Date | null;
+  endDate?: Date | null;
+}): Promise<number> {
+  try {
+    const conditions: SQL<unknown>[] = [
+      eq(accountTransaction.userId, userId),
+      eq(accountTransaction.type, "bonus"),
+    ];
+
+    if (startDate) {
+      conditions.push(gte(accountTransaction.occurredAt, startDate));
+    }
+    if (endDate) {
+      conditions.push(lte(accountTransaction.occurredAt, endDate));
+    }
+
+    const [result] = await db
+      .select({
+        total: sum(accountTransaction.amount),
+      })
+      .from(accountTransaction)
+      .where(and(...conditions));
+
+    return result?.total ? Number.parseFloat(result.total) : 0;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get total bonuses for user"
+    );
+  }
+}
+
+/**
  * Get total open exposure (non-settled matched bets).
  */
 export async function getOpenExposure({
