@@ -1,9 +1,9 @@
 "use client";
 
-import { ArrowLeft, Loader2, Plus } from "lucide-react";
+import { ArrowLeft, Gift, Loader2, Plus } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { ValueWithTooltip } from "@/components/bets/calculation-tooltip";
 import { Button } from "@/components/ui/button";
@@ -44,15 +44,28 @@ export interface AccountOption {
   currency: string | null;
 }
 
+export interface FreeBetOption {
+  id: string;
+  name: string;
+  value: number;
+  currency: string;
+  accountId: string | null;
+  accountName: string | null;
+  expiresAt: string | null;
+  minOdds: number | null;
+}
+
 interface QuickAddFormProps {
   bookmakers: AccountOption[];
   exchanges: AccountOption[];
+  freeBets?: FreeBetOption[];
 }
 
 interface FormData {
   market: string;
   selection: string;
   promoType: string;
+  freeBetId: string;
   backOdds: string;
   backStake: string;
   backBookmaker: string;
@@ -64,7 +77,7 @@ interface FormData {
   notes: string;
 }
 
-export function QuickAddForm({ bookmakers, exchanges }: QuickAddFormProps) {
+export function QuickAddForm({ bookmakers, exchanges, freeBets = [] }: QuickAddFormProps) {
   const router = useRouter();
 
   // Pick default selections based on available accounts
@@ -81,6 +94,7 @@ export function QuickAddForm({ bookmakers, exchanges }: QuickAddFormProps) {
     market: "",
     selection: "",
     promoType: "",
+    freeBetId: "",
     backOdds: "",
     backStake: "",
     backBookmaker: defaultBookmaker,
@@ -104,6 +118,24 @@ export function QuickAddForm({ bookmakers, exchanges }: QuickAddFormProps) {
     }
   };
 
+  // Filter available free bets based on selected bookmaker
+  const availableFreeBets = useMemo(() => {
+    const selectedBookmaker = bookmakers.find(
+      (b) => b.name === formData.backBookmaker
+    );
+    if (!selectedBookmaker) return freeBets;
+    // Show free bets for the selected bookmaker's account
+    return freeBets.filter(
+      (fb) => fb.accountId === selectedBookmaker.id || !fb.accountId
+    );
+  }, [bookmakers, formData.backBookmaker, freeBets]);
+
+  // Get selected free bet details
+  const selectedFreeBet = useMemo(() => {
+    if (!formData.freeBetId) return null;
+    return freeBets.find((fb) => fb.id === formData.freeBetId) ?? null;
+  }, [formData.freeBetId, freeBets]);
+
   // When bookmaker changes, update currency to match account's currency
   const handleBookmakerChange = (value: string) => {
     if (value === "__add_new__") {
@@ -114,6 +146,38 @@ export function QuickAddForm({ bookmakers, exchanges }: QuickAddFormProps) {
     const selected = bookmakers.find((b) => b.name === value);
     if (selected?.currency) {
       updateField("backCurrency", selected.currency);
+    }
+    // Clear free bet selection when bookmaker changes
+    if (formData.freeBetId) {
+      const currentFreeBet = freeBets.find((fb) => fb.id === formData.freeBetId);
+      if (currentFreeBet && currentFreeBet.accountId !== selected?.id) {
+        updateField("freeBetId", "");
+      }
+    }
+  };
+
+  // When promo type changes, clear free bet if not "Free Bet" type
+  const handlePromoTypeChange = (value: string) => {
+    updateField("promoType", value);
+    if (value !== "Free Bet" && value !== "Risk-Free Bet") {
+      updateField("freeBetId", "");
+    }
+  };
+
+  // When free bet is selected, auto-fill stake and currency
+  const handleFreeBetChange = (freeBetId: string) => {
+    updateField("freeBetId", freeBetId);
+    const fb = freeBets.find((f) => f.id === freeBetId);
+    if (fb) {
+      updateField("backStake", fb.value.toString());
+      updateField("backCurrency", fb.currency);
+      // Also select the bookmaker if the free bet has an account
+      if (fb.accountName) {
+        const bookmaker = bookmakers.find((b) => b.name === fb.accountName);
+        if (bookmaker) {
+          updateField("backBookmaker", bookmaker.name);
+        }
+      }
     }
   };
 
@@ -189,6 +253,7 @@ export function QuickAddForm({ bookmakers, exchanges }: QuickAddFormProps) {
           market: formData.market.trim(),
           selection: formData.selection.trim(),
           promoType: formData.promoType || undefined,
+          freeBetId: formData.freeBetId || undefined,
           back: {
             odds: Number.parseFloat(formData.backOdds),
             stake: Number.parseFloat(formData.backStake),
@@ -211,7 +276,11 @@ export function QuickAddForm({ bookmakers, exchanges }: QuickAddFormProps) {
         throw new Error(data.error || "Failed to create bet");
       }
 
-      toast.success("Matched bet created successfully!");
+      toast.success(
+        formData.freeBetId 
+          ? "Matched bet created and free bet marked as used!" 
+          : "Matched bet created successfully!"
+      );
       router.push("/bets");
     } catch (error) {
       console.error("Quick add error:", error);
@@ -307,7 +376,7 @@ export function QuickAddForm({ bookmakers, exchanges }: QuickAddFormProps) {
                 <Label htmlFor="promoType">Promo Type (optional)</Label>
                 <Select
                   value={formData.promoType}
-                  onValueChange={(value) => updateField("promoType", value)}
+                  onValueChange={handlePromoTypeChange}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select promo type..." />
@@ -321,6 +390,75 @@ export function QuickAddForm({ bookmakers, exchanges }: QuickAddFormProps) {
                   </SelectContent>
                 </Select>
               </div>
+
+              {/* Free Bet Selector - shown when promo type is Free Bet or Risk-Free Bet */}
+              {(formData.promoType === "Free Bet" || formData.promoType === "Risk-Free Bet") && (
+                <div className="space-y-2">
+                  <Label htmlFor="freeBet" className="flex items-center gap-2">
+                    <Gift className="h-4 w-4 text-emerald-600" />
+                    Use a Free Bet (optional)
+                  </Label>
+                  {availableFreeBets.length > 0 ? (
+                    <>
+                      <Select
+                        value={formData.freeBetId}
+                        onValueChange={handleFreeBetChange}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a free bet to use..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availableFreeBets.map((fb) => (
+                            <SelectItem key={fb.id} value={fb.id}>
+                              <span className="flex items-center gap-2">
+                                {fb.name}
+                                <span className="text-emerald-600 font-medium">
+                                  {fb.currency} {fb.value.toFixed(2)}
+                                </span>
+                                {fb.accountName && (
+                                  <span className="text-muted-foreground text-xs">
+                                    @ {fb.accountName}
+                                  </span>
+                                )}
+                              </span>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {selectedFreeBet && (
+                        <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm">
+                          <div className="flex items-center gap-2 font-medium text-emerald-900">
+                            <Gift className="h-4 w-4" />
+                            Using: {selectedFreeBet.name}
+                          </div>
+                          <div className="mt-1 text-emerald-700">
+                            Value: {selectedFreeBet.currency} {selectedFreeBet.value.toFixed(2)}
+                            {selectedFreeBet.minOdds && (
+                              <span className="ml-3">Min odds: {selectedFreeBet.minOdds.toFixed(2)}</span>
+                            )}
+                            {selectedFreeBet.expiresAt && (
+                              <span className="ml-3">
+                                Expires: {new Date(selectedFreeBet.expiresAt).toLocaleDateString()}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="rounded-md border border-muted bg-muted/50 p-3 text-sm text-muted-foreground">
+                      No active free bets available
+                      {formData.backBookmaker && (
+                        <span> for {formData.backBookmaker}</span>
+                      )}
+                      .{" "}
+                      <Link href="/bets/settings/promos/new" className="text-primary hover:underline">
+                        Add one
+                      </Link>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Back Bet */}

@@ -52,6 +52,7 @@ vi.mock("@/lib/db/queries", () => ({
   createManualScreenshot: vi.fn(),
   getMatchedBetWithParts: vi.fn(),
   createAccountTransaction: vi.fn(),
+  markFreeBetAsUsed: vi.fn(),
 }));
 
 const makeBlob = (content = "stub") =>
@@ -1330,6 +1331,135 @@ describe("bets API routes (unit)", () => {
       expect(res.status).toBe(401);
       const json = await res.json();
       expect(json.error).toBe("Unauthorized");
+    });
+
+    it("marks free bet as used when freeBetId is provided", async () => {
+      // Setup mocks
+      (dbQueries.createManualScreenshot as vi.Mock).mockResolvedValueOnce({
+        id: "manual-back-1",
+      });
+      (dbQueries.createManualScreenshot as vi.Mock).mockResolvedValueOnce({
+        id: "manual-lay-1",
+      });
+      (dbQueries.getOrCreateAccount as vi.Mock).mockResolvedValueOnce({
+        id: "acc-back",
+      });
+      (dbQueries.getOrCreateAccount as vi.Mock).mockResolvedValueOnce({
+        id: "acc-lay",
+      });
+      (dbQueries.saveBackBet as vi.Mock).mockResolvedValue({ id: "bb1" });
+      (dbQueries.saveLayBet as vi.Mock).mockResolvedValue({ id: "lb1" });
+      (dbQueries.createMatchedBetRecord as vi.Mock).mockResolvedValue({
+        id: "mb1",
+        status: "matched",
+      });
+      (dbQueries.createAuditEntry as vi.Mock).mockResolvedValue({ id: "audit-1" });
+      (dbQueries.markFreeBetAsUsed as vi.Mock).mockResolvedValue({ success: true });
+
+      const freeBetId = "123e4567-e89b-12d3-a456-426614174000";
+      const payload = {
+        market: "Premier League",
+        selection: "Arsenal to Win",
+        promoType: "Free Bet",
+        freeBetId,
+        back: {
+          odds: 2.5,
+          stake: 100,
+          bookmaker: "bet365",
+          currency: "NOK",
+        },
+        lay: {
+          odds: 2.52,
+          stake: 99.2,
+          exchange: "bfb247",
+          currency: "NOK",
+        },
+      };
+
+      const res = await quickAddRoute(
+        new Request("http://localhost/api/bets/quick-add", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        })
+      );
+
+      expect(res.status).toBe(200);
+      const json = await res.json();
+      expect(json.success).toBe(true);
+      expect(json.freeBetUsed).toBe(true);
+
+      // Verify markFreeBetAsUsed was called with correct params
+      expect(dbQueries.markFreeBetAsUsed).toHaveBeenCalledWith({
+        id: freeBetId,
+        userId: user.id,
+        matchedBetId: "mb1",
+      });
+
+      // Verify audit entry includes freeBetId
+      expect(dbQueries.createAuditEntry).toHaveBeenCalledWith(
+        expect.objectContaining({
+          entityType: "matched_bet",
+          changes: expect.objectContaining({
+            freeBetId,
+          }),
+        })
+      );
+    });
+
+    it("does not call markFreeBetAsUsed when freeBetId is not provided", async () => {
+      // Setup mocks
+      (dbQueries.createManualScreenshot as vi.Mock).mockResolvedValueOnce({
+        id: "manual-back-1",
+      });
+      (dbQueries.createManualScreenshot as vi.Mock).mockResolvedValueOnce({
+        id: "manual-lay-1",
+      });
+      (dbQueries.getOrCreateAccount as vi.Mock).mockResolvedValueOnce({
+        id: "acc-back",
+      });
+      (dbQueries.getOrCreateAccount as vi.Mock).mockResolvedValueOnce({
+        id: "acc-lay",
+      });
+      (dbQueries.saveBackBet as vi.Mock).mockResolvedValue({ id: "bb1" });
+      (dbQueries.saveLayBet as vi.Mock).mockResolvedValue({ id: "lb1" });
+      (dbQueries.createMatchedBetRecord as vi.Mock).mockResolvedValue({
+        id: "mb1",
+        status: "matched",
+      });
+      (dbQueries.createAuditEntry as vi.Mock).mockResolvedValue({ id: "audit-1" });
+
+      const payload = {
+        market: "Premier League",
+        selection: "Arsenal to Win",
+        promoType: "Free Bet",
+        back: {
+          odds: 2.5,
+          stake: 100,
+          bookmaker: "bet365",
+          currency: "NOK",
+        },
+        lay: {
+          odds: 2.52,
+          stake: 99.2,
+          exchange: "bfb247",
+          currency: "NOK",
+        },
+      };
+
+      const res = await quickAddRoute(
+        new Request("http://localhost/api/bets/quick-add", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        })
+      );
+
+      expect(res.status).toBe(200);
+      const json = await res.json();
+      expect(json.success).toBe(true);
+      expect(json.freeBetUsed).toBe(false);
+
+      // Verify markFreeBetAsUsed was NOT called
+      expect(dbQueries.markFreeBetAsUsed).not.toHaveBeenCalled();
     });
   });
 });

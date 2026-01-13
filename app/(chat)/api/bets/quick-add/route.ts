@@ -7,6 +7,7 @@ import {
   createManualScreenshot,
   getOrCreateAccount,
   getOrCreatePromoByType,
+  markFreeBetAsUsed,
   saveBackBet,
   saveLayBet,
 } from "@/lib/db/queries";
@@ -16,6 +17,7 @@ const quickAddSchema = z.object({
   market: z.string().min(1, "Market is required"),
   selection: z.string().min(1, "Selection is required"),
   promoType: z.string().optional(),
+  freeBetId: z.string().uuid().optional(),
   back: z.object({
     odds: z.number().positive("Back odds must be positive"),
     stake: z.number().positive("Back stake must be positive"),
@@ -172,6 +174,15 @@ export async function POST(request: Request) {
         : "[Manual Entry]",
     });
 
+    // Mark free bet as used if one was selected
+    if (body.freeBetId) {
+      await markFreeBetAsUsed({
+        id: body.freeBetId,
+        userId: session.user.id,
+        matchedBetId: matched.id,
+      });
+    }
+
     // Create audit entries
     await Promise.allSettled([
       createAuditEntry({
@@ -218,8 +229,11 @@ export async function POST(request: Request) {
           status: "matched",
           netExposure,
           source: "quick_add",
+          freeBetId: body.freeBetId ?? null,
         },
-        notes: body.notes ?? "Created via Quick Add",
+        notes: body.freeBetId 
+          ? `Created via Quick Add with free bet ${body.freeBetId}`
+          : (body.notes ?? "Created via Quick Add"),
       }),
     ]);
 
@@ -228,6 +242,7 @@ export async function POST(request: Request) {
       matched,
       back: backBetRow,
       lay: layBetRow,
+      freeBetUsed: !!body.freeBetId,
     });
   } catch (error) {
     console.error("Failed to create quick add bet", error);
