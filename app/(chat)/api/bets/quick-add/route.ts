@@ -16,6 +16,7 @@ import { convertAmountToNok } from "@/lib/fx-rates";
 const quickAddSchema = z.object({
   market: z.string().min(1, "Market is required"),
   selection: z.string().min(1, "Selection is required"),
+  matchId: z.string().uuid().optional(),
   promoType: z.string().optional(),
   freeBetId: z.string().uuid().optional(),
   back: z.object({
@@ -163,6 +164,7 @@ export async function POST(request: Request) {
       userId: session.user.id,
       backBetId: backBetRow.id,
       layBetId: layBetRow.id,
+      matchId: body.matchId ?? null,
       market: body.market,
       selection: body.selection,
       promoId: promo?.id ?? null,

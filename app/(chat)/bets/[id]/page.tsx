@@ -1,4 +1,5 @@
 import { format } from "date-fns";
+import { CalendarDays, Trophy } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -13,7 +14,7 @@ import {
   getMatchedBetWithParts,
   listAuditEntriesByEntity,
 } from "@/lib/db/queries";
-import type { BackBet, LayBet, ScreenshotUpload } from "@/lib/db/schema";
+import type { BackBet, FootballMatch, LayBet, ScreenshotUpload } from "@/lib/db/schema";
 
 export const metadata = {
   title: "Matched bet detail",
@@ -39,7 +40,7 @@ export default async function Page({ params }: PageProps) {
     notFound();
   }
 
-  const { matched, back, lay, backScreenshot, layScreenshot } = data;
+  const { matched, back, lay, backScreenshot, layScreenshot, footballMatch } = data;
 
   // Fetch audit history for this matched bet
   const auditEntries = await listAuditEntriesByEntity({
@@ -122,6 +123,11 @@ export default async function Page({ params }: PageProps) {
           </p>
         </div>
       </div>
+
+      {/* Linked Football Match */}
+      {footballMatch && (
+        <MatchInfoCard match={footballMatch} />
+      )}
 
       {/* Two-column layout for back and lay */}
       <div className="grid gap-6 lg:grid-cols-2">
@@ -393,4 +399,94 @@ function detectMismatches(
   }
 
   return issues;
+}
+
+/**
+ * MatchInfoCard - Displays linked football match information.
+ *
+ * Why: Shows users which real-world match this bet is linked to,
+ * enabling future auto-settlement when match results are synced.
+ */
+function MatchInfoCard({ match }: { match: FootballMatch }) {
+  const matchDate = new Date(match.matchDate);
+  const isFinished = match.status === "FINISHED";
+  const isUpcoming =
+    match.status === "SCHEDULED" || match.status === "TIMED";
+  const isLive = match.status === "IN_PLAY" || match.status === "PAUSED";
+
+  const getStatusBadge = () => {
+    if (isFinished) {
+      return (
+        <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-emerald-800 text-xs font-medium">
+          Finished
+        </span>
+      );
+    }
+    if (isLive) {
+      return (
+        <span className="rounded-full bg-red-100 px-2 py-0.5 text-red-800 text-xs font-medium animate-pulse">
+          Live
+        </span>
+      );
+    }
+    if (isUpcoming) {
+      return (
+        <span className="rounded-full bg-blue-100 px-2 py-0.5 text-blue-800 text-xs font-medium">
+          Upcoming
+        </span>
+      );
+    }
+    return (
+      <span className="rounded-full bg-gray-100 px-2 py-0.5 text-gray-800 text-xs font-medium">
+        {match.status}
+      </span>
+    );
+  };
+
+  return (
+    <Card className="border-amber-200 bg-amber-50/30 dark:bg-amber-950/10 dark:border-amber-800">
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Trophy className="h-4 w-4 text-amber-600" />
+          Linked Match
+          {getStatusBadge()}
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-3">
+          {/* Teams */}
+          <div className="flex items-center justify-between">
+            <div className="text-center flex-1">
+              <p className="font-semibold text-lg">{match.homeTeam}</p>
+              {isFinished && match.homeScore !== null && (
+                <p className="font-bold text-2xl text-amber-700 dark:text-amber-400">
+                  {match.homeScore}
+                </p>
+              )}
+            </div>
+            <div className="px-4 text-muted-foreground font-medium">vs</div>
+            <div className="text-center flex-1">
+              <p className="font-semibold text-lg">{match.awayTeam}</p>
+              {isFinished && match.awayScore !== null && (
+                <p className="font-bold text-2xl text-amber-700 dark:text-amber-400">
+                  {match.awayScore}
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Match details */}
+          <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground border-t pt-3">
+            <span className="bg-amber-100 dark:bg-amber-900 px-2 py-0.5 rounded font-medium text-amber-800 dark:text-amber-200">
+              {match.competitionCode || match.competition}
+            </span>
+            <div className="flex items-center gap-1">
+              <CalendarDays className="h-3.5 w-3.5" />
+              {format(matchDate, "EEE dd MMM yyyy, HH:mm")}
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
 }

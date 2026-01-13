@@ -1,11 +1,12 @@
 "use client";
 
-import { ArrowLeft, Gift, Loader2, Plus } from "lucide-react";
+import { ArrowLeft, Gift, Loader2, Plus, Trophy } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { ValueWithTooltip } from "@/components/bets/calculation-tooltip";
+import { MatchPicker, type MatchOption } from "@/components/bets/match-picker";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -64,6 +65,7 @@ interface QuickAddFormProps {
 interface FormData {
   market: string;
   selection: string;
+  matchId: string;
   promoType: string;
   freeBetId: string;
   backOdds: string;
@@ -93,6 +95,7 @@ export function QuickAddForm({ bookmakers, exchanges, freeBets = [] }: QuickAddF
   const [formData, setFormData] = useState<FormData>({
     market: "",
     selection: "",
+    matchId: "",
     promoType: "",
     freeBetId: "",
     backOdds: "",
@@ -181,6 +184,16 @@ export function QuickAddForm({ bookmakers, exchanges, freeBets = [] }: QuickAddF
     }
   };
 
+  // When match is selected, auto-fill the market field
+  const handleMatchChange = (match: MatchOption | null) => {
+    if (match) {
+      updateField("matchId", match.id);
+      updateField("market", match.label);
+    } else {
+      updateField("matchId", "");
+    }
+  };
+
   // When exchange changes, update currency to match account's currency
   const handleExchangeChange = (value: string) => {
     if (value === "__add_new__") {
@@ -252,6 +265,7 @@ export function QuickAddForm({ bookmakers, exchanges, freeBets = [] }: QuickAddF
         body: JSON.stringify({
           market: formData.market.trim(),
           selection: formData.selection.trim(),
+          matchId: formData.matchId || undefined,
           promoType: formData.promoType || undefined,
           freeBetId: formData.freeBetId || undefined,
           back: {
@@ -339,9 +353,26 @@ export function QuickAddForm({ bookmakers, exchanges, freeBets = [] }: QuickAddF
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Market Details */}
             <div className="space-y-4">
-              <h3 className="text-sm font-medium text-muted-foreground">
+              <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                 Market Details
+                <Trophy className="h-4 w-4 text-amber-500" />
               </h3>
+              
+              {/* Match Picker - optional link to synced football match */}
+              <div className="space-y-2">
+                <Label htmlFor="matchPicker" className="flex items-center gap-2">
+                  Link to Match (optional)
+                </Label>
+                <MatchPicker
+                  value={formData.matchId || null}
+                  onChange={handleMatchChange}
+                  placeholder="Search for a match..."
+                />
+                <p className="text-xs text-muted-foreground">
+                  Linking to a match enables automatic result lookup
+                </p>
+              </div>
+
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="market">Market</Label>

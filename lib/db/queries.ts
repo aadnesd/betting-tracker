@@ -1474,6 +1474,7 @@ export async function createMatchedBetRecord({
   userId,
   backBetId,
   layBetId,
+  matchId,
   market,
   selection,
   promoId,
@@ -1486,6 +1487,7 @@ export async function createMatchedBetRecord({
   userId: string;
   backBetId?: string | null;
   layBetId?: string | null;
+  matchId?: string | null;
   market: string;
   selection: string;
   promoId?: string | null;
@@ -1501,6 +1503,7 @@ export async function createMatchedBetRecord({
       userId,
       backBetId: backBetId ?? null,
       layBetId: layBetId ?? null,
+      matchId: matchId ?? null,
       market,
       selection,
       promoId: promoId ?? null,
@@ -1657,16 +1660,18 @@ export async function getMatchedBetWithParts({
   userId: string;
 }) {
   try {
-    // First get the matched bet with back/lay bets joined
+    // First get the matched bet with back/lay bets and football match joined
     const [row] = await db
       .select({
         matched: matchedBet,
         back: backBet,
         lay: layBet,
+        footballMatch: footballMatch,
       })
       .from(matchedBet)
       .leftJoin(backBet, eq(matchedBet.backBetId, backBet.id))
       .leftJoin(layBet, eq(matchedBet.layBetId, layBet.id))
+      .leftJoin(footballMatch, eq(matchedBet.matchId, footballMatch.id))
       .where(eq(matchedBet.id, id));
 
     if (!row || row.matched.userId !== userId) {
@@ -1701,6 +1706,7 @@ export async function getMatchedBetWithParts({
       lay: row.lay,
       backScreenshot,
       layScreenshot,
+      footballMatch: row.footballMatch,
     };
   } catch (_error) {
     throw new ChatSDKError(
