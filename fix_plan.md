@@ -89,6 +89,15 @@ Prioritized implementation tasks. Check off when complete with tests passing.
 
 - [x] **API slowness** (High priority) - Initially added performance timing instrumentation to both `/api/bets/screenshots` and `/api/bets/autoparse` endpoints for diagnostics. **Performance Fix (v0.0.40):** Implemented Azure Document Intelligence OCR for faster bet parsing. Created `lib/azure-ocr.ts` with text extraction using Azure's `prebuilt-read` model (~5 seconds per image). Created `lib/bet-parser-ocr.ts` with OCR+text LLM approach (faster than vision LLM since it uses extracted text instead of images). Updated autoparse route to automatically use OCR path when `AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT` and `AZURE_DOCUMENT_INTELLIGENCE_KEY` env vars are configured, with fallback to vision LLM approach. Benefits: Text extraction is fast and high-confidence (100% in tests), and text-only LLM parsing is faster than vision model processing. Tests: 5 tests in `tests/unit/performance-logging.test.ts` covering timing phases; mocks updated in `tests/unit/bets-api.test.ts` for OCR exports. Total: 369 tests passing.
 
+- [ ] **Automatic football match linking during AI parse** (High priority) - When parsing a bet via AI autoparse, automatically link it to the correct football match from the synced `FootballMatch` table. This enables auto-settlement when matches complete. **Current state:** Account matching works, but match linking is manual via Match Picker in Quick Add only. **Problem:** When searching for matches, multiple candidates may be returned (e.g., "Man City" returns both Man Utd vs Man City and Bodø/Glimt vs Man City). The system needs to intelligently pick the correct match. **Solution:** Use LLM to resolve match ambiguity by providing parsed bet context (market name, selection, date if available) and candidate matches, then asking the LLM to select the best match or indicate "no confident match". **Flow:**
+  1. After AI parsing extracts market/selection (e.g., "Man Utd v Man City", "Man City")
+  2. Search `FootballMatch` table for upcoming matches involving extracted team names
+  3. If 0 matches: skip linking, set `matchId = null`
+  4. If 1 match: auto-link with high confidence
+  5. If 2+ matches: call LLM with bet context + candidates to select best match
+  6. Store `matchId` on parsed result and pass through to bet creation
+  **DoD:** Autoparse returns `matchId` when confident match found; bet detail shows linked match; enables subsequent auto-settlement flow. **Why:** Completes the automation chain from upload → parse → match link → auto-settle. See `specs/ai-autoparse.md` for detailed requirements.
+
 ---
 
 ## Completed

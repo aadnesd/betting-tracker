@@ -9,8 +9,8 @@
  */
 
 import { generateObject } from "ai";
+import { gateway } from "@ai-sdk/gateway";
 import { z } from "zod";
-import { myProvider } from "@/lib/ai/providers";
 import { extractTextFromImages } from "@/lib/azure-ocr";
 import { isTestEnvironment } from "@/lib/constants";
 import type { ParsedBet, ParsedPair } from "@/lib/bet-parser";
@@ -105,7 +105,7 @@ export async function parseMatchedBetWithOcr({
   const llmStart = Date.now();
   
   const { object } = await generateObject({
-    model: myProvider.languageModel("chat-model"),
+    model: gateway.languageModel("google/gemini-2.0-flash"),
     schema: pairSchema,
     messages: [
       {
@@ -138,7 +138,11 @@ Extract:
 - exchange: The bookmaker/exchange name
 - currency: ISO-4217 code (USD, EUR, NOK, GBP, etc.)
 
-For lay bets, if you see "Backer's Stake" that's the stake field. "Liability" is separate.
+IMPORTANT DEFAULTS:
+- For lay bets, if you see "Backer's Stake" that's the stake field. "Liability" is separate.
+- Lay bet currency defaults to NOK if not explicitly specified in the text.
+- If exchange name is unclear, use "Bookmaker" for back bets and "Exchange" for lay bets.
+
 Flag needsReview=true if the markets or selections don't align between back and lay.`,
       },
     ],
