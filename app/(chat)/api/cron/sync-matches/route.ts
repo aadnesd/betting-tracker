@@ -155,9 +155,13 @@ async function fetchMatchesFromApi({
  * Uses CRON_SECRET header for Vercel cron authorization.
  */
 export async function GET(request: Request) {
+  console.log("[Match Sync] Request received");
+  
   // Verify cron secret for security
   const authHeader = request.headers.get("authorization");
   const cronSecret = process.env.CRON_SECRET;
+  
+  console.log("[Match Sync] Auth check - cronSecret set:", !!cronSecret, "authHeader received:", !!authHeader);
 
   // In production, require CRON_SECRET. In development, allow without it.
   if (
@@ -165,7 +169,7 @@ export async function GET(request: Request) {
     cronSecret &&
     authHeader !== `Bearer ${cronSecret}`
   ) {
-    console.log("[Match Sync] Auth failed - cronSecret exists:", !!cronSecret, "authHeader exists:", !!authHeader);
+    console.log("[Match Sync] Auth FAILED - returning 401");
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -173,6 +177,8 @@ export async function GET(request: Request) {
   if (process.env.NODE_ENV === "production" && !cronSecret) {
     console.log("[Match Sync] Warning: CRON_SECRET not configured, allowing request");
   }
+  
+  console.log("[Match Sync] Auth passed, starting sync");
 
   // Get competitions to sync from user settings (union of all users' enabled competitions)
   // Falls back to DEFAULT_COMPETITION_CODES if no users have configured settings
