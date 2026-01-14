@@ -13,6 +13,8 @@ vi.mock("@/lib/ai/providers", () => ({
 
 vi.mock("@/lib/bet-parser", () => ({
   parseMatchedBetFromScreenshots: vi.fn(),
+  parseMatchedBetWithOcr: vi.fn(),
+  isOcrConfigured: vi.fn(() => false),
 }));
 
 const user = { id: "user-perf" };
@@ -128,9 +130,9 @@ describe("Performance logging instrumentation", () => {
         })
       );
 
-      // Verify performance logging was called
+      // Verify performance logging was called (look for the timing log specifically)
       const logCall = consoleSpy.mock.calls.find(
-        (call) => typeof call[0] === "string" && call[0].includes("[bets/autoparse]")
+        (call) => typeof call[0] === "string" && call[0].includes("[bets/autoparse]") && call[0].includes("Total:")
       );
       expect(logCall).toBeDefined();
       expect(logCall?.[0]).toMatch(/Total: \d+ms/);
@@ -166,7 +168,7 @@ describe("Performance logging instrumentation", () => {
       );
 
       const logCall = consoleSpy.mock.calls.find(
-        (call) => typeof call[0] === "string" && call[0].includes("[bets/autoparse]")
+        (call) => typeof call[0] === "string" && call[0].includes("[bets/autoparse]") && call[0].includes("Total:")
       );
 
       // Phases should be in order: auth -> parsePayload -> fetchScreenshots -> aiParsing -> accountMatching -> updateStatus

@@ -3,6 +3,9 @@ import { z } from "zod";
 import { myProvider } from "@/lib/ai/providers";
 import { isTestEnvironment } from "@/lib/constants";
 
+// Re-export OCR-based parser for use when Azure is configured
+export { parseMatchedBetWithOcr, isOcrConfigured } from "@/lib/bet-parser-ocr";
+
 export type ParsedBet = {
   type: "back" | "lay";
   market: string;

@@ -18,6 +18,8 @@ vi.mock("@/lib/ai/providers", () => ({
 
 vi.mock("@/lib/bet-parser", () => ({
   parseMatchedBetFromScreenshots: vi.fn(),
+  parseMatchedBetWithOcr: vi.fn(),
+  isOcrConfigured: vi.fn(() => false), // Default to non-OCR path for tests
 }));
 
 vi.mock("@/lib/fx-rates", () => ({

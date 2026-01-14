@@ -1,8 +1,12 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/app/(auth)/auth";
-import type { ParsedBet } from "@/lib/bet-parser";
-import { parseMatchedBetFromScreenshots } from "@/lib/bet-parser";
+import type { ParsedBet, ParsedPair } from "@/lib/bet-parser";
+import {
+  parseMatchedBetFromScreenshots,
+  parseMatchedBetWithOcr,
+  isOcrConfigured,
+} from "@/lib/bet-parser";
 import { evaluateNeedsReview } from "@/lib/bet-review";
 import {
   getAccountByName,
@@ -117,11 +121,26 @@ export async function POST(request: Request) {
   }
 
   try {
-    const parsed = await parseMatchedBetFromScreenshots({
-      backImageUrl: backShot.url,
-      layImageUrl: layShot.url,
-    });
-    timer.mark("aiParsing");
+    // Use OCR-based parsing if Azure Document Intelligence is configured (faster)
+    // Otherwise fall back to vision LLM approach
+    const useOcr = isOcrConfigured();
+    console.log(`[bets/autoparse] Using ${useOcr ? "OCR + LLM" : "Vision LLM"} approach`);
+
+    let parsed: ParsedPair;
+    if (useOcr) {
+      const ocrResult = await parseMatchedBetWithOcr({
+        backImageUrl: backShot.url,
+        layImageUrl: layShot.url,
+      });
+      parsed = ocrResult;
+      timer.mark(`aiParsing (OCR: ${ocrResult.ocrDurationMs}ms, LLM: ${ocrResult.llmDurationMs}ms)`);
+    } else {
+      parsed = await parseMatchedBetFromScreenshots({
+        backImageUrl: backShot.url,
+        layImageUrl: layShot.url,
+      });
+      timer.mark("aiParsing");
+    }
 
     // Match parsed exchange/bookmaker names against user's existing accounts
     const [backAccountId, layAccountId] = await Promise.all([
