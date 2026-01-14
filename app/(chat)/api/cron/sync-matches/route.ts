@@ -165,7 +165,13 @@ export async function GET(request: Request) {
     cronSecret &&
     authHeader !== `Bearer ${cronSecret}`
   ) {
+    console.log("[Match Sync] Auth failed - cronSecret exists:", !!cronSecret, "authHeader exists:", !!authHeader);
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // If no CRON_SECRET is configured in production, allow the request (for initial setup)
+  if (process.env.NODE_ENV === "production" && !cronSecret) {
+    console.log("[Match Sync] Warning: CRON_SECRET not configured, allowing request");
   }
 
   // Get competitions to sync from user settings (union of all users' enabled competitions)
