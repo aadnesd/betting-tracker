@@ -13,6 +13,7 @@ import {
   getScreenshotById,
   updateScreenshotStatus,
 } from "@/lib/db/queries";
+import { linkBetToMatch, type MatchLinkResult } from "@/lib/match-linking";
 
 /**
  * Performance timer utility for diagnosing API slowness.
@@ -161,6 +162,37 @@ export async function POST(request: Request) {
     const enrichedBack = enrichBetWithAccountMatch(parsed.back, backAccountId);
     const enrichedLay = enrichBetWithAccountMatch(parsed.lay, layAccountId);
 
+    // Attempt to link the bet to a football match from synced matches
+    // Uses team names from market/selection to find candidates
+    let matchLinkResult: MatchLinkResult = {
+      matchId: null,
+      matchConfidence: null,
+      matchCandidates: 0,
+    };
+
+    try {
+      matchLinkResult = await linkBetToMatch({
+        market: parsed.back.market,
+        selection: parsed.back.selection,
+        betDate: parsed.back.placedAt ?? null,
+      });
+      timer.mark("matchLinking");
+
+      if (matchLinkResult.matchId) {
+        console.log(
+          `[bets/autoparse] Linked to match ${matchLinkResult.matchId} ` +
+          `(confidence: ${matchLinkResult.matchConfidence}, candidates: ${matchLinkResult.matchCandidates})`
+        );
+      } else if (matchLinkResult.matchCandidates > 0) {
+        console.log(
+          `[bets/autoparse] ${matchLinkResult.matchCandidates} candidate matches found but no confident link`
+        );
+      }
+    } catch (error) {
+      console.warn("[bets/autoparse] Match linking failed (non-fatal):", error);
+      timer.mark("matchLinking (failed)");
+    }
+
     // Flag for review if any account is unmatched (user may need to create accounts)
     const hasUnmatchedAccounts =
       enrichedBack.unmatchedAccount || enrichedLay.unmatchedAccount;
@@ -214,6 +246,10 @@ export async function POST(request: Request) {
       lay: enrichedLay,
       needsReview,
       notes,
+      // Match linking results
+      matchId: matchLinkResult.matchId,
+      matchConfidence: matchLinkResult.matchConfidence,
+      matchCandidates: matchLinkResult.matchCandidates,
     });
   } catch (error) {
     console.error("Failed to parse bets", error);
