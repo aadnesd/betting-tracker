@@ -163,19 +163,13 @@ export async function GET(request: Request) {
   
   console.log("[Match Sync] Auth check - cronSecret set:", !!cronSecret, "authHeader received:", !!authHeader);
 
-  // In production, require CRON_SECRET. In development, allow without it.
-  if (
-    process.env.NODE_ENV === "production" &&
-    cronSecret &&
-    authHeader !== `Bearer ${cronSecret}`
-  ) {
-    console.log("[Match Sync] Auth FAILED - returning 401");
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  // If no CRON_SECRET is configured in production, allow the request (for initial setup)
-  if (process.env.NODE_ENV === "production" && !cronSecret) {
-    console.log("[Match Sync] Warning: CRON_SECRET not configured, allowing request");
+  // In production, require CRON_SECRET if it's configured
+  // Vercel cron jobs automatically send: Authorization: Bearer <CRON_SECRET>
+  if (process.env.NODE_ENV === "production" && cronSecret) {
+    if (authHeader !== `Bearer ${cronSecret}`) {
+      console.log("[Match Sync] Auth FAILED - header mismatch");
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
   }
   
   console.log("[Match Sync] Auth passed, starting sync");
