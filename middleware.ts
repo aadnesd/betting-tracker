@@ -19,6 +19,11 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // Allow cron jobs to bypass authentication (they use CRON_SECRET for auth)
+  if (pathname.startsWith("/api/cron")) {
+    return NextResponse.next();
+  }
+
   const token = await getToken({
     req: request,
     secret: process.env.AUTH_SECRET,
