@@ -4294,6 +4294,70 @@ export async function upsertFootballMatch(params: CreateFootballMatchParams) {
 }
 
 /**
+ * Batch upsert football matches - more efficient for syncing many matches at once.
+ * Uses a single INSERT ... ON CONFLICT statement for all matches.
+ */
+export async function batchUpsertFootballMatches(
+  matches: CreateFootballMatchParams[]
+): Promise<{ synced: number; errors: number }> {
+  if (matches.length === 0) {
+    return { synced: 0, errors: 0 };
+  }
+
+  const now = new Date();
+  const values = matches.map((params) => ({
+    createdAt: now,
+    externalId: String(params.externalId),
+    homeTeam: params.homeTeam,
+    awayTeam: params.awayTeam,
+    competition: params.competition,
+    competitionCode: params.competitionCode ?? null,
+    matchDate: params.matchDate,
+    status: params.status ?? "SCHEDULED",
+    homeScore: params.homeScore != null ? String(params.homeScore) : null,
+    awayScore: params.awayScore != null ? String(params.awayScore) : null,
+    lastSyncedAt: now,
+  }));
+
+  try {
+    const results = await db
+      .insert(footballMatch)
+      .values(values)
+      .onConflictDoUpdate({
+        target: footballMatch.externalId,
+        set: {
+          homeTeam: sql`excluded.home_team`,
+          awayTeam: sql`excluded.away_team`,
+          competition: sql`excluded.competition`,
+          competitionCode: sql`excluded.competition_code`,
+          matchDate: sql`excluded.match_date`,
+          status: sql`excluded.status`,
+          homeScore: sql`excluded.home_score`,
+          awayScore: sql`excluded.away_score`,
+          lastSyncedAt: sql`excluded.last_synced_at`,
+        },
+      })
+      .returning();
+
+    return { synced: results.length, errors: 0 };
+  } catch (error) {
+    console.error("[batchUpsertFootballMatches] Error:", error);
+    // Fall back to individual upserts if batch fails
+    let synced = 0;
+    let errors = 0;
+    for (const params of matches) {
+      try {
+        await upsertFootballMatch(params);
+        synced++;
+      } catch {
+        errors++;
+      }
+    }
+    return { synced, errors };
+  }
+}
+
+/**
  * List all football matches with optional filters.
  */
 export async function listFootballMatches({

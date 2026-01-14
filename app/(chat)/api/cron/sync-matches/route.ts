@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import {
-  upsertFootballMatch,
+  batchUpsertFootballMatches,
   getAllEnabledCompetitions,
   countBetsReadyForAutoSettlement,
   type CreateFootballMatchParams,
@@ -195,36 +195,31 @@ export async function GET(request: Request) {
   };
 
   try {
-    // Sync upcoming matches (next 14 days)
+    // Sync upcoming matches (next 10 days - API limit)
     const now = new Date();
-    const fourteenDaysAhead = new Date();
-    fourteenDaysAhead.setDate(fourteenDaysAhead.getDate() + 14);
+    const tenDaysAhead = new Date();
+    tenDaysAhead.setDate(tenDaysAhead.getDate() + 10);
 
     console.log(
-      `[Match Sync] Fetching upcoming matches from ${formatDate(now)} to ${formatDate(fourteenDaysAhead)} for competitions: ${competitionsToSync.join(", ")}`
+      `[Match Sync] Fetching upcoming matches from ${formatDate(now)} to ${formatDate(tenDaysAhead)} for competitions: ${competitionsToSync.join(", ")}`
     );
 
     const upcomingMatches = await fetchMatchesFromApi({
       dateFrom: now,
-      dateTo: fourteenDaysAhead,
+      dateTo: tenDaysAhead,
       competitions: competitionsToSync,
       status: ["SCHEDULED", "TIMED"],
     });
 
     console.log(`[Match Sync] Found ${upcomingMatches.length} upcoming matches`);
 
-    for (const match of upcomingMatches) {
-      try {
-        const params = parseFootballDataMatch(match);
-        await upsertFootballMatch(params);
-        syncResults.upcoming.synced++;
-      } catch (error) {
-        syncResults.upcoming.errors++;
-        syncResults.errors.push(
-          `Failed to sync upcoming match ${match.id}: ${error instanceof Error ? error.message : "Unknown error"}`
-        );
-      }
-    }
+    // Parse all matches and batch upsert
+    const upcomingParams = upcomingMatches.map(parseFootballDataMatch);
+    console.log(`[Match Sync] Batch upserting ${upcomingParams.length} upcoming matches...`);
+    const upcomingResult = await batchUpsertFootballMatches(upcomingParams);
+    syncResults.upcoming.synced = upcomingResult.synced;
+    syncResults.upcoming.errors = upcomingResult.errors;
+    console.log(`[Match Sync] Upcoming matches: ${upcomingResult.synced} synced, ${upcomingResult.errors} errors`);
 
     // Sync recently finished matches (last 3 days)
     const threeDaysAgo = new Date();
@@ -243,18 +238,13 @@ export async function GET(request: Request) {
 
     console.log(`[Match Sync] Found ${finishedMatches.length} finished matches`);
 
-    for (const match of finishedMatches) {
-      try {
-        const params = parseFootballDataMatch(match);
-        await upsertFootballMatch(params);
-        syncResults.finished.synced++;
-      } catch (error) {
-        syncResults.finished.errors++;
-        syncResults.errors.push(
-          `Failed to sync finished match ${match.id}: ${error instanceof Error ? error.message : "Unknown error"}`
-        );
-      }
-    }
+    // Parse all matches and batch upsert
+    const finishedParams = finishedMatches.map(parseFootballDataMatch);
+    console.log(`[Match Sync] Batch upserting ${finishedParams.length} finished matches...`);
+    const finishedResult = await batchUpsertFootballMatches(finishedParams);
+    syncResults.finished.synced = finishedResult.synced;
+    syncResults.finished.errors = finishedResult.errors;
+    console.log(`[Match Sync] Finished matches: ${finishedResult.synced} synced, ${finishedResult.errors} errors`);
 
     // After syncing finished matches, check for bets ready for auto-settlement
     // These are matched bets linked to FINISHED matches with scores available
