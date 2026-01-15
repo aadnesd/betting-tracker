@@ -6,6 +6,7 @@ import { BetStatusBadge } from "@/components/bets/bet-status-badge";
 import { DashboardActions } from "@/components/bets/dashboard-actions";
 import { DashboardSummaryCards } from "@/components/bets/dashboard-summary-cards";
 import { ExposureAlertBanner } from "@/components/bets/exposure-alert-banner";
+import { ExposureByEventCard } from "@/components/bets/exposure-by-event-card";
 import { ExposureTimelineWithControls } from "@/components/bets/exposure-timeline-chart";
 import { FreeBetExpiryBanner } from "@/components/bets/free-bet-expiry-banner";
 import { PendingSettlementCard } from "@/components/bets/pending-settlement-card";
@@ -15,6 +16,7 @@ import {
   countExpiringFreeBets,
   countPendingSettlementBets,
   getDashboardSummary,
+  getExposureByEvent,
   getExposureTimeline,
   getPendingSettlementBets,
   listAccountsWithBalances,
@@ -34,7 +36,7 @@ export default async function Page() {
 
   const userId = session.user.id;
 
-  const [bets, summary, expiringFreeBetsCount, exposureData7, exposureData14, exposureData30, exposureData90, pendingSettlementBets, pendingSettlementCount, accountsWithBalances] = await Promise.all([
+  const [bets, summary, expiringFreeBetsCount, exposureData7, exposureData14, exposureData30, exposureData90, exposureByEvent, pendingSettlementBets, pendingSettlementCount, accountsWithBalances] = await Promise.all([
     listMatchedBetsByUser({
       userId,
       limit: 50,
@@ -45,6 +47,7 @@ export default async function Page() {
     getExposureTimeline({ userId, daysBack: 14 }),
     getExposureTimeline({ userId, daysBack: 30 }),
     getExposureTimeline({ userId, daysBack: 90 }),
+    getExposureByEvent({ userId }),
     getPendingSettlementBets({ userId, filter: "all", limit: 10 }),
     countPendingSettlementBets({ userId }),
     listAccountsWithBalances({ userId }),
@@ -114,6 +117,11 @@ export default async function Page() {
       <PendingSettlementCard
         bets={pendingSettlementBets}
         totalCount={pendingSettlementCount}
+      />
+
+      <ExposureByEventCard
+        exposureData={exposureByEvent}
+        warningThreshold={5000}
       />
 
       <Card>
