@@ -1,5 +1,5 @@
 import { format } from "date-fns";
-import { ArrowLeft, CalendarDays, Gift, Lock, Target, Trash2 } from "lucide-react";
+import { ArrowLeft, CalendarDays, Gift, Lock, Target } from "lucide-react";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/app/(auth)/auth";

@@ -4,6 +4,7 @@ import { ChevronDown, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
+import { DeleteConfirmDialog } from "@/components/bets/delete-confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -216,6 +217,23 @@ export function FreeBetForm({ accounts, initialData, mode }: FreeBetFormProps) {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleDelete = async () => {
+    if (!initialData?.id) return;
+
+    const response = await fetch(`/api/bets/free-bets/${initialData.id}`, {
+      method: "DELETE",
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || "Failed to delete free bet");
+    }
+
+    toast.success("Free bet deleted!");
+    router.push("/bets/settings/promos");
   };
 
   const bookmakers = accounts.filter((a) => a.currency); // Only show accounts with currency set
@@ -525,6 +543,27 @@ export function FreeBetForm({ accounts, initialData, mode }: FreeBetFormProps) {
           )}
         </Button>
       </div>
+
+      {/* Delete section - only for edit mode */}
+      {mode === "edit" && initialData?.id && initialData.status !== "used" && (
+        <div className="border-t pt-6 mt-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-destructive">Danger Zone</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Delete this free bet permanently. This cannot be undone.
+              </p>
+            </div>
+            <DeleteConfirmDialog
+              title="Delete free bet?"
+              description={`This will permanently delete the free bet "${initialData.name}" worth ${initialData.currency} ${Number.parseFloat(initialData.value).toFixed(2)}. This action cannot be undone.`}
+              onConfirm={handleDelete}
+              destructiveLabel="Delete Free Bet"
+              disabled={isSubmitting}
+            />
+          </div>
+        </div>
+      )}
     </form>
   );
 }

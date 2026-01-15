@@ -91,7 +91,18 @@ Prioritized implementation tasks. Check off when complete with tests passing.
 
 ## Future Enhancements
 
-- [ ] **Delete functionality**: Add ability to delete bets, matched bets, transactions, accounts, and free bets. DoD: Delete buttons/actions available in detail pages with confirmation dialogs, cascade deletes handled properly (e.g., deleting matched bet should handle linked back/lay bets), audit trail entries created for deletions. Why: Users need to correct mistakes and remove test/invalid data. Implementation: Add DELETE endpoints for each entity type, add confirmation modals to UI, ensure proper cascade behavior (matched bet deletion should optionally delete linked bets or just unlink them).
+- [x] **Delete functionality**: Added ability to delete bets, matched bets, transactions, accounts, and free bets. DoD: Delete buttons/actions available in detail pages with confirmation dialogs, cascade deletes handled properly, audit trail entries created for deletions. Why: Users need to correct mistakes and remove test/invalid data. Implementation:
+  - Created `deleteMatchedBet` query in `lib/db/queries.ts` with optional `cascade` parameter - cascade=true deletes linked back/lay bets, cascade=false leaves them orphaned. Handles unlinking free bets (restores to active status) and qualifying bets (updates progress). Creates audit entries.
+  - Created `deleteBet` query for individual back/lay bet deletion - unlinks from matched bet if linked, cleans up orphaned screenshots, creates audit entries.
+  - Created `deleteAccount` query - validates no linked bets, transactions, or free bets before deletion. Suggests archiving instead if dependencies exist.
+  - Created `deleteAccountTransaction` query - creates audit entries for tracking.
+  - Created DELETE API endpoints: `/api/bets/[id]` (matched bets with ?cascade=true option), `/api/bets/accounts/[id]` (accounts), `/api/bets/accounts/[id]/transactions/[txId]` (transactions).
+  - Created `DeleteConfirmDialog` reusable component with cascade option checkbox for matched bets.
+  - Added delete button to `MatchedBetDetailActions` component with cascade checkbox.
+  - Created `TransactionRow` component with hover-reveal delete button.
+  - Added delete section to `AccountEditForm` with danger zone styling.
+  - Added delete section to `FreeBetForm` for active/expired free bets.
+  - Tests: 25 tests in `tests/unit/delete-operations.test.ts` covering query function signatures, API behavior, cascade logic, constraint checks, and audit trail documentation.
 
 - [ ] **OAuth SSO authentication**: Replace email/password signup/login with OAuth providers (Google, GitHub). DoD: Users can sign in with Google or GitHub accounts, existing guest sessions can be linked to OAuth accounts, email/password forms removed. Why: Simpler onboarding, no password management, more secure. Implementation guide: https://authjs.dev/getting-started/authentication/oauth. Files to update: `lib/auth.ts` (add OAuth providers), `app/(auth)/login/page.tsx`, `app/(auth)/register/page.tsx` (replace forms with OAuth buttons), possibly `lib/db/schema.ts` if account linking needed.
 
