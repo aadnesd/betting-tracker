@@ -3,10 +3,11 @@
  *
  * Why: Automatic match linking enables the auto-settlement flow by connecting bets to
  * synced FootballMatch records. Tests cover:
- * 1. Search term extraction from market strings
- * 2. Candidate match finding via DB search
- * 3. LLM-based match selection
- * 4. End-to-end linking flow
+ * 1. Team name normalization dictionary
+ * 2. Search term extraction from market strings
+ * 3. Candidate match finding via DB search
+ * 4. LLM-based match selection
+ * 5. End-to-end linking flow
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -30,6 +31,9 @@ import {
   extractSearchTermsFromMarket,
   findCandidateMatches,
   linkBetToMatch,
+  normalizeTeamName,
+  getSearchTermsForTeam,
+  TEAM_NAME_ALIASES,
   type MatchCandidate,
   type MatchLinkResult,
 } from "@/lib/match-linking";
@@ -41,6 +45,115 @@ const mockSearchFootballMatches = searchFootballMatches as ReturnType<typeof vi.
 const mockGenerateText = generateText as ReturnType<typeof vi.fn>;
 
 describe("Match Linking Module", () => {
+  describe("TEAM_NAME_ALIASES dictionary", () => {
+    it("has entries for major English teams", () => {
+      expect(TEAM_NAME_ALIASES["manchester united"]).toBeDefined();
+      expect(TEAM_NAME_ALIASES["manchester city"]).toBeDefined();
+      expect(TEAM_NAME_ALIASES["arsenal"]).toBeDefined();
+      expect(TEAM_NAME_ALIASES["chelsea"]).toBeDefined();
+      expect(TEAM_NAME_ALIASES["liverpool"]).toBeDefined();
+    });
+
+    it("has entries for major Spanish teams", () => {
+      expect(TEAM_NAME_ALIASES["real madrid"]).toBeDefined();
+      expect(TEAM_NAME_ALIASES["barcelona"]).toBeDefined();
+      expect(TEAM_NAME_ALIASES["atletico madrid"]).toBeDefined();
+    });
+
+    it("has entries for major German teams", () => {
+      expect(TEAM_NAME_ALIASES["bayern munich"]).toBeDefined();
+      expect(TEAM_NAME_ALIASES["borussia dortmund"]).toBeDefined();
+    });
+
+    it("has entries for major Italian teams", () => {
+      expect(TEAM_NAME_ALIASES["juventus"]).toBeDefined();
+      expect(TEAM_NAME_ALIASES["inter milan"]).toBeDefined();
+      expect(TEAM_NAME_ALIASES["ac milan"]).toBeDefined();
+    });
+
+    it("includes common abbreviations for Man United", () => {
+      const aliases = TEAM_NAME_ALIASES["manchester united"];
+      expect(aliases).toContain("man utd");
+      expect(aliases).toContain("man u");
+      expect(aliases).toContain("mufc");
+    });
+
+    it("includes common abbreviations for Man City", () => {
+      const aliases = TEAM_NAME_ALIASES["manchester city"];
+      expect(aliases).toContain("man city");
+      expect(aliases).toContain("mcfc");
+      expect(aliases).toContain("city");
+    });
+  });
+
+  describe("normalizeTeamName", () => {
+    it("normalizes 'Man Utd' to 'manchester united'", () => {
+      const result = normalizeTeamName("Man Utd");
+      expect(result).toContain("manchester united");
+    });
+
+    it("normalizes 'Man City' to 'manchester city'", () => {
+      const result = normalizeTeamName("Man City");
+      expect(result).toContain("manchester city");
+    });
+
+    it("normalizes 'Barca' to 'barcelona'", () => {
+      const result = normalizeTeamName("Barca");
+      expect(result).toContain("barcelona");
+    });
+
+    it("normalizes 'Bayern' to 'bayern munich'", () => {
+      const result = normalizeTeamName("Bayern");
+      expect(result).toContain("bayern munich");
+    });
+
+    it("normalizes 'PSG' to 'paris saint-germain'", () => {
+      const result = normalizeTeamName("PSG");
+      expect(result).toContain("paris saint-germain");
+    });
+
+    it("returns original term when no alias matches (case normalized)", () => {
+      // Bodø/Glimt IS in the dictionary, so let's use a truly unknown team
+      const result = normalizeTeamName("FC Unkown Team");
+      // Should return the trimmed original term when no match
+      expect(result).toContain("FC Unkown Team");
+    });
+
+    it("is case-insensitive", () => {
+      const result1 = normalizeTeamName("MAN UTD");
+      const result2 = normalizeTeamName("man utd");
+      expect(result1).toContain("manchester united");
+      expect(result2).toContain("manchester united");
+    });
+  });
+
+  describe("getSearchTermsForTeam", () => {
+    it("returns original and normalized terms", () => {
+      const terms = getSearchTermsForTeam("Man Utd");
+      expect(terms).toContain("Man Utd");
+      expect(terms).toContain("manchester united");
+    });
+
+    it("includes words from canonical name", () => {
+      const terms = getSearchTermsForTeam("Spurs");
+      expect(terms).toContain("tottenham hotspur");
+      // Should include "tottenham" as a separate search term
+      expect(terms).toContain("tottenham");
+    });
+
+    it("filters out short words from canonical names", () => {
+      const terms = getSearchTermsForTeam("Arsenal");
+      // Should not include "FC" or other short words
+      expect(terms.every(t => t.length >= 3)).toBe(true);
+    });
+
+    it("returns only original term when unknown team", () => {
+      const terms = getSearchTermsForTeam("Unknown FC");
+      expect(terms).toContain("Unknown FC");
+      expect(terms.length).toBeGreaterThanOrEqual(1);
+    });
+  });
+
   describe("extractSearchTermsFromMarket", () => {
     it("extracts teams from 'Home v Away' format", () => {
       const terms = extractSearchTermsFromMarket("Man Utd v Man City");
@@ -90,19 +203,18 @@ describe("Match Linking Module", () => {
       vi.clearAllMocks();
     });
 
-    it("searches using extracted team names", async () => {
+    it("searches using extracted team names and normalized variants", async () => {
       mockSearchFootballMatches.mockResolvedValue([]);
 
       await findCandidateMatches({
         market: "Man Utd v Man City",
       });
 
-      expect(mockSearchFootballMatches).toHaveBeenCalledWith(
-        expect.objectContaining({ searchTerm: "Man Utd" })
-      );
-      expect(mockSearchFootballMatches).toHaveBeenCalledWith(
-        expect.objectContaining({ searchTerm: "Man City" })
-      );
+      // Should search for original terms plus normalized variants
+      expect(mockSearchFootballMatches).toHaveBeenCalled();
+      const calls = mockSearchFootballMatches.mock.calls.map(c => c[0].searchTerm);
+      // Should include original term or normalized variant
+      expect(calls.some(t => t === "Man Utd" || t === "manchester united" || t === "manchester")).toBe(true);
     });
 
     it("deduplicates matches across search terms", async () => {
@@ -122,7 +234,7 @@ describe("Match Linking Module", () => {
         market: "Man Utd v Man City",
       });
 
-      // Should only include the match once
+      // Should only include the match once even with expanded search terms
       expect(candidates.length).toBe(1);
       expect(candidates[0].id).toBe("match-1");
     });

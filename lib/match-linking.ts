@@ -3,16 +3,181 @@
  * 
  * Flow:
  * 1. OCR/AI parsing extracts market, selection, and placedAt from bet screenshots
- * 2. Fuzzy search FootballMatch DB using team names from the market string
- * 3. LLM compares parsed bet with candidate matches and picks the best match
+ * 2. Normalize team names using static dictionary
+ * 3. Fuzzy search FootballMatch DB using normalized team names
+ * 4. LLM compares parsed bet with candidate matches and picks the best match
  * 
- * The LLM is good at handling team name variations (Man Utd vs Manchester United)
- * and can use the match date from the bet to disambiguate.
+ * The static dictionary handles common abbreviations and variations to reduce
+ * reliance on LLM for simple team name matching.
  */
 
 import { generateText } from "ai";
 import { myProvider } from "@/lib/ai/providers";
 import { searchFootballMatches } from "@/lib/db/queries";
+
+/**
+ * Team name normalization dictionary.
+ * Maps common abbreviations and variations to canonical team names.
+ * 
+ * Why: Betting sites use various abbreviations (Man Utd, Man U, United)
+ * while football-data.org uses full names. This reduces LLM calls and
+ * improves matching speed/reliability.
+ * 
+ * Keys should be lowercase for case-insensitive matching.
+ */
+export const TEAM_NAME_ALIASES: Record<string, string[]> = {
+  // English Premier League
+  "manchester united": ["man utd", "man u", "man united", "mufc", "utd"],
+  "manchester city": ["man city", "man c", "mcfc", "city"],
+  "arsenal": ["ars", "afc", "gunners"],
+  "chelsea": ["che", "cfc", "blues"],
+  "liverpool": ["liv", "lfc", "pool"],
+  "tottenham hotspur": ["tottenham", "spurs", "thfc", "spurs fc"],
+  "newcastle united": ["newcastle", "nufc", "toon"],
+  "west ham united": ["west ham", "whu", "hammers"],
+  "aston villa": ["villa", "avfc"],
+  "brighton & hove albion": ["brighton", "bhafc", "brighton hove", "bhfc"],
+  "everton": ["eve", "efc", "toffees"],
+  "wolverhampton wanderers": ["wolves", "wwfc", "wolverhampton"],
+  "leicester city": ["leicester", "lcfc", "foxes"],
+  "crystal palace": ["palace", "cpfc", "eagles"],
+  "brentford": ["brentford fc", "bees"],
+  "fulham": ["fulham fc", "ffc", "cottagers"],
+  "nottingham forest": ["notts forest", "nffc", "forest"],
+  "bournemouth": ["afc bournemouth", "cherries"],
+  "ipswich town": ["ipswich", "itfc", "tractors"],
+  "southampton": ["soton", "saints", "sfc"],
+  
+  // Spanish La Liga
+  "real madrid": ["real", "madrid", "rmcf", "blancos"],
+  "barcelona": ["barca", "barça", "fcb", "blaugrana"],
+  "atletico madrid": ["atletico", "atleti", "atm"],
+  "sevilla": ["sevilla fc", "sfc"],
+  "real sociedad": ["la real", "sociedad", "rsoc"],
+  "real betis": ["betis", "rbb"],
+  "athletic bilbao": ["athletic", "bilbao"],
+  "villarreal": ["villarreal cf", "yellow submarine"],
+  "valencia": ["valencia cf", "vcf"],
+  "celta vigo": ["celta", "vigo", "rcde"],
+  
+  // German Bundesliga
+  "bayern munich": ["bayern", "fcb", "bayern münchen", "bayern munchen"],
+  "borussia dortmund": ["dortmund", "bvb"],
+  "rb leipzig": ["leipzig", "rbl"],
+  "bayer leverkusen": ["leverkusen", "b04"],
+  "eintracht frankfurt": ["frankfurt", "eintracht", "sge"],
+  "borussia monchengladbach": ["gladbach", "bmg", "borussia m'gladbach", "monchengladbach"],
+  "vfb stuttgart": ["stuttgart", "vfb"],
+  "union berlin": ["union", "fcub", "köpenick"],
+  "werder bremen": ["bremen", "werder", "svw"],
+  "freiburg": ["sc freiburg", "scf"],
+  
+  // Italian Serie A
+  "juventus": ["juve", "jfc", "old lady", "bianconeri"],
+  "inter milan": ["inter", "internazionale", "nerazzurri"],
+  "ac milan": ["milan", "acm", "rossoneri"],
+  "napoli": ["ssc napoli", "naples"],
+  "roma": ["as roma", "giallorossi"],
+  "lazio": ["ss lazio", "biancocelesti"],
+  "atalanta": ["atalanta bc", "dea"],
+  "fiorentina": ["acf fiorentina", "viola"],
+  "torino": ["torino fc", "toro", "granata"],
+  "bologna": ["bologna fc", "rossoblu"],
+  
+  // French Ligue 1
+  "paris saint-germain": ["psg", "paris", "paris sg"],
+  "olympique marseille": ["marseille", "om"],
+  "olympique lyonnais": ["lyon", "ol", "olympique lyon"],
+  "monaco": ["as monaco", "asm"],
+  "lille": ["losc", "losc lille"],
+  "lens": ["rc lens", "sang et or"],
+  "nice": ["ogc nice", "ogcn"],
+  "strasbourg": ["rc strasbourg", "racing"],
+  "rennes": ["stade rennais", "srfc"],
+  "nantes": ["fc nantes", "canaris"],
+  
+  // Champions League / Europe
+  "benfica": ["sl benfica", "slb", "eagles"],
+  "porto": ["fc porto", "fcp", "dragões"],
+  "sporting cp": ["sporting", "sporting lisbon", "leões"],
+  "ajax": ["afc ajax", "amsterdammers"],
+  "psv eindhoven": ["psv", "eindhoven"],
+  "feyenoord": ["feyenoord rotterdam"],
+  "celtic": ["celtic fc", "hoops"],
+  "rangers": ["rangers fc", "gers"],
+  "red star belgrade": ["red star", "crvena zvezda"],
+  "galatasaray": ["gala", "galata"],
+  "fenerbahce": ["fener", "fenerbahçe"],
+  "besiktas": ["besiktaş", "bjk"],
+  
+  // Norwegian Eliteserien (for local testing)
+  "bodø/glimt": ["bodø", "glimt", "bodo/glimt", "bodo"],
+  "rosenborg": ["rbk", "rosenborg bk"],
+  "molde": ["molde fk", "mfk"],
+  "brann": ["sk brann", "bergen"],
+  "viking": ["viking fk", "viking stavanger"],
+};
+
+/**
+ * Normalize a team name using the alias dictionary.
+ * Returns all possible canonical names that could match the input.
+ * 
+ * @param teamName - The team name to normalize (from bet slip)
+ * @returns Array of possible canonical team names
+ */
+export function normalizeTeamName(teamName: string): string[] {
+  const normalized = teamName.toLowerCase().trim();
+  const results: string[] = [];
+  
+  // Check if input matches any canonical name (key) exactly
+  if (TEAM_NAME_ALIASES[normalized]) {
+    results.push(normalized);
+  }
+  
+  // Check if input matches any alias
+  for (const [canonical, aliases] of Object.entries(TEAM_NAME_ALIASES)) {
+    if (aliases.some(alias => alias.toLowerCase() === normalized)) {
+      results.push(canonical);
+    }
+    // Also check for partial matches (e.g., "Man Utd" should match "Manchester United")
+    if (aliases.some(alias => normalized.includes(alias.toLowerCase()) || alias.toLowerCase().includes(normalized))) {
+      if (!results.includes(canonical)) {
+        results.push(canonical);
+      }
+    }
+  }
+  
+  // If no matches found, return the original term for fallback search
+  if (results.length === 0) {
+    results.push(teamName.trim());
+  }
+  
+  return results;
+}
+
+/**
+ * Get search terms for a team name, including normalized variants.
+ * This provides both the original term and any canonical names from the dictionary.
+ */
+export function getSearchTermsForTeam(teamName: string): string[] {
+  const terms = new Set<string>();
+  
+  // Add original term
+  terms.add(teamName.trim());
+  
+  // Add normalized variants
+  for (const normalized of normalizeTeamName(teamName)) {
+    terms.add(normalized);
+    // Also add words from the canonical name for partial matching
+    for (const word of normalized.split(" ")) {
+      if (word.length >= 4) {
+        terms.add(word);
+      }
+    }
+  }
+  
+  return Array.from(terms);
+}
 
 export interface MatchCandidate {
   id: string;
@@ -76,7 +241,7 @@ export function extractSearchTermsFromMarket(market: string): string[] {
 
 /**
  * Search for candidate matches in the FootballMatch table.
- * Uses LIKE search on team names.
+ * Uses team name normalization and LIKE search on team names.
  */
 export async function findCandidateMatches({
   market,
@@ -85,10 +250,18 @@ export async function findCandidateMatches({
   market: string;
   betDate?: Date | null;
 }): Promise<MatchCandidate[]> {
-  const searchTerms = extractSearchTermsFromMarket(market);
+  const rawSearchTerms = extractSearchTermsFromMarket(market);
   
-  if (searchTerms.length === 0) {
+  if (rawSearchTerms.length === 0) {
     return [];
+  }
+  
+  // Expand search terms with normalized variants
+  const searchTerms = new Set<string>();
+  for (const term of rawSearchTerms) {
+    for (const expanded of getSearchTermsForTeam(term)) {
+      searchTerms.add(expanded);
+    }
   }
   
   const candidates: MatchCandidate[] = [];
