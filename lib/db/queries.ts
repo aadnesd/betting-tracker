@@ -4655,22 +4655,36 @@ export async function updateFootballMatch({
 }
 
 /**
- * Search for matches by team name (partial match).
- * Useful for match picker autocomplete.
+ * Search for matches by team name using trigram fuzzy matching.
+ * Uses pg_trgm extension for similarity search - handles typos and abbreviations.
+ * 
+ * Examples that will match "Manchester United FC":
+ * - "Man United" (similarity ~0.4)
+ * - "Manchster United" (typo, similarity ~0.7)
+ * - "Manchester Utd" (similarity ~0.6)
  */
 export async function searchFootballMatches({
   searchTerm,
   fromDate,
   limit = 20,
+  similarityThreshold = 0.2,
 }: {
   searchTerm: string;
   fromDate?: Date;
   limit?: number;
+  /** Minimum similarity score (0-1). Lower = more fuzzy. Default 0.2 */
+  similarityThreshold?: number;
 }) {
   try {
-    const term = `%${searchTerm.toLowerCase()}%`;
+    const term = searchTerm.trim();
+    
+    // Use trigram similarity for fuzzy matching
+    // GREATEST picks the higher similarity between home and away team
     const conditions: SQL<unknown>[] = [
-      sql`(LOWER(${footballMatch.homeTeam}) LIKE ${term} OR LOWER(${footballMatch.awayTeam}) LIKE ${term})`,
+      sql`(
+        similarity(${footballMatch.homeTeam}, ${term}) > ${similarityThreshold}
+        OR similarity(${footballMatch.awayTeam}, ${term}) > ${similarityThreshold}
+      )`,
     ];
 
     if (fromDate) {
@@ -4678,10 +4692,31 @@ export async function searchFootballMatches({
     }
 
     const rows = await db
-      .select()
+      .select({
+        id: footballMatch.id,
+        externalId: footballMatch.externalId,
+        homeTeam: footballMatch.homeTeam,
+        awayTeam: footballMatch.awayTeam,
+        competition: footballMatch.competition,
+        competitionCode: footballMatch.competitionCode,
+        matchDate: footballMatch.matchDate,
+        status: footballMatch.status,
+        homeScore: footballMatch.homeScore,
+        awayScore: footballMatch.awayScore,
+        lastSyncedAt: footballMatch.lastSyncedAt,
+        // Include similarity score for ordering
+        similarity: sql<number>`GREATEST(
+          similarity(${footballMatch.homeTeam}, ${term}),
+          similarity(${footballMatch.awayTeam}, ${term})
+        )`.as("similarity"),
+      })
       .from(footballMatch)
       .where(and(...conditions))
-      .orderBy(asc(footballMatch.matchDate))
+      // Order by similarity (best matches first), then by date
+      .orderBy(
+        sql`GREATEST(similarity(${footballMatch.homeTeam}, ${term}), similarity(${footballMatch.awayTeam}, ${term})) DESC`,
+        asc(footballMatch.matchDate)
+      )
       .limit(limit);
 
     return rows;
