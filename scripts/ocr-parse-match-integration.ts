@@ -4,7 +4,7 @@
  * 2. LLM parsing of extracted text (Google Gemini)
  * 3. Football match linking (football-data.org API)
  *
- * Run with: npx tsx tests/integration/ocr-parse-match.test.ts
+ * Run with: npx tsx scripts/ocr-parse-match-integration.ts
  *
  * Requires:
  * - AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT
