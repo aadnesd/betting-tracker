@@ -17,6 +17,7 @@ export const myProvider = isTestEnvironment
       languageModels: {
         "chat-model": mockChatModel,
         "chat-model-reasoning": mockReasoningModel,
+        "chat-model-fast": mockChatModel, // Fast model for simple tasks
         "title-model": mockTitleModel,
         "artifact-model": mockArtifactModel,
       },
@@ -28,6 +29,7 @@ export const myProvider = isTestEnvironment
           model: gateway.languageModel("openai/gpt-5"),
           middleware: extractReasoningMiddleware({ tagName: "think" }),
         }),
+        "chat-model-fast": gateway.languageModel("google/gemini-2.0-flash"), // Fast model for match linking
         "title-model": gateway.languageModel("openai/gpt-5-nano"),
         "artifact-model": gateway.languageModel("openai/gpt-5"),
       },
