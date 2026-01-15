@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
+import { DeleteConfirmDialog } from "@/components/bets/delete-confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -38,6 +39,7 @@ export function MatchedBetDetailActions({
   const [status, setStatus] = useState<MatchedBetStatus>(currentStatus);
   const [notes, setNotes] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [cascadeDelete, setCascadeDelete] = useState(false);
 
   const hasMismatches = mismatches.length > 0;
 
@@ -132,6 +134,23 @@ export function MatchedBetDetailActions({
     }
   };
 
+  const handleDelete = async () => {
+    const url = `/api/bets/${matchedBetId}${cascadeDelete ? "?cascade=true" : ""}`;
+    const resp = await fetch(url, { method: "DELETE" });
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.error || "Failed to delete");
+    }
+
+    toast.success(
+      cascadeDelete
+        ? "Matched bet and linked bets deleted"
+        : "Matched bet deleted"
+    );
+    router.push("/bets");
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -195,6 +214,17 @@ export function MatchedBetDetailActions({
               </Button>
             </>
           )}
+
+          {/* Delete button with confirmation */}
+          <DeleteConfirmDialog
+            title="Delete matched bet?"
+            description="This action cannot be undone. The matched bet will be permanently deleted."
+            onConfirm={handleDelete}
+            destructiveLabel="Delete"
+            showCascadeOption={hasBothLegs}
+            onCascadeChange={setCascadeDelete}
+            disabled={isSaving}
+          />
         </div>
 
         {/* Guidance based on mismatches */}

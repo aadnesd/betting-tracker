@@ -4,6 +4,7 @@ import { Building2, CreditCard, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
+import { DeleteConfirmDialog } from "@/components/bets/delete-confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -130,6 +131,21 @@ export function AccountEditForm({ account }: AccountEditFormProps) {
     formData.currency !== (account.currency ?? "NOK") ||
     formData.commission !== (account.commission?.toString() ?? "") ||
     formData.status !== account.status;
+
+  const handleDelete = async () => {
+    const response = await fetch(`/api/bets/accounts/${account.id}`, {
+      method: "DELETE",
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || "Failed to delete account");
+    }
+
+    toast.success("Account deleted!");
+    router.push("/bets/settings/accounts");
+  };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -272,6 +288,25 @@ export function AccountEditForm({ account }: AccountEditFormProps) {
             "Save Changes"
           )}
         </Button>
+      </div>
+
+      {/* Delete section - separated from main actions */}
+      <div className="border-t pt-6 mt-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-destructive">Danger Zone</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Delete this account permanently. This cannot be undone.
+            </p>
+          </div>
+          <DeleteConfirmDialog
+            title="Delete account?"
+            description="This action cannot be undone. The account will be permanently deleted. Note: You cannot delete accounts that have linked bets, transactions, or free bets. Archive instead."
+            onConfirm={handleDelete}
+            destructiveLabel="Delete Account"
+            disabled={isSubmitting}
+          />
+        </div>
       </div>
     </form>
   );

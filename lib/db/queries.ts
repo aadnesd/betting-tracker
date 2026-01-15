@@ -4840,3 +4840,374 @@ export async function getAllEnabledCompetitions(): Promise<string[]> {
   }
 }
 
+// ============================================================================
+// Delete Operations
+// ============================================================================
+
+/**
+ * Delete an account transaction by ID.
+ * Only the owner can delete transactions. Creates an audit entry.
+ */
+export async function deleteAccountTransaction({
+  id,
+  userId,
+}: {
+  id: string;
+  userId: string;
+}) {
+  try {
+    // Verify the transaction exists and belongs to user
+    const [existing] = await db
+      .select()
+      .from(accountTransaction)
+      .where(and(eq(accountTransaction.id, id), eq(accountTransaction.userId, userId)));
+
+    if (!existing) {
+      return null;
+    }
+
+    await db
+      .delete(accountTransaction)
+      .where(and(eq(accountTransaction.id, id), eq(accountTransaction.userId, userId)));
+
+    // Create audit entry
+    await db.insert(auditLog).values({
+      createdAt: new Date(),
+      userId,
+      entityType: "account",
+      entityId: existing.accountId,
+      action: "delete",
+      changes: {
+        transactionId: id,
+        type: existing.type,
+        amount: existing.amount,
+        currency: existing.currency,
+      },
+      notes: `Deleted ${existing.type} transaction: ${existing.currency} ${existing.amount}`,
+    });
+
+    return { success: true };
+  } catch (error) {
+    if (error instanceof ChatSDKError) {
+      throw error;
+    }
+    throw new ChatSDKError("bad_request:database", "Failed to delete account transaction");
+  }
+}
+
+/**
+ * Delete an account by ID.
+ * Only allows deletion if the account has no linked bets or transactions.
+ * Creates an audit entry.
+ */
+export async function deleteAccount({
+  id,
+  userId,
+}: {
+  id: string;
+  userId: string;
+}) {
+  try {
+    // Verify the account exists and belongs to user
+    const existing = await getAccountById({ id, userId });
+    if (!existing) {
+      return null;
+    }
+
+    // Check for linked bets (back or lay)
+    const [linkedBackBet] = await db
+      .select({ id: backBet.id })
+      .from(backBet)
+      .where(eq(backBet.accountId, id))
+      .limit(1);
+
+    const [linkedLayBet] = await db
+      .select({ id: layBet.id })
+      .from(layBet)
+      .where(eq(layBet.accountId, id))
+      .limit(1);
+
+    if (linkedBackBet || linkedLayBet) {
+      throw new ChatSDKError(
+        "bad_request:api",
+        "Cannot delete account with linked bets. Archive it instead."
+      );
+    }
+
+    // Check for linked transactions
+    const [linkedTransaction] = await db
+      .select({ id: accountTransaction.id })
+      .from(accountTransaction)
+      .where(eq(accountTransaction.accountId, id))
+      .limit(1);
+
+    if (linkedTransaction) {
+      throw new ChatSDKError(
+        "bad_request:api",
+        "Cannot delete account with transactions. Archive it instead."
+      );
+    }
+
+    // Check for linked free bets
+    const [linkedFreeBet] = await db
+      .select({ id: freeBet.id })
+      .from(freeBet)
+      .where(eq(freeBet.accountId, id))
+      .limit(1);
+
+    if (linkedFreeBet) {
+      throw new ChatSDKError(
+        "bad_request:api",
+        "Cannot delete account with linked free bets. Archive it instead."
+      );
+    }
+
+    await db
+      .delete(account)
+      .where(and(eq(account.id, id), eq(account.userId, userId)));
+
+    // Create audit entry
+    await db.insert(auditLog).values({
+      createdAt: new Date(),
+      userId,
+      entityType: "account",
+      entityId: id,
+      action: "delete",
+      changes: {
+        name: existing.name,
+        kind: existing.kind,
+        currency: existing.currency,
+      },
+      notes: `Deleted account: ${existing.name}`,
+    });
+
+    return { success: true };
+  } catch (error) {
+    if (error instanceof ChatSDKError) {
+      throw error;
+    }
+    throw new ChatSDKError("bad_request:database", "Failed to delete account");
+  }
+}
+
+/**
+ * Delete a single bet (back or lay) by ID.
+ * If the bet is part of a matched bet, unlinks it from the matched bet first.
+ * Creates audit entries.
+ */
+export async function deleteBet({
+  id,
+  kind,
+  userId,
+}: {
+  id: string;
+  kind: "back" | "lay";
+  userId: string;
+}) {
+  try {
+    const betTable = kind === "back" ? backBet : layBet;
+    const foreignKeyColumn = kind === "back" ? matchedBet.backBetId : matchedBet.layBetId;
+
+    // Verify the bet exists and belongs to user
+    const [existing] = await db
+      .select()
+      .from(betTable)
+      .where(and(eq(betTable.id, id), eq(betTable.userId, userId)));
+
+    if (!existing) {
+      return null;
+    }
+
+    // Check if this bet is linked to a matched bet
+    const [linkedMatchedBet] = await db
+      .select({ id: matchedBet.id })
+      .from(matchedBet)
+      .where(eq(foreignKeyColumn, id));
+
+    if (linkedMatchedBet) {
+      // Unlink the bet from matched bet (set to null)
+      await db
+        .update(matchedBet)
+        .set({ [kind === "back" ? "backBetId" : "layBetId"]: null })
+        .where(eq(matchedBet.id, linkedMatchedBet.id));
+
+      // Create audit entry for the unlinking
+      await db.insert(auditLog).values({
+        createdAt: new Date(),
+        userId,
+        entityType: "matched_bet",
+        entityId: linkedMatchedBet.id,
+        action: "update",
+        changes: { [`${kind}BetId`]: null, reason: "bet_deleted" },
+        notes: `Unlinked ${kind} bet due to deletion`,
+      });
+    }
+
+    // Delete the bet's screenshot if it's a manual/placeholder one
+    const [screenshot] = await db
+      .select()
+      .from(screenshotUpload)
+      .where(eq(screenshotUpload.id, existing.screenshotId));
+
+    // Delete the bet
+    await db.delete(betTable).where(eq(betTable.id, id));
+
+    // Delete the screenshot if it was created for this bet only
+    if (screenshot) {
+      // Check if other bets reference this screenshot
+      const [otherBackBet] = await db
+        .select({ id: backBet.id })
+        .from(backBet)
+        .where(eq(backBet.screenshotId, screenshot.id))
+        .limit(1);
+
+      const [otherLayBet] = await db
+        .select({ id: layBet.id })
+        .from(layBet)
+        .where(eq(layBet.screenshotId, screenshot.id))
+        .limit(1);
+
+      if (!otherBackBet && !otherLayBet) {
+        await db.delete(screenshotUpload).where(eq(screenshotUpload.id, screenshot.id));
+      }
+    }
+
+    // Create audit entry
+    await db.insert(auditLog).values({
+      createdAt: new Date(),
+      userId,
+      entityType: kind === "back" ? "back_bet" : "lay_bet",
+      entityId: id,
+      action: "delete",
+      changes: {
+        market: existing.market,
+        selection: existing.selection,
+        odds: existing.odds,
+        stake: existing.stake,
+      },
+      notes: `Deleted ${kind} bet: ${existing.selection} @ ${existing.odds}`,
+    });
+
+    return { success: true };
+  } catch (error) {
+    if (error instanceof ChatSDKError) {
+      throw error;
+    }
+    throw new ChatSDKError("bad_request:database", "Failed to delete bet");
+  }
+}
+
+/**
+ * Delete a matched bet by ID.
+ * Options:
+ * - cascade: true = also delete the linked back/lay bets and their screenshots
+ * - cascade: false = only delete the matched bet, leave back/lay bets orphaned
+ * Creates audit entries.
+ */
+export async function deleteMatchedBet({
+  id,
+  userId,
+  cascade = false,
+}: {
+  id: string;
+  userId: string;
+  cascade?: boolean;
+}) {
+  try {
+    // Verify the matched bet exists and belongs to user
+    const [existing] = await db
+      .select()
+      .from(matchedBet)
+      .where(and(eq(matchedBet.id, id), eq(matchedBet.userId, userId)));
+
+    if (!existing) {
+      return null;
+    }
+
+    // Check for linked free bets that used this matched bet
+    const linkedFreeBets = await db
+      .select({ id: freeBet.id })
+      .from(freeBet)
+      .where(eq(freeBet.usedInMatchedBetId, id));
+
+    // Unlink free bets - set usedInMatchedBetId to null and status back to active
+    for (const fb of linkedFreeBets) {
+      await db
+        .update(freeBet)
+        .set({ usedInMatchedBetId: null, status: "active" })
+        .where(eq(freeBet.id, fb.id));
+    }
+
+    // Check for qualifying bets referencing this matched bet
+    const linkedQualifyingBets = await db
+      .select({ id: qualifyingBet.id, freeBetId: qualifyingBet.freeBetId, contribution: qualifyingBet.contribution })
+      .from(qualifyingBet)
+      .where(eq(qualifyingBet.matchedBetId, id));
+
+    // Remove qualifying bet references and update progress
+    for (const qb of linkedQualifyingBets) {
+      // Get the free bet to update progress
+      const [fb] = await db
+        .select()
+        .from(freeBet)
+        .where(eq(freeBet.id, qb.freeBetId));
+
+      if (fb) {
+        const currentProgress = Number.parseFloat(fb.unlockProgress ?? "0");
+        const contribution = Number.parseFloat(qb.contribution);
+        const newProgress = Math.max(0, currentProgress - contribution);
+
+        await db
+          .update(freeBet)
+          .set({ unlockProgress: newProgress.toString() })
+          .where(eq(freeBet.id, fb.id));
+      }
+
+      // Delete the qualifying bet link
+      await db.delete(qualifyingBet).where(eq(qualifyingBet.id, qb.id));
+    }
+
+    // Delete audit entries for this matched bet
+    await db.delete(auditLog).where(
+      and(eq(auditLog.entityType, "matched_bet"), eq(auditLog.entityId, id))
+    );
+
+    if (cascade) {
+      // Delete back bet if exists
+      if (existing.backBetId) {
+        await deleteBet({ id: existing.backBetId, kind: "back", userId });
+      }
+      // Delete lay bet if exists
+      if (existing.layBetId) {
+        await deleteBet({ id: existing.layBetId, kind: "lay", userId });
+      }
+    }
+
+    // Delete the matched bet
+    await db.delete(matchedBet).where(eq(matchedBet.id, id));
+
+    // Create audit entry
+    await db.insert(auditLog).values({
+      createdAt: new Date(),
+      userId,
+      entityType: "matched_bet",
+      entityId: id,
+      action: "delete",
+      changes: {
+        market: existing.market,
+        selection: existing.selection,
+        promoType: existing.promoType,
+        cascade,
+      },
+      notes: `Deleted matched bet: ${existing.selection}${cascade ? " (with cascade)" : ""}`,
+    });
+
+    return { success: true, cascade };
+  } catch (error) {
+    if (error instanceof ChatSDKError) {
+      throw error;
+    }
+    throw new ChatSDKError("bad_request:database", "Failed to delete matched bet");
+  }
+}
+

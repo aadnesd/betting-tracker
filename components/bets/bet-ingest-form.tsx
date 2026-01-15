@@ -1,4 +1,5 @@
 "use client";
+import { LinkIcon } from "lucide-react";
 import Image from "next/image";
 import { useMemo, useState, type ComponentProps } from "react";
 import { toast } from "sonner";
@@ -32,6 +33,8 @@ type ParsedForm = {
   selection: string;
   notes?: string;
   needsReview: boolean;
+  matchId?: string | null;
+  matchConfidence?: string | null;
   back: ParsedPair["back"];
   lay: ParsedPair["lay"];
 };
@@ -104,13 +107,15 @@ export function BetIngestForm() {
         throw new Error("Parsing failed");
       }
 
-      const parsedJson: ParsedPair = await parseResp.json();
+      const parsedJson: ParsedPair & { matchId?: string | null; matchConfidence?: string | null } = await parseResp.json();
 
       setParsed({
         market: parsedJson.back.market ?? parsedJson.lay.market,
         selection: parsedJson.back.selection ?? parsedJson.lay.selection,
         needsReview: parsedJson.needsReview,
         notes: parsedJson.notes,
+        matchId: parsedJson.matchId,
+        matchConfidence: parsedJson.matchConfidence,
         back: parsedJson.back,
         lay: parsedJson.lay,
       });
@@ -141,6 +146,7 @@ export function BetIngestForm() {
           layScreenshotId: screenshots.lay.id,
           market: parsed.market,
           selection: parsed.selection,
+          matchId: parsed.matchId,
           needsReview: parsed.needsReview,
           notes: parsed.notes,
           back: parsed.back,
@@ -274,6 +280,20 @@ export function BetIngestForm() {
                 value={parsed?.selection ?? ""}
               />
             </div>
+            {/* Match link indicator */}
+            {parsed?.matchId && (
+              <div className="flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
+                <LinkIcon className="h-4 w-4 text-emerald-600" />
+                <span>
+                  Linked to match
+                  {parsed.matchConfidence && (
+                    <span className="ml-1 text-emerald-600">
+                      (confidence: {parsed.matchConfidence})
+                    </span>
+                  )}
+                </span>
+              </div>
+            )}
             <div className="space-y-2">
               <Label>Notes</Label>
               <Textarea

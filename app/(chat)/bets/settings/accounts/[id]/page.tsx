@@ -1,18 +1,15 @@
 import {
-  ArrowDownCircle,
   ArrowLeft,
-  ArrowUpCircle,
   Building2,
   CreditCard,
-  Gift,
   Pencil,
   Plus,
-  Settings2,
 } from "lucide-react";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/app/(auth)/auth";
 import { AccountEditForm } from "@/components/bets/account-edit-form";
+import { TransactionRow } from "@/components/bets/transaction-row";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -157,48 +154,20 @@ export default async function AccountDetailPage({
             </div>
           ) : (
             <div className="space-y-2">
-              {transactions.map((tx) => {
-                const amount = Number.parseFloat(tx.amount);
-                const isPositive = tx.type !== "withdrawal";
-                const occurredAt = new Date(tx.occurredAt);
-                
-                const icon = {
-                  deposit: <ArrowDownCircle className="h-5 w-5 text-green-600" />,
-                  withdrawal: <ArrowUpCircle className="h-5 w-5 text-red-600" />,
-                  bonus: <Gift className="h-5 w-5 text-blue-600" />,
-                  adjustment: <Settings2 className="h-5 w-5 text-gray-600" />,
-                }[tx.type];
-
-                return (
-                  <div
-                    key={tx.id}
-                    className="flex items-center justify-between rounded-md border p-3"
-                  >
-                    <div className="flex items-center gap-3">
-                      {icon}
-                      <div>
-                        <p className="font-medium capitalize">{tx.type}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {occurredAt.toLocaleDateString("en-GB", {
-                            day: "numeric",
-                            month: "short",
-                            year: "numeric",
-                          })}
-                          {tx.notes && ` • ${tx.notes}`}
-                        </p>
-                      </div>
-                    </div>
-                    <p
-                      className={`font-semibold ${
-                        isPositive ? "text-green-600" : "text-red-600"
-                      }`}
-                    >
-                      {isPositive ? "+" : "-"}
-                      {tx.currency} {amount.toFixed(2)}
-                    </p>
-                  </div>
-                );
-              })}
+              {transactions.map((tx) => (
+                <TransactionRow
+                  key={tx.id}
+                  transaction={{
+                    id: tx.id,
+                    type: tx.type as "deposit" | "withdrawal" | "bonus" | "adjustment",
+                    amount: tx.amount,
+                    currency: tx.currency,
+                    occurredAt: tx.occurredAt.toISOString(),
+                    notes: tx.notes,
+                  }}
+                  accountId={id}
+                />
+              ))}
             </div>
           )}
         </CardContent>
