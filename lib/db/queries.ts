@@ -4326,15 +4326,15 @@ export async function batchUpsertFootballMatches(
       .onConflictDoUpdate({
         target: footballMatch.externalId,
         set: {
-          homeTeam: sql`excluded.home_team`,
-          awayTeam: sql`excluded.away_team`,
-          competition: sql`excluded.competition`,
-          competitionCode: sql`excluded.competition_code`,
-          matchDate: sql`excluded.match_date`,
-          status: sql`excluded.status`,
-          homeScore: sql`excluded.home_score`,
-          awayScore: sql`excluded.away_score`,
-          lastSyncedAt: sql`excluded.last_synced_at`,
+          homeTeam: sql`excluded."homeTeam"`,
+          awayTeam: sql`excluded."awayTeam"`,
+          competition: sql`excluded."competition"`,
+          competitionCode: sql`excluded."competitionCode"`,
+          matchDate: sql`excluded."matchDate"`,
+          status: sql`excluded."status"`,
+          homeScore: sql`excluded."homeScore"`,
+          awayScore: sql`excluded."awayScore"`,
+          lastSyncedAt: sql`excluded."lastSyncedAt"`,
         },
       })
       .returning();
