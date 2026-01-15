@@ -3031,6 +3031,129 @@ export async function getExposureTimeline({
   }
 }
 
+/**
+ * Exposure grouped by event (football match).
+ * Provides per-event exposure breakdown for users with multiple bets on same match.
+ */
+export type ExposureByEvent = {
+  /** Match ID (null for bets not linked to a match) */
+  matchId: string | null;
+  /** Match info if linked */
+  match: {
+    homeTeam: string;
+    awayTeam: string;
+    competition: string;
+    matchDate: Date;
+    status: FootballMatchStatus;
+  } | null;
+  /** Total exposure for this event */
+  totalExposure: number;
+  /** Number of bets on this event */
+  betCount: number;
+  /** List of bet IDs for this event */
+  betIds: string[];
+  /** Promo types used for bets on this event */
+  promoTypes: string[];
+};
+
+/**
+ * Get open exposure grouped by football match/event.
+ * Returns exposure breakdown per event for users with multiple bets on same match.
+ * 
+ * Why: Users may have multiple bets on the same match (e.g., Match Odds + Over 2.5)
+ * and need to see their total exposure to that single event for risk management.
+ */
+export async function getExposureByEvent({
+  userId,
+}: {
+  userId: string;
+}): Promise<ExposureByEvent[]> {
+  try {
+    // Get all open matched bets with their exposure and match info
+    const openBets = await db
+      .select({
+        betId: matchedBet.id,
+        matchId: matchedBet.matchId,
+        netExposure: matchedBet.netExposure,
+        promoType: matchedBet.promoType,
+        homeTeam: footballMatch.homeTeam,
+        awayTeam: footballMatch.awayTeam,
+        competition: footballMatch.competition,
+        matchDate: footballMatch.matchDate,
+        matchStatus: footballMatch.status,
+      })
+      .from(matchedBet)
+      .leftJoin(footballMatch, eq(matchedBet.matchId, footballMatch.id))
+      .where(
+        and(
+          eq(matchedBet.userId, userId),
+          inArray(matchedBet.status, ["draft", "matched", "needs_review"]),
+          isNotNull(matchedBet.netExposure)
+        )
+      );
+
+    if (openBets.length === 0) {
+      return [];
+    }
+
+    // Group bets by matchId (or null for unlinked bets)
+    const exposureMap = new Map<string | null, {
+      matchInfo: ExposureByEvent["match"];
+      totalExposure: number;
+      betIds: string[];
+      promoTypes: Set<string>;
+    }>();
+
+    for (const bet of openBets) {
+      const key = bet.matchId;
+      const exposure = bet.netExposure ? Number.parseFloat(bet.netExposure) : 0;
+
+      const existing = exposureMap.get(key);
+      if (existing) {
+        existing.totalExposure += exposure;
+        existing.betIds.push(bet.betId);
+        if (bet.promoType) {
+          existing.promoTypes.add(bet.promoType);
+        }
+      } else {
+        exposureMap.set(key, {
+          matchInfo: bet.matchId && bet.homeTeam && bet.awayTeam
+            ? {
+                homeTeam: bet.homeTeam,
+                awayTeam: bet.awayTeam,
+                competition: bet.competition || "",
+                matchDate: bet.matchDate!,
+                status: (bet.matchStatus || "SCHEDULED") as FootballMatchStatus,
+              }
+            : null,
+          totalExposure: exposure,
+          betIds: [bet.betId],
+          promoTypes: new Set(bet.promoType ? [bet.promoType] : []),
+        });
+      }
+    }
+
+    // Convert map to array and sort by exposure (highest first)
+    const result: ExposureByEvent[] = Array.from(exposureMap.entries())
+      .map(([matchId, data]) => ({
+        matchId,
+        match: data.matchInfo,
+        totalExposure: Math.round(data.totalExposure * 100) / 100,
+        betCount: data.betIds.length,
+        betIds: data.betIds,
+        promoTypes: Array.from(data.promoTypes),
+      }))
+      .sort((a, b) => b.totalExposure - a.totalExposure);
+
+    return result;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get exposure by event"
+    );
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Import Operations
 // ─────────────────────────────────────────────────────────────────────────────
