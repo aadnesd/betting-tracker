@@ -149,6 +149,9 @@ export default async function Page(props: PageProps) {
           <Button asChild variant="outline" size="sm">
             <Link href="/bets/quick-add">Quick Add</Link>
           </Button>
+          <Button asChild variant="outline" size="sm">
+            <Link href="/bets/new/standalone">New Single Bet</Link>
+          </Button>
           <Button asChild size="sm">
             <Link href="/bets/new">New matched bet</Link>
           </Button>

@@ -5,6 +5,7 @@ import { POST as autoparseRoute } from "@/app/(chat)/api/bets/autoparse/route";
 import { POST as createMatchedRoute } from "@/app/(chat)/api/bets/create-matched/route";
 import { PATCH as updateMatchedRoute } from "@/app/(chat)/api/bets/update-matched/route";
 import { POST as quickAddRoute } from "@/app/(chat)/api/bets/quick-add/route";
+import { POST as standaloneRoute } from "@/app/(chat)/api/bets/standalone/route";
 import * as authModule from "@/app/(auth)/auth";
 import * as dbQueries from "@/lib/db/queries";
 import { parseMatchedBetFromScreenshots } from "@/lib/bet-parser";
@@ -1462,6 +1463,181 @@ describe("bets API routes (unit)", () => {
 
       // Verify markFreeBetAsUsed was NOT called
       expect(dbQueries.markFreeBetAsUsed).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("POST /api/bets/standalone", () => {
+    it("creates a standalone back bet with status placed", async () => {
+      (dbQueries.createManualScreenshot as vi.Mock).mockResolvedValue({
+        id: "screenshot-1",
+      });
+      (dbQueries.getOrCreateAccount as vi.Mock).mockResolvedValue({
+        id: "acc-1",
+      });
+      (dbQueries.saveBackBet as vi.Mock).mockResolvedValue({
+        id: "bet-1",
+        market: "Man Utd v Liverpool",
+        selection: "Man Utd",
+        odds: "2.50",
+        stake: "100.00",
+        status: "placed",
+        currency: "NOK",
+        placedAt: new Date(),
+        createdAt: new Date(),
+        accountId: "acc-1",
+      });
+      (dbQueries.createAuditEntry as vi.Mock).mockResolvedValue({
+        id: "audit-1",
+      });
+
+      const payload = {
+        kind: "back",
+        market: "Man Utd v Liverpool",
+        selection: "Man Utd",
+        odds: 2.5,
+        stake: 100,
+        account: "bet365",
+        currency: "NOK",
+      };
+
+      const res = await standaloneRoute(
+        new Request("http://localhost/api/bets/standalone", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        })
+      );
+
+      expect(res.status).toBe(200);
+      const json = await res.json();
+      expect(json.success).toBe(true);
+      expect(json.bet.kind).toBe("back");
+      expect(json.bet.status).toBe("placed");
+      expect(dbQueries.saveBackBet).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: "placed",
+        })
+      );
+      expect(dbQueries.createAuditEntry).toHaveBeenCalledWith(
+        expect.objectContaining({
+          entityType: "back_bet",
+          action: "create",
+          changes: expect.objectContaining({
+            source: "standalone",
+          }),
+        })
+      );
+    });
+
+    it("creates a standalone lay bet", async () => {
+      (dbQueries.createManualScreenshot as vi.Mock).mockResolvedValue({
+        id: "screenshot-2",
+      });
+      (dbQueries.getOrCreateAccount as vi.Mock).mockResolvedValue({
+        id: "acc-2",
+      });
+      (dbQueries.saveLayBet as vi.Mock).mockResolvedValue({
+        id: "bet-2",
+        market: "Man Utd v Liverpool",
+        selection: "Man Utd",
+        odds: "2.52",
+        stake: "99.20",
+        status: "placed",
+        currency: "NOK",
+        placedAt: new Date(),
+        createdAt: new Date(),
+        accountId: "acc-2",
+      });
+      (dbQueries.createAuditEntry as vi.Mock).mockResolvedValue({
+        id: "audit-2",
+      });
+
+      const payload = {
+        kind: "lay",
+        market: "Man Utd v Liverpool",
+        selection: "Man Utd",
+        odds: 2.52,
+        stake: 99.2,
+        account: "bfb247",
+        currency: "NOK",
+      };
+
+      const res = await standaloneRoute(
+        new Request("http://localhost/api/bets/standalone", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        })
+      );
+
+      expect(res.status).toBe(200);
+      const json = await res.json();
+      expect(json.success).toBe(true);
+      expect(json.bet.kind).toBe("lay");
+      expect(dbQueries.saveLayBet).toHaveBeenCalled();
+      expect(dbQueries.createAuditEntry).toHaveBeenCalledWith(
+        expect.objectContaining({
+          entityType: "lay_bet",
+        })
+      );
+    });
+
+    it("rejects invalid payload (missing required fields)", async () => {
+      const payload = {
+        kind: "back",
+        // Missing market, selection, odds, stake, account
+      };
+
+      const res = await standaloneRoute(
+        new Request("http://localhost/api/bets/standalone", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        })
+      );
+
+      expect(res.status).toBe(400);
+      const json = await res.json();
+      expect(json.error).toBe("Invalid payload");
+    });
+
+    it("rejects unauthenticated requests", async () => {
+      (authModule.auth as vi.Mock).mockResolvedValue(null);
+
+      const payload = {
+        kind: "back",
+        market: "Man Utd v Liverpool",
+        selection: "Man Utd",
+        odds: 2.5,
+        stake: 100,
+        account: "bet365",
+      };
+
+      const res = await standaloneRoute(
+        new Request("http://localhost/api/bets/standalone", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        })
+      );
+
+      expect(res.status).toBe(401);
+    });
+
+    it("rejects invalid bet kind", async () => {
+      const payload = {
+        kind: "invalid",
+        market: "Man Utd v Liverpool",
+        selection: "Man Utd",
+        odds: 2.5,
+        stake: 100,
+        account: "bet365",
+      };
+
+      const res = await standaloneRoute(
+        new Request("http://localhost/api/bets/standalone", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        })
+      );
+
+      expect(res.status).toBe(400);
     });
   });
 });
