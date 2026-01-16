@@ -1567,6 +1567,208 @@ export async function listMatchedBetsByUser({
   }
 }
 
+export type IndividualBetListItem = {
+  id: string;
+  kind: "back" | "lay";
+  market: string;
+  selection: string;
+  odds: number;
+  stake: number;
+  status:
+    | "draft"
+    | "placed"
+    | "matched"
+    | "settled"
+    | "needs_review"
+    | "error";
+  currency: string | null;
+  placedAt: Date | null;
+  createdAt: Date;
+  settledAt: Date | null;
+  profitLoss: number | null;
+  exchange: string;
+  accountId: string | null;
+  accountName: string | null;
+  accountKind: "bookmaker" | "exchange" | null;
+  matchedBetId: string | null;
+  matchedBetStatus: "draft" | "matched" | "settled" | "needs_review" | null;
+};
+
+export async function listAllBetsByUser({
+  userId,
+  status,
+  accountId,
+  fromDate,
+  toDate,
+  search,
+  limit = 50,
+}: {
+  userId: string;
+  status?: "placed" | "settled";
+  accountId?: string;
+  fromDate?: Date;
+  toDate?: Date;
+  search?: string;
+  limit?: number;
+}): Promise<IndividualBetListItem[]> {
+  try {
+    const normalizedSearch = search?.trim().toLowerCase();
+    const backConditions: SQL<unknown>[] = [eq(backBet.userId, userId)];
+    const layConditions: SQL<unknown>[] = [eq(layBet.userId, userId)];
+
+    if (status) {
+      backConditions.push(eq(backBet.status, status));
+      layConditions.push(eq(layBet.status, status));
+    }
+    if (accountId) {
+      backConditions.push(eq(backBet.accountId, accountId));
+      layConditions.push(eq(layBet.accountId, accountId));
+    }
+    if (fromDate) {
+      backConditions.push(
+        sql`COALESCE(${backBet.placedAt}, ${backBet.createdAt}) >= ${fromDate}`
+      );
+      layConditions.push(
+        sql`COALESCE(${layBet.placedAt}, ${layBet.createdAt}) >= ${fromDate}`
+      );
+    }
+    if (toDate) {
+      backConditions.push(
+        sql`COALESCE(${backBet.placedAt}, ${backBet.createdAt}) <= ${toDate}`
+      );
+      layConditions.push(
+        sql`COALESCE(${layBet.placedAt}, ${layBet.createdAt}) <= ${toDate}`
+      );
+    }
+    if (normalizedSearch) {
+      const pattern = `%${normalizedSearch}%`;
+      backConditions.push(
+        sql`(LOWER(${backBet.market}) LIKE ${pattern} OR LOWER(${backBet.selection}) LIKE ${pattern} OR LOWER(${backBet.exchange}) LIKE ${pattern})`
+      );
+      layConditions.push(
+        sql`(LOWER(${layBet.market}) LIKE ${pattern} OR LOWER(${layBet.selection}) LIKE ${pattern} OR LOWER(${layBet.exchange}) LIKE ${pattern})`
+      );
+    }
+
+    const [backRows, layRows] = await Promise.all([
+      db
+        .select({
+          id: backBet.id,
+          createdAt: backBet.createdAt,
+          placedAt: backBet.placedAt,
+          settledAt: backBet.settledAt,
+          market: backBet.market,
+          selection: backBet.selection,
+          odds: backBet.odds,
+          stake: backBet.stake,
+          status: backBet.status,
+          currency: backBet.currency,
+          profitLoss: backBet.profitLoss,
+          exchange: backBet.exchange,
+          accountId: backBet.accountId,
+          accountName: account.name,
+          accountKind: account.kind,
+          matchedBetId: matchedBet.id,
+          matchedBetStatus: matchedBet.status,
+        })
+        .from(backBet)
+        .leftJoin(account, eq(backBet.accountId, account.id))
+        .leftJoin(matchedBet, eq(matchedBet.backBetId, backBet.id))
+        .where(and(...backConditions))
+        .orderBy(
+          desc(sql`COALESCE(${backBet.placedAt}, ${backBet.createdAt})`)
+        )
+        .limit(limit),
+      db
+        .select({
+          id: layBet.id,
+          createdAt: layBet.createdAt,
+          placedAt: layBet.placedAt,
+          settledAt: layBet.settledAt,
+          market: layBet.market,
+          selection: layBet.selection,
+          odds: layBet.odds,
+          stake: layBet.stake,
+          status: layBet.status,
+          currency: layBet.currency,
+          profitLoss: layBet.profitLoss,
+          exchange: layBet.exchange,
+          accountId: layBet.accountId,
+          accountName: account.name,
+          accountKind: account.kind,
+          matchedBetId: matchedBet.id,
+          matchedBetStatus: matchedBet.status,
+        })
+        .from(layBet)
+        .leftJoin(account, eq(layBet.accountId, account.id))
+        .leftJoin(matchedBet, eq(matchedBet.layBetId, layBet.id))
+        .where(and(...layConditions))
+        .orderBy(
+          desc(sql`COALESCE(${layBet.placedAt}, ${layBet.createdAt})`)
+        )
+        .limit(limit),
+    ]);
+
+    const combined: IndividualBetListItem[] = [
+      ...backRows.map((row) => ({
+        id: row.id,
+        kind: "back",
+        market: row.market,
+        selection: row.selection,
+        odds: Number(row.odds),
+        stake: Number(row.stake),
+        status: row.status,
+        currency: row.currency ?? null,
+        placedAt: row.placedAt ?? null,
+        createdAt: row.createdAt,
+        settledAt: row.settledAt ?? null,
+        profitLoss:
+          row.profitLoss === null ? null : Number.parseFloat(row.profitLoss),
+        exchange: row.exchange,
+        accountId: row.accountId ?? null,
+        accountName: row.accountName ?? null,
+        accountKind: row.accountKind ?? null,
+        matchedBetId: row.matchedBetId ?? null,
+        matchedBetStatus: row.matchedBetStatus ?? null,
+      })),
+      ...layRows.map((row) => ({
+        id: row.id,
+        kind: "lay",
+        market: row.market,
+        selection: row.selection,
+        odds: Number(row.odds),
+        stake: Number(row.stake),
+        status: row.status,
+        currency: row.currency ?? null,
+        placedAt: row.placedAt ?? null,
+        createdAt: row.createdAt,
+        settledAt: row.settledAt ?? null,
+        profitLoss:
+          row.profitLoss === null ? null : Number.parseFloat(row.profitLoss),
+        exchange: row.exchange,
+        accountId: row.accountId ?? null,
+        accountName: row.accountName ?? null,
+        accountKind: row.accountKind ?? null,
+        matchedBetId: row.matchedBetId ?? null,
+        matchedBetStatus: row.matchedBetStatus ?? null,
+      })),
+    ];
+
+    combined.sort((a, b) => {
+      const dateA = (a.placedAt ?? a.createdAt).getTime();
+      const dateB = (b.placedAt ?? b.createdAt).getTime();
+      return dateB - dateA;
+    });
+
+    return combined.slice(0, limit);
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to list individual bets"
+    );
+  }
+}
+
 export async function getMatchedBetById({
   id,
   userId,
@@ -5420,4 +5622,3 @@ export async function deleteMatchedBet({
     throw new ChatSDKError("bad_request:database", "Failed to delete matched bet");
   }
 }
-
