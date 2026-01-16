@@ -2086,6 +2086,216 @@ export async function countBetsReadyForAutoSettlement(): Promise<number> {
   }
 }
 
+/**
+ * Parameters for applying auto-settlement to a bet.
+ */
+export interface ApplyAutoSettlementParams {
+  /** The matched bet ID */
+  matchedBetId: string;
+  /** User ID who owns the bet */
+  userId: string;
+  /** The determined outcome (win/loss/push) */
+  outcome: "win" | "loss" | "push";
+  /** Calculated profit/loss for back bet */
+  backProfitLoss: number;
+  /** Calculated profit/loss for lay bet */
+  layProfitLoss: number;
+  /** ID of the back bet (if exists) */
+  backBetId: string | null;
+  /** ID of the lay bet (if exists) */
+  layBetId: string | null;
+  /** Account ID for back bet (for balance adjustment) */
+  backAccountId: string | null;
+  /** Account ID for lay bet (for balance adjustment) */
+  layAccountId: string | null;
+  /** Currency for back bet */
+  backCurrency: string | null;
+  /** Currency for lay bet */
+  layCurrency: string | null;
+  /** Market description for audit/transaction notes */
+  market: string;
+  /** Selection description for audit/transaction notes */
+  selection: string;
+  /** Match result description for audit notes */
+  matchResult: string;
+}
+
+/**
+ * Result of auto-settlement application.
+ */
+export interface ApplyAutoSettlementResult {
+  success: boolean;
+  matchedBetId: string;
+  transactionsCreated: number;
+}
+
+/**
+ * Apply auto-settlement to a single matched bet.
+ *
+ * Updates the matched bet and individual legs to 'settled' status,
+ * sets profitLoss and settledAt, and creates account balance adjustment transactions.
+ *
+ * @param params - Settlement parameters including bet IDs, P&L, and account info
+ * @returns Result indicating success and number of transactions created
+ */
+export async function applyAutoSettlement(
+  params: ApplyAutoSettlementParams
+): Promise<ApplyAutoSettlementResult> {
+  const now = new Date();
+  let transactionsCreated = 0;
+
+  try {
+    // 1. Update matched bet status to settled
+    await db
+      .update(matchedBet)
+      .set({ status: "settled" })
+      .where(
+        and(
+          eq(matchedBet.id, params.matchedBetId),
+          eq(matchedBet.userId, params.userId)
+        )
+      );
+
+    // 2. Update back bet if exists
+    if (params.backBetId) {
+      await db
+        .update(backBet)
+        .set({
+          status: "settled",
+          profitLoss: params.backProfitLoss.toFixed(2),
+          settledAt: now,
+        })
+        .where(eq(backBet.id, params.backBetId));
+
+      // Create account adjustment transaction for back bet
+      if (params.backAccountId && params.backProfitLoss !== 0) {
+        await db.insert(accountTransaction).values({
+          createdAt: now,
+          userId: params.userId,
+          accountId: params.backAccountId,
+          type: "adjustment",
+          amount: params.backProfitLoss.toFixed(2),
+          currency: params.backCurrency ?? "NOK",
+          occurredAt: now,
+          notes: `Auto-settlement: ${params.market} - ${params.selection} (${params.matchResult})`,
+        });
+        transactionsCreated++;
+      }
+    }
+
+    // 3. Update lay bet if exists
+    if (params.layBetId) {
+      await db
+        .update(layBet)
+        .set({
+          status: "settled",
+          profitLoss: params.layProfitLoss.toFixed(2),
+          settledAt: now,
+        })
+        .where(eq(layBet.id, params.layBetId));
+
+      // Create account adjustment transaction for lay bet
+      if (params.layAccountId && params.layProfitLoss !== 0) {
+        await db.insert(accountTransaction).values({
+          createdAt: now,
+          userId: params.userId,
+          accountId: params.layAccountId,
+          type: "adjustment",
+          amount: params.layProfitLoss.toFixed(2),
+          currency: params.layCurrency ?? "NOK",
+          occurredAt: now,
+          notes: `Auto-settlement: ${params.market} - ${params.selection} (${params.matchResult})`,
+        });
+        transactionsCreated++;
+      }
+    }
+
+    // 4. Create audit entry
+    await db.insert(auditLog).values({
+      createdAt: now,
+      userId: params.userId,
+      entityType: "matched_bet",
+      entityId: params.matchedBetId,
+      action: "auto_settle_applied",
+      changes: {
+        outcome: params.outcome,
+        backProfitLoss: params.backProfitLoss,
+        layProfitLoss: params.layProfitLoss,
+        matchResult: params.matchResult,
+      },
+      notes: `Auto-settled: ${params.outcome} on ${params.market} - ${params.selection}`,
+    });
+
+    return {
+      success: true,
+      matchedBetId: params.matchedBetId,
+      transactionsCreated,
+    };
+  } catch (error) {
+    console.error(
+      `[applyAutoSettlement] Failed for bet ${params.matchedBetId}:`,
+      error
+    );
+    throw new ChatSDKError(
+      "bad_request:database",
+      `Failed to apply auto-settlement for bet ${params.matchedBetId}`
+    );
+  }
+}
+
+/**
+ * Flag a bet for review instead of auto-settling.
+ * Used when outcome confidence is too low for automatic settlement.
+ *
+ * @param matchedBetId - The matched bet ID
+ * @param userId - User ID who owns the bet
+ * @param reason - Explanation of why the bet needs review
+ */
+export async function flagBetForReview({
+  matchedBetId,
+  userId,
+  reason,
+}: {
+  matchedBetId: string;
+  userId: string;
+  reason: string;
+}): Promise<void> {
+  const now = new Date();
+
+  try {
+    // Update status to needs_review and add note
+    await db
+      .update(matchedBet)
+      .set({
+        status: "needs_review",
+        notes: sql`COALESCE(${matchedBet.notes} || E'\n\n', '') || ${`[Auto-settlement] ${reason}`}`,
+      })
+      .where(
+        and(eq(matchedBet.id, matchedBetId), eq(matchedBet.userId, userId))
+      );
+
+    // Create audit entry
+    await db.insert(auditLog).values({
+      createdAt: now,
+      userId,
+      entityType: "matched_bet",
+      entityId: matchedBetId,
+      action: "auto_settle_detected",
+      changes: { flaggedForReview: true, reason },
+      notes: `Flagged for review: ${reason}`,
+    });
+  } catch (error) {
+    console.error(
+      `[flagBetForReview] Failed for bet ${matchedBetId}:`,
+      error
+    );
+    throw new ChatSDKError(
+      "bad_request:database",
+      `Failed to flag bet ${matchedBetId} for review`
+    );
+  }
+}
+
 // Audit log type definitions
 export type AuditEntityType =
   | "back_bet"
