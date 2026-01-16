@@ -6,6 +6,7 @@ import { POST as createMatchedRoute } from "@/app/(chat)/api/bets/create-matched
 import { PATCH as updateMatchedRoute } from "@/app/(chat)/api/bets/update-matched/route";
 import { POST as quickAddRoute } from "@/app/(chat)/api/bets/quick-add/route";
 import { POST as standaloneRoute } from "@/app/(chat)/api/bets/standalone/route";
+import { POST as settleRoute } from "@/app/(chat)/api/bets/settle/route";
 import * as authModule from "@/app/(auth)/auth";
 import * as dbQueries from "@/lib/db/queries";
 import { parseMatchedBetFromScreenshots } from "@/lib/bet-parser";
@@ -56,6 +57,10 @@ vi.mock("@/lib/db/queries", () => ({
   getMatchedBetWithParts: vi.fn(),
   createAccountTransaction: vi.fn(),
   markFreeBetAsUsed: vi.fn(),
+  getBackBetById: vi.fn(),
+  getLayBetById: vi.fn(),
+  updateBackBet: vi.fn(),
+  updateLayBet: vi.fn(),
 }));
 
 const makeBlob = (content = "stub") =>
@@ -1638,6 +1643,285 @@ describe("bets API routes (unit)", () => {
       );
 
       expect(res.status).toBe(400);
+    });
+  });
+
+  describe("POST /api/bets/settle", () => {
+    it("settles a back bet with won outcome and calculates P&L correctly", async () => {
+      const betId = "11111111-1111-1111-1111-111111111111";
+      const odds = 2.5;
+      const stake = 100;
+      
+      (dbQueries.getBackBetById as vi.Mock).mockResolvedValue({
+        id: betId,
+        status: "placed",
+        odds: odds.toString(),
+        stake: stake.toString(),
+        currency: "NOK",
+        accountId: "acc-1",
+        market: "Man Utd v Liverpool",
+        selection: "Man Utd",
+      });
+      (dbQueries.updateBackBet as vi.Mock).mockResolvedValue({
+        id: betId,
+        status: "settled",
+      });
+      (dbQueries.createAccountTransaction as vi.Mock).mockResolvedValue({
+        id: "txn-1",
+      });
+      (dbQueries.createAuditEntry as vi.Mock).mockResolvedValue({
+        id: "audit-1",
+      });
+
+      const res = await settleRoute(
+        new Request("http://localhost/api/bets/settle", {
+          method: "POST",
+          body: JSON.stringify({
+            betId,
+            betKind: "back",
+            outcome: "won",
+          }),
+        })
+      );
+
+      expect(res.status).toBe(200);
+      const json = await res.json();
+      expect(json.success).toBe(true);
+      // Back bet won: P&L = stake × (odds - 1) = 100 × 1.5 = 150
+      expect(json.bet.profitLoss).toBe(150);
+      expect(json.bet.outcome).toBe("won");
+
+      // Verify bet was updated
+      expect(dbQueries.updateBackBet).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: betId,
+          status: "settled",
+          profitLoss: "150",
+        })
+      );
+
+      // Verify account transaction was created
+      expect(dbQueries.createAccountTransaction).toHaveBeenCalledWith(
+        expect.objectContaining({
+          accountId: "acc-1",
+          type: "adjustment",
+          amount: 150,
+        })
+      );
+
+      // Verify audit entry was created
+      expect(dbQueries.createAuditEntry).toHaveBeenCalledWith(
+        expect.objectContaining({
+          entityType: "back_bet",
+          action: "manual_settle",
+          changes: expect.objectContaining({
+            outcome: "won",
+            profitLoss: 150,
+          }),
+        })
+      );
+    });
+
+    it("settles a back bet with lost outcome (loses stake)", async () => {
+      const betId = "22222222-2222-2222-2222-222222222222";
+      const stake = 50;
+      
+      (dbQueries.getBackBetById as vi.Mock).mockResolvedValue({
+        id: betId,
+        status: "placed",
+        odds: "3.0",
+        stake: stake.toString(),
+        currency: "GBP",
+        accountId: "acc-2",
+        market: "Chelsea v Arsenal",
+        selection: "Chelsea",
+      });
+      (dbQueries.updateBackBet as vi.Mock).mockResolvedValue({
+        id: betId,
+        status: "settled",
+      });
+      (dbQueries.createAccountTransaction as vi.Mock).mockResolvedValue({
+        id: "txn-2",
+      });
+      (dbQueries.createAuditEntry as vi.Mock).mockResolvedValue({
+        id: "audit-2",
+      });
+
+      const res = await settleRoute(
+        new Request("http://localhost/api/bets/settle", {
+          method: "POST",
+          body: JSON.stringify({
+            betId,
+            betKind: "back",
+            outcome: "lost",
+          }),
+        })
+      );
+
+      expect(res.status).toBe(200);
+      const json = await res.json();
+      // Back bet lost: P&L = -stake = -50
+      expect(json.bet.profitLoss).toBe(-50);
+      expect(json.bet.outcome).toBe("lost");
+    });
+
+    it("settles a lay bet with won outcome (backer lost)", async () => {
+      const betId = "33333333-3333-3333-3333-333333333333";
+      const layStake = 100;
+      const layOdds = 2.0;
+      
+      (dbQueries.getLayBetById as vi.Mock).mockResolvedValue({
+        id: betId,
+        status: "placed",
+        odds: layOdds.toString(),
+        stake: layStake.toString(),
+        currency: "NOK",
+        accountId: "acc-3",
+        market: "Man City v Spurs",
+        selection: "Man City",
+      });
+      (dbQueries.updateLayBet as vi.Mock).mockResolvedValue({
+        id: betId,
+        status: "settled",
+      });
+      (dbQueries.createAccountTransaction as vi.Mock).mockResolvedValue({
+        id: "txn-3",
+      });
+      (dbQueries.createAuditEntry as vi.Mock).mockResolvedValue({
+        id: "audit-3",
+      });
+
+      const res = await settleRoute(
+        new Request("http://localhost/api/bets/settle", {
+          method: "POST",
+          body: JSON.stringify({
+            betId,
+            betKind: "lay",
+            outcome: "won",
+          }),
+        })
+      );
+
+      expect(res.status).toBe(200);
+      const json = await res.json();
+      // Lay bet won (backer lost): P&L = layStake = 100
+      expect(json.bet.profitLoss).toBe(100);
+    });
+
+    it("settles with push outcome (no P&L)", async () => {
+      const betId = "44444444-4444-4444-4444-444444444444";
+      
+      (dbQueries.getBackBetById as vi.Mock).mockResolvedValue({
+        id: betId,
+        status: "placed",
+        odds: "2.0",
+        stake: "100",
+        currency: "NOK",
+        accountId: "acc-4",
+        market: "Draw no bet",
+        selection: "Home",
+      });
+      (dbQueries.updateBackBet as vi.Mock).mockResolvedValue({
+        id: betId,
+        status: "settled",
+      });
+      (dbQueries.createAccountTransaction as vi.Mock).mockResolvedValue({
+        id: "txn-4",
+      });
+      (dbQueries.createAuditEntry as vi.Mock).mockResolvedValue({
+        id: "audit-4",
+      });
+
+      const res = await settleRoute(
+        new Request("http://localhost/api/bets/settle", {
+          method: "POST",
+          body: JSON.stringify({
+            betId,
+            betKind: "back",
+            outcome: "push",
+          }),
+        })
+      );
+
+      expect(res.status).toBe(200);
+      const json = await res.json();
+      // Push: P&L = 0
+      expect(json.bet.profitLoss).toBe(0);
+    });
+
+    it("returns 404 when bet not found", async () => {
+      (dbQueries.getBackBetById as vi.Mock).mockResolvedValue(null);
+
+      const res = await settleRoute(
+        new Request("http://localhost/api/bets/settle", {
+          method: "POST",
+          body: JSON.stringify({
+            betId: "55555555-5555-5555-5555-555555555555",
+            betKind: "back",
+            outcome: "won",
+          }),
+        })
+      );
+
+      expect(res.status).toBe(404);
+    });
+
+    it("returns 400 when bet is already settled", async () => {
+      const settledBetId = "66666666-6666-6666-6666-666666666666";
+      (dbQueries.getBackBetById as vi.Mock).mockResolvedValue({
+        id: settledBetId,
+        status: "settled", // Already settled
+        odds: "2.0",
+        stake: "100",
+        currency: "NOK",
+      });
+
+      const res = await settleRoute(
+        new Request("http://localhost/api/bets/settle", {
+          method: "POST",
+          body: JSON.stringify({
+            betId: settledBetId,
+            betKind: "back",
+            outcome: "won",
+          }),
+        })
+      );
+
+      expect(res.status).toBe(400);
+      const json = await res.json();
+      expect(json.error).toBe("Bet is already settled");
+    });
+
+    it("rejects invalid outcome", async () => {
+      const res = await settleRoute(
+        new Request("http://localhost/api/bets/settle", {
+          method: "POST",
+          body: JSON.stringify({
+            betId: "bet-123",
+            betKind: "back",
+            outcome: "invalid",
+          }),
+        })
+      );
+
+      expect(res.status).toBe(400);
+    });
+
+    it("rejects unauthenticated requests", async () => {
+      (authModule.auth as vi.Mock).mockResolvedValue(null);
+
+      const res = await settleRoute(
+        new Request("http://localhost/api/bets/settle", {
+          method: "POST",
+          body: JSON.stringify({
+            betId: "bet-123",
+            betKind: "back",
+            outcome: "won",
+          }),
+        })
+      );
+
+      expect(res.status).toBe(401);
     });
   });
 });

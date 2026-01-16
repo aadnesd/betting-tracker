@@ -2,6 +2,7 @@ import { endOfDay, format, startOfDay, subDays } from "date-fns";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/app/(auth)/auth";
+import { BetSettlementDropdown } from "@/components/bets/bet-settlement-dropdown";
 import { BetStatusBadge } from "@/components/bets/bet-status-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -366,15 +367,25 @@ export default async function Page(props: PageProps) {
                         {format(displayDate, "dd MMM yyyy, HH:mm")}
                       </TableCell>
                       <TableCell className="text-right">
-                        {bet.matchedBetId ? (
-                          <Button asChild variant="ghost" size="sm">
-                            <Link href={`/bets/${bet.matchedBetId}`}>
-                              Matched set
-                            </Link>
-                          </Button>
-                        ) : (
-                          <span className="text-muted-foreground text-xs">—</span>
-                        )}
+                        <div className="flex items-center justify-end gap-2">
+                          {bet.status !== "settled" && (
+                            <BetSettlementDropdown
+                              betId={bet.id}
+                              betKind={bet.kind}
+                              odds={bet.odds}
+                              stake={bet.stake}
+                              currency={bet.currency ?? "NOK"}
+                              selection={bet.selection}
+                            />
+                          )}
+                          {bet.matchedBetId && (
+                            <Button asChild variant="ghost" size="sm">
+                              <Link href={`/bets/${bet.matchedBetId}`}>
+                                Matched
+                              </Link>
+                            </Button>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   );

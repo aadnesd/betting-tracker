@@ -369,6 +369,7 @@ const auditActionEnum = [
   "attach_leg",
   "auto_settle_detected",
   "auto_settle_applied",
+  "manual_settle",
 ] as const;
 
 export const auditLog = pgTable("AuditLog", {

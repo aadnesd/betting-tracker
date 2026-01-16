@@ -1478,6 +1478,114 @@ export async function saveLayBet({
   }
 }
 
+/**
+ * Get a back bet by ID
+ */
+export async function getBackBetById({
+  id,
+  userId,
+}: {
+  id: string;
+  userId: string;
+}) {
+  try {
+    const [row] = await db
+      .select()
+      .from(backBet)
+      .where(and(eq(backBet.id, id), eq(backBet.userId, userId)));
+    return row ?? null;
+  } catch (_error) {
+    throw new ChatSDKError("bad_request:database", "Failed to get back bet");
+  }
+}
+
+/**
+ * Get a lay bet by ID
+ */
+export async function getLayBetById({
+  id,
+  userId,
+}: {
+  id: string;
+  userId: string;
+}) {
+  try {
+    const [row] = await db
+      .select()
+      .from(layBet)
+      .where(and(eq(layBet.id, id), eq(layBet.userId, userId)));
+    return row ?? null;
+  } catch (_error) {
+    throw new ChatSDKError("bad_request:database", "Failed to get lay bet");
+  }
+}
+
+/**
+ * Update a back bet
+ */
+export async function updateBackBet({
+  id,
+  userId,
+  status,
+  settledAt,
+  profitLoss,
+}: {
+  id: string;
+  userId: string;
+  status?: "draft" | "placed" | "matched" | "settled" | "needs_review" | "error";
+  settledAt?: Date | null;
+  profitLoss?: string | null;
+}) {
+  try {
+    const updates: Partial<typeof backBet.$inferInsert> = {};
+    if (status !== undefined) updates.status = status;
+    if (settledAt !== undefined) updates.settledAt = settledAt;
+    if (profitLoss !== undefined) updates.profitLoss = profitLoss;
+
+    const [row] = await db
+      .update(backBet)
+      .set(updates)
+      .where(and(eq(backBet.id, id), eq(backBet.userId, userId)))
+      .returning();
+    return row ?? null;
+  } catch (_error) {
+    throw new ChatSDKError("bad_request:database", "Failed to update back bet");
+  }
+}
+
+/**
+ * Update a lay bet
+ */
+export async function updateLayBet({
+  id,
+  userId,
+  status,
+  settledAt,
+  profitLoss,
+}: {
+  id: string;
+  userId: string;
+  status?: "draft" | "placed" | "matched" | "settled" | "needs_review" | "error";
+  settledAt?: Date | null;
+  profitLoss?: string | null;
+}) {
+  try {
+    const updates: Partial<typeof layBet.$inferInsert> = {};
+    if (status !== undefined) updates.status = status;
+    if (settledAt !== undefined) updates.settledAt = settledAt;
+    if (profitLoss !== undefined) updates.profitLoss = profitLoss;
+
+    const [row] = await db
+      .update(layBet)
+      .set(updates)
+      .where(and(eq(layBet.id, id), eq(layBet.userId, userId)))
+      .returning();
+    return row ?? null;
+  } catch (_error) {
+    throw new ChatSDKError("bad_request:database", "Failed to update lay bet");
+  }
+}
+
 export async function createMatchedBetRecord({
   userId,
   backBetId,
@@ -2514,7 +2622,8 @@ export type AuditAction =
   | "reconcile"
   | "attach_leg"
   | "auto_settle_detected"
-  | "auto_settle_applied";
+  | "auto_settle_applied"
+  | "manual_settle";
 
 export async function createAuditEntry({
   userId,
