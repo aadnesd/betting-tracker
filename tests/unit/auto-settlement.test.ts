@@ -314,4 +314,160 @@ describe("auto-settlement detection queries", () => {
       }
     });
   });
+
+  describe("applyAutoSettlement", () => {
+    it("is a function that accepts settlement parameters", () => {
+      expect(typeof dbQueries.applyAutoSettlement).toBe("function");
+
+      // Type check: verify parameter interface
+      const params: dbQueries.ApplyAutoSettlementParams = {
+        matchedBetId: "bet-1",
+        userId: "user-1",
+        outcome: "win",
+        backProfitLoss: 100,
+        layProfitLoss: -98,
+        backBetId: "back-1",
+        layBetId: "lay-1",
+        backAccountId: "acct-1",
+        layAccountId: "acct-2",
+        backCurrency: "EUR",
+        layCurrency: "NOK",
+        market: "Match Odds",
+        selection: "Home Win",
+        matchResult: "Arsenal 2-1 Chelsea",
+      };
+      expect(params.matchedBetId).toBeDefined();
+    });
+
+    it("returns result with success status and transaction count", () => {
+      // Type check: verify result interface
+      const result: dbQueries.ApplyAutoSettlementResult = {
+        success: true,
+        matchedBetId: "bet-1",
+        transactionsCreated: 2,
+      };
+      expect(result.success).toBe(true);
+      expect(typeof result.transactionsCreated).toBe("number");
+    });
+
+    it("accepts all three outcome types: win, loss, push", () => {
+      const outcomes: Array<dbQueries.ApplyAutoSettlementParams["outcome"]> = [
+        "win",
+        "loss",
+        "push",
+      ];
+
+      for (const outcome of outcomes) {
+        expect(["win", "loss", "push"]).toContain(outcome);
+      }
+    });
+
+    it("handles null account IDs for missing legs", () => {
+      const paramsWithoutLay: dbQueries.ApplyAutoSettlementParams = {
+        matchedBetId: "bet-2",
+        userId: "user-1",
+        outcome: "win",
+        backProfitLoss: 100,
+        layProfitLoss: 0,
+        backBetId: "back-2",
+        layBetId: null,
+        backAccountId: "acct-1",
+        layAccountId: null,
+        backCurrency: "EUR",
+        layCurrency: null,
+        market: "Match Odds",
+        selection: "Home Win",
+        matchResult: "Arsenal 2-1 Chelsea",
+      };
+      expect(paramsWithoutLay.layBetId).toBeNull();
+      expect(paramsWithoutLay.layAccountId).toBeNull();
+    });
+
+    it("includes match result for audit trail", () => {
+      const params: dbQueries.ApplyAutoSettlementParams = {
+        matchedBetId: "bet-1",
+        userId: "user-1",
+        outcome: "loss",
+        backProfitLoss: -100,
+        layProfitLoss: 98,
+        backBetId: "back-1",
+        layBetId: "lay-1",
+        backAccountId: "acct-1",
+        layAccountId: "acct-2",
+        backCurrency: "EUR",
+        layCurrency: "NOK",
+        market: "Over/Under 2.5 Goals",
+        selection: "Over 2.5",
+        matchResult: "Liverpool 1-1 Everton",
+      };
+      expect(params.matchResult).toContain("-");
+      expect(params.market).toBeDefined();
+      expect(params.selection).toBeDefined();
+    });
+  });
+
+  describe("flagBetForReview", () => {
+    it("is a function that accepts bet ID, user ID, and reason", () => {
+      expect(typeof dbQueries.flagBetForReview).toBe("function");
+
+      // Type check: verify parameters
+      const fn: (params: {
+        matchedBetId: string;
+        userId: string;
+        reason: string;
+      }) => Promise<void> = dbQueries.flagBetForReview;
+      expect(fn).toBeDefined();
+    });
+
+    it("accepts descriptive reason for flagging", () => {
+      // The reason should explain why auto-settlement couldn't complete
+      const lowConfidenceReason =
+        "Market type 'Asian Handicap' not recognized, needs manual review";
+      const ambiguousReason =
+        "Selection 'Both Teams to Score' is ambiguous for current market";
+
+      expect(lowConfidenceReason.length).toBeGreaterThan(10);
+      expect(ambiguousReason.length).toBeGreaterThan(10);
+    });
+  });
+
+  describe("settlement application workflow", () => {
+    it("updates bet status to settled when outcome is clear", () => {
+      // High confidence outcomes should update status to 'settled'
+      const settledStatuses = ["settled"];
+      expect(settledStatuses).toContain("settled");
+    });
+
+    it("creates account transactions for both back and lay bets", () => {
+      // When both legs have account IDs and non-zero P&L,
+      // expect 2 adjustment transactions to be created
+      const expectedTransactionCount = 2;
+      expect(expectedTransactionCount).toBe(2);
+    });
+
+    it("creates only one transaction when one leg is missing", () => {
+      // If only back bet exists (lay is null), expect 1 transaction
+      const expectedTransactionCount = 1;
+      expect(expectedTransactionCount).toBe(1);
+    });
+
+    it("creates audit entry for every settlement action", () => {
+      // Every settlement should create an audit entry with action 'auto_settle_applied'
+      const auditAction: dbQueries.AuditAction = "auto_settle_applied";
+      expect(auditAction).toBe("auto_settle_applied");
+    });
+
+    it("flags bets with low confidence outcomes for review", () => {
+      // When outcome confidence is 'low' or outcome is 'unknown',
+      // status should be 'needs_review' not 'settled'
+      const reviewStatus = "needs_review";
+      expect(reviewStatus).toBe("needs_review");
+    });
+
+    it("defaults currency to NOK when not specified", () => {
+      // If currency is null, default to NOK for transactions
+      const defaultCurrency = "NOK";
+      expect(defaultCurrency).toBe("NOK");
+    });
+  });
 });

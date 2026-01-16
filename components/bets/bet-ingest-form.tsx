@@ -1,7 +1,7 @@
 "use client";
 import { LinkIcon } from "lucide-react";
 import Image from "next/image";
-import { useMemo, useState, type ComponentProps } from "react";
+import { type ComponentProps, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { BetStatusBadge } from "@/components/bets/bet-status-badge";
 import { Button } from "@/components/ui/button";
@@ -107,7 +107,10 @@ export function BetIngestForm() {
         throw new Error("Parsing failed");
       }
 
-      const parsedJson: ParsedPair & { matchId?: string | null; matchConfidence?: string | null } = await parseResp.json();
+      const parsedJson: ParsedPair & {
+        matchId?: string | null;
+        matchConfidence?: string | null;
+      } = await parseResp.json();
 
       setParsed({
         market: parsedJson.back.market ?? parsedJson.lay.market,
@@ -218,7 +221,9 @@ export function BetIngestForm() {
               disabled={isUploading || isParsing}
               onClick={handleUploadAndParse}
             >
-              {isUploading || isParsing ? "Processing..." : "Upload & Auto-parse"}
+              {isUploading || isParsing
+                ? "Processing..."
+                : "Upload & Auto-parse"}
             </Button>
           </CardContent>
         </Card>
@@ -282,7 +287,7 @@ export function BetIngestForm() {
             </div>
             {/* Match link indicator */}
             {parsed?.matchId && (
-              <div className="flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
+              <div className="flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-emerald-800 text-sm">
                 <LinkIcon className="h-4 w-4 text-emerald-600" />
                 <span>
                   Linked to match
@@ -331,8 +336,8 @@ export function BetIngestForm() {
             {parsed && (
               <>
                 <BetFields
-                  label="Back bet"
                   allowCurrencyEdit
+                  label="Back bet"
                   onChange={(val) =>
                     setParsed((prev) => (prev ? { ...prev, back: val } : prev))
                   }
@@ -488,7 +493,7 @@ function formatDateTimeLocal(value?: string | null) {
     return "";
   }
 
-  const offset = parsed.getTimezoneOffset() * 60000;
+  const offset = parsed.getTimezoneOffset() * 60_000;
   return new Date(parsed.getTime() - offset).toISOString().slice(0, 16);
 }
 
