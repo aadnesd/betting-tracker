@@ -41,6 +41,9 @@ export function DashboardActions({ pendingReviewCount, accounts }: DashboardActi
         </Link>
       </Button>
       <Button asChild variant="ghost" size="sm" className="md:size-default">
+        <Link href="/bets/all">All bets</Link>
+      </Button>
+      <Button asChild variant="ghost" size="sm" className="md:size-default">
         <Link href="/bets/settings/accounts">Accounts</Link>
       </Button>
       <Button asChild variant="ghost" size="sm" className="md:size-default">
