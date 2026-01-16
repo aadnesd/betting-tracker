@@ -1712,7 +1712,7 @@ export async function listAllBetsByUser({
     const combined: IndividualBetListItem[] = [
       ...backRows.map((row) => ({
         id: row.id,
-        kind: "back",
+        kind: "back" as const,
         market: row.market,
         selection: row.selection,
         odds: Number(row.odds),
@@ -1733,7 +1733,7 @@ export async function listAllBetsByUser({
       })),
       ...layRows.map((row) => ({
         id: row.id,
-        kind: "lay",
+        kind: "lay" as const,
         market: row.market,
         selection: row.selection,
         odds: Number(row.odds),
