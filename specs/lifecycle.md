@@ -43,6 +43,60 @@ Returns:
 }
 ```
 
+## Manual Settlement
+
+For bets that cannot be auto-settled (non-football markets, unlinked bets, or when user wants manual control):
+
+### Individual Bets View
+- List all back and lay bets separately (not grouped as matched sets)
+- One bet per row showing: type, account, market, selection, odds, stake, status, date
+- Sortable by date, filterable by status/account
+- Quick settlement actions available inline
+
+### Settlement Options
+Users can manually settle any bet with one of three outcomes:
+
+1. **Won**
+   - Back bet: Profit = stake × (odds - 1)
+   - Lay bet: Profit = stake
+   - Creates adjustment transaction crediting account
+
+2. **Lost**
+   - Back bet: Loss = -stake
+   - Lay bet: Loss = -stake × (odds - 1)
+   - Creates adjustment transaction debiting account
+
+3. **Push** (void/refund)
+   - Back bet: Profit = 0 (stake returned)
+   - Lay bet: Profit = 0 (stake returned)
+   - No account transaction needed
+
+### Settlement Flow
+1. User selects outcome from dropdown (Won/Lost/Push)
+2. System calculates P&L based on bet type and odds
+3. Preview shows calculated impact on account balance
+4. Confirmation updates:
+   - Bet status → 'settled'
+   - Sets profitLoss and settledAt
+   - Creates account adjustment transaction
+   - Updates profit analytics
+   - Creates audit entry with action 'manual_settle'
+
+### Standalone Bets
+Users can create individual bets without a matched pair:
+- Used for free bets, value bets, or first half of a match before laying
+- Saved with status 'placed', not linked to matched set
+- Can be settled independently
+- Can later be linked to a matched set if user adds corresponding hedge
+
+### Delete Functionality
+- Individual bets can be deleted from detail page
+- If bet is part of matched set: offer cascade options
+  - Delete entire matched set
+  - Just unlink this bet (set becomes draft)
+- Reverses settlement transactions if bet was settled
+- Creates audit entry
+
 ## Reconciliation
 - Detect missing lay/back, odds drift, partial match, currency mismatch.
 - Provide a reconciliation queue with actions:
