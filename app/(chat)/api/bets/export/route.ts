@@ -5,6 +5,7 @@ import {
   type ExportableMatchedBet,
 } from "@/lib/csv";
 import { getSettledMatchedBetsForReporting } from "@/lib/db/queries";
+import { createXlsxBuffer } from "@/lib/xlsx";
 
 /**
  * GET /api/bets/export
@@ -73,16 +74,70 @@ export async function GET(request: Request) {
     }));
 
     if (format === "xlsx") {
-      // For XLSX, we'd need a library like xlsx or exceljs
-      // For now, return CSV with xlsx extension hint
-      // This can be extended later with proper XLSX generation
-      const csvContent = generateMatchedBetsCsv(exportableBets);
+      // Build XLSX rows: first the headers, then the data
+      const headers = [
+        "matchedSetId",
+        "market",
+        "selection",
+        "promoType",
+        "status",
+        "backExchange",
+        "backOdds",
+        "backStake",
+        "backCurrency",
+        "backProfitLoss",
+        "layExchange",
+        "layOdds",
+        "layStake",
+        "layCurrency",
+        "layProfitLoss",
+        "netExposure",
+        "netProfit",
+        "settledAt",
+      ];
 
-      return new NextResponse(csvContent, {
+      const dataRows = exportableBets.map((bet) => {
+        const backPL = Number.parseFloat(bet.backBet?.profitLoss ?? "0");
+        const layPL = Number.parseFloat(bet.layBet?.profitLoss ?? "0");
+        const netProfit = backPL + layPL;
+
+        return [
+          bet.id,
+          bet.market,
+          bet.selection,
+          bet.promoType ?? "",
+          bet.status,
+          bet.backBet?.exchange ?? "",
+          bet.backBet?.odds ? Number.parseFloat(bet.backBet.odds) : null,
+          bet.backBet?.stake ? Number.parseFloat(bet.backBet.stake) : null,
+          bet.backBet?.currency ?? "",
+          bet.backBet?.profitLoss
+            ? Number.parseFloat(bet.backBet.profitLoss)
+            : null,
+          bet.layBet?.exchange ?? "",
+          bet.layBet?.odds ? Number.parseFloat(bet.layBet.odds) : null,
+          bet.layBet?.stake ? Number.parseFloat(bet.layBet.stake) : null,
+          bet.layBet?.currency ?? "",
+          bet.layBet?.profitLoss
+            ? Number.parseFloat(bet.layBet.profitLoss)
+            : null,
+          bet.netExposure ? Number.parseFloat(bet.netExposure) : null,
+          Number.isNaN(netProfit) ? null : netProfit,
+          bet.settledAt?.toISOString() ?? "",
+        ];
+      });
+
+      const xlsxBuffer = createXlsxBuffer({
+        name: "Matched Bets",
+        rows: [headers, ...dataRows],
+      });
+
+      return new NextResponse(xlsxBuffer, {
         status: 200,
         headers: {
-          "Content-Type": "text/csv; charset=utf-8",
-          "Content-Disposition": `attachment; filename="matched-bets-export-${new Date().toISOString().split("T")[0]}.csv"`,
+          "Content-Type":
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "Content-Disposition": `attachment; filename="matched-bets-export-${new Date().toISOString().split("T")[0]}.xlsx"`,
         },
       });
     }
