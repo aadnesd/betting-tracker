@@ -298,12 +298,17 @@ export async function POST(request: Request) {
         layLiabilityProvided: body.lay.liability,
       });
 
+      console.log(`[NET EXPOSURE] Computing with backCurrency=${backCurrency}, layCurrency=${layCurrency}`);
+      console.log(`[NET EXPOSURE] backProfit=${backProfit}, layLiability=${layLiability}`);
+
       const [backProfitNok, layLiabilityNok] = await Promise.all([
         convertAmountToNok(backProfit, backCurrency ?? "NOK"),
         convertAmountToNok(layLiability, layCurrency),
       ]);
 
+      console.log(`[NET EXPOSURE] backProfitNok=${backProfitNok}, layLiabilityNok=${layLiabilityNok}`);
       netExposure = layLiabilityNok - backProfitNok;
+      console.log(`[NET EXPOSURE] Final netExposure=${netExposure}`);
     }
 
     const auditNote = formatNeedsReviewNote(reviewInfo);
