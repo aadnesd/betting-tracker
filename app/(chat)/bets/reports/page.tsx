@@ -122,12 +122,13 @@ async function ReportingContent({
     lay: row.lay,
   }));
 
-  const summary = calculateReportingSummary(betsWithLegs, openExposureData.totalExposure, totalBonuses);
-
-  // Calculate cumulative profit data for the chart at different granularities
-  const dayChartData = calculateCumulativeProfitData(betsWithLegs, "day");
-  const weekChartData = calculateCumulativeProfitData(betsWithLegs, "week");
-  const monthChartData = calculateCumulativeProfitData(betsWithLegs, "month");
+  // Calculate summary and cumulative profit data (all async for FX conversion)
+  const [summary, dayChartData, weekChartData, monthChartData] = await Promise.all([
+    calculateReportingSummary(betsWithLegs, openExposureData.totalExposure, totalBonuses),
+    calculateCumulativeProfitData(betsWithLegs, "day"),
+    calculateCumulativeProfitData(betsWithLegs, "week"),
+    calculateCumulativeProfitData(betsWithLegs, "month"),
+  ]);
 
   // Enrich breakdown data with ROI
   const bookmakerBreakdown = enrichWithROI(

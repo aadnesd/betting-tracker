@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import {
   calculateCumulativeProfitData,
   calculateQualifyingLoss,
@@ -13,6 +13,11 @@ import {
   type MatchedBetWithLegs,
 } from "@/lib/reporting";
 import type { BackBet, LayBet, MatchedBet } from "@/lib/db/schema";
+
+// Mock convertAmountToNok to return the same amount (assume all are NOK in tests)
+vi.mock("@/lib/fx-rates", () => ({
+  convertAmountToNok: vi.fn(async (amount: number, _currency?: string) => amount),
+}));
 
 /**
  * Unit tests for reporting helper functions.
@@ -142,8 +147,8 @@ describe("calculateQualifyingLoss", () => {
 });
 
 describe("calculateReportingSummary", () => {
-  test("returns zeros for empty array", () => {
-    const summary = calculateReportingSummary([]);
+  test("returns zeros for empty array", async () => {
+    const summary = await calculateReportingSummary([]);
     expect(summary).toEqual({
       totalProfit: 0,
       qualifyingLoss: 0,
@@ -157,7 +162,7 @@ describe("calculateReportingSummary", () => {
     });
   });
 
-  test("calculates profit from settled bets only", () => {
+  test("calculates profit from settled bets only", async () => {
     const bets: MatchedBetWithLegs[] = [
       createMockMatchedBet({
         matched: { status: "settled" },
@@ -171,7 +176,7 @@ describe("calculateReportingSummary", () => {
       }),
     ];
 
-    const summary = calculateReportingSummary(bets);
+    const summary = await calculateReportingSummary(bets);
 
     expect(summary.totalProfit).toBe(5); // 50 - 45
     expect(summary.bettingProfit).toBe(5); // Same as totalProfit
@@ -180,12 +185,12 @@ describe("calculateReportingSummary", () => {
     expect(summary.settledCount).toBe(1);
   });
 
-  test("includes open exposure from parameter", () => {
-    const summary = calculateReportingSummary([], 1500);
+  test("includes open exposure from parameter", async () => {
+    const summary = await calculateReportingSummary([], 1500);
     expect(summary.openExposure).toBe(1500);
   });
 
-  test("calculates ROI correctly", () => {
+  test("calculates ROI correctly", async () => {
     const bets: MatchedBetWithLegs[] = [
       createMockMatchedBet({
         matched: { status: "settled" },
@@ -194,7 +199,7 @@ describe("calculateReportingSummary", () => {
       }),
     ];
 
-    const summary = calculateReportingSummary(bets);
+    const summary = await calculateReportingSummary(bets);
 
     // Net profit: 20 - 15 = 5
     // Total stake: 100 + 100 = 200
@@ -202,7 +207,7 @@ describe("calculateReportingSummary", () => {
     expect(summary.roi).toBe(2.5);
   });
 
-  test("includes bonus total in net profit calculation", () => {
+  test("includes bonus total in net profit calculation", async () => {
     const bets: MatchedBetWithLegs[] = [
       createMockMatchedBet({
         matched: { status: "settled" },
@@ -212,7 +217,7 @@ describe("calculateReportingSummary", () => {
     ];
 
     // Add 100 NOK in bonuses
-    const summary = calculateReportingSummary(bets, 0, 100);
+    const summary = await calculateReportingSummary(bets, 0, 100);
 
     expect(summary.bettingProfit).toBe(5); // 50 - 45
     expect(summary.bonusTotal).toBe(100);
@@ -222,7 +227,7 @@ describe("calculateReportingSummary", () => {
     expect(summary.roi).toBe(52.5);
   });
 
-  test("handles negative betting profit with positive bonuses", () => {
+  test("handles negative betting profit with positive bonuses", async () => {
     const bets: MatchedBetWithLegs[] = [
       createMockMatchedBet({
         matched: { status: "settled" },
@@ -232,7 +237,7 @@ describe("calculateReportingSummary", () => {
     ];
 
     // Add 50 NOK in bonuses
-    const summary = calculateReportingSummary(bets, 0, 50);
+    const summary = await calculateReportingSummary(bets, 0, 50);
 
     expect(summary.bettingProfit).toBe(-30); // -20 - 10
     expect(summary.bonusTotal).toBe(50);
@@ -240,7 +245,7 @@ describe("calculateReportingSummary", () => {
     expect(summary.roi).toBe(10); // 20 / 200 * 100 = 10%
   });
 
-  test("zero bonuses does not affect calculations", () => {
+  test("zero bonuses does not affect calculations", async () => {
     const bets: MatchedBetWithLegs[] = [
       createMockMatchedBet({
         matched: { status: "settled" },
@@ -249,8 +254,8 @@ describe("calculateReportingSummary", () => {
       }),
     ];
 
-    const summaryWithoutBonuses = calculateReportingSummary(bets, 0, 0);
-    const summaryDefaultBonuses = calculateReportingSummary(bets, 0);
+    const summaryWithoutBonuses = await calculateReportingSummary(bets, 0, 0);
+    const summaryDefaultBonuses = await calculateReportingSummary(bets, 0);
 
     expect(summaryWithoutBonuses.netProfit).toBe(50);
     expect(summaryDefaultBonuses.netProfit).toBe(50);
@@ -398,12 +403,12 @@ describe("calculateCumulativeProfitData", () => {
    * These tests verify the data points are correctly computed for charting.
    */
 
-  test("returns empty array for no bets", () => {
-    const result = calculateCumulativeProfitData([]);
+  test("returns empty array for no bets", async () => {
+    const result = await calculateCumulativeProfitData([]);
     expect(result).toEqual([]);
   });
 
-  test("returns empty array for non-settled bets", () => {
+  test("returns empty array for non-settled bets", async () => {
     const bets = [
       createMockMatchedBet({
         matched: { status: "draft" },
@@ -415,11 +420,11 @@ describe("calculateCumulativeProfitData", () => {
       }),
     ];
 
-    const result = calculateCumulativeProfitData(bets);
+    const result = await calculateCumulativeProfitData(bets);
     expect(result).toEqual([]);
   });
 
-  test("calculates cumulative profit correctly for settled bets", () => {
+  test("calculates cumulative profit correctly for settled bets", async () => {
     const bets = [
       createMockMatchedBet({
         matched: { status: "settled", createdAt: new Date("2025-01-01") },
@@ -438,7 +443,7 @@ describe("calculateCumulativeProfitData", () => {
       }),
     ];
 
-    const result = calculateCumulativeProfitData(bets, "day");
+    const result = await calculateCumulativeProfitData(bets, "day");
 
     expect(result.length).toBe(3);
     // Day 1: profit 40 (50-10), cumulative 40
@@ -455,7 +460,7 @@ describe("calculateCumulativeProfitData", () => {
     expect(result[2].count).toBe(1);
   });
 
-  test("groups by week correctly", () => {
+  test("groups by week correctly", async () => {
     const bets = [
       createMockMatchedBet({
         matched: { status: "settled", createdAt: new Date("2025-01-06") }, // Monday
@@ -474,7 +479,7 @@ describe("calculateCumulativeProfitData", () => {
       }),
     ];
 
-    const result = calculateCumulativeProfitData(bets, "week");
+    const result = await calculateCumulativeProfitData(bets, "week");
 
     expect(result.length).toBe(2);
     // Week 1: profit 80 (50+30), cumulative 80, count 2
@@ -487,7 +492,7 @@ describe("calculateCumulativeProfitData", () => {
     expect(result[1].count).toBe(1);
   });
 
-  test("groups by month correctly", () => {
+  test("groups by month correctly", async () => {
     const bets = [
       createMockMatchedBet({
         matched: { status: "settled", createdAt: new Date("2025-01-15") },
@@ -506,7 +511,7 @@ describe("calculateCumulativeProfitData", () => {
       }),
     ];
 
-    const result = calculateCumulativeProfitData(bets, "month");
+    const result = await calculateCumulativeProfitData(bets, "month");
 
     expect(result.length).toBe(2);
     // Jan: profit 150, cumulative 150, count 2
@@ -519,7 +524,7 @@ describe("calculateCumulativeProfitData", () => {
     expect(result[1].count).toBe(1);
   });
 
-  test("sorts bets chronologically", () => {
+  test("sorts bets chronologically", async () => {
     // Create bets out of order
     const bets = [
       createMockMatchedBet({
@@ -539,7 +544,7 @@ describe("calculateCumulativeProfitData", () => {
       }),
     ];
 
-    const result = calculateCumulativeProfitData(bets, "day");
+    const result = await calculateCumulativeProfitData(bets, "day");
 
     expect(result.length).toBe(3);
     // Should be sorted: Day 1 (10), Day 2 (20), Day 3 (30)

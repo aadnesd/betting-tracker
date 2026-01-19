@@ -5,9 +5,11 @@
  * - Qualifying Loss: The small guaranteed loss from a qualifying bet (used to unlock free bets)
  * - Net Profit: Total profit minus qualifying losses
  * - ROI: Return on Investment as a percentage of total stake
+ * - All monetary values are converted to base currency (NOK) before aggregation
  */
 
 import type { BackBet, LayBet, MatchedBet } from "@/lib/db/schema";
+import { convertAmountToNok } from "@/lib/fx-rates";
 
 export type MatchedBetWithLegs = {
   matched: MatchedBet;
@@ -81,15 +83,16 @@ export function calculateQualifyingLoss(bet: MatchedBetWithLegs): number {
 
 /**
  * Calculate reporting summary from an array of matched bets with their legs.
+ * All amounts are converted to NOK (base currency) before aggregation.
  * @param bets - Array of matched bets with back/lay legs
  * @param openExposure - Total open exposure from non-settled bets (optional, defaults to 0)
- * @param bonusTotal - Total bonus/reward transactions (optional, defaults to 0)
+ * @param bonusTotal - Total bonus/reward transactions in NOK (optional, defaults to 0)
  */
-export function calculateReportingSummary(
+export async function calculateReportingSummary(
   bets: MatchedBetWithLegs[],
   openExposure = 0,
   bonusTotal = 0
-): ReportingSummary {
+): Promise<ReportingSummary> {
   let totalProfit = 0;
   let qualifyingLoss = 0;
   let totalStake = 0;
@@ -102,18 +105,22 @@ export function calculateReportingSummary(
 
     settledCount++;
 
-    // Sum profit/loss from both legs
+    // Sum profit/loss from both legs, converted to NOK
     const backPL = bet.back?.profitLoss ? Number.parseFloat(bet.back.profitLoss) : 0;
     const layPL = bet.lay?.profitLoss ? Number.parseFloat(bet.lay.profitLoss) : 0;
-    totalProfit += backPL + layPL;
+    const backPLInNok = await convertAmountToNok(backPL, bet.back?.currency);
+    const layPLInNok = await convertAmountToNok(layPL, bet.lay?.currency);
+    totalProfit += backPLInNok + layPLInNok;
 
-    // Sum stakes from both legs
+    // Sum stakes from both legs, converted to NOK
     const backStake = bet.back?.stake ? Number.parseFloat(bet.back.stake) : 0;
     const layStake = bet.lay?.stake ? Number.parseFloat(bet.lay.stake) : 0;
-    totalStake += backStake + layStake;
+    const backStakeInNok = await convertAmountToNok(backStake, bet.back?.currency);
+    const layStakeInNok = await convertAmountToNok(layStake, bet.lay?.currency);
+    totalStake += backStakeInNok + layStakeInNok;
 
-    // Calculate qualifying loss for this bet
-    qualifyingLoss += calculateQualifyingLoss(bet);
+    // Calculate qualifying loss for this bet (in NOK)
+    qualifyingLoss += await calculateQualifyingLossInNok(bet);
   }
 
   // Betting profit is the raw profit from bets only
@@ -136,6 +143,32 @@ export function calculateReportingSummary(
     bonusTotal,
     bettingProfit,
   };
+}
+
+/**
+ * Calculate qualifying loss for a matched bet, converted to NOK.
+ */
+async function calculateQualifyingLossInNok(bet: MatchedBetWithLegs): Promise<number> {
+  const promoType = bet.matched.promoType;
+  const isQualifyingPromo = promoType === "Qualifying Bet" || promoType === "Sign-up Offer";
+
+  if (!isQualifyingPromo) {
+    return 0;
+  }
+
+  // Calculate P/L from both legs in NOK
+  const backPL = bet.back?.profitLoss ? Number.parseFloat(bet.back.profitLoss) : 0;
+  const layPL = bet.lay?.profitLoss ? Number.parseFloat(bet.lay.profitLoss) : 0;
+  const backPLInNok = await convertAmountToNok(backPL, bet.back?.currency);
+  const layPLInNok = await convertAmountToNok(layPL, bet.lay?.currency);
+  const totalPL = backPLInNok + layPLInNok;
+
+  // For qualifying bets with a loss, record the absolute value as qualifying loss
+  if (totalPL < 0) {
+    return Math.abs(totalPL);
+  }
+
+  return 0;
 }
 
 /**
@@ -272,11 +305,12 @@ export type ProfitDataPoint = {
 /**
  * Calculate cumulative profit data points for chart visualization.
  * Returns data points sorted chronologically with cumulative profit.
+ * All profits are normalized to NOK for consistent aggregation.
  */
-export function calculateCumulativeProfitData(
+export async function calculateCumulativeProfitData(
   bets: MatchedBetWithLegs[],
   grouping: "day" | "week" | "month" = "day"
-): ProfitDataPoint[] {
+): Promise<ProfitDataPoint[]> {
   // Filter to only settled bets and sort by settled date
   const settledBets = bets
     .filter((bet) => bet.matched.status === "settled")
@@ -323,9 +357,13 @@ export function calculateCumulativeProfitData(
       }
     }
 
-    // Calculate profit for this bet
-    const backPL = bet.back?.profitLoss ? Number.parseFloat(bet.back.profitLoss) : 0;
-    const layPL = bet.lay?.profitLoss ? Number.parseFloat(bet.lay.profitLoss) : 0;
+    // Calculate profit for this bet, converting to NOK for consistent aggregation
+    const backPLRaw = bet.back?.profitLoss ? Number.parseFloat(bet.back.profitLoss) : 0;
+    const layPLRaw = bet.lay?.profitLoss ? Number.parseFloat(bet.lay.profitLoss) : 0;
+    const backCurrency = bet.back?.currency ?? "NOK";
+    const layCurrency = bet.lay?.currency ?? "NOK";
+    const backPL = await convertAmountToNok(backPLRaw, backCurrency);
+    const layPL = await convertAmountToNok(layPLRaw, layCurrency);
     const betProfit = backPL + layPL;
 
     const existing = groups.get(key) ?? { profit: 0, count: 0 };
