@@ -5,16 +5,26 @@ Prioritized implementation tasks. Check off when complete with tests passing.
 ---
 ## Status
 
-**Last updated**: 19 January 2026
+**Last updated**: 20 January 2026
 **Build**: ✅ Passing
-**Tests**: ✅ 495 unit tests passing
-**Tag**: v0.0.50
+**Tests**: ✅ 490 unit tests passing
+**Tag**: v0.0.51
 
 All planned items have been completed. The matched betting tracker is feature-complete according to the specs.
 
 ---
 
 ## Bugs — Active Issues
+
+- [x] **Lay bet settlement not deducting exchange commission**: When a lay bet wins (back bet loses), the settlement logic returned the full `layStake` as profit without deducting the exchange's commission rate (e.g., Betfair's 5%, SMarkets' 2%). This meant winning lay bets were over-reporting profit by the commission amount. DoD: Lay bet P&L correctly applies `profit × (1 - commissionRate)` when the layer wins; commission rate fetched from linked exchange account; tests validate commission calculation. Implementation:
+  1. Updated `calculateLayProfitLoss` in `lib/settlement.ts` to accept optional `commissionRate` parameter (default 0). When layer wins, applies `grossProfit * (1 - commissionRate)`. Losses remain unaffected.
+  2. Updated `calculateMatchedBetProfitLoss` to accept and pass through `exchangeCommission` parameter.
+  3. Extended `findBetsReadyForAutoSettlement` query in `lib/db/queries.ts` to join the exchange account table via `aliasedTable` and return `layAccountCommission`.
+  4. Updated `app/(chat)/api/cron/auto-settle/route.ts` to extract commission from bet data and pass to `calculateMatchedBetProfitLoss`.
+  5. Updated `app/(chat)/api/bets/settle/route.ts` manual settlement to fetch account via `getAccountById` and apply commission for lay bet settlements.
+  6. Updated `components/bets/bet-settlement-dropdown.tsx` to accept `commissionRate` prop and show commission-adjusted P&L preview for lay bets.
+  7. Extended `listAllBetsByUser` query to include `accountCommission` for UI preview.
+  Tests: Added 6 new tests in `tests/unit/settlement.test.ts` covering: 5% commission deduction, 2% commission deduction, zero commission, no commission on lay losses, matched bet with exchange commission, and high commission (10%) scenarios. Total: 490 tests passing.
 
 - [x] **XLSX export returns CSV instead of real Excel file**: Export endpoint advertises `format=xlsx` but currently returns CSV with an XLSX filename hint. This violates the import/export spec requiring true Excel output and risks data loss for users expecting native spreadsheets. DoD: Generate a real XLSX file for matched-set exports with correct MIME type, sheet name, and column headers matching CSV export; update tests to validate XLSX structure; document why the XLSX library is required and how tests cover it. Implementation: Updated `app/(chat)/api/bets/export/route.ts` to import and use `createXlsxBuffer` from `lib/xlsx.ts`. When `format=xlsx` is requested, the endpoint now builds proper XLSX rows (headers + data), passes them to `createXlsxBuffer`, and returns the result with correct MIME type `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`. Numeric values (odds, stake, profit/loss) are stored as actual numbers in Excel cells for proper spreadsheet functionality. Tests: Added 14 new tests in `tests/unit/xlsx-export.test.ts` covering: valid ZIP structure verification (PK signature), empty rows handling, numeric value storage, null/undefined handling, special character XML escaping, sheet name sanitization (length truncation, special char replacement), required XLSX parts presence, wide column references (A-Z and AA+), matched bets export structure, number vs string cell types, and correct XLSX MIME content types in the package.
 

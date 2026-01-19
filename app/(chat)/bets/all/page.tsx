@@ -379,6 +379,7 @@ export default async function Page(props: PageProps) {
                               stake={bet.stake}
                               currency={bet.currency ?? "NOK"}
                               selection={bet.selection}
+                              commissionRate={bet.kind === "lay" ? (bet.accountCommission ?? 0) : 0}
                             />
                           )}
                           {bet.matchedBetId && (

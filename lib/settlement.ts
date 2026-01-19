@@ -558,27 +558,36 @@ export function calculateProfitLoss(
 /**
  * Calculate lay bet profit/loss based on outcome
  *
+ * Exchange commission is deducted from winning lay bets. For example, with 5% commission:
+ * - Lay wins (selection lost): profit = layStake × (1 - commission)
+ * - Lay loses (selection won): loss = -layStake × (odds - 1) (no commission on losses)
+ *
  * @param outcome - The bet outcome from back bet perspective
  * @param layStake - The lay stake amount
  * @param layOdds - The decimal lay odds
+ * @param commissionRate - The exchange commission rate as a decimal (e.g., 0.05 for 5%). Defaults to 0.
  * @returns The profit/loss amount for the layer
  */
 export function calculateLayProfitLoss(
   outcome: BetOutcome,
   layStake: number,
-  layOdds: number
+  layOdds: number,
+  commissionRate = 0
 ): number {
   // Lay liability = layStake * (layOdds - 1)
   const liability = layStake * (layOdds - 1);
 
   switch (outcome) {
     case "win":
-      // Selection won: layer loses liability
+      // Selection won: layer loses liability (no commission on losses)
       return -liability;
 
     case "loss":
-      // Selection lost: layer wins the lay stake
-      return layStake;
+      // Selection lost: layer wins the lay stake minus commission
+      // Commission is only applied to profits
+      const grossProfit = layStake;
+      const commission = grossProfit * commissionRate;
+      return grossProfit - commission;
 
     case "push":
       // Push: no profit/loss
@@ -599,6 +608,7 @@ export function calculateLayProfitLoss(
  * @param layStake - The lay bet stake
  * @param layOdds - The lay bet decimal odds
  * @param isFreeBet - Whether the back bet is a free bet
+ * @param exchangeCommission - The exchange commission rate as a decimal (e.g., 0.05 for 5%). Defaults to 0.
  * @returns The net profit/loss from both legs
  */
 export function calculateMatchedBetProfitLoss(
@@ -607,10 +617,11 @@ export function calculateMatchedBetProfitLoss(
   backOdds: number,
   layStake: number,
   layOdds: number,
-  isFreeBet = false
+  isFreeBet = false,
+  exchangeCommission = 0
 ): { backProfitLoss: number; layProfitLoss: number; netProfitLoss: number } {
   const backProfitLoss = calculateProfitLoss(outcome, backStake, backOdds, isFreeBet);
-  const layProfitLoss = calculateLayProfitLoss(outcome, layStake, layOdds);
+  const layProfitLoss = calculateLayProfitLoss(outcome, layStake, layOdds, exchangeCommission);
 
   return {
     backProfitLoss,

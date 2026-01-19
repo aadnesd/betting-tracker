@@ -37,6 +37,7 @@ vi.mock("drizzle-orm/postgres-js", () => ({
                       layOdds: "2.55",
                       layStake: "98.00",
                       layAccountId: "acct-2",
+                      layAccountCommission: "0.05",
                       footballMatchId: "match-1",
                       externalId: 538001,
                       homeTeam: "Arsenal FC",
@@ -127,6 +128,7 @@ describe("auto-settlement detection queries", () => {
         layOdds: "2.55",
         layStake: "98.00",
         layAccountId: "acct-2",
+        layAccountCommission: 0.05, // 5% exchange commission
         // Football match result
         footballMatch: {
           id: "match-1",
@@ -186,6 +188,7 @@ describe("auto-settlement detection queries", () => {
         layOdds: "3.10",
         layStake: "48.00",
         layAccountId: "acct-2",
+        layAccountCommission: 0.02, // 2% exchange commission
         footballMatch: {
           id: "match-1",
           externalId: 538002,
