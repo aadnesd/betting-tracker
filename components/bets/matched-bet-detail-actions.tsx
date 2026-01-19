@@ -27,6 +27,7 @@ interface Props {
   currentStatus: MatchedBetStatus;
   hasBothLegs: boolean;
   mismatches: MismatchIssue[];
+  backBetId?: string | null;
 }
 
 export function MatchedBetDetailActions({
@@ -34,11 +35,13 @@ export function MatchedBetDetailActions({
   currentStatus,
   hasBothLegs,
   mismatches,
+  backBetId,
 }: Props) {
   const router = useRouter();
   const [status, setStatus] = useState<MatchedBetStatus>(currentStatus);
   const [notes, setNotes] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [isRecalculating, setIsRecalculating] = useState(false);
   const [cascadeDelete, setCascadeDelete] = useState(false);
 
   const hasMismatches = mismatches.length > 0;
@@ -151,6 +154,33 @@ export function MatchedBetDetailActions({
     router.push("/bets");
   };
 
+  const handleRecalculateExposure = async () => {
+    setIsRecalculating(true);
+    try {
+      const resp = await fetch("/api/bets/recalculate-exposure", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: matchedBetId }),
+      });
+
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        throw new Error(err.error || "Failed to recalculate");
+      }
+
+      const result = await resp.json();
+      toast.success(
+        `Net exposure recalculated: ${result.oldNetExposure?.toFixed(2) ?? "N/A"} → ${result.newNetExposure?.toFixed(2)} NOK`
+      );
+      router.refresh();
+    } catch (error) {
+      console.error(error);
+      toast.error(error instanceof Error ? error.message : "Recalculation failed");
+    } finally {
+      setIsRecalculating(false);
+    }
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -192,6 +222,17 @@ export function MatchedBetDetailActions({
           >
             {isSaving ? "Saving..." : "Save changes"}
           </Button>
+
+          {/* Recalculate exposure - especially useful for currency mismatches */}
+          {hasBothLegs && (
+            <Button
+              disabled={isRecalculating || isSaving}
+              onClick={handleRecalculateExposure}
+              variant="outline"
+            >
+              {isRecalculating ? "Recalculating..." : "Recalculate exposure"}
+            </Button>
+          )}
 
           {/* Quick resolve for needs_review */}
           {(currentStatus === "needs_review" || currentStatus === "draft") && (

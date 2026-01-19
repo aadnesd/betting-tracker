@@ -55,6 +55,14 @@ export async function convertAmountToNok(
     return amount;
   }
 
-  const rate = await fetchRate(currency);
-  return amount * rate;
+  try {
+    const rate = await fetchRate(currency);
+    const converted = amount * rate;
+    console.log(`[FX] Converted ${amount} ${currency} → ${converted.toFixed(2)} NOK (rate: ${rate})`);
+    return converted;
+  } catch (error) {
+    console.error(`[FX] Failed to convert ${amount} ${currency} to NOK:`, error);
+    // Fallback: return amount unchanged (will be wrong but won't crash)
+    return amount;
+  }
 }
