@@ -16,6 +16,7 @@ import {
   saveBackBet,
   saveLayBet,
 } from "@/lib/db/queries";
+import { computeNetExposureInputs } from "@/lib/bet-calculations";
 import { convertAmountToNok } from "@/lib/fx-rates";
 
 const betPartSchema = z.object({
@@ -80,28 +81,6 @@ function safeDate(value?: string | null) {
   }
   const parsed = new Date(value);
   return Number.isNaN(parsed.getTime()) ? null : parsed;
-}
-
-function computeNetExposure({
-  backStake,
-  backOdds,
-  layStake,
-  layOdds,
-  layLiabilityProvided,
-}: {
-  backStake: number;
-  backOdds: number;
-  layStake: number;
-  layOdds: number;
-  /** If the liability was directly extracted from the exchange, use it instead of computing */
-  layLiabilityProvided?: number | null;
-}) {
-  const backProfit = backStake * (backOdds - 1);
-  // Use provided liability if available (from exchange screenshot), otherwise compute from stake
-  const layLiability = layLiabilityProvided != null && layLiabilityProvided > 0
-    ? layLiabilityProvided
-    : layStake * (layOdds - 1);
-  return { backProfit, layLiability };
 }
 
 async function resolveAccountId({
@@ -311,7 +290,7 @@ export async function POST(request: Request) {
     let netExposure: number | null = null;
 
     if (hasBack && hasLay && body.back && body.lay) {
-      const { backProfit, layLiability } = computeNetExposure({
+      const { backProfit, layLiability } = computeNetExposureInputs({
         backStake: body.back.stake,
         backOdds: body.back.odds,
         layStake: body.lay.stake,

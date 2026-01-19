@@ -7,6 +7,7 @@ import {
 } from "@/lib/db/queries";
 import {
   calculateMatchedBetProfitLoss,
+  isFreeBetPromoType,
   resolveOutcome,
   type BetOutcome,
 } from "@/lib/settlement";
@@ -36,16 +37,6 @@ interface AutoSettleResult {
     outcome?: BetOutcome;
     reason?: string;
   }>;
-}
-
-/**
- * Check if promo type indicates a free bet.
- * Free bets don't return stake on win, affecting P&L calculation.
- */
-function isFreeBet(promoType: string | null): boolean {
-  if (!promoType) return false;
-  const normalized = promoType.toLowerCase();
-  return normalized.includes("free bet") || normalized.includes("freebet");
 }
 
 /**
@@ -88,7 +79,7 @@ async function processBet(
   const layOdds = bet.layOdds ? Number.parseFloat(bet.layOdds) : 0;
   const layStake = bet.layStake ? Number.parseFloat(bet.layStake) : 0;
 
-  const freeBet = isFreeBet(bet.promoType);
+  const freeBet = isFreeBetPromoType(bet.promoType);
   const { backProfitLoss, layProfitLoss } = calculateMatchedBetProfitLoss(
     outcomeResult.outcome,
     backStake,

@@ -197,8 +197,14 @@ export async function POST(request: Request) {
     const hasUnmatchedAccounts =
       enrichedBack.unmatchedAccount || enrichedLay.unmatchedAccount;
 
+    const matchConfidenceLow = matchLinkResult.matchConfidence === "low";
+    const matchNeedsReview =
+      matchConfidenceLow ||
+      (matchLinkResult.matchCandidates > 0 && !matchLinkResult.matchId);
+
     const { needsReview } = evaluateNeedsReview({
-      explicitFlag: parsed.needsReview || hasUnmatchedAccounts,
+      explicitFlag:
+        parsed.needsReview || hasUnmatchedAccounts || matchNeedsReview,
       backConfidence: parsed.back.confidence,
       layConfidence: parsed.lay.confidence,
     });
@@ -218,9 +224,21 @@ export async function POST(request: Request) {
       );
     }
 
-    const notes = unmatchedNotes.length > 0
-      ? [parsed.notes, ...unmatchedNotes].filter(Boolean).join("\n")
-      : parsed.notes;
+    const matchNotes: string[] = [];
+    if (matchLinkResult.matchCandidates > 0 && !matchLinkResult.matchId) {
+      matchNotes.push(
+        `Found ${matchLinkResult.matchCandidates} candidate matches but none were linked.`
+      );
+    } else if (matchLinkResult.matchId && matchConfidenceLow) {
+      matchNotes.push("Match link confidence is low. Please verify the match.");
+    }
+
+    const notes =
+      unmatchedNotes.length > 0 || matchNotes.length > 0
+        ? [parsed.notes, ...unmatchedNotes, ...matchNotes]
+            .filter(Boolean)
+            .join("\n")
+        : parsed.notes;
 
     await Promise.all([
       updateScreenshotStatus({

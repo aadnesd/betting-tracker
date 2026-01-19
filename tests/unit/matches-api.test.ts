@@ -6,6 +6,14 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import * as authModule from "@/app/(auth)/auth";
+import {
+  GET as listMatchesRoute,
+} from "@/app/(chat)/api/bets/matches/route";
+import {
+  GET as getMatchByIdRoute,
+} from "@/app/(chat)/api/bets/matches/[id]/route";
+import * as dbQueries from "@/lib/db/queries";
 
 // Mock auth to return a test user
 vi.mock("@/app/(auth)/auth", () => ({
@@ -16,9 +24,15 @@ vi.mock("@/app/(auth)/auth", () => ({
 vi.mock("@/lib/db/queries", () => ({
   searchFootballMatches: vi.fn(),
   listUpcomingMatches: vi.fn(),
+  getFootballMatchById: vi.fn(),
 }));
 
 describe("/api/bets/matches", () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    (authModule.auth as vi.Mock).mockResolvedValue({ user: { id: "test-user-id" } });
+  });
+
   describe("formatMatch helper", () => {
     it("should format match with all fields", () => {
       const match = {
@@ -199,5 +213,73 @@ describe("/api/bets/matches", () => {
       expect(statusMap.IN_PLAY).toBe("Live");
       expect(statusMap.FINISHED).toBe("Finished");
     });
+  });
+
+  describe("GET /api/bets/matches route", () => {
+    it("returns upcoming matches when no search term provided", async () => {
+      (dbQueries.listUpcomingMatches as vi.Mock).mockResolvedValueOnce([]);
+      const res = await listMatchesRoute(
+        new Request("http://localhost/api/bets/matches")
+      );
+      const json = await res.json();
+      expect(res.status).toBe(200);
+      expect(Array.isArray(json.matches)).toBe(true);
+    });
+  });
+});
+
+describe("/api/bets/matches/:id", () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    (authModule.auth as vi.Mock).mockResolvedValue({ user: { id: "test-user-id" } });
+  });
+
+  it("returns 401 when unauthenticated", async () => {
+    (authModule.auth as vi.Mock).mockResolvedValueOnce(null);
+    const res = await getMatchByIdRoute(
+      new Request("http://localhost/api/bets/matches/match-1"),
+      { params: Promise.resolve({ id: "match-1" }) }
+    );
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 404 when match not found", async () => {
+    (dbQueries.getFootballMatchById as vi.Mock).mockResolvedValueOnce(null);
+    const res = await getMatchByIdRoute(
+      new Request("http://localhost/api/bets/matches/match-1"),
+      { params: Promise.resolve({ id: "match-1" }) }
+    );
+    expect(res.status).toBe(404);
+    const json = await res.json();
+    expect(json.error).toBe("Match not found");
+  });
+
+  it("returns formatted match details", async () => {
+    (dbQueries.getFootballMatchById as vi.Mock).mockResolvedValueOnce({
+      id: "match-1",
+      externalId: "ext-123",
+      homeTeam: "Arsenal",
+      awayTeam: "Chelsea",
+      competition: "Premier League",
+      competitionCode: "PL",
+      matchDate: new Date("2025-02-01T17:30:00Z"),
+      status: "SCHEDULED",
+      homeScore: null,
+      awayScore: null,
+      lastSyncedAt: new Date(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const res = await getMatchByIdRoute(
+      new Request("http://localhost/api/bets/matches/match-1"),
+      { params: Promise.resolve({ id: "match-1" }) }
+    );
+
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.match.id).toBe("match-1");
+    expect(json.match.label).toBe("Arsenal vs Chelsea");
+    expect(json.match.competitionCode).toBe("PL");
   });
 });

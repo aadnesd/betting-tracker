@@ -6,7 +6,8 @@
  * 1. Fuzzy trigram search in the database to find candidate matches
  * 2. LLM to select the correct match from candidates
  * 
- * This avoids maintaining team name dictionaries - the fuzzy search + LLM handles variations.
+ * This normalizes common team names, uses fuzzy search, and only calls the LLM
+ * for disambiguation when multiple candidates remain.
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -46,19 +47,30 @@ describe("Match Linking Module", () => {
   });
 
   describe("findCandidateMatches", () => {
-    it("uses fuzzy search with full market string", async () => {
+    it("uses normalized market and selection terms for search", async () => {
       mockSearchFootballMatches.mockResolvedValue([]);
 
       await findCandidateMatches({
         market: "Man Utd v Man City",
+        selection: "Man City",
       });
 
-      expect(mockSearchFootballMatches).toHaveBeenCalledWith({
-        searchTerm: "Man Utd v Man City",
-        fromDate: expect.any(Date),
-        limit: 15,
-        similarityThreshold: 0.15,
-      });
+      expect(mockSearchFootballMatches).toHaveBeenCalledWith(
+        expect.objectContaining({
+          searchTerm: "Manchester United v Manchester City",
+          fromDate: expect.any(Date),
+          limit: 10,
+          similarityThreshold: 0.15,
+        })
+      );
+      expect(mockSearchFootballMatches).toHaveBeenCalledWith(
+        expect.objectContaining({
+          searchTerm: "Manchester City",
+          fromDate: expect.any(Date),
+          limit: 10,
+          similarityThreshold: 0.15,
+        })
+      );
     });
 
     it("passes bet date as fromDate when provided", async () => {
@@ -67,15 +79,18 @@ describe("Match Linking Module", () => {
       const betDate = new Date("2026-01-15");
       await findCandidateMatches({
         market: "Arsenal v Chelsea",
+        selection: "Arsenal",
         betDate,
       });
 
-      expect(mockSearchFootballMatches).toHaveBeenCalledWith({
-        searchTerm: "Arsenal v Chelsea",
-        fromDate: betDate,
-        limit: 15,
-        similarityThreshold: 0.15,
-      });
+      expect(mockSearchFootballMatches).toHaveBeenCalledWith(
+        expect.objectContaining({
+          searchTerm: "Arsenal FC v Chelsea FC",
+          fromDate: betDate,
+          limit: 10,
+          similarityThreshold: 0.15,
+        })
+      );
     });
 
     it("returns empty array for short market strings", async () => {
@@ -96,6 +111,24 @@ describe("Match Linking Module", () => {
       expect(mockSearchFootballMatches).not.toHaveBeenCalled();
     });
 
+    it("uses selection term when market is too short", async () => {
+      mockSearchFootballMatches.mockResolvedValue([]);
+
+      await findCandidateMatches({
+        market: "AB",
+        selection: "Manchester United",
+      });
+
+      expect(mockSearchFootballMatches).toHaveBeenCalledWith(
+        expect.objectContaining({
+          searchTerm: "Manchester United",
+          fromDate: expect.any(Date),
+          limit: 10,
+          similarityThreshold: 0.15,
+        })
+      );
+    });
+
     it("maps DB results to MatchCandidate format", async () => {
       const dbMatch = {
         id: "match-1",
@@ -112,6 +145,7 @@ describe("Match Linking Module", () => {
 
       const candidates = await findCandidateMatches({
         market: "Man Utd v Man City",
+        selection: "Man City",
       });
 
       expect(candidates.length).toBe(1);
@@ -132,6 +166,7 @@ describe("Match Linking Module", () => {
 
       const candidates = await findCandidateMatches({
         market: "Arsenal v Chelsea",
+        selection: "Arsenal",
       });
 
       expect(candidates).toEqual([]);
@@ -305,7 +340,7 @@ describe("Match Linking Module", () => {
       expect(result.matchCandidates).toBe(0);
     });
 
-    it("calls LLM to select match when candidates found", async () => {
+    it("auto-links single candidate without LLM", async () => {
       const match: MatchCandidate = {
         id: "match-uuid-123",
         externalId: "12345",
@@ -318,14 +353,13 @@ describe("Match Linking Module", () => {
       };
 
       mockSearchFootballMatches.mockResolvedValue([match]);
-      mockGenerateText.mockResolvedValue({ text: "1" });
 
       const result = await linkBetToMatch({
         market: "Man Utd v Man City",
         selection: "Man City",
       });
 
-      expect(mockGenerateText).toHaveBeenCalled();
+      expect(mockGenerateText).not.toHaveBeenCalled();
       expect(result.matchId).toBe("match-uuid-123");
       expect(result.matchConfidence).toBe("high");
       expect(result.matchCandidates).toBe(1);
@@ -344,7 +378,6 @@ describe("Match Linking Module", () => {
       };
 
       mockSearchFootballMatches.mockResolvedValue([match]);
-      mockGenerateText.mockResolvedValue({ text: "1" });
 
       const result = await linkBetToMatch({
         market: "Man Utd v Man City",

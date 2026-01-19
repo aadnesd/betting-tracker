@@ -47,6 +47,20 @@ export interface OutcomeResult {
 }
 
 /**
+ * Normalize promo type labels to detect free bets.
+ * Free bets do not return stake on win, so P&L differs.
+ */
+export function isFreeBetPromoType(promoType: string | null): boolean {
+  if (!promoType) return false;
+  const normalized = promoType.toLowerCase();
+  return (
+    normalized.includes("free bet") ||
+    normalized.includes("freebet") ||
+    normalized.includes("free_bet")
+  );
+}
+
+/**
  * Detect the market type from market name
  */
 export function detectMarketType(market: string): MarketType {
