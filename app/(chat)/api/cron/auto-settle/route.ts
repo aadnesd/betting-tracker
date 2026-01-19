@@ -78,6 +78,8 @@ async function processBet(
   const backStake = bet.backStake ? Number.parseFloat(bet.backStake) : 0;
   const layOdds = bet.layOdds ? Number.parseFloat(bet.layOdds) : 0;
   const layStake = bet.layStake ? Number.parseFloat(bet.layStake) : 0;
+  // Exchange commission (e.g., 0.05 for 5%) - defaults to 0 if not set
+  const exchangeCommission = bet.layAccountCommission ?? 0;
 
   const freeBet = isFreeBetPromoType(bet.promoType);
   const { backProfitLoss, layProfitLoss } = calculateMatchedBetProfitLoss(
@@ -86,7 +88,8 @@ async function processBet(
     backOdds,
     layStake,
     layOdds,
-    freeBet
+    freeBet,
+    exchangeCommission
   );
 
   // Apply the settlement

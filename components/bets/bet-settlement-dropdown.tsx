@@ -21,25 +21,34 @@ interface BetSettlementDropdownProps {
   stake: number;
   currency: string;
   selection: string;
+  /** Exchange commission rate for lay bets (e.g., 0.05 for 5%). Defaults to 0. */
+  commissionRate?: number;
 }
 
 /**
- * Calculate potential P&L for display in dropdown
+ * Calculate potential P&L for display in dropdown.
+ * For lay bets, commission is deducted from winning profits.
  */
 function calculatePotentialPL(
   kind: "back" | "lay",
   outcome: Outcome,
   stake: number,
-  odds: number
+  odds: number,
+  commissionRate = 0
 ): number {
   switch (outcome) {
     case "won":
       // For back bet: win = stake × (odds - 1)
-      // For lay bet: win = stake (backer loses stake)
-      return kind === "back" ? stake * (odds - 1) : stake;
+      // For lay bet: win = stake × (1 - commission) (backer loses stake, exchange takes commission)
+      if (kind === "back") {
+        return stake * (odds - 1);
+      }
+      // Lay bet win: profit minus commission
+      const grossProfit = stake;
+      return grossProfit * (1 - commissionRate);
     case "lost":
       // For back bet: lose stake
-      // For lay bet: lose = stake × (odds - 1) (pay out winnings)
+      // For lay bet: lose = stake × (odds - 1) (pay out winnings, no commission on losses)
       return kind === "back" ? -stake : -stake * (odds - 1);
     case "push":
       return 0;
@@ -58,6 +67,7 @@ export function BetSettlementDropdown({
   stake,
   currency,
   selection,
+  commissionRate = 0,
 }: BetSettlementDropdownProps) {
   const router = useRouter();
   const [isSettling, setIsSettling] = useState(false);
@@ -99,8 +109,8 @@ export function BetSettlementDropdown({
     }
   };
 
-  const wonPL = calculatePotentialPL(betKind, "won", stake, odds);
-  const lostPL = calculatePotentialPL(betKind, "lost", stake, odds);
+  const wonPL = calculatePotentialPL(betKind, "won", stake, odds, commissionRate);
+  const lostPL = calculatePotentialPL(betKind, "lost", stake, odds, commissionRate);
 
   return (
     <DropdownMenu>

@@ -1,6 +1,7 @@
 import "server-only";
 
 import {
+  aliasedTable,
   and,
   asc,
   count,
@@ -1962,6 +1963,8 @@ export type IndividualBetListItem = {
   accountId: string | null;
   accountName: string | null;
   accountKind: "bookmaker" | "exchange" | null;
+  /** Exchange commission rate for lay bets (decimal, e.g., 0.05 for 5%) */
+  accountCommission: number | null;
   matchedBetId: string | null;
   matchedBetStatus: "draft" | "matched" | "settled" | "needs_review" | null;
 };
@@ -2042,6 +2045,7 @@ export async function listAllBetsByUser({
           accountId: backBet.accountId,
           accountName: account.name,
           accountKind: account.kind,
+          accountCommission: account.commission,
           matchedBetId: matchedBet.id,
           matchedBetStatus: matchedBet.status,
         })
@@ -2070,6 +2074,7 @@ export async function listAllBetsByUser({
           accountId: layBet.accountId,
           accountName: account.name,
           accountKind: account.kind,
+          accountCommission: account.commission,
           matchedBetId: matchedBet.id,
           matchedBetStatus: matchedBet.status,
         })
@@ -2102,6 +2107,9 @@ export async function listAllBetsByUser({
         accountId: row.accountId ?? null,
         accountName: row.accountName ?? null,
         accountKind: row.accountKind ?? null,
+        accountCommission: row.accountCommission 
+          ? Number.parseFloat(row.accountCommission) 
+          : null,
         matchedBetId: row.matchedBetId ?? null,
         matchedBetStatus: row.matchedBetStatus ?? null,
       })),
@@ -2123,6 +2131,9 @@ export async function listAllBetsByUser({
         accountId: row.accountId ?? null,
         accountName: row.accountName ?? null,
         accountKind: row.accountKind ?? null,
+        accountCommission: row.accountCommission 
+          ? Number.parseFloat(row.accountCommission) 
+          : null,
         matchedBetId: row.matchedBetId ?? null,
         matchedBetStatus: row.matchedBetStatus ?? null,
       })),
@@ -2538,6 +2549,8 @@ export type BetReadyForSettlement = {
   layOdds: string | null;
   layStake: string | null;
   layAccountId: string | null;
+  /** Exchange commission rate as a decimal (e.g., 0.05 for 5%). Null if no exchange account or commission not set. */
+  layAccountCommission: number | null;
   // Football match result
   footballMatch: {
     id: string;
@@ -2570,6 +2583,9 @@ export async function findBetsReadyForAutoSettlement({
   limit?: number;
 } = {}): Promise<BetReadyForSettlement[]> {
   try {
+    // Alias for the exchange account to get commission
+    const exchangeAccount = aliasedTable(account, "exchangeAccount");
+    
     const rows = await db
       .select({
         id: matchedBet.id,
@@ -2589,6 +2605,8 @@ export async function findBetsReadyForAutoSettlement({
         layOdds: layBet.odds,
         layStake: layBet.stake,
         layAccountId: layBet.accountId,
+        // Exchange account commission
+        layAccountCommission: exchangeAccount.commission,
         // Football match
         footballMatchId: footballMatch.id,
         externalId: footballMatch.externalId,
@@ -2604,6 +2622,7 @@ export async function findBetsReadyForAutoSettlement({
       .innerJoin(footballMatch, eq(matchedBet.matchId, footballMatch.id))
       .leftJoin(backBet, eq(matchedBet.backBetId, backBet.id))
       .leftJoin(layBet, eq(matchedBet.layBetId, layBet.id))
+      .leftJoin(exchangeAccount, eq(layBet.accountId, exchangeAccount.id))
       .where(
         and(
           eq(matchedBet.status, "matched"),
@@ -2640,6 +2659,9 @@ export async function findBetsReadyForAutoSettlement({
         layOdds: row.layOdds,
         layStake: row.layStake,
         layAccountId: row.layAccountId,
+        layAccountCommission: row.layAccountCommission 
+          ? Number.parseFloat(row.layAccountCommission)
+          : null,
         footballMatch: {
           id: row.footballMatchId!,
           externalId: Number.parseInt(row.externalId!, 10),

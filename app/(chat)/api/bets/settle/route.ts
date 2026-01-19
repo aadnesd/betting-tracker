@@ -4,6 +4,7 @@ import { auth } from "@/app/(auth)/auth";
 import {
   createAccountTransaction,
   createAuditEntry,
+  getAccountById,
   getBackBetById,
   getLayBetById,
   getMatchedBetByLegId,
@@ -26,13 +27,16 @@ const settleSchema = z.object({
 
 /**
  * Calculate P&L for a bet based on outcome
+ * 
+ * @param commissionRate - For lay bets, the exchange commission rate as a decimal (e.g., 0.05 for 5%)
  */
 function calculateBetProfitLoss(
   kind: "back" | "lay",
   outcome: "won" | "lost" | "push",
   stake: number,
   odds: number,
-  isFreeBet = false
+  isFreeBet = false,
+  commissionRate = 0
 ): number {
   // Convert outcome to settlement outcome type
   const betOutcome = outcome === "won" ? "win" : outcome === "lost" ? "loss" : "push";
@@ -46,7 +50,7 @@ function calculateBetProfitLoss(
   // So we need to flip: layer won → back lost, layer lost → back won
   const layOutcomeFromBackPerspective =
     betOutcome === "win" ? "loss" : betOutcome === "loss" ? "win" : "push";
-  return calculateLayProfitLoss(layOutcomeFromBackPerspective, stake, odds);
+  return calculateLayProfitLoss(layOutcomeFromBackPerspective, stake, odds, commissionRate);
 }
 
 export async function POST(request: Request) {
@@ -101,6 +105,18 @@ export async function POST(request: Request) {
       isFreeBet = isFreeBetPromoType(matchedBet?.promoType ?? null);
     }
 
+    // For lay bets, get the exchange account's commission rate
+    let commissionRate = 0;
+    if (body.betKind === "lay" && bet.accountId) {
+      const exchangeAccount = await getAccountById({
+        id: bet.accountId,
+        userId: session.user.id,
+      });
+      if (exchangeAccount?.commission) {
+        commissionRate = Number.parseFloat(exchangeAccount.commission);
+      }
+    }
+
     // Calculate profit/loss
     const stake = Number(bet.stake);
     const odds = Number(bet.odds);
@@ -109,7 +125,8 @@ export async function POST(request: Request) {
       body.outcome,
       stake,
       odds,
-      isFreeBet
+      isFreeBet,
+      commissionRate
     );
 
     const now = new Date();
