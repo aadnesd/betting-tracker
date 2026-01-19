@@ -103,6 +103,165 @@ export async function createGuestUser() {
   }
 }
 
+export async function getUserById(id: string): Promise<User | null> {
+  try {
+    const [found] = await db.select().from(user).where(eq(user.id, id));
+    return found ?? null;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get user by id"
+    );
+  }
+}
+
+export async function createOAuthUser(email: string) {
+  try {
+    const [created] = await db
+      .insert(user)
+      .values({ email, password: null })
+      .returning({ id: user.id, email: user.email });
+    return created;
+  } catch (_error) {
+    throw new ChatSDKError("bad_request:database", "Failed to create OAuth user");
+  }
+}
+
+async function updateUserEmailForOAuth({
+  id,
+  email,
+}: {
+  id: string;
+  email: string;
+}) {
+  try {
+    const [updated] = await db
+      .update(user)
+      .set({ email, password: null })
+      .where(eq(user.id, id))
+      .returning({ id: user.id, email: user.email });
+    return updated;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to update user for OAuth"
+    );
+  }
+}
+
+async function transferUserData({
+  fromUserId,
+  toUserId,
+}: {
+  fromUserId: string;
+  toUserId: string;
+}) {
+  try {
+    await db.transaction(async (tx) => {
+      await tx.update(chat).set({ userId: toUserId }).where(eq(chat.userId, fromUserId));
+      await tx
+        .update(document)
+        .set({ userId: toUserId })
+        .where(eq(document.userId, fromUserId));
+      await tx
+        .update(suggestion)
+        .set({ userId: toUserId })
+        .where(eq(suggestion.userId, fromUserId));
+      await tx
+        .update(screenshotUpload)
+        .set({ userId: toUserId })
+        .where(eq(screenshotUpload.userId, fromUserId));
+      await tx
+        .update(account)
+        .set({ userId: toUserId })
+        .where(eq(account.userId, fromUserId));
+      await tx
+        .update(promo)
+        .set({ userId: toUserId })
+        .where(eq(promo.userId, fromUserId));
+      await tx
+        .update(accountTransaction)
+        .set({ userId: toUserId })
+        .where(eq(accountTransaction.userId, fromUserId));
+      await tx
+        .update(backBet)
+        .set({ userId: toUserId })
+        .where(eq(backBet.userId, fromUserId));
+      await tx
+        .update(layBet)
+        .set({ userId: toUserId })
+        .where(eq(layBet.userId, fromUserId));
+      await tx
+        .update(matchedBet)
+        .set({ userId: toUserId })
+        .where(eq(matchedBet.userId, fromUserId));
+      await tx
+        .update(auditLog)
+        .set({ userId: toUserId })
+        .where(eq(auditLog.userId, fromUserId));
+      await tx
+        .update(freeBet)
+        .set({ userId: toUserId })
+        .where(eq(freeBet.userId, fromUserId));
+
+      const existingSettings = await tx
+        .select()
+        .from(userSettings)
+        .where(eq(userSettings.userId, toUserId));
+      if (existingSettings.length > 0) {
+        await tx.delete(userSettings).where(eq(userSettings.userId, fromUserId));
+      } else {
+        await tx
+          .update(userSettings)
+          .set({ userId: toUserId })
+          .where(eq(userSettings.userId, fromUserId));
+      }
+
+      await tx.delete(user).where(eq(user.id, fromUserId));
+    });
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to transfer user data"
+    );
+  }
+}
+
+export async function findOrCreateOAuthUser({
+  email,
+  guestUserId,
+}: {
+  email: string;
+  guestUserId?: string | null;
+}) {
+  const existingUsers = await getUser(email);
+  const existingUser = existingUsers[0];
+
+  if (guestUserId) {
+    if (existingUser && existingUser.id !== guestUserId) {
+      await transferUserData({ fromUserId: guestUserId, toUserId: existingUser.id });
+      return { userId: existingUser.id, linkedFromGuest: true };
+    }
+
+    const updated = await updateUserEmailForOAuth({ id: guestUserId, email });
+    if (!updated) {
+      throw new ChatSDKError(
+        "bad_request:database",
+        "Failed to link guest user to OAuth"
+      );
+    }
+
+    return { userId: updated.id, linkedFromGuest: true };
+  }
+
+  if (existingUser) {
+    return { userId: existingUser.id, linkedFromGuest: false };
+  }
+
+  const created = await createOAuthUser(email);
+  return { userId: created.id, linkedFromGuest: false };
+}
+
 export async function saveChat({
   id,
   userId,
@@ -1554,6 +1713,58 @@ export async function updateBackBet({
 }
 
 /**
+ * Update editable back bet fields (market, selection, odds, stake, account, currency, placedAt)
+ */
+export async function updateBackBetDetails({
+  id,
+  userId,
+  market,
+  selection,
+  odds,
+  stake,
+  exchange,
+  accountId,
+  currency,
+  placedAt,
+}: {
+  id: string;
+  userId: string;
+  market: string;
+  selection: string;
+  odds: number;
+  stake: number;
+  exchange: string;
+  accountId: string | null;
+  currency: string | null;
+  placedAt: Date | null;
+}) {
+  try {
+    const updates: Partial<typeof backBet.$inferInsert> = {
+      market,
+      selection,
+      odds: odds.toString(),
+      stake: stake.toString(),
+      exchange,
+      accountId,
+      currency,
+      placedAt,
+    };
+
+    const [row] = await db
+      .update(backBet)
+      .set(updates)
+      .where(and(eq(backBet.id, id), eq(backBet.userId, userId)))
+      .returning();
+    return row ?? null;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to update back bet details"
+    );
+  }
+}
+
+/**
  * Update a lay bet
  */
 export async function updateLayBet({
@@ -1583,6 +1794,58 @@ export async function updateLayBet({
     return row ?? null;
   } catch (_error) {
     throw new ChatSDKError("bad_request:database", "Failed to update lay bet");
+  }
+}
+
+/**
+ * Update editable lay bet fields (market, selection, odds, stake, account, currency, placedAt)
+ */
+export async function updateLayBetDetails({
+  id,
+  userId,
+  market,
+  selection,
+  odds,
+  stake,
+  exchange,
+  accountId,
+  currency,
+  placedAt,
+}: {
+  id: string;
+  userId: string;
+  market: string;
+  selection: string;
+  odds: number;
+  stake: number;
+  exchange: string;
+  accountId: string | null;
+  currency: string | null;
+  placedAt: Date | null;
+}) {
+  try {
+    const updates: Partial<typeof layBet.$inferInsert> = {
+      market,
+      selection,
+      odds: odds.toString(),
+      stake: stake.toString(),
+      exchange,
+      accountId,
+      currency,
+      placedAt,
+    };
+
+    const [row] = await db
+      .update(layBet)
+      .set(updates)
+      .where(and(eq(layBet.id, id), eq(layBet.userId, userId)))
+      .returning();
+    return row ?? null;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to update lay bet details"
+    );
   }
 }
 
@@ -1895,6 +2158,31 @@ export async function getMatchedBetById({
     throw new ChatSDKError(
       "bad_request:database",
       "Failed to fetch matched bet"
+    );
+  }
+}
+
+export async function getMatchedBetByLegId({
+  betId,
+  kind,
+  userId,
+}: {
+  betId: string;
+  kind: "back" | "lay";
+  userId: string;
+}) {
+  try {
+    const foreignKeyColumn = kind === "back" ? matchedBet.backBetId : matchedBet.layBetId;
+    const [row] = await db
+      .select()
+      .from(matchedBet)
+      .where(and(eq(foreignKeyColumn, betId), eq(matchedBet.userId, userId)))
+      .limit(1);
+    return row ?? null;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to fetch matched bet by leg"
     );
   }
 }
@@ -5541,7 +5829,7 @@ export async function deleteBet({
 
     // Check if this bet is linked to a matched bet
     const [linkedMatchedBet] = await db
-      .select({ id: matchedBet.id })
+      .select({ id: matchedBet.id, status: matchedBet.status })
       .from(matchedBet)
       .where(eq(foreignKeyColumn, id));
 
@@ -5549,7 +5837,12 @@ export async function deleteBet({
       // Unlink the bet from matched bet (set to null)
       await db
         .update(matchedBet)
-        .set({ [kind === "back" ? "backBetId" : "layBetId"]: null })
+        .set({
+          [kind === "back" ? "backBetId" : "layBetId"]: null,
+          status: "draft",
+          netExposure: null,
+          confirmedAt: null,
+        })
         .where(eq(matchedBet.id, linkedMatchedBet.id));
 
       // Create audit entry for the unlinking
@@ -5559,7 +5852,11 @@ export async function deleteBet({
         entityType: "matched_bet",
         entityId: linkedMatchedBet.id,
         action: "update",
-        changes: { [`${kind}BetId`]: null, reason: "bet_deleted" },
+        changes: {
+          [`${kind}BetId`]: null,
+          status: { from: linkedMatchedBet.status, to: "draft" },
+          reason: "bet_deleted",
+        },
         notes: `Unlinked ${kind} bet due to deletion`,
       });
     }
@@ -5569,6 +5866,29 @@ export async function deleteBet({
       .select()
       .from(screenshotUpload)
       .where(eq(screenshotUpload.id, existing.screenshotId));
+
+    // Reverse settlement if needed (create adjustment to offset prior P/L)
+    let reversalTransactionId: string | null = null;
+    if (
+      existing.status === "settled" &&
+      existing.accountId &&
+      existing.profitLoss !== null &&
+      existing.profitLoss !== undefined
+    ) {
+      const profitLossValue = Number.parseFloat(existing.profitLoss.toString());
+      if (!Number.isNaN(profitLossValue) && profitLossValue !== 0) {
+        const reversal = await createAccountTransaction({
+          userId,
+          accountId: existing.accountId,
+          type: "adjustment",
+          amount: -profitLossValue,
+          currency: (existing.currency ?? "NOK").toUpperCase(),
+          occurredAt: new Date(),
+          notes: `Reversal: deleted ${kind} bet ${existing.selection} @ ${existing.odds}`,
+        });
+        reversalTransactionId = reversal.id ?? null;
+      }
+    }
 
     // Delete the bet
     await db.delete(betTable).where(eq(betTable.id, id));
@@ -5605,6 +5925,9 @@ export async function deleteBet({
         selection: existing.selection,
         odds: existing.odds,
         stake: existing.stake,
+        status: existing.status,
+        profitLoss: existing.profitLoss ?? null,
+        reversalTransactionId,
       },
       notes: `Deleted ${kind} bet: ${existing.selection} @ ${existing.odds}`,
     });
@@ -5688,11 +6011,6 @@ export async function deleteMatchedBet({
       await db.delete(qualifyingBet).where(eq(qualifyingBet.id, qb.id));
     }
 
-    // Delete audit entries for this matched bet
-    await db.delete(auditLog).where(
-      and(eq(auditLog.entityType, "matched_bet"), eq(auditLog.entityId, id))
-    );
-
     if (cascade) {
       // Delete back bet if exists
       if (existing.backBetId) {
@@ -5703,6 +6021,11 @@ export async function deleteMatchedBet({
         await deleteBet({ id: existing.layBetId, kind: "lay", userId });
       }
     }
+
+    // Delete audit entries for this matched bet (after cascade cleanup)
+    await db.delete(auditLog).where(
+      and(eq(auditLog.entityType, "matched_bet"), eq(auditLog.entityId, id))
+    );
 
     // Delete the matched bet
     await db.delete(matchedBet).where(eq(matchedBet.id, id));

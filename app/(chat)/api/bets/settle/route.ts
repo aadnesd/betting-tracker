@@ -6,10 +6,16 @@ import {
   createAuditEntry,
   getBackBetById,
   getLayBetById,
+  getMatchedBetByLegId,
+  updateMatchedBetRecord,
   updateBackBet,
   updateLayBet,
 } from "@/lib/db/queries";
-import { calculateProfitLoss, calculateLayProfitLoss } from "@/lib/settlement";
+import {
+  calculateProfitLoss,
+  calculateLayProfitLoss,
+  isFreeBetPromoType,
+} from "@/lib/settlement";
 
 const settleSchema = z.object({
   betId: z.string().uuid(),
@@ -75,12 +81,24 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Bet not found" }, { status: 404 });
     }
 
+    const matchedBet = await getMatchedBetByLegId({
+      betId: body.betId,
+      kind: body.betKind,
+      userId: session.user.id,
+    });
+
     // Check if already settled
     if (bet.status === "settled") {
       return NextResponse.json(
         { error: "Bet is already settled" },
         { status: 400 }
       );
+    }
+
+    // Determine if this bet is part of a free bet promo (affects back bet P&L)
+    let isFreeBet = false;
+    if (body.betKind === "back") {
+      isFreeBet = isFreeBetPromoType(matchedBet?.promoType ?? null);
     }
 
     // Calculate profit/loss
@@ -91,7 +109,7 @@ export async function POST(request: Request) {
       body.outcome,
       stake,
       odds,
-      false // TODO: Could check if this is a free bet
+      isFreeBet
     );
 
     const now = new Date();
@@ -136,6 +154,37 @@ export async function POST(request: Request) {
         body.notes ??
         `Manual settlement: ${body.outcome}. P&L: ${profitLoss.toFixed(2)} ${currency}`,
     });
+
+    if (matchedBet && matchedBet.status !== "settled") {
+      const otherBetId =
+        body.betKind === "back" ? matchedBet.layBetId : matchedBet.backBetId;
+
+      if (otherBetId) {
+        const otherBet =
+          body.betKind === "back"
+            ? await getLayBetById({ id: otherBetId, userId: session.user.id })
+            : await getBackBetById({ id: otherBetId, userId: session.user.id });
+
+        if (otherBet?.status === "settled") {
+          await updateMatchedBetRecord({
+            id: matchedBet.id,
+            userId: session.user.id,
+            status: "settled",
+          });
+
+          await createAuditEntry({
+            userId: session.user.id,
+            entityType: "matched_bet",
+            entityId: matchedBet.id,
+            action: "status_change",
+            changes: {
+              status: { from: matchedBet.status, to: "settled" },
+            },
+            notes: "Marked matched bet settled after both legs were manually settled.",
+          });
+        }
+      }
+    }
 
     return NextResponse.json({
       success: true,

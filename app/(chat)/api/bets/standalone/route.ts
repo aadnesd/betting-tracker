@@ -4,22 +4,34 @@ import { auth } from "@/app/(auth)/auth";
 import {
   createAuditEntry,
   createManualScreenshot,
+  getAccountById,
   getOrCreateAccount,
   saveBackBet,
   saveLayBet,
 } from "@/lib/db/queries";
 
-const standaloneBetSchema = z.object({
-  kind: z.enum(["back", "lay"]),
-  market: z.string().min(1, "Market is required"),
-  selection: z.string().min(1, "Selection is required"),
-  odds: z.number().positive("Odds must be positive"),
-  stake: z.number().positive("Stake must be positive"),
-  account: z.string().min(1, "Account is required"),
-  currency: z.string().length(3).default("NOK"),
-  placedAt: z.string().optional(), // ISO date string
-  notes: z.string().optional(),
-});
+const standaloneBetSchema = z
+  .object({
+    kind: z.enum(["back", "lay"]),
+    market: z.string().min(1, "Market is required"),
+    selection: z.string().min(1, "Selection is required"),
+    odds: z.number().positive("Odds must be positive"),
+    stake: z.number().positive("Stake must be positive"),
+    accountId: z.string().uuid().optional(),
+    account: z.string().min(1, "Account is required").optional(),
+    currency: z.string().length(3).default("NOK"),
+    placedAt: z.string().optional(), // ISO date string
+    notes: z.string().optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (!value.accountId && !value.account) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Account is required",
+        path: ["account"],
+      });
+    }
+  });
 
 export async function POST(request: Request) {
   const session = await auth();
@@ -50,12 +62,35 @@ export async function POST(request: Request) {
     });
 
     // Resolve or create the account
-    const account = await getOrCreateAccount({
-      userId: session.user.id,
-      name: body.account,
-      kind: body.kind === "back" ? "bookmaker" : "exchange",
-      currency: body.currency,
-    });
+    const expectedKind = body.kind === "back" ? "bookmaker" : "exchange";
+    let account = null;
+
+    if (body.accountId) {
+      account = await getAccountById({
+        id: body.accountId,
+        userId: session.user.id,
+      });
+
+      if (!account) {
+        return NextResponse.json({ error: "Account not found" }, { status: 404 });
+      }
+
+      if (account.kind !== expectedKind) {
+        return NextResponse.json(
+          { error: "Account type does not match bet kind" },
+          { status: 400 }
+        );
+      }
+    }
+
+    if (!account) {
+      account = await getOrCreateAccount({
+        userId: session.user.id,
+        name: body.account ?? "",
+        kind: expectedKind,
+        currency: body.currency,
+      });
+    }
 
     const betData = {
       userId: session.user.id,
@@ -64,7 +99,7 @@ export async function POST(request: Request) {
       selection: body.selection,
       odds: body.odds,
       stake: body.stake,
-      exchange: body.account, // Stored as exchange field regardless of bet type
+      exchange: account.name ?? body.account ?? "", // Stored as exchange field regardless of bet type
       accountId: account.id,
       currency: body.currency,
       placedAt: body.placedAt ? new Date(body.placedAt) : new Date(),
@@ -91,7 +126,7 @@ export async function POST(request: Request) {
         selection: body.selection,
         odds: body.odds,
         stake: body.stake,
-        account: body.account,
+        account: account.name ?? body.account,
         currency: body.currency,
         source: "standalone",
       },

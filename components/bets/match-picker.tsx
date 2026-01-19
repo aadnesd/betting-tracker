@@ -40,6 +40,7 @@ export function MatchPicker({
   const [search, setSearch] = useState("");
   const [matches, setMatches] = useState<MatchOption[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingSelected, setLoadingSelected] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const [selectedMatch, setSelectedMatch] = useState<MatchOption | null>(null);
 
@@ -80,7 +81,7 @@ export function MatchPicker({
     return () => clearTimeout(timer);
   }, [search, fetchMatches]);
 
-  // Load selected match from value on mount
+  // Load selected match from value on mount (if it exists in search results)
   useEffect(() => {
     if (value && matches.length > 0 && !selectedMatch) {
       const match = matches.find((m) => m.id === value);
@@ -89,6 +90,46 @@ export function MatchPicker({
       }
     }
   }, [value, matches, selectedMatch]);
+
+  // Fetch match details when a value is provided but not present in search results
+  useEffect(() => {
+    if (!value) {
+      if (selectedMatch) {
+        setSelectedMatch(null);
+      }
+      return;
+    }
+
+    if (selectedMatch?.id === value) {
+      return;
+    }
+
+    let active = true;
+    const fetchMatchById = async () => {
+      setLoadingSelected(true);
+      try {
+        const response = await fetch(`/api/bets/matches/${value}`);
+        if (!response.ok) {
+          throw new Error("Failed to fetch selected match");
+        }
+        const data = await response.json();
+        if (active && data.match) {
+          setSelectedMatch(data.match);
+        }
+      } catch (error) {
+        console.error("[MatchPicker] Error fetching selected match:", error);
+      } finally {
+        if (active) {
+          setLoadingSelected(false);
+        }
+      }
+    };
+
+    fetchMatchById();
+    return () => {
+      active = false;
+    };
+  }, [value, selectedMatch]);
 
   const handleSelect = (match: MatchOption) => {
     setSelectedMatch(match);
@@ -165,7 +206,7 @@ export function MatchPicker({
           disabled={disabled}
           className="pl-9"
         />
-        {loading && (
+        {(loading || loadingSelected) && (
           <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
         )}
       </div>

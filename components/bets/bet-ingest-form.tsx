@@ -4,6 +4,7 @@ import Image from "next/image";
 import { type ComponentProps, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { BetStatusBadge } from "@/components/bets/bet-status-badge";
+import { MatchPicker, type MatchOption } from "@/components/bets/match-picker";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -35,6 +36,7 @@ type ParsedForm = {
   needsReview: boolean;
   matchId?: string | null;
   matchConfidence?: string | null;
+  matchCandidates?: number | null;
   back: ParsedPair["back"];
   lay: ParsedPair["lay"];
 };
@@ -110,6 +112,7 @@ export function BetIngestForm() {
       const parsedJson: ParsedPair & {
         matchId?: string | null;
         matchConfidence?: string | null;
+        matchCandidates?: number | null;
       } = await parseResp.json();
 
       setParsed({
@@ -119,6 +122,7 @@ export function BetIngestForm() {
         notes: parsedJson.notes,
         matchId: parsedJson.matchId,
         matchConfidence: parsedJson.matchConfidence,
+        matchCandidates: parsedJson.matchCandidates,
         back: parsedJson.back,
         lay: parsedJson.lay,
       });
@@ -168,6 +172,17 @@ export function BetIngestForm() {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleMatchChange = (match: MatchOption | null) => {
+    setParsed((prev) =>
+      prev
+        ? {
+            ...prev,
+            matchId: match?.id ?? null,
+          }
+        : prev
+    );
   };
 
   return (
@@ -285,20 +300,34 @@ export function BetIngestForm() {
                 value={parsed?.selection ?? ""}
               />
             </div>
-            {/* Match link indicator */}
-            {parsed?.matchId && (
-              <div className="flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-emerald-800 text-sm">
-                <LinkIcon className="h-4 w-4 text-emerald-600" />
-                <span>
-                  Linked to match
-                  {parsed.matchConfidence && (
-                    <span className="ml-1 text-emerald-600">
-                      (confidence: {parsed.matchConfidence})
-                    </span>
-                  )}
-                </span>
-              </div>
-            )}
+            <div className="space-y-2">
+              <Label>Linked match (optional)</Label>
+              <MatchPicker
+                disabled={!parsed}
+                onChange={handleMatchChange}
+                value={parsed?.matchId ?? null}
+                placeholder="Search for a football match to link"
+              />
+              {parsed?.matchId ? (
+                <div className="flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-emerald-800 text-sm">
+                  <LinkIcon className="h-4 w-4 text-emerald-600" />
+                  <span>
+                    Linked to match
+                    {parsed.matchConfidence && (
+                      <span className="ml-1 text-emerald-600">
+                        (confidence: {parsed.matchConfidence})
+                      </span>
+                    )}
+                  </span>
+                </div>
+              ) : parsed?.matchCandidates && parsed.matchCandidates > 0 ? (
+                <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-amber-800 text-sm">
+                  We found {parsed.matchCandidates} candidate matches but did not
+                  link one automatically. Please choose the correct match above
+                  if applicable.
+                </div>
+              ) : null}
+            </div>
             <div className="space-y-2">
               <Label>Notes</Label>
               <Textarea

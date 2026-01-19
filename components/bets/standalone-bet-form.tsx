@@ -34,6 +34,19 @@ export interface AccountOption {
 interface StandaloneBetFormProps {
   bookmakers: AccountOption[];
   exchanges: AccountOption[];
+  mode?: "create" | "edit";
+  initialData?: {
+    id: string;
+    kind: "back" | "lay";
+    market: string;
+    selection: string;
+    odds: number;
+    stake: number;
+    accountId: string;
+    currency: string;
+    placedAt: Date;
+    notes?: string | null;
+  };
 }
 
 interface FormData {
@@ -42,7 +55,7 @@ interface FormData {
   selection: string;
   odds: string;
   stake: string;
-  account: string;
+  accountId: string;
   currency: string;
   placedAt: string;
   notes: string;
@@ -51,19 +64,30 @@ interface FormData {
 export function StandaloneBetForm({
   bookmakers,
   exchanges,
+  mode = "create",
+  initialData,
 }: StandaloneBetFormProps) {
   const router = useRouter();
+  const isEdit = Boolean(mode === "edit" && initialData);
+
+  const initialKind = initialData?.kind ?? "back";
+  const initialAccounts = initialKind === "back" ? bookmakers : exchanges;
+  const fallbackAccountId = initialAccounts[0]?.id ?? "";
+  const fallbackCurrency = initialAccounts[0]?.currency ?? "NOK";
+  const initialPlacedAt = initialData?.placedAt
+    ? new Date(initialData.placedAt).toISOString().slice(0, 16)
+    : new Date().toISOString().slice(0, 16);
 
   const [formData, setFormData] = useState<FormData>({
-    kind: "back",
-    market: "",
-    selection: "",
-    odds: "",
-    stake: "",
-    account: bookmakers.length > 0 ? bookmakers[0].name : "",
-    currency: bookmakers.length > 0 ? (bookmakers[0].currency ?? "NOK") : "NOK",
-    placedAt: new Date().toISOString().slice(0, 16), // datetime-local format
-    notes: "",
+    kind: initialKind,
+    market: initialData?.market ?? "",
+    selection: initialData?.selection ?? "",
+    odds: initialData?.odds ? initialData.odds.toString() : "",
+    stake: initialData?.stake ? initialData.stake.toString() : "",
+    accountId: initialData?.accountId ?? fallbackAccountId,
+    currency: initialData?.currency ?? fallbackCurrency,
+    placedAt: initialPlacedAt, // datetime-local format
+    notes: initialData?.notes ?? "",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<Partial<Record<keyof FormData, string>>>(
@@ -83,24 +107,24 @@ export function StandaloneBetForm({
   // When bet type changes, reset account to first available of that type
   const handleKindChange = (kind: "back" | "lay") => {
     const newAccounts = kind === "back" ? bookmakers : exchanges;
-    const newAccount = newAccounts.length > 0 ? newAccounts[0].name : "";
+    const newAccountId = newAccounts.length > 0 ? newAccounts[0].id : "";
     const newCurrency =
       newAccounts.length > 0 ? (newAccounts[0].currency ?? "NOK") : "NOK";
 
     setFormData((prev) => ({
       ...prev,
       kind,
-      account: newAccount,
+      accountId: newAccountId,
       currency: newCurrency,
     }));
   };
 
   // When account changes, update currency
-  const handleAccountChange = (accountName: string) => {
-    const selectedAccount = accounts.find((a) => a.name === accountName);
+  const handleAccountChange = (accountId: string) => {
+    const selectedAccount = accounts.find((a) => a.id === accountId);
     setFormData((prev) => ({
       ...prev,
-      account: accountName,
+      accountId,
       currency: selectedAccount?.currency ?? prev.currency,
     }));
   };
@@ -120,8 +144,8 @@ export function StandaloneBetForm({
     if (!formData.stake || Number.parseFloat(formData.stake) <= 0) {
       newErrors.stake = "Stake must be positive";
     }
-    if (!formData.account) {
-      newErrors.account = "Account is required";
+    if (!formData.accountId) {
+      newErrors.accountId = "Account is required";
     }
 
     setErrors(newErrors);
@@ -136,16 +160,20 @@ export function StandaloneBetForm({
     setIsSubmitting(true);
 
     try {
-      const response = await fetch("/api/bets/standalone", {
+      const endpoint =
+        mode === "edit" ? "/api/bets/individual/update" : "/api/bets/standalone";
+      const response = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          betId: initialData?.id,
+          betKind: formData.kind,
           kind: formData.kind,
           market: formData.market.trim(),
           selection: formData.selection.trim(),
           odds: Number.parseFloat(formData.odds),
           stake: Number.parseFloat(formData.stake),
-          account: formData.account,
+          accountId: formData.accountId,
           currency: formData.currency,
           placedAt: formData.placedAt
             ? new Date(formData.placedAt).toISOString()
@@ -157,20 +185,29 @@ export function StandaloneBetForm({
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || "Failed to create bet");
+        throw new Error(
+          data.error ||
+            (mode === "edit" ? "Failed to update bet" : "Failed to create bet")
+        );
       }
 
       toast.success(
-        `${formData.kind === "back" ? "Back" : "Lay"} bet created successfully`,
+        mode === "edit"
+          ? "Bet updated successfully"
+          : `${formData.kind === "back" ? "Back" : "Lay"} bet created successfully`,
         {
           description: `${formData.selection} @ ${formData.odds}`,
         }
       );
 
-      router.push("/bets/all");
+      if (mode === "edit" && initialData) {
+        router.push(`/bets/${initialData.kind}/${initialData.id}`);
+      } else {
+        router.push("/bets/all");
+      }
       router.refresh();
     } catch (error) {
-      toast.error("Failed to create bet", {
+      toast.error(mode === "edit" ? "Failed to update bet" : "Failed to create bet", {
         description: error instanceof Error ? error.message : "Unknown error",
       });
     } finally {
@@ -197,19 +234,23 @@ export function StandaloneBetForm({
     <div className="container mx-auto max-w-xl p-4">
       <div className="mb-4">
         <Link
-          href="/bets/all"
+          href={isEdit && initialData ? `/bets/${initialData.kind}/${initialData.id}` : "/bets/all"}
           className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="mr-2 h-4 w-4" />
-          Back to All Bets
+          {isEdit ? "Back to Bet Detail" : "Back to All Bets"}
         </Link>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Create Standalone Bet</CardTitle>
+          <CardTitle>
+            {isEdit ? "Edit Bet" : "Create Standalone Bet"}
+          </CardTitle>
           <CardDescription>
-            Add a single back or lay bet without a matched pair
+            {isEdit
+              ? "Update the details of this individual bet"
+              : "Add a single back or lay bet without a matched pair"}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -237,6 +278,7 @@ export function StandaloneBetForm({
                     type="button"
                     variant={formData.kind === "back" ? "default" : "outline"}
                     className="flex-1"
+                    disabled={isEdit}
                     onClick={() => handleKindChange("back")}
                   >
                     Back
@@ -245,6 +287,7 @@ export function StandaloneBetForm({
                     type="button"
                     variant={formData.kind === "lay" ? "default" : "outline"}
                     className="flex-1"
+                    disabled={isEdit}
                     onClick={() => handleKindChange("lay")}
                   >
                     Lay
@@ -277,7 +320,7 @@ export function StandaloneBetForm({
                   </div>
                 ) : (
                   <Select
-                    value={formData.account}
+                    value={formData.accountId}
                     onValueChange={handleAccountChange}
                   >
                     <SelectTrigger id="account">
@@ -285,7 +328,7 @@ export function StandaloneBetForm({
                     </SelectTrigger>
                     <SelectContent>
                       {accounts.map((acc) => (
-                        <SelectItem key={acc.id} value={acc.name}>
+                        <SelectItem key={acc.id} value={acc.id}>
                           {acc.name}{" "}
                           {acc.currency && (
                             <span className="text-muted-foreground">
@@ -297,8 +340,8 @@ export function StandaloneBetForm({
                     </SelectContent>
                   </Select>
                 )}
-                {errors.account && (
-                  <p className="text-xs text-destructive">{errors.account}</p>
+                {errors.accountId && (
+                  <p className="text-xs text-destructive">{errors.accountId}</p>
                 )}
               </div>
 
@@ -426,10 +469,12 @@ export function StandaloneBetForm({
                 {isSubmitting ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Creating...
+                    {isEdit ? "Updating..." : "Creating..."}
                   </>
                 ) : (
-                  `Create ${formData.kind === "back" ? "Back" : "Lay"} Bet`
+                  isEdit
+                    ? "Update Bet"
+                    : `Create ${formData.kind === "back" ? "Back" : "Lay"} Bet`
                 )}
               </Button>
             </form>

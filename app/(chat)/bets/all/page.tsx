@@ -368,6 +368,9 @@ export default async function Page(props: PageProps) {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-2">
+                          <Button asChild variant="ghost" size="sm">
+                            <Link href={`/bets/${bet.kind}/${bet.id}`}>View</Link>
+                          </Button>
                           {bet.status !== "settled" && (
                             <BetSettlementDropdown
                               betId={bet.id}

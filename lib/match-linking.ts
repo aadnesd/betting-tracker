@@ -1,13 +1,10 @@
 /**
  * Match linking module for automatic football match detection during AI autoparse.
- * 
- * Simplified flow:
- * 1. Take the market string from parsed bet (e.g., "Man Utd v Man City")
- * 2. Fuzzy search FootballMatch DB using trigram similarity
- * 3. LLM selects the correct match from candidates
- * 
- * The LLM handles team name variations directly (Man Utd = Manchester United).
- * No need for manual parsing or dictionaries - fuzzy search + LLM does the work.
+ *
+ * Flow:
+ * 1. Normalize common team name abbreviations (Man Utd → Manchester United, etc.)
+ * 2. Fuzzy search FootballMatch DB using trigram similarity across market/selection
+ * 3. Auto-link if a single candidate is found, otherwise use LLM disambiguation
  */
 
 import { generateText } from "ai";
@@ -32,43 +29,150 @@ export interface MatchLinkResult {
   linkedMatch?: MatchCandidate;
 }
 
+const TEAM_NAME_NORMALIZATION: Record<string, string> = {
+  "man utd": "Manchester United",
+  "man united": "Manchester United",
+  "man city": "Manchester City",
+  spurs: "Tottenham Hotspur",
+  arsenal: "Arsenal FC",
+  chelsea: "Chelsea FC",
+  liverpool: "Liverpool FC",
+  newcastle: "Newcastle United",
+  "west ham": "West Ham United",
+  wolves: "Wolverhampton Wanderers",
+  brighton: "Brighton & Hove Albion",
+  villa: "Aston Villa",
+  palace: "Crystal Palace",
+  forest: "Nottingham Forest",
+  bournemouth: "AFC Bournemouth",
+  fulham: "Fulham FC",
+  brentford: "Brentford FC",
+  everton: "Everton FC",
+  leeds: "Leeds United",
+  leicester: "Leicester City",
+  southampton: "Southampton FC",
+};
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function normalizeTeamNames(input: string) {
+  let normalized = input;
+
+  for (const [key, value] of Object.entries(TEAM_NAME_NORMALIZATION)) {
+    const pattern = new RegExp(`\\b${escapeRegExp(key)}\\b`, "gi");
+    normalized = normalized.replace(pattern, value);
+  }
+
+  return normalized.replace(/\s+/g, " ").trim();
+}
+
+function splitMarketTeams(market: string) {
+  const parts = market
+    .split(/\s+(?:v|vs|vs\.|-|–|@)\s+/i)
+    .map((part) => part.trim())
+    .filter((part) => part.length > 2);
+
+  return parts.length >= 2 ? parts : [];
+}
+
+function buildSearchTerms({
+  market,
+  selection,
+}: {
+  market?: string;
+  selection?: string;
+}) {
+  const terms = new Set<string>();
+
+  if (market) {
+    const normalizedMarket = normalizeTeamNames(market);
+    if (normalizedMarket.length >= 3) {
+      terms.add(normalizedMarket);
+    }
+    splitMarketTeams(normalizedMarket).forEach((team) => terms.add(team));
+  }
+
+  if (selection) {
+    const normalizedSelection = normalizeTeamNames(selection);
+    if (normalizedSelection.length >= 3) {
+      terms.add(normalizedSelection);
+    }
+  }
+
+  return Array.from(terms);
+}
+
 /**
  * Search for candidate matches using fuzzy trigram search.
- * The search term can be the full market string - trigram will find similar team names.
+ * Tries the normalized market, split team names, and selection to widen matches.
  */
 export async function findCandidateMatches({
   market,
+  selection,
   betDate,
 }: {
   market: string;
+  selection?: string;
   betDate?: Date | null;
 }): Promise<MatchCandidate[]> {
-  if (!market || market.trim().length < 3) {
+  const searchTerms = buildSearchTerms({ market, selection });
+
+  if (searchTerms.length === 0) {
     return [];
   }
-  
+
   const fromDate = betDate ?? new Date();
-  
+
   try {
-    // Use fuzzy search with the market string directly
-    // Trigram similarity will match "Man Utd" to "Manchester United"
-    const matches = await searchFootballMatches({
-      searchTerm: market,
-      fromDate,
-      limit: 15,
-      similarityThreshold: 0.15, // Low threshold to cast wide net, LLM will filter
-    });
-    
-    return matches.map(m => ({
-      id: m.id,
-      externalId: m.externalId,
-      homeTeam: m.homeTeam,
-      awayTeam: m.awayTeam,
-      competition: m.competition,
-      matchDate: m.matchDate,
-      status: m.status,
-      similarity: m.similarity,
-    }));
+    const results = await Promise.all(
+      searchTerms.map((term) =>
+        searchFootballMatches({
+          searchTerm: term,
+          fromDate,
+          limit: 10,
+          similarityThreshold: 0.15, // Low threshold to cast wide net, LLM will filter
+        })
+      )
+    );
+
+    const candidateMap = new Map<string, MatchCandidate>();
+
+    for (const matches of results) {
+      for (const match of matches) {
+        const existing = candidateMap.get(match.id);
+        const similarity = match.similarity ?? 0;
+
+        if (existing) {
+          candidateMap.set(match.id, {
+            ...existing,
+            similarity: Math.max(existing.similarity ?? 0, similarity),
+          });
+        } else {
+          candidateMap.set(match.id, {
+            id: match.id,
+            externalId: match.externalId,
+            homeTeam: match.homeTeam,
+            awayTeam: match.awayTeam,
+            competition: match.competition,
+            matchDate: match.matchDate,
+            status: match.status,
+            similarity: match.similarity,
+          });
+        }
+      }
+    }
+
+    return Array.from(candidateMap.values())
+      .sort((a, b) => {
+        const simDiff = (b.similarity ?? 0) - (a.similarity ?? 0);
+        if (simDiff !== 0) {
+          return simDiff;
+        }
+        return a.matchDate.getTime() - b.matchDate.getTime();
+      })
+      .slice(0, 15);
   } catch (error) {
     console.warn(`[match-linking] Search failed for "${market}":`, error);
     return [];
@@ -157,7 +261,8 @@ Respond with ONLY a single number (1-${candidates.length} for a match, or 0 for 
  * Main entry point: link a parsed bet to a football match.
  * 
  * 1. Fuzzy search FootballMatch table for candidates
- * 2. LLM picks the best match (always, even for single candidate)
+ * 2. Auto-link if a single candidate is found
+ * 3. LLM picks the best match when multiple candidates remain
  * 3. Return match ID and confidence
  */
 export async function linkBetToMatch({
@@ -176,6 +281,7 @@ export async function linkBetToMatch({
     // Find candidate matches from DB using fuzzy search
     const candidates = await findCandidateMatches({
       market,
+      selection,
       betDate: parsedBetDate,
     });
 
@@ -189,7 +295,23 @@ export async function linkBetToMatch({
       };
     }
 
-    console.log(`[match-linking] Found ${candidates.length} candidates for "${market}"`);
+    console.log(
+      `[match-linking] Found ${candidates.length} candidates for "${market}"`
+    );
+
+    if (candidates.length === 1) {
+      const candidate = candidates[0];
+      console.log(
+        `[match-linking] Auto-linked single candidate: ${candidate.homeTeam} vs ${candidate.awayTeam}`
+      );
+
+      return {
+        matchId: candidate.id,
+        matchConfidence: "high",
+        matchCandidates: 1,
+        linkedMatch: candidate,
+      };
+    }
 
     // Always use LLM to select the match
     const { matchIndex, confidence } = await selectMatchWithLLM({
