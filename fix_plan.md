@@ -32,6 +32,46 @@ All planned items have been completed. The matched betting tracker is feature-co
 
 - [x] **Quick Add not showing existing accounts**: The Quick Add page filters accounts by `status === "active"`, but accounts like "Stake" that exist are not appearing in the bookmaker/exchange dropdowns. Possible causes: 1) Account was created with null/undefined status, 2) Account `kind` is incorrect (bookmaker vs exchange mismatch), 3) Account belongs to a different user (guest vs logged in). DoD: All active accounts for the current user appear in the appropriate dropdown. Implementation: Root cause was accounts created before the status column was properly enforced had null status, which were being filtered out by the strict `status === "active"` check. Solution: Added `isActive` helper function that treats null/undefined status as active for backwards compatibility. Files changed: `app/(chat)/bets/quick-add/page.tsx` (added isActive helper for filtering accounts), `app/(chat)/bets/settings/promos/new/page.tsx` (same fix for promo creation), `app/(chat)/bets/settings/promos/[id]/page.tsx` (same fix for promo editing), `lib/db/queries.ts` (fixed `getBankrollSummary` activeAccountCount filter). Tests: 2 new tests in `tests/unit/account-queries.test.ts` covering the isActive logic.
 
+- [ ] **FX conversion on every dashboard load wastes API calls**: Dashboard and reports perform live FX conversion for all historical bets on every page load. With 1000s of bets in foreign currencies, this creates unnecessary API calls since historical exchange rates don't change. The dashboard calls `convertAmountToNok()` for every settled bet's stake and P/L when computing totals.
+  
+  **Problem:** `getDashboardSummary` and reporting queries iterate over all settled bets and call `convertAmountToNok()` for each non-NOK amount. This causes:
+  1. Excessive FX API calls (even with 5-min caching, fresh deploys/cache misses trigger many calls)
+  2. Slower page loads as FX conversions are awaited
+  3. Potential rate limiting from the FX API
+  
+  **Solution:** Store NOK-equivalent values at bet creation/settlement time. Convert once, store permanently.
+  
+  **Schema changes:**
+  1. Add `stakeNok numeric(14,2)` column to `BackBet` and `LayBet` tables
+  2. Add `profitLossNok numeric(14,2)` column to `BackBet` and `LayBet` tables
+  3. Add `netExposureNok numeric(14,2)` column to `MatchedBet` table (already exists but ensure it's always populated)
+  
+  **Code changes:**
+  1. `saveBackBet` / `saveLayBet` in `lib/db/queries.ts`: Convert stake to NOK at creation time and store in `stakeNok`
+  2. Settlement logic (`applyAutoSettlement`, manual settle route): Convert P/L to NOK and store in `profitLossNok`
+  3. `create-matched` route: Already stores `netExposureNok` — ensure FX conversion happens here
+  4. `getDashboardSummary`: Use `SUM(stakeNok)` and `SUM(profitLossNok)` instead of iterating + converting
+  5. `getSettledMatchedBetsForReporting`: Use stored NOK values instead of live conversion
+  6. `calculateReportingSummary`: Remove live FX calls, use pre-converted values
+  
+  **Backfill migration:**
+  1. Create migration script that:
+     - Fetches all bets with non-NOK currency and null `stakeNok`/`profitLossNok`
+     - Converts using current FX rates (acceptable for historical data)
+     - Updates the records in batches
+  2. Run once after deployment
+  
+  **DoD:**
+  - New columns added with migration
+  - Bet creation stores `stakeNok` immediately
+  - Settlement stores `profitLossNok` immediately
+  - Dashboard/reports use stored values (no live FX conversion)
+  - Backfill script converts existing bets
+  - No `convertAmountToNok` calls in dashboard summary queries
+  - Tests verify NOK values are stored and retrieved correctly
+  
+  **Why:** Eliminates redundant FX API calls, improves page load performance, and ensures consistent historical values (rate at time of bet vs. current rate).
+
 ## P9 — UX Improvements
 
 - [x] **Quick transaction from dashboard**: Add ability to quickly add bonus/deposit/withdrawal transactions from the dashboard without navigating through Accounts → Account → Add Transaction. DoD: Dashboard has a "Quick Transaction" button that opens a modal or flyout with account selector, transaction type, amount, and notes. Why: Reduces friction for common operations like recording a bonus received. Implementation: Created `components/bets/quick-transaction-sheet.tsx` with `QuickTransactionSheet` component featuring: account dropdown grouped by bookmaker/exchange with balance display, transaction type quick-select buttons (deposit/withdrawal/bonus/adjustment) with icons, amount/currency inputs, date picker, notes textarea, form validation, and success toast on completion. Created `components/bets/dashboard-actions.tsx` with `DashboardActions` client component that wraps all dashboard header buttons including the new QuickTransactionSheet. Updated `app/(chat)/bets/page.tsx` to fetch accounts via `listAccountsWithBalances` and pass them to DashboardActions. Added "Quick Transaction" button with Gift icon to dashboard header (shows "Txn" on mobile for space efficiency). On submit, calls existing `/api/bets/accounts/[id]/transactions` POST endpoint. Shows success toast with transaction details and refreshes dashboard data. Tests: 21 new tests in `tests/unit/quick-transaction.test.ts` covering AccountOption interface, transaction types, API endpoint compatibility, supported currencies, and form validation rules. Total: 353 unit tests passing.
