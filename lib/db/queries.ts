@@ -2132,7 +2132,8 @@ export async function listAllBetsByUser({
     });
 
     return combined.slice(0, limit);
-  } catch (_error) {
+  } catch (error) {
+    console.error("[listAllBetsByUser] Database error:", error);
     throw new ChatSDKError(
       "bad_request:database",
       "Failed to list individual bets"
