@@ -437,7 +437,14 @@ function BetFields({
       </div>
       <div className="grid gap-2 md:grid-cols-2">
         <ConfidenceInput
-          onChange={(e) => onChange({ ...value, odds: Number(e.target.value) })}
+          onChange={(e) =>
+            onChange({
+              ...value,
+              odds: Number(e.target.value),
+              // Clear liability override when odds change so it gets recalculated
+              liability: null,
+            })
+          }
           placeholder="Odds"
           score={resolveConfidence(value.confidence, "odds")}
           step="0.01"
@@ -446,7 +453,12 @@ function BetFields({
         />
         <ConfidenceInput
           onChange={(e) =>
-            onChange({ ...value, stake: Number(e.target.value) })
+            onChange({
+              ...value,
+              stake: Number(e.target.value),
+              // Clear liability override when stake changes so it gets recalculated
+              liability: null,
+            })
           }
           placeholder="Stake"
           score={resolveConfidence(value.confidence, "stake")}
