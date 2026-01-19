@@ -3444,6 +3444,7 @@ export type BookmakerProfitWithBonuses = {
  * Get bookmaker profit/loss including bonus/reward transactions.
  * Combines betting profit from matched bets with bonus transactions from accounts.
  * This allows users to see which bookmaker reward programs offer the best ROI.
+ * All amounts are converted to NOK for consistent aggregation.
  */
 export async function getBookmakerProfitWithBonuses({
   userId,
@@ -3455,7 +3456,7 @@ export async function getBookmakerProfitWithBonuses({
   endDate?: Date | null;
 }): Promise<BookmakerProfitWithBonuses[]> {
   try {
-    // Get betting profit per bookmaker account
+    // Get betting profit per bookmaker account (with currency for FX conversion)
     const bettingConditions: SQL<unknown>[] = [
       eq(matchedBet.userId, userId),
       eq(matchedBet.status, "settled"),
@@ -3468,21 +3469,21 @@ export async function getBookmakerProfitWithBonuses({
       bettingConditions.push(lte(matchedBet.createdAt, endDate));
     }
 
+    // Fetch individual bets for FX conversion instead of aggregating in SQL
     const bettingRows = await db
       .select({
         accountId: backBet.accountId,
         accountName: account.name,
-        count: count(matchedBet.id),
-        totalProfitLoss: sum(backBet.profitLoss),
-        totalStake: sum(backBet.stake),
+        profitLoss: backBet.profitLoss,
+        stake: backBet.stake,
+        currency: backBet.currency,
       })
       .from(matchedBet)
       .leftJoin(backBet, eq(matchedBet.backBetId, backBet.id))
       .leftJoin(account, eq(backBet.accountId, account.id))
-      .where(and(...bettingConditions))
-      .groupBy(backBet.accountId, account.name);
+      .where(and(...bettingConditions));
 
-    // Get bonus transactions per bookmaker account
+    // Get bonus transactions per bookmaker account (with currency)
     const bonusConditions: SQL<unknown>[] = [
       eq(accountTransaction.userId, userId),
       eq(accountTransaction.type, "bonus"),
@@ -3500,14 +3501,14 @@ export async function getBookmakerProfitWithBonuses({
       .select({
         accountId: accountTransaction.accountId,
         accountName: account.name,
-        bonusTotal: sum(accountTransaction.amount),
+        amount: accountTransaction.amount,
+        currency: account.currency,
       })
       .from(accountTransaction)
       .innerJoin(account, eq(accountTransaction.accountId, account.id))
-      .where(and(...bonusConditions))
-      .groupBy(accountTransaction.accountId, account.name);
+      .where(and(...bonusConditions));
 
-    // Combine betting and bonus data
+    // Combine betting and bonus data with FX conversion
     const accountMap = new Map<
       string,
       {
@@ -3520,30 +3521,42 @@ export async function getBookmakerProfitWithBonuses({
       }
     >();
 
-    // Add betting data
+    // Process betting data with FX conversion
     for (const row of bettingRows) {
       if (row.accountId) {
-        accountMap.set(row.accountId, {
+        const existing = accountMap.get(row.accountId) ?? {
           accountId: row.accountId,
           accountName: row.accountName ?? "Unknown Bookmaker",
-          betCount: row.count,
-          bettingProfit: row.totalProfitLoss
-            ? Number.parseFloat(row.totalProfitLoss)
-            : 0,
-          totalStake: row.totalStake ? Number.parseFloat(row.totalStake) : 0,
+          betCount: 0,
+          bettingProfit: 0,
+          totalStake: 0,
           bonusTotal: 0,
-        });
+        };
+        
+        const pl = row.profitLoss ? Number.parseFloat(row.profitLoss) : 0;
+        const stake = row.stake ? Number.parseFloat(row.stake) : 0;
+        const currency = row.currency ?? "NOK";
+        
+        const plNok = await convertAmountToNok(pl, currency);
+        const stakeNok = await convertAmountToNok(stake, currency);
+        
+        existing.betCount += 1;
+        existing.bettingProfit += plNok;
+        existing.totalStake += stakeNok;
+        
+        accountMap.set(row.accountId, existing);
       }
     }
 
-    // Add bonus data
+    // Process bonus data with FX conversion
     for (const row of bonusRows) {
       const existing = accountMap.get(row.accountId);
-      const bonusTotal = row.bonusTotal
-        ? Number.parseFloat(row.bonusTotal)
-        : 0;
+      const amount = row.amount ? Number.parseFloat(row.amount) : 0;
+      const currency = row.currency ?? "NOK";
+      const amountNok = await convertAmountToNok(amount, currency);
+      
       if (existing) {
-        existing.bonusTotal = bonusTotal;
+        existing.bonusTotal += amountNok;
       } else {
         // Account has bonuses but no betting activity
         accountMap.set(row.accountId, {
@@ -3552,7 +3565,7 @@ export async function getBookmakerProfitWithBonuses({
           betCount: 0,
           bettingProfit: 0,
           totalStake: 0,
-          bonusTotal,
+          bonusTotal: amountNok,
         });
       }
     }
@@ -3560,12 +3573,17 @@ export async function getBookmakerProfitWithBonuses({
     // Calculate totals and ROI
     const results: BookmakerProfitWithBonuses[] = [];
     for (const data of accountMap.values()) {
-      const totalProfit = data.bettingProfit + data.bonusTotal;
+      const totalProfit = Math.round((data.bettingProfit + data.bonusTotal) * 100) / 100;
       const roi = data.totalStake > 0 ? (totalProfit / data.totalStake) * 100 : 0;
       results.push({
-        ...data,
+        accountId: data.accountId,
+        accountName: data.accountName,
+        betCount: data.betCount,
+        bettingProfit: Math.round(data.bettingProfit * 100) / 100,
+        totalStake: Math.round(data.totalStake * 100) / 100,
+        bonusTotal: Math.round(data.bonusTotal * 100) / 100,
         totalProfit,
-        roi,
+        roi: Math.round(roi * 100) / 100,
       });
     }
 
@@ -3584,6 +3602,7 @@ export async function getBookmakerProfitWithBonuses({
 /**
  * Get total bonus/reward transactions for a user within a date range.
  * Used to include bonuses in the overall reporting summary alongside betting profit.
+ * All amounts are converted to NOK for consistent aggregation.
  */
 export async function getTotalBonusesForUser({
   userId,
@@ -3607,14 +3626,26 @@ export async function getTotalBonusesForUser({
       conditions.push(lte(accountTransaction.occurredAt, endDate));
     }
 
-    const [result] = await db
+    // Fetch individual transactions with account currency for FX conversion
+    const transactions = await db
       .select({
-        total: sum(accountTransaction.amount),
+        amount: accountTransaction.amount,
+        currency: account.currency,
       })
       .from(accountTransaction)
+      .innerJoin(account, eq(accountTransaction.accountId, account.id))
       .where(and(...conditions));
 
-    return result?.total ? Number.parseFloat(result.total) : 0;
+    // Convert each bonus to NOK and sum
+    let total = 0;
+    for (const tx of transactions) {
+      const amount = tx.amount ? Number.parseFloat(tx.amount) : 0;
+      const currency = tx.currency ?? "NOK";
+      const amountNok = await convertAmountToNok(amount, currency);
+      total += amountNok;
+    }
+
+    return Math.round(total * 100) / 100;
   } catch (_error) {
     throw new ChatSDKError(
       "bad_request:database",
