@@ -290,6 +290,8 @@ export async function POST(request: Request) {
     let netExposure: number | null = null;
 
     if (hasBack && hasLay && body.back && body.lay) {
+      console.log(`[NET EXPOSURE] Input values: backStake=${body.back.stake}, backOdds=${body.back.odds}, layStake=${body.lay.stake}, layOdds=${body.lay.odds}, layLiability=${body.lay.liability}`);
+      
       const { backProfit, layLiability } = computeNetExposureInputs({
         backStake: body.back.stake,
         backOdds: body.back.odds,
