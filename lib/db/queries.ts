@@ -23,6 +23,7 @@ import postgres from "postgres";
 import type { ArtifactKind } from "@/components/artifact";
 import type { VisibilityType } from "@/components/visibility-selector";
 import { ChatSDKError } from "../errors";
+import { convertAmountToNok } from "../fx-rates";
 import type { AppUsage } from "../usage";
 import { generateUUID } from "../utils";
 import {
@@ -4184,6 +4185,7 @@ export interface DashboardSummary {
 /**
  * Get dashboard summary statistics for a user.
  * Aggregates key metrics for the dashboard overview cards.
+ * All profits are normalized to NOK for consistent aggregation.
  */
 export async function getDashboardSummary({
   userId,
@@ -4196,18 +4198,19 @@ export async function getDashboardSummary({
 
     // Run all queries in parallel for performance
     const [
-      settledStats,
+      settledBetsData,
       openExposureData,
       pendingReview,
       recentActivity,
     ] = await Promise.all([
-      // Total profit from settled bets (via back/lay bet profitLoss)
+      // Fetch settled bets with P/L and currency for FX conversion
       db
         .select({
-          count: count(matchedBet.id),
-          totalBackProfit: sql<string>`COALESCE(SUM(${backBet.profitLoss}::numeric), 0)`,
-          totalLayProfit: sql<string>`COALESCE(SUM(${layBet.profitLoss}::numeric), 0)`,
-          totalBackStake: sql<string>`COALESCE(SUM(${backBet.stake}::numeric), 0)`,
+          backProfitLoss: backBet.profitLoss,
+          backCurrency: backBet.currency,
+          backStake: backBet.stake,
+          layProfitLoss: layBet.profitLoss,
+          layCurrency: layBet.currency,
         })
         .from(matchedBet)
         .leftJoin(backBet, eq(matchedBet.backBetId, backBet.id))
@@ -4240,21 +4243,36 @@ export async function getDashboardSummary({
         ),
     ]);
 
-    const backProfit = Number.parseFloat(settledStats[0]?.totalBackProfit ?? "0");
-    const layProfit = Number.parseFloat(settledStats[0]?.totalLayProfit ?? "0");
-    const totalProfit = backProfit + layProfit;
-    const totalStake = Number.parseFloat(settledStats[0]?.totalBackStake ?? "0");
-    const settledCount = settledStats[0]?.count ?? 0;
+    // Convert all P/L values to NOK and sum
+    let totalProfit = 0;
+    let totalStake = 0;
+    for (const bet of settledBetsData) {
+      const backPL = bet.backProfitLoss ? Number.parseFloat(bet.backProfitLoss) : 0;
+      const layPL = bet.layProfitLoss ? Number.parseFloat(bet.layProfitLoss) : 0;
+      const backCurrency = bet.backCurrency ?? "NOK";
+      const layCurrency = bet.layCurrency ?? "NOK";
+      
+      const backPLNok = await convertAmountToNok(backPL, backCurrency);
+      const layPLNok = await convertAmountToNok(layPL, layCurrency);
+      totalProfit += backPLNok + layPLNok;
+      
+      // Stake is also converted for ROI calculation
+      const backStake = bet.backStake ? Number.parseFloat(bet.backStake) : 0;
+      const backStakeNok = await convertAmountToNok(backStake, backCurrency);
+      totalStake += backStakeNok;
+    }
+    
+    const settledCount = settledBetsData.length;
     const roi = totalStake > 0 ? (totalProfit / totalStake) * 100 : 0;
 
     return {
-      totalProfit,
+      totalProfit: Math.round(totalProfit * 100) / 100,
       settledCount,
       openExposure: openExposureData.totalExposure,
       openPositions: openExposureData.count,
       pendingReviewCount: pendingReview[0]?.count ?? 0,
       recentActivityCount: recentActivity[0]?.count ?? 0,
-      roi,
+      roi: Math.round(roi * 100) / 100,
     };
   } catch (_error) {
     throw new ChatSDKError("bad_request:database", "Failed to get dashboard summary");
