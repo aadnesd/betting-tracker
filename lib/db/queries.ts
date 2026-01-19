@@ -1996,19 +1996,21 @@ export async function listAllBetsByUser({
       layConditions.push(eq(layBet.accountId, accountId));
     }
     if (fromDate) {
+      const fromDateStr = fromDate.toISOString();
       backConditions.push(
-        sql`COALESCE(${backBet.placedAt}, ${backBet.createdAt}) >= ${fromDate}`
+        sql`COALESCE(${backBet.placedAt}, ${backBet.createdAt}) >= ${fromDateStr}::timestamp`
       );
       layConditions.push(
-        sql`COALESCE(${layBet.placedAt}, ${layBet.createdAt}) >= ${fromDate}`
+        sql`COALESCE(${layBet.placedAt}, ${layBet.createdAt}) >= ${fromDateStr}::timestamp`
       );
     }
     if (toDate) {
+      const toDateStr = toDate.toISOString();
       backConditions.push(
-        sql`COALESCE(${backBet.placedAt}, ${backBet.createdAt}) <= ${toDate}`
+        sql`COALESCE(${backBet.placedAt}, ${backBet.createdAt}) <= ${toDateStr}::timestamp`
       );
       layConditions.push(
-        sql`COALESCE(${layBet.placedAt}, ${layBet.createdAt}) <= ${toDate}`
+        sql`COALESCE(${layBet.placedAt}, ${layBet.createdAt}) <= ${toDateStr}::timestamp`
       );
     }
     if (normalizedSearch) {
