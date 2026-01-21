@@ -4,7 +4,6 @@ import { getToken } from "next-auth/jwt";
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  const guestRegex = /^guest-\d+$/;
   const isDevelopmentEnvironment = process.env.NODE_ENV === "development";
 
   /*
@@ -24,6 +23,23 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // Allow login and register pages for unauthenticated users
+  if (["/login", "/register"].includes(pathname)) {
+    const token = await getToken({
+      req: request,
+      secret: process.env.AUTH_SECRET,
+      secureCookie: !isDevelopmentEnvironment,
+    });
+
+    // If already authenticated, redirect away from auth pages
+    if (token) {
+      return NextResponse.redirect(new URL("/", request.url));
+    }
+
+    // Allow unauthenticated access to login/register
+    return NextResponse.next();
+  }
+
   const token = await getToken({
     req: request,
     secret: process.env.AUTH_SECRET,
@@ -31,17 +47,15 @@ export async function middleware(request: NextRequest) {
   });
 
   if (!token) {
-    const redirectUrl = encodeURIComponent(request.url);
-
+    // For API routes, return 401 instead of redirect
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    // Redirect to login page with callback URL
+    const callbackUrl = encodeURIComponent(request.nextUrl.pathname);
     return NextResponse.redirect(
-      new URL(`/api/auth/guest?redirectUrl=${redirectUrl}`, request.url)
+      new URL(`/login?callbackUrl=${callbackUrl}`, request.url)
     );
-  }
-
-  const isGuest = guestRegex.test(token?.email ?? "");
-
-  if (token && !isGuest && ["/login", "/register"].includes(pathname)) {
-    return NextResponse.redirect(new URL("/", request.url));
   }
 
   return NextResponse.next();

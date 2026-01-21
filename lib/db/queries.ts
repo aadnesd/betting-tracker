@@ -76,23 +76,6 @@ export async function createUser(email: string, password: string) {
   }
 }
 
-export async function createGuestUser() {
-  const email = `guest-${Date.now()}`;
-  const password = generateHashedPassword(generateUUID());
-
-  try {
-    return await db.insert(user).values({ email, password }).returning({
-      id: user.id,
-      email: user.email,
-    });
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to create guest user"
-    );
-  }
-}
-
 export async function getUserById(id: string): Promise<User | null> {
   try {
     const [found] = await db.select().from(user).where(eq(user.id, id));
@@ -210,30 +193,13 @@ async function transferUserData({
 
 export async function findOrCreateOAuthUser({
   email,
-  guestUserId,
+  guestUserId: _guestUserId,
 }: {
   email: string;
   guestUserId?: string | null;
 }) {
   const existingUsers = await getUser(email);
   const existingUser = existingUsers[0];
-
-  if (guestUserId) {
-    if (existingUser && existingUser.id !== guestUserId) {
-      await transferUserData({ fromUserId: guestUserId, toUserId: existingUser.id });
-      return { userId: existingUser.id, linkedFromGuest: true };
-    }
-
-    const updated = await updateUserEmailForOAuth({ id: guestUserId, email });
-    if (!updated) {
-      throw new ChatSDKError(
-        "bad_request:database",
-        "Failed to link guest user to OAuth"
-      );
-    }
-
-    return { userId: updated.id, linkedFromGuest: true };
-  }
 
   if (existingUser) {
     return { userId: existingUser.id, linkedFromGuest: false };

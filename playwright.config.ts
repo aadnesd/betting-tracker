@@ -100,7 +100,7 @@ export default defineConfig({
 
   /* Run your local dev server before starting the tests */
   webServer: {
-    command: `HOST=${HOST} PORT=${PORT} pnpm dev --hostname ${HOST} --port ${PORT}`,
+    command: `PLAYWRIGHT=true HOST=${HOST} PORT=${PORT} pnpm dev --hostname ${HOST} --port ${PORT}`,
     url: `${baseURL}/ping`,
     timeout: 120 * 1000,
     reuseExistingServer: !process.env.CI,

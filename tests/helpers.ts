@@ -4,10 +4,8 @@ import {
   type APIRequestContext,
   type Browser,
   type BrowserContext,
-  expect,
   type Page,
 } from "@playwright/test";
-import { generateId } from "ai";
 import { getUnixTime } from "date-fns";
 
 export type UserContext = {
@@ -35,22 +33,38 @@ export async function createAuthenticatedContext({
   const page = await context.newPage();
 
   const email = `test-${name}@playwright.com`;
-  const password = generateId();
 
-  await page.goto("http://localhost:3000/register");
-  await page.getByPlaceholder("user@acme.com").click();
-  await page.getByPlaceholder("user@acme.com").fill(email);
-  await page.getByLabel("Password").click();
-  await page.getByLabel("Password").fill(password);
-  await page.getByRole("button", { name: "Sign Up" }).click();
-
-  await expect(page.getByTestId("toast")).toContainText(
-    "Account created successfully!"
+  // Use the test-only auth route to create and get token
+  const response = await page.request.post(
+    "http://localhost:3000/api/auth/test",
+    {
+      data: { email },
+    }
   );
 
-  // Wait for redirect to bets dashboard after registration
-  await page.waitForURL("**/bets");
-  await page.waitForTimeout(1000);
+  if (!response.ok()) {
+    const text = await response.text();
+    console.error("Test auth failed:", response.status(), text);
+    throw new Error(
+      `Failed to authenticate test user: ${response.status()} ${text}`
+    );
+  }
+
+  const { cookieName, token } = await response.json();
+
+  // Set the auth cookie in the browser context
+  await context.addCookies([
+    {
+      name: cookieName,
+      value: token,
+      domain: "localhost",
+      path: "/",
+      httpOnly: true,
+      sameSite: "Lax",
+    },
+  ]);
+
+  // Save the session state
   await context.storageState({ path: storageFile });
   await page.close();
 
@@ -66,10 +80,8 @@ export async function createAuthenticatedContext({
 
 export function generateRandomTestUser() {
   const email = `test-${getUnixTime(new Date())}@playwright.com`;
-  const password = generateId();
 
   return {
     email,
-    password,
   };
 }

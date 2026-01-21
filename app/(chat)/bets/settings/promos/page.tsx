@@ -90,7 +90,7 @@ export default async function PromosSettingsPage({
   const session = await auth();
 
   if (!session) {
-    redirect("/api/auth/guest");
+    redirect("/login");
   }
 
   const userId = session.user.id;

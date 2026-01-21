@@ -30,6 +30,30 @@ This is a matched-betting tracker. Read `specs/*` for product requirements befor
 - Tests: `pnpm test` (Playwright; starts `pnpm dev`, targets `http://localhost:$PORT/ping`).
 - Sandbox tip: if you hit EPERM on `~/Library/Application Support`, run db/tools or tests with `HOME=$PWD/.home`.
 - Sandbox tip: if `pnpm db:generate` hangs in the sandbox, run `HOME=$PWD/.home ./node_modules/.bin/drizzle-kit generate`.
+- agent-browser open <url>              # Navigate to URL (aliases: goto, navigate)
+- agent-browser click <sel>             # Click element
+- agent-browser dblclick <sel>          # Double-click element
+- agent-browser focus <sel>             # Focus element
+- agent-browser type <sel> <text>       # Type into element
+- agent-browser fill <sel> <text>       # Clear and fill
+- agent-browser press <key>             # Press key (Enter, Tab, Control+a) (alias: key)
+- agent-browser keydown <key>           # Hold key down
+- agent-browser keyup <key>             # Release key
+-    agent-browser select <sel> <val>      # Select dropdown option
+ -   agent-browser uncheck <sel>           # Uncheck checkbox
+-    agent-browser hover <sel>             # Hover element
+ -   agent-browser scroll <dir> [px]       # Scroll (up/down/left/right)
+  -  agent-browser check <sel>             # Check checkbox
+   - agent-browser scrollintoview <sel>    # Scroll element into view (alias: scrollinto)
+  -  agent-browser drag <src> <tgt>        # Drag and drop
+   - agent-browser upload <sel> <files>    # Upload files
+   -agent-browser screenshot [path]       # Take screenshot (--full for full page, base64 png to stdout if 
+    -agent-browser pdf <path>              # Save as PDF
+You - agent-browser snapshot                # Accessibility tree with refs (best for AI)
+   - agent-browser eval <js>               # Run JavaScript
+    -agent-browser connect <port>          # Connect to browser via -
+   - agent-browser close                   # Close browser (aliases: quit, exit)
+
 
 ## Coding Style & Naming Conventions
 - TypeScript strict mode; path alias `@/*`.

@@ -10,7 +10,7 @@ export const metadata = {
 export default async function QuickAddPage() {
   const session = await auth();
   if (!session?.user) {
-    redirect("/api/auth/guest");
+    redirect("/login");
   }
 
   const [accounts, freeBets] = await Promise.all([
