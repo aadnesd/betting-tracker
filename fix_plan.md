@@ -7,8 +7,8 @@ Prioritized implementation tasks. Check off when complete with tests passing.
 
 **Last updated**: 20 January 2026
 **Build**: ✅ Passing
-**Tests**: ✅ 490 unit tests passing
-**Tag**: v0.0.51
+**Tests**: ✅ 501 unit tests passing
+**Tag**: v0.0.52
 
 All planned items have been completed. The matched betting tracker is feature-complete according to the specs.
 
@@ -16,111 +16,32 @@ All planned items have been completed. The matched betting tracker is feature-co
 
 ## Bugs — Active Issues
 
-- [ ] **Remove chatbot and make matched betting dashboard the landing page**: The app still contains the original chatbot template code as the landing page (`/`), with matched betting dashboard at `/bets`. Users land on the chatbot which is not the intended product. Need to remove chatbot entirely and make matched betting the default experience.
+- [x] **Remove chatbot and make matched betting dashboard the landing page**: The app still contains the original chatbot template code as the landing page (`/`), with matched betting dashboard at `/bets`. Users land on the chatbot which is not the intended product. Need to remove chatbot entirely and make matched betting the default experience.
   
-  **Scope of removal:**
-  1. **Routes to remove:**
-     - `app/(chat)/page.tsx` – Chatbot landing page (replace with redirect to `/bets`)
-     - `app/(chat)/chat/[id]/` – Individual chat pages
-     - `app/(chat)/api/chat/` – Chat API routes (route.ts, schema.ts, [id]/)
-     - `app/(chat)/api/history/` – Chat history API
-     - `app/(chat)/api/suggestions/` – Chat suggestions API
-     - `app/(chat)/api/vote/` – Chat vote API
-     - `app/(chat)/api/document/` – Document API (if chat-only)
-     - `app/(chat)/api/files/` – File upload API (if chat-only)
+  **Implementation completed (v0.0.52):**
+  1. Updated root page (`/`) to redirect to `/bets` dashboard
+  2. Replaced chat navigation in sidebar with matched betting navigation (Dashboard, Quick Add, Reports, Bankroll, Free Bets, Settings)
+  3. Removed all chat routes: `chat/[id]/`, `api/chat/`, `api/history/`, `api/suggestions/`, `api/vote/`, `api/document/`, `api/files/`
+  4. Removed all chat components (~35 files): chat.tsx, messages.tsx, message*.tsx, multimodal-input.tsx, suggestion*.tsx, artifact*.tsx, document*.tsx, editor components, etc.
+  5. Removed chat-specific lib modules: lib/ai/entitlements.ts, lib/ai/prompts.ts, lib/ai/tools/, lib/artifacts/, lib/editor/, artifacts/
+  6. Kept lib/ai/providers.ts and lib/ai/models.ts (used by bet parser and match linking)
+  7. Removed chat hooks: use-artifact.ts, use-auto-resume.ts, use-chat-visibility.ts, use-messages.tsx
+  8. Cleaned up layout.tsx (removed Pyodide script and DataStreamProvider)
+  9. Removed chat tables from schema: Chat, Message, Vote, Document, Suggestion, Stream
+  10. Generated and applied migration (0020_illegal_wrecking_crew.sql) to drop chat tables
+  11. Removed chat-related queries from queries.ts
+  12. Updated test helpers to remove chat-specific setup
   
-  2. **Components to remove:**
-     - `components/chat.tsx` – Main chat component
-     - `components/chat-header.tsx` – Chat header
-     - `components/messages.tsx` – Chat messages display
-     - `components/message.tsx` – Individual message
-     - `components/message-actions.tsx` – Message action buttons
-     - `components/message-editor.tsx` – Message editing
-     - `components/message-reasoning.tsx` – AI reasoning display
-     - `components/multimodal-input.tsx` – Chat input with attachments
-     - `components/suggested-actions.tsx` – Suggested prompts
-     - `components/suggestion.tsx` – Individual suggestion
-     - `components/greeting.tsx` – Chat greeting
-     - `components/model-selector.tsx` – AI model picker
-     - `components/visibility-selector.tsx` – Chat visibility
-     - `components/sidebar-history.tsx` – Chat history sidebar
-     - `components/sidebar-history-item.tsx` – History item
-     - `components/data-stream-handler.tsx` – AI stream handler
-     - `components/data-stream-provider.tsx` – Stream context
-     - `components/preview-attachment.tsx` – Attachment preview
-     - `components/artifact*.tsx` – All artifact components (5 files)
-     - `components/document*.tsx` – Document components (3 files)
-     - `components/code-editor.tsx` – Code artifact editor
-     - `components/console.tsx` – Code console
-     - `components/diffview.tsx` – Diff viewer
-     - `components/image-editor.tsx` – Image artifact editor
-     - `components/sheet-editor.tsx` – Sheet artifact editor
-     - `components/text-editor.tsx` – Text artifact editor
-     - `components/create-artifact.tsx` – Artifact creation
-     - `components/toolbar.tsx` – Chat toolbar
-     - `components/weather.tsx` – Weather tool display
+  **Files removed:** ~60+ files (routes, components, lib modules, hooks, test files)
+  **Migration:** Drops 8 database tables (Chat, Message, Message_v2, Vote, Vote_v2, Document, Suggestion, Stream)
   
-  3. **Lib modules to remove:**
-     - `lib/ai/` – AI providers, models, tools, prompts (entire directory)
-     - `lib/artifacts/` – Artifact server actions (entire directory)
-     - `lib/editor/` – Editor utilities (entire directory)
-     - `artifacts/` – Artifact actions and code (entire directory)
-  
-  4. **Hooks to remove:**
-     - `hooks/use-artifact.ts`
-     - `hooks/use-auto-resume.ts`
-     - `hooks/use-chat-visibility.ts`
-     - `hooks/use-messages.tsx`
-  
-  5. **Database cleanup:**
-     - Remove chat-related tables from schema: `Chat`, `Message`, `Vote`, `Document`, `Suggestion`
-     - Generate migration to drop tables
-     - Remove chat-related queries from `lib/db/queries.ts`
-  
-  6. **Sidebar update:**
-     - Update `components/app-sidebar.tsx` to remove chat history, new chat button, delete all chats
-     - Replace with matched betting navigation (Dashboard, Quick Add, Reports, Settings, etc.)
-     - Change branding from "Chatbot" to app name (e.g., "Bet Tracker")
-  
-  7. **Layout update:**
-     - Update `app/(chat)/layout.tsx` to remove Pyodide script (for code execution)
-     - Remove DataStreamProvider wrapper
-     - Keep sidebar layout for matched betting pages
-  
-  8. **Root page redirect:**
-     - Change `app/(chat)/page.tsx` to redirect to `/bets` dashboard
-     - OR move `/bets` content to become the root page
-  
-  9. **Dependencies to remove from package.json:**
-     - `@ai-sdk/*` packages (if not used elsewhere)
-     - `ai` package
-     - `codemirror` and related packages
-     - `pyodide` (via CDN script)
-     - `diff`, `diff-match-patch`
-     - `shiki` (syntax highlighting)
-     - `papaparse` (if chat-only CSV)
-     - `react-markdown`, `remark-gfm`
-     - `xlsx` – KEEP (used for bet export)
-  
-  **DoD:** 
+  **DoD:** ✅ All criteria met
   - Landing page (`/`) shows matched betting dashboard
   - No chatbot UI or API routes remain
   - Sidebar shows matched betting navigation only
   - All chat-related database tables removed
   - Build passes with no dead code warnings
-  - Tests updated to remove chat-related coverage
-  
-  **Implementation order:**
-  1. Update root page to redirect to `/bets`
-  2. Update sidebar to matched betting navigation
-  3. Remove chat routes and API endpoints
-  4. Remove chat components
-  5. Remove lib/ai, lib/artifacts, lib/editor, artifacts/
-  6. Remove chat hooks
-  7. Update database schema and generate migration
-  8. Clean up package.json dependencies
-  9. Update tests
-  10. Verify build and run full test suite
+  - Tests updated (501 tests passing)
 
 - [x] **Lay bet settlement not deducting exchange commission**: When a lay bet wins (back bet loses), the settlement logic returned the full `layStake` as profit without deducting the exchange's commission rate (e.g., Betfair's 5%, SMarkets' 2%). This meant winning lay bets were over-reporting profit by the commission amount. DoD: Lay bet P&L correctly applies `profit × (1 - commissionRate)` when the layer wins; commission rate fetched from linked exchange account; tests validate commission calculation. Implementation:
   1. Updated `calculateLayProfitLoss` in `lib/settlement.ts` to accept optional `commissionRate` parameter (default 0). When layer wins, applies `grossProfit * (1 - commissionRate)`. Losses remain unaffected.
