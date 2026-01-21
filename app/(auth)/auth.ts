@@ -1,18 +1,14 @@
 import NextAuth, { type DefaultSession } from "next-auth";
 import type { DefaultJWT } from "next-auth/jwt";
-import Credentials from "next-auth/providers/credentials";
 import GitHub from "next-auth/providers/github";
 import Google from "next-auth/providers/google";
-import { createGuestUser, findOrCreateOAuthUser } from "@/lib/db/queries";
+import { findOrCreateOAuthUser } from "@/lib/db/queries";
 import { authConfig } from "./auth.config";
-
-export type UserType = "guest" | "regular";
 
 declare module "next-auth" {
   interface Session extends DefaultSession {
     user: {
       id: string;
-      type: UserType;
     } & DefaultSession["user"];
   }
 
@@ -20,14 +16,12 @@ declare module "next-auth" {
   interface User {
     id?: string;
     email?: string | null;
-    type: UserType;
   }
 }
 
 declare module "next-auth/jwt" {
   interface JWT extends DefaultJWT {
     id: string;
-    type: UserType;
   }
 }
 
@@ -41,14 +35,6 @@ export const {
   providers: [
     Google,
     GitHub,
-    Credentials({
-      id: "guest",
-      credentials: {},
-      async authorize() {
-        const [guestUser] = await createGuestUser();
-        return { ...guestUser, type: "guest" };
-      },
-    }),
   ],
   callbacks: {
     async signIn({ user, account, profile }) {
@@ -67,17 +53,14 @@ export const {
           return token;
         }
 
-        const guestUserId = token.type === "guest" ? token.id : null;
         const { userId } = await findOrCreateOAuthUser({
           email,
-          guestUserId,
+          guestUserId: null,
         });
 
         token.id = userId;
-        token.type = "regular";
       } else if (user) {
         token.id = user.id as string;
-        token.type = user.type;
       }
 
       return token;
@@ -85,7 +68,6 @@ export const {
     async session({ session, token }) {
       if (session.user) {
         session.user.id = token.id;
-        session.user.type = token.type;
       }
 
       return session;

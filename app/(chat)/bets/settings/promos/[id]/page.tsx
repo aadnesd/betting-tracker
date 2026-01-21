@@ -45,7 +45,7 @@ export default async function FreeBetDetailPage({
   const session = await auth();
 
   if (!session) {
-    redirect("/api/auth/guest");
+    redirect("/login");
   }
 
   const userId = session.user.id;

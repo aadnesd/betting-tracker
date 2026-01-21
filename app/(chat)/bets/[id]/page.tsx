@@ -29,7 +29,7 @@ export default async function Page({ params }: PageProps) {
   const session = await auth();
 
   if (!session) {
-    redirect("/api/auth/guest");
+    redirect("/login");
   }
 
   const userId = session.user.id;

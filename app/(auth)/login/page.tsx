@@ -1,23 +1,23 @@
 "use client";
 
 import { Github } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { signIn, useSession } from "next-auth/react";
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import { LogoGoogle } from "@/components/icons";
 import { Button } from "@/components/ui/button";
-import { guestRegex } from "@/lib/constants";
 
-export default function Page() {
+function LoginContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { data, status } = useSession();
-  const isGuest = guestRegex.test(data?.user?.email ?? "");
+  const callbackUrl = searchParams.get("callbackUrl") || "/";
 
   useEffect(() => {
-    if (status === "authenticated" && data?.user?.type === "regular") {
-      router.replace("/");
+    if (status === "authenticated" && data?.user) {
+      router.replace(callbackUrl);
     }
-  }, [data?.user?.type, router, status]);
+  }, [data?.user, router, status, callbackUrl]);
 
   return (
     <div className="flex h-dvh w-screen items-start justify-center bg-background pt-12 md:items-center md:pt-0">
@@ -25,13 +25,13 @@ export default function Page() {
         <div className="flex flex-col items-center justify-center gap-2 text-center">
           <h3 className="font-semibold text-xl text-foreground">Sign In</h3>
           <p className="text-muted-foreground text-sm">
-            Continue with a provider to sync your matched betting data.
+            Sign in with your account to access your matched betting data.
           </p>
         </div>
         <div className="flex flex-col gap-3">
           <Button
             className="w-full justify-center gap-2"
-            onClick={() => signIn("google", { redirectTo: "/" })}
+            onClick={() => signIn("google", { redirectTo: callbackUrl })}
             type="button"
             variant="outline"
           >
@@ -40,26 +40,23 @@ export default function Page() {
           </Button>
           <Button
             className="w-full justify-center gap-2"
-            onClick={() => signIn("github", { redirectTo: "/" })}
+            onClick={() => signIn("github", { redirectTo: callbackUrl })}
             type="button"
             variant="outline"
           >
             <Github className="size-4" />
             Continue with GitHub
           </Button>
-          <Button
-            className="w-full"
-            onClick={() => router.push("/api/auth/guest?redirectUrl=/")}
-            type="button"
-            variant="secondary"
-          >
-            {isGuest ? "Continue as guest" : "Try as guest"}
-          </Button>
         </div>
-        <p className="text-center text-muted-foreground text-xs">
-          Guest sessions can be upgraded later without losing your bets.
-        </p>
       </div>
     </div>
+  );
+}
+
+export default function Page() {
+  return (
+    <Suspense fallback={<div className="flex h-dvh w-screen items-center justify-center">Loading...</div>}>
+      <LoginContent />
+    </Suspense>
   );
 }

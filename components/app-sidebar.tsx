@@ -7,6 +7,7 @@ import {
   BarChart3,
   Gift,
   LayoutDashboard,
+  LogIn,
   PlusSquare,
   Settings,
   Wallet,
@@ -107,7 +108,22 @@ export function AppSidebar({ user }: { user: User | undefined }) {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-      <SidebarFooter>{user && <SidebarUserNav user={user} />}</SidebarFooter>
+      <SidebarFooter>
+        {user ? (
+          <SidebarUserNav user={user} />
+        ) : (
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild>
+                <Link href="/login">
+                  <LogIn className="size-4" />
+                  <span>Sign in</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        )}
+      </SidebarFooter>
     </Sidebar>
   );
 }
