@@ -96,7 +96,7 @@ function resolveDateRange({
 export default async function Page(props: PageProps) {
   const session = await auth();
 
-  if (!session) {
+  if (!session?.user) {
     redirect("/login");
   }
 

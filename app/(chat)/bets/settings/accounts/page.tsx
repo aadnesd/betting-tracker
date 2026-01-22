@@ -50,7 +50,7 @@ function AccountStatusBadge({ status }: { status: "active" | "archived" }) {
 export default async function AccountSettingsPage() {
   const session = await auth();
 
-  if (!session) {
+  if (!session?.user) {
     redirect("/login");
   }
 
