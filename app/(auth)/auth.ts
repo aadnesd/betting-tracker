@@ -1,6 +1,5 @@
 import NextAuth, { type DefaultSession } from "next-auth";
 import type { DefaultJWT } from "next-auth/jwt";
-import GitHub from "next-auth/providers/github";
 import Google from "next-auth/providers/google";
 import { findOrCreateOAuthUser, getUserById } from "@/lib/db/queries";
 import { authConfig } from "./auth.config";
@@ -33,8 +32,10 @@ export const {
 } = NextAuth({
   ...authConfig,
   providers: [
-    Google,
-    GitHub,
+    Google({
+      clientId: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+    }),
   ],
   callbacks: {
     async signIn({ user, account, profile }) {
