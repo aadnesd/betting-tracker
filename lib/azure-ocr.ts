@@ -15,12 +15,12 @@ import {
   type AnalyzeResult,
 } from "@azure/ai-form-recognizer";
 
-const endpoint = process.env.AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT;
-const key = process.env.AZURE_DOCUMENT_INTELLIGENCE_KEY;
-
 let client: DocumentAnalysisClient | null = null;
 
 function getClient(): DocumentAnalysisClient {
+  const endpoint = process.env.AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT;
+  const key = process.env.AZURE_DOCUMENT_INTELLIGENCE_KEY;
+
   if (!endpoint || !key) {
     throw new Error(
       "Azure Document Intelligence not configured. Set AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT and AZURE_DOCUMENT_INTELLIGENCE_KEY environment variables."
