@@ -12,7 +12,7 @@ export default async function Page() {
   await connection();
   const session = await auth();
 
-  if (!session) {
+  if (!session?.user) {
     redirect("/login");
   }
 

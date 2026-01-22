@@ -89,7 +89,7 @@ export default async function PromosSettingsPage({
 }) {
   const session = await auth();
 
-  if (!session) {
+  if (!session?.user) {
     redirect("/login");
   }
 

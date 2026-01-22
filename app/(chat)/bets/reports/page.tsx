@@ -40,7 +40,7 @@ type Props = {
 export default async function Page(props: Props) {
   const session = await auth();
 
-  if (!session) {
+  if (!session?.user) {
     redirect("/login");
   }
 

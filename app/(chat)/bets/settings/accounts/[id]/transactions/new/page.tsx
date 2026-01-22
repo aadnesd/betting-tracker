@@ -16,7 +16,7 @@ export default async function NewTransactionPage({
   params: Promise<{ id: string }>;
 }) {
   const session = await auth();
-  if (!session) {
+  if (!session?.user) {
     redirect("/login");
   }
 

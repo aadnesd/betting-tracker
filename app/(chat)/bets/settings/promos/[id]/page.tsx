@@ -44,7 +44,7 @@ export default async function FreeBetDetailPage({
 }: FreeBetDetailPageProps) {
   const session = await auth();
 
-  if (!session) {
+  if (!session?.user) {
     redirect("/login");
   }
 

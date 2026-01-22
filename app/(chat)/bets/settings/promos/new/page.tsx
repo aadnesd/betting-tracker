@@ -14,7 +14,7 @@ export const metadata = {
 export default async function NewFreeBetPage() {
   const session = await auth();
 
-  if (!session) {
+  if (!session?.user) {
     redirect("/login");
   }
 
