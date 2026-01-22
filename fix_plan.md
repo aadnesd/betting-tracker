@@ -242,6 +242,91 @@ Remaining blocker: Rerun Playwright route tests in an environment that permits b
 
 - [x] **Account balance update on settlement**: When matched bet settles, update back/lay account balances based on outcome. DoD: settling a bet adjusts both account balances correctly. Implementation: Modified `app/(chat)/api/bets/update-matched/route.ts` to detect status transitions TO 'settled'. When settling, fetches full bet with parts via `getMatchedBetWithParts`, then creates adjustment transactions for each bet leg that has both accountId and profitLoss. Uses `createAccountTransaction` with type 'adjustment' and notes referencing the settlement. Tests: 5 new tests in `tests/unit/bets-api.test.ts` covering: transactions created on settlement, no transactions when already settled, no transactions without accountId, no transactions without profitLoss, single transaction when only one leg has account. Why: Keep balances accurate without manual entry.
 
+- [ ] **LLM-based account matching**: Current account matching uses exact name matching (case-insensitive via `nameNormalized`), which fails when the OCR/parser extracts a slightly different name (e.g., "Betfair Exchange" vs "Betfair", "Bet 365" vs "Bet365"). Enhance to use LLM-based fuzzy matching similar to football match linking.
+  
+  **Current flow:**
+  1. AI parses bet screenshot → extracts `exchange` field (e.g., "Betfair Exchange")
+  2. `getAccountByName()` does exact match on `nameNormalized`
+  3. If no match → `unmatchedAccount: true`, flagged for review
+  
+  **Proposed flow:**
+  1. AI parses bet screenshot → extracts `exchange` field
+  2. Fetch all user's accounts of matching kind (bookmaker/exchange) via `listAccountsByUser()`
+  3. If exact match found → link directly (high confidence)
+  4. If no exact match but accounts exist → call LLM with parsed name + account list to select best match
+  5. LLM returns: matched account ID + confidence (high/medium/low)
+  6. Low confidence or no match → flag for review with suggestions
+  
+  **Implementation plan:**
+  1. Create `lib/account-linking.ts` module (similar to `lib/match-linking.ts`)
+  2. Add `linkBetToAccount()` function that orchestrates the matching
+  3. Add `selectAccountWithLLM()` for LLM-based disambiguation
+  4. Update `app/(chat)/api/bets/autoparse/route.ts` to use new linking logic
+  5. Return `accountConfidence` in autoparse response
+  
+  **DoD:** Parsed bets link to correct accounts even when names don't exactly match; LLM selects from user's account list when ambiguous; confidence levels returned for UI display.
+  
+  **Why:** Reduces manual corrections during review; OCR/parser output rarely matches account names exactly.
+  
+  **Tests:** Unit tests for account linking logic, LLM prompt construction, confidence level handling.
+
+- [ ] **Normalize bet selection during match linking**: The bet selection field (e.g., "Arsenal", "Manchester United", "Draw") needs to be normalized to match the football-data.org API's `winner` field format (`HOME_TEAM`, `AWAY_TEAM`, `DRAW`) for seamless auto-settlement. This should happen **during match linking**, not as a separate step.
+  
+  **Current state:**
+  - Bet selection stored as free text (e.g., "Arsenal", "Man City to Win")
+  - Auto-settlement must parse selection and compare against match's home/away teams
+  - Error-prone string matching at settlement time
+  
+  **Proposed solution:**
+  Extend the existing match linking LLM call to also normalize the selection in the same request. The LLM already has all the context it needs:
+  - Parsed selection text (e.g., "Arsenal", "Man City to Win")
+  - Candidate matches with homeTeam and awayTeam
+  
+  **Updated LLM output:**
+  ```typescript
+  {
+    matchId: string | null,           // Selected match ID
+    confidence: 'high' | 'medium' | 'low',
+    normalizedSelection: 'HOME_TEAM' | 'AWAY_TEAM' | 'DRAW' | null
+  }
+  ```
+  
+  The LLM determines `normalizedSelection` by comparing the parsed selection against the selected match's teams:
+  - Selection mentions homeTeam → `HOME_TEAM`
+  - Selection mentions awayTeam → `AWAY_TEAM`  
+  - Selection is "Draw", "X", "Tie" → `DRAW`
+  - Can't determine (non-1X2 market, ambiguous) → `null`
+  
+  **Schema changes:**
+  - Add `normalizedSelection` column to `MatchedBet` (text: `HOME_TEAM`, `AWAY_TEAM`, `DRAW`, or null)
+  - Add `normalizedSelection` column to `BackBet`/`LayBet` for standalone bets
+  
+  **Auto-settlement simplification:**
+  ```typescript
+  // Current (complex):
+  if (selection.includes(match.homeTeam) || selection.includes("Home")) → HOME_TEAM
+  
+  // Proposed (simple):
+  if (bet.normalizedSelection === match.winner) → bet won
+  ```
+  
+  **Implementation plan:**
+  1. Add `normalizedSelection` columns to schema + migration
+  2. Update `selectMatchWithLLM()` in `lib/match-linking.ts` to return `normalizedSelection`
+  3. Update `linkBetToMatch()` return type to include `normalizedSelection`
+  4. Update autoparse to pass `normalizedSelection` through to create-matched payload
+  5. Update `createMatchedBetRecord` to store `normalizedSelection`
+  6. Simplify `resolveOutcome()` in `lib/settlement.ts` to use `normalizedSelection` when available
+  7. Update bet detail UI to show normalized selection alongside original
+  
+  **Scope:** Initially for Match Odds (1X2) market only. Other markets (Over/Under, BTTS, Correct Score) have different outcome types and would need separate handling.
+  
+  **DoD:** For Match Odds bets linked to a football match, `normalizedSelection` is populated during match linking and auto-settlement uses direct comparison with `match.winner`.
+  
+  **Why:** Makes auto-settlement reliable, eliminates fuzzy string matching at settlement time, and is more efficient (single LLM call for both match linking and selection normalization).
+  
+  **Tests:** Unit tests for combined match linking + selection normalization, settlement with normalized selection.
+
 ## P5 — Visualization & Analytics
 
 - [x] **Profit/loss chart**: Add interactive line or area chart showing cumulative profit over time on the reports page. DoD: chart renders with settled bets data, supports date range filtering, displays profit trend with hover tooltips showing exact values. Why: Visual representation of performance helps users identify trends and patterns. Implementation: Installed Recharts library. Created `calculateCumulativeProfitData` function in `lib/reporting.ts` that computes cumulative profit data points with day/week/month grouping options. Created `components/bets/profit-chart.tsx` with `ProfitChart` and `ProfitChartWithControls` components featuring: interactive area chart with cumulative profit line, day/week/month toggle controls, custom tooltip showing period profit, cumulative profit, and bet count, responsive layout, color-coded (green for profit, red for loss), Y-axis with padding. Integrated chart into `app/(chat)/bets/reports/page.tsx` below the summary card. Tests: 6 new tests in `tests/unit/reporting.test.ts` covering: empty data, non-settled bets filtered, cumulative calculation, week grouping, month grouping, chronological sorting.
