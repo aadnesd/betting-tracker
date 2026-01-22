@@ -114,6 +114,14 @@ const betStatusEnum = [
   "error",
 ] as const;
 
+/**
+ * Normalized selection type for Match Odds (1X2) bets.
+ * Matches the football-data.org API's `winner` field format.
+ * Why: Enables reliable auto-settlement by comparing with match result directly.
+ */
+export const normalizedSelectionEnum = ["HOME_TEAM", "AWAY_TEAM", "DRAW"] as const;
+export type NormalizedSelection = (typeof normalizedSelectionEnum)[number];
+
 export const backBet = pgTable("BackBet", {
   id: uuid("id").primaryKey().notNull().defaultRandom(),
   createdAt: timestamp("createdAt").notNull(),
@@ -127,6 +135,10 @@ export const backBet = pgTable("BackBet", {
   matchId: uuid("matchId"),
   market: text("market").notNull(),
   selection: text("selection").notNull(),
+  // Normalized selection for Match Odds: HOME_TEAM, AWAY_TEAM, DRAW (populated during match linking)
+  normalizedSelection: varchar("normalizedSelection", {
+    enum: ["HOME_TEAM", "AWAY_TEAM", "DRAW"],
+  }),
   odds: numeric("odds", { precision: 12, scale: 4 }).notNull(),
   stake: numeric("stake", { precision: 12, scale: 2 }).notNull(),
   stakeNok: numeric("stakeNok", { precision: 14, scale: 2 }),
@@ -158,6 +170,10 @@ export const layBet = pgTable("LayBet", {
   matchId: uuid("matchId"),
   market: text("market").notNull(),
   selection: text("selection").notNull(),
+  // Normalized selection for Match Odds: HOME_TEAM, AWAY_TEAM, DRAW (populated during match linking)
+  normalizedSelection: varchar("normalizedSelection", {
+    enum: ["HOME_TEAM", "AWAY_TEAM", "DRAW"],
+  }),
   odds: numeric("odds", { precision: 12, scale: 4 }).notNull(),
   stake: numeric("stake", { precision: 12, scale: 2 }).notNull(),
   stakeNok: numeric("stakeNok", { precision: 14, scale: 2 }),
@@ -188,6 +204,10 @@ export const matchedBet = pgTable("MatchedBet", {
   matchId: uuid("matchId"),
   market: text("market").notNull(),
   selection: text("selection").notNull(),
+  // Normalized selection for Match Odds: HOME_TEAM, AWAY_TEAM, DRAW (populated during match linking)
+  normalizedSelection: varchar("normalizedSelection", {
+    enum: ["HOME_TEAM", "AWAY_TEAM", "DRAW"],
+  }),
   promoId: uuid("promoId").references(() => promo.id),
   promoType: text("promoType"),
   status: varchar("status", {

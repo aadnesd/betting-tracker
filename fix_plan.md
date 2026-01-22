@@ -7,8 +7,8 @@ Prioritized implementation tasks. Check off when complete with tests passing.
 
 **Last updated**: 22 January 2026
 **Build**: ✅ Passing
-**Tests**: ✅ `pnpm exec vitest run tests/unit/bets-api.test.ts`
-**Tag**: v0.0.54
+**Tests**: ✅ `pnpm exec vitest run` (548 tests passing)
+**Tag**: v0.0.55
 
 Remaining blocker: Rerun Playwright route tests in an environment that permits binding the dev server.
 
@@ -270,62 +270,26 @@ Remaining blocker: Rerun Playwright route tests in an environment that permits b
   
   **Tests:** Unit tests for account linking logic, LLM prompt construction, confidence level handling.
 
-- [ ] **Normalize bet selection during match linking**: The bet selection field (e.g., "Arsenal", "Manchester United", "Draw") needs to be normalized to match the football-data.org API's `winner` field format (`HOME_TEAM`, `AWAY_TEAM`, `DRAW`) for seamless auto-settlement. This should happen **during match linking**, not as a separate step.
+- [x] **Normalize bet selection during match linking**: The bet selection field (e.g., "Arsenal", "Manchester United", "Draw") is normalized to match the football-data.org API's `winner` field format (`HOME_TEAM`, `AWAY_TEAM`, `DRAW`) for seamless auto-settlement. This happens **during match linking**, not as a separate step.
   
-  **Current state:**
-  - Bet selection stored as free text (e.g., "Arsenal", "Man City to Win")
-  - Auto-settlement must parse selection and compare against match's home/away teams
-  - Error-prone string matching at settlement time
+  **Implementation (completed v0.0.55):**
+  1. Added `normalizedSelection` column to `BackBet`, `LayBet`, and `MatchedBet` tables in schema with enum `["HOME_TEAM", "AWAY_TEAM", "DRAW"]`
+  2. Created migration `lib/db/migrations/0023_add_normalized_selection.sql`
+  3. Updated `selectMatchWithLLM()` in `lib/match-linking.ts` to return `normalizedSelection` alongside match selection
+  4. Added `determineNormalizedSelection()` helper for single-candidate auto-linking cases
+  5. Updated `linkBetToMatch()` return type to include `normalizedSelection`
+  6. Updated autoparse route to pass `normalizedSelection` through response
+  7. Updated create-matched route to accept and store `normalizedSelection` on all bet records
+  8. Updated `BetInputBase`, `saveBackBet`, `saveLayBet`, `createMatchedBetRecord` to handle `normalizedSelection`
+  9. Added `getMatchWinner()` and `resolveOutcomeWithNormalizedSelection()` functions to `lib/settlement.ts`
+  10. Updated auto-settle cron route to use normalized selection when available, falling back to text-based resolution
+  11. Added 13 new unit tests in `tests/unit/settlement.test.ts` covering `getMatchWinner()` and `resolveOutcomeWithNormalizedSelection()`
   
-  **Proposed solution:**
-  Extend the existing match linking LLM call to also normalize the selection in the same request. The LLM already has all the context it needs:
-  - Parsed selection text (e.g., "Arsenal", "Man City to Win")
-  - Candidate matches with homeTeam and awayTeam
-  
-  **Updated LLM output:**
-  ```typescript
-  {
-    matchId: string | null,           // Selected match ID
-    confidence: 'high' | 'medium' | 'low',
-    normalizedSelection: 'HOME_TEAM' | 'AWAY_TEAM' | 'DRAW' | null
-  }
-  ```
-  
-  The LLM determines `normalizedSelection` by comparing the parsed selection against the selected match's teams:
-  - Selection mentions homeTeam → `HOME_TEAM`
-  - Selection mentions awayTeam → `AWAY_TEAM`  
-  - Selection is "Draw", "X", "Tie" → `DRAW`
-  - Can't determine (non-1X2 market, ambiguous) → `null`
-  
-  **Schema changes:**
-  - Add `normalizedSelection` column to `MatchedBet` (text: `HOME_TEAM`, `AWAY_TEAM`, `DRAW`, or null)
-  - Add `normalizedSelection` column to `BackBet`/`LayBet` for standalone bets
-  
-  **Auto-settlement simplification:**
-  ```typescript
-  // Current (complex):
-  if (selection.includes(match.homeTeam) || selection.includes("Home")) → HOME_TEAM
-  
-  // Proposed (simple):
-  if (bet.normalizedSelection === match.winner) → bet won
-  ```
-  
-  **Implementation plan:**
-  1. Add `normalizedSelection` columns to schema + migration
-  2. Update `selectMatchWithLLM()` in `lib/match-linking.ts` to return `normalizedSelection`
-  3. Update `linkBetToMatch()` return type to include `normalizedSelection`
-  4. Update autoparse to pass `normalizedSelection` through to create-matched payload
-  5. Update `createMatchedBetRecord` to store `normalizedSelection`
-  6. Simplify `resolveOutcome()` in `lib/settlement.ts` to use `normalizedSelection` when available
-  7. Update bet detail UI to show normalized selection alongside original
-  
-  **Scope:** Initially for Match Odds (1X2) market only. Other markets (Over/Under, BTTS, Correct Score) have different outcome types and would need separate handling.
-  
-  **DoD:** For Match Odds bets linked to a football match, `normalizedSelection` is populated during match linking and auto-settlement uses direct comparison with `match.winner`.
+  **DoD:** ✅ For Match Odds bets linked to a football match, `normalizedSelection` is populated during match linking and auto-settlement uses direct comparison with `match.winner`.
   
   **Why:** Makes auto-settlement reliable, eliminates fuzzy string matching at settlement time, and is more efficient (single LLM call for both match linking and selection normalization).
   
-  **Tests:** Unit tests for combined match linking + selection normalization, settlement with normalized selection.
+  **Tests:** 548 unit tests passing (13 new tests for normalized selection resolution).
 
 ## P5 — Visualization & Analytics
 

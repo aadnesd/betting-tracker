@@ -168,6 +168,7 @@ export async function POST(request: Request) {
       matchId: null,
       matchConfidence: null,
       matchCandidates: 0,
+      normalizedSelection: null,
     };
 
     try {
@@ -268,6 +269,7 @@ export async function POST(request: Request) {
       matchId: matchLinkResult.matchId,
       matchConfidence: matchLinkResult.matchConfidence,
       matchCandidates: matchLinkResult.matchCandidates,
+      normalizedSelection: matchLinkResult.normalizedSelection,
     });
   } catch (error) {
     console.error("Failed to parse bets", error);

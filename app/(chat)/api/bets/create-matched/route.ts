@@ -18,6 +18,7 @@ import {
 } from "@/lib/db/queries";
 import { computeNetExposureInputs } from "@/lib/bet-calculations";
 import { convertAmountToNok } from "@/lib/fx-rates";
+import type { NormalizedSelection } from "@/lib/db/schema";
 
 const betPartSchema = z.object({
   market: z.string().min(1),
@@ -45,6 +46,8 @@ const payloadSchema = z
     market: z.string().min(1),
     selection: z.string().min(1),
     matchId: z.string().uuid().optional().nullable(),
+    /** Normalized selection for Match Odds (1X2): HOME_TEAM, AWAY_TEAM, DRAW */
+    normalizedSelection: z.enum(["HOME_TEAM", "AWAY_TEAM", "DRAW"]).optional().nullable(),
     promoId: z.string().uuid().optional(),
     promoType: z.string().optional(),
     needsReview: z.boolean().optional(),
@@ -256,6 +259,7 @@ export async function POST(request: Request) {
           screenshotId: backShot!.id,
           market: body.back.market,
           selection: body.back.selection,
+          normalizedSelection: body.normalizedSelection ?? null,
           odds: body.back.odds,
           stake: body.back.stake,
           exchange: backExchange,
@@ -276,6 +280,7 @@ export async function POST(request: Request) {
           screenshotId: layShot!.id,
           market: body.lay.market,
           selection: body.lay.selection,
+          normalizedSelection: body.normalizedSelection ?? null,
           odds: body.lay.odds,
           stake: body.lay.stake,
           exchange: layExchange,
@@ -328,6 +333,7 @@ export async function POST(request: Request) {
       matchId: body.matchId ?? null,
       market: body.market,
       selection: body.selection,
+      normalizedSelection: body.normalizedSelection ?? null,
       promoId,
       promoType: body.promoType ?? null,
       status: missingLeg ? "draft" : needsReview ? "needs_review" : "matched",

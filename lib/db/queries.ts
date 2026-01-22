@@ -913,6 +913,8 @@ type BetInputBase = {
   confidence?: Record<string, number> | null;
   error?: string | null;
   status?: "draft" | "placed" | "matched" | "settled" | "needs_review" | "error";
+  /** Normalized selection for Match Odds: HOME_TEAM, AWAY_TEAM, DRAW */
+  normalizedSelection?: "HOME_TEAM" | "AWAY_TEAM" | "DRAW" | null;
 };
 
 export async function saveScreenshotUpload({
@@ -1038,6 +1040,7 @@ export async function saveBackBet({
       matchId: bet.matchId ?? null,
       market: bet.market,
       selection: bet.selection,
+      normalizedSelection: bet.normalizedSelection ?? null,
       odds: bet.odds.toString(),
       stake: bet.stake.toString(),
       stakeNok: stakeNok.toFixed(2),
@@ -1085,6 +1088,7 @@ export async function saveLayBet({
       matchId: bet.matchId ?? null,
       market: bet.market,
       selection: bet.selection,
+      normalizedSelection: bet.normalizedSelection ?? null,
       odds: bet.odds.toString(),
       stake: bet.stake.toString(),
       stakeNok: stakeNok.toFixed(2),
@@ -1344,6 +1348,7 @@ export async function createMatchedBetRecord({
   matchId,
   market,
   selection,
+  normalizedSelection,
   promoId,
   promoType,
   status,
@@ -1357,6 +1362,8 @@ export async function createMatchedBetRecord({
   matchId?: string | null;
   market: string;
   selection: string;
+  /** Normalized selection for Match Odds: HOME_TEAM, AWAY_TEAM, DRAW */
+  normalizedSelection?: "HOME_TEAM" | "AWAY_TEAM" | "DRAW" | null;
   promoId?: string | null;
   promoType?: string | null;
   status?: "draft" | "matched" | "settled" | "needs_review";
@@ -1373,6 +1380,7 @@ export async function createMatchedBetRecord({
       matchId: matchId ?? null,
       market,
       selection,
+      normalizedSelection: normalizedSelection ?? null,
       promoId: promoId ?? null,
       promoType: promoType ?? null,
       status: status ?? "draft",
@@ -2245,6 +2253,8 @@ export type BetReadyForSettlement = {
   userId: string;
   market: string;
   selection: string;
+  /** Normalized selection for Match Odds: HOME_TEAM, AWAY_TEAM, DRAW (if available) */
+  normalizedSelection: "HOME_TEAM" | "AWAY_TEAM" | "DRAW" | null;
   status: string;
   promoType: string | null;
   matchId: string;
@@ -2301,6 +2311,7 @@ export async function findBetsReadyForAutoSettlement({
         userId: matchedBet.userId,
         market: matchedBet.market,
         selection: matchedBet.selection,
+        normalizedSelection: matchedBet.normalizedSelection,
         status: matchedBet.status,
         promoType: matchedBet.promoType,
         matchId: matchedBet.matchId,
@@ -2357,6 +2368,7 @@ export async function findBetsReadyForAutoSettlement({
         userId: row.userId,
         market: row.market,
         selection: row.selection,
+        normalizedSelection: row.normalizedSelection as "HOME_TEAM" | "AWAY_TEAM" | "DRAW" | null,
         status: row.status,
         promoType: row.promoType,
         matchId: row.matchId!,
