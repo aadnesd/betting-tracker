@@ -2,7 +2,7 @@ import NextAuth, { type DefaultSession } from "next-auth";
 import type { DefaultJWT } from "next-auth/jwt";
 import GitHub from "next-auth/providers/github";
 import Google from "next-auth/providers/google";
-import { findOrCreateOAuthUser } from "@/lib/db/queries";
+import { findOrCreateOAuthUser, getUserById } from "@/lib/db/queries";
 import { authConfig } from "./auth.config";
 
 declare module "next-auth" {
@@ -66,7 +66,14 @@ export const {
       return token;
     },
     async session({ session, token }) {
-      if (session.user) {
+      if (session.user && token.id) {
+        // Verify the user still exists in the database
+        const dbUser = await getUserById(token.id);
+        if (!dbUser) {
+          // User was deleted from database - invalidate session
+          // This forces re-authentication
+          throw new Error("User not found");
+        }
         session.user.id = token.id;
       }
 
