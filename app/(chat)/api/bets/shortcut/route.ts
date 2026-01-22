@@ -279,6 +279,8 @@ export async function POST(request: Request) {
     } | null = null;
 
     try {
+      console.log(`[shortcut] Calling linkBetToMatch with market="${parsed.back.market}", selection="${parsed.back.selection}", betDate="${parsed.back.placedAt}"`);
+      
       const matchResult = await linkBetToMatch({
         market: parsed.back.market,
         selection: parsed.back.selection,
