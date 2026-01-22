@@ -21,6 +21,7 @@ type ParsedForm = {
   matchId?: string | null;
   matchConfidence?: string | null;
   matchCandidates?: number | null;
+  normalizedSelection?: "HOME_TEAM" | "AWAY_TEAM" | "DRAW" | null;
   back: ParsedPair["back"];
   lay: ParsedPair["lay"];
 };
@@ -32,6 +33,7 @@ interface IntakeData {
     matchId?: string | null;
     matchConfidence?: string | null;
     matchCandidates?: number | null;
+    normalizedSelection?: "HOME_TEAM" | "AWAY_TEAM" | "DRAW" | null;
     notes?: string;
     needsReview: boolean;
   };
@@ -68,6 +70,7 @@ export function BetIntakeWrapper({
       matchId?: string | null;
       matchConfidence?: string | null;
       matchCandidates?: number | null;
+      normalizedSelection?: "HOME_TEAM" | "AWAY_TEAM" | "DRAW" | null;
       notes?: string;
       needsReview: boolean;
     };
