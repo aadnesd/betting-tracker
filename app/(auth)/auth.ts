@@ -70,9 +70,9 @@ export const {
         // Verify the user still exists in the database
         const dbUser = await getUserById(token.id);
         if (!dbUser) {
-          // User was deleted from database - invalidate session
-          // This forces re-authentication
-          throw new Error("User not found");
+          // User was deleted from database - return empty session
+          // This will cause useSession to show unauthenticated state
+          return { ...session, user: undefined, expires: new Date(0).toISOString() };
         }
         session.user.id = token.id;
       }
