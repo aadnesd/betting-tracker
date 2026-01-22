@@ -242,33 +242,217 @@ Remaining blocker: Rerun Playwright route tests in an environment that permits b
 
 - [x] **Account balance update on settlement**: When matched bet settles, update back/lay account balances based on outcome. DoD: settling a bet adjusts both account balances correctly. Implementation: Modified `app/(chat)/api/bets/update-matched/route.ts` to detect status transitions TO 'settled'. When settling, fetches full bet with parts via `getMatchedBetWithParts`, then creates adjustment transactions for each bet leg that has both accountId and profitLoss. Uses `createAccountTransaction` with type 'adjustment' and notes referencing the settlement. Tests: 5 new tests in `tests/unit/bets-api.test.ts` covering: transactions created on settlement, no transactions when already settled, no transactions without accountId, no transactions without profitLoss, single transaction when only one leg has account. Why: Keep balances accurate without manual entry.
 
-- [ ] **LLM-based account matching**: Current account matching uses exact name matching (case-insensitive via `nameNormalized`), which fails when the OCR/parser extracts a slightly different name (e.g., "Betfair Exchange" vs "Betfair", "Bet 365" vs "Bet365"). Enhance to use LLM-based fuzzy matching similar to football match linking.
+- [ ] **Agentic account matching with vision fallback**: Replace current exact-name account matching with an LLM agent that has access to user's accounts and can use vision when OCR is incomplete. The agent handles the entire parse flow with full context.
+
+  **Current problems:**
+  - OCR often misses bookmaker/exchange names (logos, colors, UI chrome aren't text)
+  - Text-only LLM only sees OCR output, never the original image
+  - Exact name matching fails on variations ("Betfair Exchange" vs "Betfair")
+  - Bookmaker names in OCR can be confused with other text (e.g., "Stake" appears as bookmaker name AND as label "Stake $5,900")
   
-  **Current flow:**
-  1. AI parses bet screenshot → extracts `exchange` field (e.g., "Betfair Exchange")
-  2. `getAccountByName()` does exact match on `nameNormalized`
-  3. If no match → `unmatchedAccount: true`, flagged for review
+  **Key insight: OCR already captures bookmaker names!**
+  From a Stake.com screenshot, OCR extracts:
+  ```
+  Loss 5:46 PM 1/20/2026
+  Bodo/Glimt - Manchester City FC
+  ...
+  Stake              <-- Bookmaker name (standalone line)
+  Odds 1.41
+  Stake $5,900.00    <-- Bet amount (different context)
+  ```
+  The bookmaker name IS in the OCR - we just need smarter parsing that:
+  1. Knows the user's accounts (can recognize "Stake" as a valid bookmaker)
+  2. Understands OCR line structure (standalone "Stake" vs "Stake $5,900")
   
-  **Proposed flow:**
-  1. AI parses bet screenshot → extracts `exchange` field
-  2. Fetch all user's accounts of matching kind (bookmaker/exchange) via `listAccountsByUser()`
-  3. If exact match found → link directly (high confidence)
-  4. If no exact match but accounts exist → call LLM with parsed name + account list to select best match
-  5. LLM returns: matched account ID + confidence (high/medium/low)
-  6. Low confidence or no match → flag for review with suggestions
+  **Proposed architecture:**
+  ```
+  1. Upload screenshots (back + lay)
+  2. Azure OCR on both (parallel)
+  3. Pre-fetch user's accounts (bookmakers + exchanges)
+  
+  For each image (parallel):
+  ┌─────────────────────────────────────────────────────────┐
+  │ LAY BET:                                                │
+  │   If user has only 1 exchange account → auto-select     │
+  │   Else → use agent                                      │
+  │                                                         │
+  │ BACK BET:                                               │
+  │   Always use agent (bookmakers vary more)               │
+  └─────────────────────────────────────────────────────────┘
+  
+  Agent receives:
+  • Raw OCR text (full content)
+  • OCR lines array (preserves structure, helps identify standalone names)
+  • User's accounts list (pre-fetched, agent knows valid options)
+  • Original image URL (available for vision tool)
+  
+  Agent tools:
+  • lookAtImage(aspect) - vision analysis when OCR insufficient
+  
+  4. Combine back + lay results
+  5. Match linking (existing flow)
+  6. Flag for review if still uncertain
+  ```
+  
+  **Key optimizations:**
+  - Pre-fetch accounts and include in prompt (no tool call needed)
+  - Pass OCR lines array (not just raw text) so agent sees structure
+  - Single-exchange shortcut: If user has only 1 exchange, auto-select for lay bets
+  - Back and lay parsed in parallel (not batched)
+  - Vision only used when agent decides OCR is insufficient
+  - Agent can match "Stake" in OCR to user's "Stake" account without vision
+  
+  **Agent prompt structure:**
+  ```typescript
+  const systemPrompt = `You are a bet screenshot parser. Parse betting information from OCR text.
+
+  USER'S ACCOUNTS:
+  Bookmakers: ${bookmakers.map(a => `${a.name} (id: ${a.id})`).join(', ')}
+  Exchanges: ${exchanges.map(a => `${a.name} (id: ${a.id})`).join(', ')}
+
+  TIPS FOR IDENTIFYING BOOKMAKER/EXCHANGE:
+  - Look for account names from the list above appearing as standalone lines in OCR
+  - Bookmaker names often appear as logos (single word on its own line)
+  - Don't confuse "Stake" (bookmaker) with "Stake: $100" (bet amount)
+  - The lines array preserves structure - use it to identify standalone names
+
+  Extract: market, selection, odds, stake, currency, placedAt, accountId
+  
+  If you cannot confidently identify the bookmaker/exchange from OCR text,
+  use the lookAtImage tool to examine the screenshot for visual cues.
+
+  Return JSON with accountId from matching account, or null if uncertain.`;
+  
+  // Message includes both raw text AND structured lines
+  const userMessage = `
+  OCR TEXT:
+  """
+  ${ocrResult.text}
+  """
+  
+  OCR LINES (for structure):
+  ${ocrResult.lines.map((line, i) => `${i + 1}: "${line}"`).join('\n')}
+  `;
+  ```
+  
+  **Agent implementation using Vercel AI SDK:**
+  Reference: https://ai-sdk.dev/docs/agents/building-agents
+  
+  ```typescript
+  // lib/bet-parser-agent.ts
+  import { generateText, tool } from "ai";
+  import { gateway } from "@ai-sdk/gateway";
+  import { z } from "zod";
+  
+  const parsedBetSchema = z.object({
+    market: z.string(),
+    selection: z.string(),
+    odds: z.number(),
+    stake: z.number(),
+    liability: z.number().optional().nullable(),
+    currency: z.string().length(3).optional().nullable(),
+    placedAt: z.string().optional().nullable(),
+    accountId: z.string().uuid().optional().nullable(),
+    accountConfidence: z.enum(["high", "medium", "low"]).optional(),
+    confidence: z.record(z.string(), z.number()).optional(),
+  });
+  
+  export async function parseBetWithAgent({
+    ocrText,
+    ocrLines,
+    imageUrl,
+    accounts,
+    betKind,
+  }: {
+    ocrText: string;
+    ocrLines: string[];
+    imageUrl: string;
+    accounts: { id: string; name: string; kind: "bookmaker" | "exchange" }[];
+    betKind: "back" | "lay";
+  }) {
+    const bookmakers = accounts.filter(a => a.kind === "bookmaker");
+    const exchanges = accounts.filter(a => a.kind === "exchange");
+    
+    const result = await generateText({
+      model: gateway.languageModel("openai/gpt-4o"),
+      system: `You are a bet screenshot parser...`, // Full prompt above
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: `OCR TEXT:\n${ocrText}\n\nOCR LINES:\n${ocrLines.map((l, i) => `${i + 1}: "${l}"`).join('\n')}` },
+            { type: "image", image: imageUrl }, // Available for tool use
+          ],
+        },
+      ],
+      tools: {
+        lookAtImage: tool({
+          description: "Examine the screenshot more closely to identify the bookmaker or exchange. Use when the OCR text doesn't clearly contain the bookmaker/exchange name, or when you need to verify a guess.",
+          parameters: z.object({
+            aspect: z.string().describe("What to look for: 'bookmaker logo', 'exchange name', 'brand colors', etc."),
+          }),
+          execute: async ({ aspect }) => {
+            // This makes a focused vision call to analyze the image
+            const { text } = await generateText({
+              model: gateway.languageModel("openai/gpt-4o"),
+              messages: [
+                {
+                  role: "user",
+                  content: [
+                    { type: "text", text: `Look at this betting screenshot and identify: ${aspect}. Return only the relevant finding.` },
+                    { type: "image", image: imageUrl },
+                  ],
+                },
+              ],
+            });
+            return text;
+          },
+        }),
+      },
+      maxSteps: 3, // Allow OCR parse → optional vision → final answer
+    });
+    
+    // Parse the final response
+    // The agent's last message should contain the structured output
+    return parsedBetSchema.parse(JSON.parse(result.text));
+  }
+  ```
+  
+  **Single-exchange shortcut (before agent call):**
+  ```typescript
+  // In autoparse route
+  const exchanges = accounts.filter(a => a.kind === "exchange" && a.status === "active");
+  
+  // If user has only one exchange, auto-select for lay bets
+  if (betKind === "lay" && exchanges.length === 1) {
+    // Parse with simpler text-only LLM, inject accountId
+    const parsed = await parseWithTextLLM(ocrText);
+    return { ...parsed, accountId: exchanges[0].id, accountConfidence: "high" };
+  }
+  
+  // Otherwise use full agent
+  return await parseBetWithAgent({ ocrText, ocrLines, imageUrl, accounts, betKind });
+  ```
   
   **Implementation plan:**
-  1. Create `lib/account-linking.ts` module (similar to `lib/match-linking.ts`)
-  2. Add `linkBetToAccount()` function that orchestrates the matching
-  3. Add `selectAccountWithLLM()` for LLM-based disambiguation
-  4. Update `app/(chat)/api/bets/autoparse/route.ts` to use new linking logic
-  5. Return `accountConfidence` in autoparse response
+  1. Create `lib/bet-parser-agent.ts` with `parseBetWithAgent()` function
+  2. Use Vercel AI SDK's `generateText` with tool-calling
+  3. Pass both `ocrResult.text` and `ocrResult.lines` to agent
+  4. Implement `lookAtImage` tool that does focused vision analysis
+  5. Update `app/(chat)/api/bets/autoparse/route.ts` to use agent
+  6. Add single-exchange shortcut for lay bets
+  7. Return `accountId` and `accountConfidence` in response
   
-  **DoD:** Parsed bets link to correct accounts even when names don't exactly match; LLM selects from user's account list when ambiguous; confidence levels returned for UI display.
+  **DoD:** 
+  - Back bets always parsed with agent that knows user's accounts
+  - Agent receives OCR text + lines array for better structure understanding
+  - Lay bets auto-select if single exchange, else use agent
+  - Vision tool available as fallback when OCR insufficient
+  - Flag for review when uncertain
   
-  **Why:** Reduces manual corrections during review; OCR/parser output rarely matches account names exactly.
+  **Why:** OCR captures bookmaker names but current parsing doesn't leverage user's account list to identify them. Agent with account context can match "Stake" in OCR to user's "Stake" account without needing vision.
   
-  **Tests:** Unit tests for account linking logic, LLM prompt construction, confidence level handling.
+  **Tests:** Unit tests for agent flow, single-exchange shortcut, OCR line parsing, vision tool invocation.
 
 - [x] **Normalize bet selection during match linking**: The bet selection field (e.g., "Arsenal", "Manchester United", "Draw") is normalized to match the football-data.org API's `winner` field format (`HOME_TEAM`, `AWAY_TEAM`, `DRAW`) for seamless auto-settlement. This happens **during match linking**, not as a separate step.
   
