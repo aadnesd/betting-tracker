@@ -16,7 +16,7 @@ export default async function Page({ params }: PageProps) {
   const session = await auth();
 
   if (!session?.user) {
-    redirect("/api/auth/guest");
+    redirect("/login");
   }
 
   const bet = await getBackBetById({ id, userId: session.user.id });
@@ -71,6 +71,7 @@ export default async function Page({ params }: PageProps) {
         stake: Number(bet.stake),
         accountId: fallbackAccountId,
         currency,
+        matchId: bet.matchId ?? null,
         placedAt: bet.placedAt ?? bet.createdAt,
         notes: null,
       }}

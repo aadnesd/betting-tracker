@@ -6,6 +6,7 @@ import {
   createBetForImport,
   createScreenshotForImport,
   createTransactionForImport,
+  getOrCreateAccount,
   findOrCreateAccount,
 } from "@/lib/db/queries";
 
@@ -81,12 +82,27 @@ async function importBets(userId: string, csvContent: string) {
 
   const allErrors: CsvRowError[] = [...parseResult.errors];
   let importedCount = 0;
+  const accountCache = new Map<string, { id: string; name: string }>();
 
   // Process each successfully parsed bet
   for (let i = 0; i < parseResult.data.length; i++) {
     const bet = parseResult.data[i];
 
     try {
+      const accountKey = `${bet.kind}:${bet.exchange.trim().toLowerCase()}`;
+      let account = accountCache.get(accountKey);
+
+      if (!account) {
+        const resolved = await getOrCreateAccount({
+          userId,
+          name: bet.exchange,
+          kind: bet.kind === "back" ? "bookmaker" : "exchange",
+          currency: bet.currency,
+        });
+        account = { id: resolved.id, name: resolved.name };
+        accountCache.set(accountKey, account);
+      }
+
       // Create a placeholder screenshot for this imported bet
       // (required by schema, marked as "parsed" since data came from CSV)
       const screenshot = await createScreenshotForImport({
@@ -110,10 +126,11 @@ async function importBets(userId: string, csvContent: string) {
         screenshotId: screenshot.id,
         market: bet.market,
         selection: bet.selection,
-        odds: String(bet.odds),
-        stake: String(bet.stake),
-        exchange: bet.exchange,
+        odds: bet.odds,
+        stake: bet.stake,
+        exchange: account.name,
         currency: bet.currency,
+        accountId: account.id,
         placedAt: bet.placedAt,
         notes: bet.notes,
       });

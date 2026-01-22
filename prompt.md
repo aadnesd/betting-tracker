@@ -32,6 +32,6 @@
 - upload screenshots via `app/(chat)/api/bets/screenshots/route.ts`
 - parse via `app/(chat)/api/bets/autoparse/route.ts`
 - create matched bet via `app/(chat)/api/bets/create-matched/route.ts`
-Always provide a review/correction path and persist confidence.
+Always provide a review/correction path and persist confidence. The default currency for the exchange will be NOK as it will be correct 99% of the time, so it is OK with some hard coding of that.
 
 999999999999999. SUPER IMPORTANT DO NOT IGNORE: DO NOT PLACE STATUS REPORT UPDATES INTO `AGENTS.md`.

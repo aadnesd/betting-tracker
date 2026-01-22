@@ -38,17 +38,29 @@ export async function POST(request: Request) {
       sub: userId,
       email: email,
       name: email.split("@")[0],
+      id: userId,
     },
     secret: process.env.AUTH_SECRET!,
     salt: cookieName,
     maxAge: 30 * 24 * 60 * 60, // 30 days
   });
 
-  // Return the token in the response body for the test to set as cookie
-  return NextResponse.json({
+  const response = NextResponse.json({
     success: true,
     userId,
     cookieName,
     token,
   });
+
+  response.headers.set("x-test-user-id", userId);
+  response.cookies.set({
+    name: cookieName,
+    value: token,
+    httpOnly: true,
+    sameSite: "lax",
+    secure: secureCookie,
+    path: "/",
+  });
+
+  return response;
 }

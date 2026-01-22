@@ -21,6 +21,9 @@ export async function createAuthenticatedContext({
   browser: Browser;
   name: string;
 }): Promise<UserContext> {
+  const host = process.env.HOST || "127.0.0.1";
+  const port = process.env.PORT || "3000";
+  const baseUrl = `http://${host}:${port}`;
   const directory = path.join(__dirname, "../playwright/.sessions");
 
   if (!fs.existsSync(directory)) {
@@ -35,12 +38,9 @@ export async function createAuthenticatedContext({
   const email = `test-${name}@playwright.com`;
 
   // Use the test-only auth route to create and get token
-  const response = await page.request.post(
-    "http://localhost:3000/api/auth/test",
-    {
-      data: { email },
-    }
-  );
+  const response = await page.request.post(`${baseUrl}/api/auth/test`, {
+    data: { email },
+  });
 
   if (!response.ok()) {
     const text = await response.text();
@@ -52,12 +52,15 @@ export async function createAuthenticatedContext({
 
   const { cookieName, token } = await response.json();
 
+  const responseHeaders = response.headers();
+  const userIdHeader = responseHeaders["x-test-user-id"] ?? null;
+
   // Set the auth cookie in the browser context
   await context.addCookies([
     {
       name: cookieName,
       value: token,
-      domain: "localhost",
+      url: baseUrl,
       path: "/",
       httpOnly: true,
       sameSite: "Lax",
@@ -68,7 +71,13 @@ export async function createAuthenticatedContext({
   await context.storageState({ path: storageFile });
   await page.close();
 
-  const newContext = await browser.newContext({ storageState: storageFile });
+  const extraHeaders = userIdHeader
+    ? { "x-test-user-id": userIdHeader }
+    : undefined;
+  const newContext = await browser.newContext({
+    storageState: storageFile,
+    extraHTTPHeaders: extraHeaders,
+  });
   const newPage = await newContext.newPage();
 
   return {

@@ -7,6 +7,7 @@ import {
   BarChart3,
   Gift,
   LayoutDashboard,
+  ListChecks,
   LogIn,
   PlusSquare,
   Settings,
@@ -29,6 +30,7 @@ import {
 
 const navigation = [
   { name: "Dashboard", href: "/bets", icon: LayoutDashboard },
+  { name: "Matched Bets", href: "/bets/matched", icon: ListChecks },
   { name: "Quick Add", href: "/bets/quick-add", icon: PlusSquare },
   { name: "Reports", href: "/bets/reports", icon: BarChart3 },
   { name: "Bankroll", href: "/bets/bankroll", icon: Wallet },

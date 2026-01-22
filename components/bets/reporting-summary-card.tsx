@@ -17,12 +17,19 @@ export function ReportingSummaryCard({ summary, className }: Props) {
   const hasBonuses = summary.bonusTotal > 0;
   
   return (
-    <div className={cn("grid gap-4 md:grid-cols-2 lg:grid-cols-4", className)}>
+    <div className={cn("grid gap-4 md:grid-cols-2 lg:grid-cols-5", className)}>
       <NetProfitCard summary={summary} hasBonuses={hasBonuses} />
       <StatCard
         title="Total Stake"
         value={formatNOK(summary.totalStake)}
         subtitle="Total wagered"
+      />
+      <StatCard
+        title="Qualifying Loss"
+        value={formatNOK(-summary.qualifyingLoss)}
+        trend={summary.qualifyingLoss > 0 ? "negative" : "neutral"}
+        subtitle="Cost to unlock offers"
+        tooltipType="qualifyingLoss"
       />
       <StatCard
         title="ROI"

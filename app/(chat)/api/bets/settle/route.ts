@@ -17,6 +17,7 @@ import {
   calculateLayProfitLoss,
   isFreeBetPromoType,
 } from "@/lib/settlement";
+import { convertAmountToNok } from "@/lib/fx-rates";
 
 const settleSchema = z.object({
   betId: z.string().uuid(),
@@ -131,6 +132,7 @@ export async function POST(request: Request) {
 
     const now = new Date();
     const currency = bet.currency ?? "NOK";
+    const profitLossNok = await convertAmountToNok(profitLoss, currency);
 
     // Update the bet
     const updateFn = body.betKind === "back" ? updateBackBet : updateLayBet;
@@ -140,6 +142,7 @@ export async function POST(request: Request) {
       status: "settled",
       settledAt: now,
       profitLoss: profitLoss.toString(),
+      profitLossNok: profitLossNok.toFixed(2),
     });
 
     // Create account balance adjustment if account is linked

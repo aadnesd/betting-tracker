@@ -194,8 +194,12 @@ export async function parseMatchedBetFromScreenshots({
   const parsed = await callModelWithRetry({ backImageUrl, layImageUrl });
   const layWithDefaults: ParsedBet = {
     ...parsed.lay,
-    exchange: "bfb247",
-    currency: "NOK",
+    exchange: parsed.lay.exchange?.trim()
+      ? parsed.lay.exchange
+      : "bfb247",
+    currency: parsed.lay.currency?.trim()
+      ? parsed.lay.currency
+      : "NOK",
   };
 
   // Cross-validate the pair; flag needsReview when markets diverge.

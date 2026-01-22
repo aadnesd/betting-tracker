@@ -5,6 +5,7 @@ import {
   createAuditEntry,
   createManualScreenshot,
   getAccountById,
+  getFootballMatchById,
   getOrCreateAccount,
   saveBackBet,
   saveLayBet,
@@ -20,6 +21,7 @@ const standaloneBetSchema = z
     accountId: z.string().uuid().optional(),
     account: z.string().min(1, "Account is required").optional(),
     currency: z.string().length(3).default("NOK"),
+    matchId: z.string().uuid().optional().nullable(),
     placedAt: z.string().optional(), // ISO date string
     notes: z.string().optional(),
   })
@@ -92,6 +94,13 @@ export async function POST(request: Request) {
       });
     }
 
+    if (body.matchId) {
+      const match = await getFootballMatchById({ id: body.matchId });
+      if (!match) {
+        return NextResponse.json({ error: "Match not found" }, { status: 404 });
+      }
+    }
+
     const betData = {
       userId: session.user.id,
       screenshotId: screenshot.id,
@@ -100,6 +109,7 @@ export async function POST(request: Request) {
       odds: body.odds,
       stake: body.stake,
       exchange: account.name ?? body.account ?? "", // Stored as exchange field regardless of bet type
+      matchId: body.matchId ?? null,
       accountId: account.id,
       currency: body.currency,
       placedAt: body.placedAt ? new Date(body.placedAt) : new Date(),
@@ -146,6 +156,7 @@ export async function POST(request: Request) {
         stake: Number(bet.stake),
         status: bet.status,
         currency: bet.currency,
+        matchId: bet.matchId ?? null,
         placedAt: bet.placedAt,
         createdAt: bet.createdAt,
         accountId: bet.accountId,

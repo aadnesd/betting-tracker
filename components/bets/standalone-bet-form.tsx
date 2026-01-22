@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
+import { MatchPicker, type MatchOption } from "@/components/bets/match-picker";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -45,6 +46,7 @@ interface StandaloneBetFormProps {
     accountId: string;
     currency: string;
     placedAt: Date;
+    matchId?: string | null;
     notes?: string | null;
   };
 }
@@ -58,6 +60,7 @@ interface FormData {
   accountId: string;
   currency: string;
   placedAt: string;
+  matchId: string;
   notes: string;
 }
 
@@ -87,6 +90,7 @@ export function StandaloneBetForm({
     accountId: initialData?.accountId ?? fallbackAccountId,
     currency: initialData?.currency ?? fallbackCurrency,
     placedAt: initialPlacedAt, // datetime-local format
+    matchId: initialData?.matchId ?? "",
     notes: initialData?.notes ?? "",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -175,6 +179,7 @@ export function StandaloneBetForm({
           stake: Number.parseFloat(formData.stake),
           accountId: formData.accountId,
           currency: formData.currency,
+          matchId: formData.matchId ? formData.matchId : null,
           placedAt: formData.placedAt
             ? new Date(formData.placedAt).toISOString()
             : undefined,
@@ -217,6 +222,9 @@ export function StandaloneBetForm({
 
   const noAccounts = bookmakers.length === 0 && exchanges.length === 0;
   const noAccountsForType = accounts.length === 0;
+  const handleMatchChange = (match: MatchOption | null) => {
+    updateField("matchId", match?.id ?? "");
+  };
 
   // Calculate potential profit/loss for display
   const odds = Number.parseFloat(formData.odds) || 0;
@@ -346,6 +354,20 @@ export function StandaloneBetForm({
               </div>
 
               {/* Market & Selection */}
+              <div className="space-y-2">
+                <Label htmlFor="matchPicker" className="flex items-center gap-2">
+                  Link to Match (optional)
+                </Label>
+                <MatchPicker
+                  value={formData.matchId || null}
+                  onChange={handleMatchChange}
+                  placeholder="Search for a match..."
+                />
+                <p className="text-xs text-muted-foreground">
+                  Linking to a match enables automatic result lookup
+                </p>
+              </div>
+
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="market">Market</Label>

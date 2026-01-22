@@ -6,6 +6,7 @@ import {
   createAuditEntry,
   getAccountById,
   getBackBetById,
+  getFootballMatchById,
   getLayBetById,
   getMatchedBetByLegId,
   updateBackBetDetails,
@@ -23,6 +24,7 @@ const updateSchema = z.object({
   stake: z.number().positive("Stake must be positive"),
   accountId: z.string().uuid(),
   currency: z.string().length(3),
+  matchId: z.string().uuid().optional().nullable(),
   placedAt: z.string().optional().nullable(),
   notes: z.string().optional(),
 });
@@ -103,15 +105,29 @@ export async function POST(request: Request) {
       );
     }
 
+    if (payload.matchId !== undefined && payload.matchId !== null) {
+      const match = await getFootballMatchById({ id: payload.matchId });
+      if (!match) {
+        return NextResponse.json(
+          { error: "Match not found" },
+          { status: 404 }
+        );
+      }
+    }
+
     const beforeState = {
       market: bet.market,
       selection: bet.selection,
       odds: bet.odds,
       stake: bet.stake,
+      matchId: bet.matchId ?? null,
       accountId: bet.accountId,
       currency: bet.currency,
       placedAt: bet.placedAt,
     };
+
+    const matchIdForUpdate =
+      payload.matchId === undefined ? (bet.matchId ?? null) : payload.matchId;
 
     const updated =
       payload.betKind === "back"
@@ -123,6 +139,7 @@ export async function POST(request: Request) {
             odds: payload.odds,
             stake: payload.stake,
             exchange: account.name,
+            matchId: matchIdForUpdate,
             accountId: account.id,
             currency: payload.currency,
             placedAt: safeDate(payload.placedAt),
@@ -135,6 +152,7 @@ export async function POST(request: Request) {
             odds: payload.odds,
             stake: payload.stake,
             exchange: account.name,
+            matchId: matchIdForUpdate,
             accountId: account.id,
             currency: payload.currency,
             placedAt: safeDate(payload.placedAt),
@@ -152,6 +170,7 @@ export async function POST(request: Request) {
       selection: updated.selection,
       odds: updated.odds,
       stake: updated.stake,
+      matchId: updated.matchId ?? null,
       accountId: updated.accountId,
       currency: updated.currency,
       placedAt: updated.placedAt,
@@ -177,6 +196,29 @@ export async function POST(request: Request) {
     });
 
     if (matchedBet) {
+      if (payload.matchId !== undefined) {
+        const nextMatchId = payload.matchId ?? null;
+        if (matchedBet.matchId !== nextMatchId) {
+          await updateMatchedBetRecord({
+            id: matchedBet.id,
+            userId,
+            matchId: nextMatchId,
+          });
+
+          await createAuditEntry({
+            userId,
+            entityType: "matched_bet",
+            entityId: matchedBet.id,
+            action: "update",
+            changes: {
+              matchId: { from: matchedBet.matchId ?? null, to: nextMatchId },
+              reason: "leg_match_update",
+            },
+            notes: "Updated match link from individual bet edit",
+          });
+        }
+      }
+
       const back =
         payload.betKind === "back"
           ? updated

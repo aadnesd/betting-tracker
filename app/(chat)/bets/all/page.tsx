@@ -97,7 +97,7 @@ export default async function Page(props: PageProps) {
   const session = await auth();
 
   if (!session) {
-    redirect("/api/auth/guest");
+    redirect("/login");
   }
 
   const searchParams = await props.searchParams;

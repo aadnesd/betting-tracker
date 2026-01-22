@@ -193,7 +193,7 @@ async function transferUserData({
 
 export async function findOrCreateOAuthUser({
   email,
-  guestUserId: _guestUserId,
+  guestUserId,
 }: {
   email: string;
   guestUserId?: string | null;
@@ -202,7 +202,19 @@ export async function findOrCreateOAuthUser({
   const existingUser = existingUsers[0];
 
   if (existingUser) {
-    return { userId: existingUser.id, linkedFromGuest: false };
+    if (guestUserId && guestUserId !== existingUser.id) {
+      await transferUserData({ fromUserId: guestUserId, toUserId: existingUser.id });
+      return { userId: existingUser.id, linkedFromGuest: true };
+    }
+
+    return { userId: existingUser.id, linkedFromGuest: Boolean(guestUserId) };
+  }
+
+  if (guestUserId) {
+    const updated = await updateUserEmailForOAuth({ id: guestUserId, email });
+    if (updated) {
+      return { userId: updated.id, linkedFromGuest: true };
+    }
   }
 
   const created = await createOAuthUser(email);
@@ -892,6 +904,7 @@ type BetInputBase = {
   odds: number;
   stake: number;
   exchange: string;
+  matchId?: string | null;
   accountId?: string | null;
   currency?: string | null;
   placedAt?: Date | null;
@@ -1008,15 +1021,26 @@ export async function saveBackBet({
   ...bet
 }: BetInputBase & { userId: string; screenshotId: string }) {
   try {
+    const stakeNok = await convertAmountToNok(
+      bet.stake,
+      bet.currency ?? "NOK"
+    );
+    const profitLossNok =
+      bet.profitLoss === undefined || bet.profitLoss === null
+        ? null
+        : await convertAmountToNok(bet.profitLoss, bet.currency ?? "NOK");
+
     const values: typeof backBet.$inferInsert = {
       createdAt: new Date(),
       userId,
       accountId: bet.accountId ?? null,
       screenshotId,
+      matchId: bet.matchId ?? null,
       market: bet.market,
       selection: bet.selection,
       odds: bet.odds.toString(),
       stake: bet.stake.toString(),
+      stakeNok: stakeNok.toFixed(2),
       exchange: bet.exchange,
       currency: bet.currency ?? null,
       placedAt: bet.placedAt ?? null,
@@ -1025,6 +1049,7 @@ export async function saveBackBet({
         bet.profitLoss === undefined || bet.profitLoss === null
           ? null
           : bet.profitLoss.toString(),
+      profitLossNok: profitLossNok === null ? null : profitLossNok.toFixed(2),
       confidence: bet.confidence ?? null,
       status: bet.status ?? "draft",
       error: bet.error ?? null,
@@ -1043,15 +1068,26 @@ export async function saveLayBet({
   ...bet
 }: BetInputBase & { userId: string; screenshotId: string }) {
   try {
+    const stakeNok = await convertAmountToNok(
+      bet.stake,
+      bet.currency ?? "NOK"
+    );
+    const profitLossNok =
+      bet.profitLoss === undefined || bet.profitLoss === null
+        ? null
+        : await convertAmountToNok(bet.profitLoss, bet.currency ?? "NOK");
+
     const values: typeof layBet.$inferInsert = {
       createdAt: new Date(),
       userId,
       accountId: bet.accountId ?? null,
       screenshotId,
+      matchId: bet.matchId ?? null,
       market: bet.market,
       selection: bet.selection,
       odds: bet.odds.toString(),
       stake: bet.stake.toString(),
+      stakeNok: stakeNok.toFixed(2),
       exchange: bet.exchange,
       currency: bet.currency ?? null,
       placedAt: bet.placedAt ?? null,
@@ -1060,6 +1096,7 @@ export async function saveLayBet({
         bet.profitLoss === undefined || bet.profitLoss === null
           ? null
           : bet.profitLoss.toString(),
+      profitLossNok: profitLossNok === null ? null : profitLossNok.toFixed(2),
       confidence: bet.confidence ?? null,
       status: bet.status ?? "draft",
       error: bet.error ?? null,
@@ -1123,18 +1160,21 @@ export async function updateBackBet({
   status,
   settledAt,
   profitLoss,
+  profitLossNok,
 }: {
   id: string;
   userId: string;
   status?: "draft" | "placed" | "matched" | "settled" | "needs_review" | "error";
   settledAt?: Date | null;
   profitLoss?: string | null;
+  profitLossNok?: string | null;
 }) {
   try {
     const updates: Partial<typeof backBet.$inferInsert> = {};
     if (status !== undefined) updates.status = status;
     if (settledAt !== undefined) updates.settledAt = settledAt;
     if (profitLoss !== undefined) updates.profitLoss = profitLoss;
+    if (profitLossNok !== undefined) updates.profitLossNok = profitLossNok;
 
     const [row] = await db
       .update(backBet)
@@ -1158,6 +1198,7 @@ export async function updateBackBetDetails({
   odds,
   stake,
   exchange,
+  matchId,
   accountId,
   currency,
   placedAt,
@@ -1169,17 +1210,21 @@ export async function updateBackBetDetails({
   odds: number;
   stake: number;
   exchange: string;
+  matchId?: string | null;
   accountId: string | null;
   currency: string | null;
   placedAt: Date | null;
 }) {
   try {
+    const stakeNok = await convertAmountToNok(stake, currency ?? "NOK");
     const updates: Partial<typeof backBet.$inferInsert> = {
       market,
       selection,
       odds: odds.toString(),
       stake: stake.toString(),
+      stakeNok: stakeNok.toFixed(2),
       exchange,
+      matchId: matchId ?? null,
       accountId,
       currency,
       placedAt,
@@ -1208,18 +1253,21 @@ export async function updateLayBet({
   status,
   settledAt,
   profitLoss,
+  profitLossNok,
 }: {
   id: string;
   userId: string;
   status?: "draft" | "placed" | "matched" | "settled" | "needs_review" | "error";
   settledAt?: Date | null;
   profitLoss?: string | null;
+  profitLossNok?: string | null;
 }) {
   try {
     const updates: Partial<typeof layBet.$inferInsert> = {};
     if (status !== undefined) updates.status = status;
     if (settledAt !== undefined) updates.settledAt = settledAt;
     if (profitLoss !== undefined) updates.profitLoss = profitLoss;
+    if (profitLossNok !== undefined) updates.profitLossNok = profitLossNok;
 
     const [row] = await db
       .update(layBet)
@@ -1243,6 +1291,7 @@ export async function updateLayBetDetails({
   odds,
   stake,
   exchange,
+  matchId,
   accountId,
   currency,
   placedAt,
@@ -1254,17 +1303,21 @@ export async function updateLayBetDetails({
   odds: number;
   stake: number;
   exchange: string;
+  matchId?: string | null;
   accountId: string | null;
   currency: string | null;
   placedAt: Date | null;
 }) {
   try {
+    const stakeNok = await convertAmountToNok(stake, currency ?? "NOK");
     const updates: Partial<typeof layBet.$inferInsert> = {
       market,
       selection,
       odds: odds.toString(),
       stake: stake.toString(),
+      stakeNok: stakeNok.toFixed(2),
       exchange,
+      matchId: matchId ?? null,
       accountId,
       currency,
       placedAt,
@@ -1365,6 +1418,224 @@ export async function listMatchedBetsByUser({
       .where(eq(matchedBet.userId, userId))
       .orderBy(desc(matchedBet.createdAt))
       .limit(limit);
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to list matched bets"
+    );
+  }
+}
+
+export type MatchedBetListItem = {
+  id: string;
+  market: string;
+  selection: string;
+  status: "draft" | "matched" | "settled" | "needs_review";
+  promoType: string | null;
+  netExposure: number | null;
+  createdAt: Date;
+  notes: string | null;
+  back: {
+    id: string;
+    odds: number;
+    stake: number;
+    exchange: string;
+    currency: string | null;
+    status: "draft" | "placed" | "matched" | "settled" | "needs_review" | "error";
+    placedAt: Date | null;
+    profitLoss: number | null;
+    accountId: string | null;
+    accountName: string | null;
+  } | null;
+  lay: {
+    id: string;
+    odds: number;
+    stake: number;
+    exchange: string;
+    currency: string | null;
+    status: "draft" | "placed" | "matched" | "settled" | "needs_review" | "error";
+    placedAt: Date | null;
+    profitLoss: number | null;
+    accountId: string | null;
+    accountName: string | null;
+  } | null;
+  footballMatch: {
+    id: string;
+    homeTeam: string;
+    awayTeam: string;
+    competition: string;
+    matchDate: Date;
+    status: FootballMatchStatus;
+    homeScore: number | null;
+    awayScore: number | null;
+  } | null;
+};
+
+export async function listMatchedBetsForList({
+  userId,
+  status,
+  fromDate,
+  toDate,
+  search,
+  limit = 100,
+}: {
+  userId: string;
+  status?: "draft" | "matched" | "settled" | "needs_review";
+  fromDate?: Date;
+  toDate?: Date;
+  search?: string;
+  limit?: number;
+}): Promise<MatchedBetListItem[]> {
+  try {
+    const conditions: SQL<unknown>[] = [eq(matchedBet.userId, userId)];
+    const normalizedSearch = search?.trim().toLowerCase();
+
+    if (status) {
+      conditions.push(eq(matchedBet.status, status));
+    }
+    if (fromDate) {
+      conditions.push(gte(matchedBet.createdAt, fromDate));
+    }
+    if (toDate) {
+      conditions.push(lte(matchedBet.createdAt, toDate));
+    }
+    if (normalizedSearch) {
+      const pattern = `%${normalizedSearch}%`;
+      conditions.push(
+        sql`(LOWER(${matchedBet.market}) LIKE ${pattern} OR LOWER(${matchedBet.selection}) LIKE ${pattern})`
+      );
+    }
+
+    const backAccount = aliasedTable(account, "backAccount");
+    const layAccount = aliasedTable(account, "layAccount");
+
+    const rows = await db
+      .select({
+        id: matchedBet.id,
+        market: matchedBet.market,
+        selection: matchedBet.selection,
+        status: matchedBet.status,
+        promoType: matchedBet.promoType,
+        netExposure: matchedBet.netExposure,
+        createdAt: matchedBet.createdAt,
+        notes: matchedBet.notes,
+        back: {
+          id: backBet.id,
+          odds: backBet.odds,
+          stake: backBet.stake,
+          exchange: backBet.exchange,
+          currency: backBet.currency,
+          status: backBet.status,
+          placedAt: backBet.placedAt,
+          profitLoss: backBet.profitLoss,
+          accountId: backBet.accountId,
+          accountName: backAccount.name,
+        },
+        lay: {
+          id: layBet.id,
+          odds: layBet.odds,
+          stake: layBet.stake,
+          exchange: layBet.exchange,
+          currency: layBet.currency,
+          status: layBet.status,
+          placedAt: layBet.placedAt,
+          profitLoss: layBet.profitLoss,
+          accountId: layBet.accountId,
+          accountName: layAccount.name,
+        },
+        footballMatch: {
+          id: footballMatch.id,
+          homeTeam: footballMatch.homeTeam,
+          awayTeam: footballMatch.awayTeam,
+          competition: footballMatch.competition,
+          matchDate: footballMatch.matchDate,
+          status: footballMatch.status,
+          homeScore: footballMatch.homeScore,
+          awayScore: footballMatch.awayScore,
+        },
+      })
+      .from(matchedBet)
+      .leftJoin(backBet, eq(matchedBet.backBetId, backBet.id))
+      .leftJoin(layBet, eq(matchedBet.layBetId, layBet.id))
+      .leftJoin(backAccount, eq(backBet.accountId, backAccount.id))
+      .leftJoin(layAccount, eq(layBet.accountId, layAccount.id))
+      .leftJoin(footballMatch, eq(matchedBet.matchId, footballMatch.id))
+      .where(and(...conditions))
+      .orderBy(desc(matchedBet.createdAt))
+      .limit(limit);
+
+    const parseNumber = (value: unknown) =>
+      value === null || value === undefined
+        ? null
+        : Number.parseFloat(value.toString());
+
+    return rows.map((row) => {
+      const back =
+        row.back?.id !== null && row.back?.id !== undefined
+          ? {
+              id: row.back.id,
+              odds: Number.parseFloat((row.back.odds ?? 0).toString()),
+              stake: Number.parseFloat((row.back.stake ?? 0).toString()),
+              exchange: row.back.exchange ?? "",
+              currency: row.back.currency ?? null,
+              status: row.back.status ?? "draft" as const,
+              placedAt: row.back.placedAt ?? null,
+              profitLoss: parseNumber(row.back.profitLoss),
+              accountId: row.back.accountId ?? null,
+              accountName: row.back.accountName ?? null,
+            }
+          : null;
+
+      const lay =
+        row.lay?.id !== null && row.lay?.id !== undefined
+          ? {
+              id: row.lay.id,
+              odds: Number.parseFloat((row.lay.odds ?? 0).toString()),
+              stake: Number.parseFloat((row.lay.stake ?? 0).toString()),
+              exchange: row.lay.exchange ?? "",
+              currency: row.lay.currency ?? null,
+              status: row.lay.status ?? "draft" as const,
+              placedAt: row.lay.placedAt ?? null,
+              profitLoss: parseNumber(row.lay.profitLoss),
+              accountId: row.lay.accountId ?? null,
+              accountName: row.lay.accountName ?? null,
+            }
+          : null;
+
+      const match =
+        row.footballMatch?.id !== null && row.footballMatch?.id !== undefined
+          ? {
+              id: row.footballMatch.id,
+              homeTeam: row.footballMatch.homeTeam ?? "",
+              awayTeam: row.footballMatch.awayTeam ?? "",
+              competition: row.footballMatch.competition ?? "",
+              matchDate: row.footballMatch.matchDate ?? new Date(),
+              status: row.footballMatch.status ?? "SCHEDULED" as FootballMatchStatus,
+              homeScore:
+                row.footballMatch.homeScore === null
+                  ? null
+                  : Number.parseFloat(row.footballMatch.homeScore.toString()),
+              awayScore:
+                row.footballMatch.awayScore === null
+                  ? null
+                  : Number.parseFloat(row.footballMatch.awayScore.toString()),
+            }
+          : null;
+
+      return {
+        id: row.id,
+        market: row.market,
+        selection: row.selection,
+        status: row.status,
+        promoType: row.promoType ?? null,
+        netExposure: parseNumber(row.netExposure),
+        createdAt: row.createdAt,
+        notes: row.notes ?? null,
+        back,
+        lay,
+        footballMatch: match,
+      };
+    });
   } catch (_error) {
     throw new ChatSDKError(
       "bad_request:database",
@@ -1643,6 +1914,7 @@ export async function updateMatchedBetRecord({
   netExposure,
   backBetId,
   layBetId,
+  matchId,
   promoId,
   promoType,
   lastError,
@@ -1655,6 +1927,7 @@ export async function updateMatchedBetRecord({
   netExposure?: number | null;
   backBetId?: string | null;
   layBetId?: string | null;
+  matchId?: string | null;
   promoId?: string | null;
   promoType?: string | null;
   lastError?: string | null;
@@ -1677,6 +1950,9 @@ export async function updateMatchedBetRecord({
     }
     if (layBetId !== undefined) {
       values.layBetId = layBetId;
+    }
+    if (matchId !== undefined) {
+      values.matchId = matchId;
     }
     if (promoId !== undefined) {
       values.promoId = promoId;
@@ -2202,6 +2478,15 @@ export async function applyAutoSettlement(
   let transactionsCreated = 0;
 
   try {
+    const backProfitLossNok = await convertAmountToNok(
+      params.backProfitLoss,
+      params.backCurrency ?? "NOK"
+    );
+    const layProfitLossNok = await convertAmountToNok(
+      params.layProfitLoss,
+      params.layCurrency ?? "NOK"
+    );
+
     // 1. Update matched bet status to settled
     await db
       .update(matchedBet)
@@ -2220,6 +2505,7 @@ export async function applyAutoSettlement(
         .set({
           status: "settled",
           profitLoss: params.backProfitLoss.toFixed(2),
+          profitLossNok: backProfitLossNok.toFixed(2),
           settledAt: now,
         })
         .where(eq(backBet.id, params.backBetId));
@@ -2247,6 +2533,7 @@ export async function applyAutoSettlement(
         .set({
           status: "settled",
           profitLoss: params.layProfitLoss.toFixed(2),
+          profitLossNok: layProfitLossNok.toFixed(2),
           settledAt: now,
         })
         .where(eq(layBet.id, params.layBetId));
@@ -2930,7 +3217,9 @@ export async function getBookmakerProfitWithBonuses({
         accountId: backBet.accountId,
         accountName: account.name,
         profitLoss: backBet.profitLoss,
+        profitLossNok: backBet.profitLossNok,
         stake: backBet.stake,
+        stakeNok: backBet.stakeNok,
         currency: backBet.currency,
       })
       .from(matchedBet)
@@ -2988,13 +3277,18 @@ export async function getBookmakerProfitWithBonuses({
           bonusTotal: 0,
         };
         
-        const pl = row.profitLoss ? Number.parseFloat(row.profitLoss) : 0;
-        const stake = row.stake ? Number.parseFloat(row.stake) : 0;
         const currency = row.currency ?? "NOK";
-        
-        const plNok = await convertAmountToNok(pl, currency);
-        const stakeNok = await convertAmountToNok(stake, currency);
-        
+        const plNok = row.profitLossNok
+          ? Number.parseFloat(row.profitLossNok)
+          : currency === "NOK" && row.profitLoss
+            ? Number.parseFloat(row.profitLoss)
+            : 0;
+        const stakeNok = row.stakeNok
+          ? Number.parseFloat(row.stakeNok)
+          : currency === "NOK" && row.stake
+            ? Number.parseFloat(row.stake)
+            : 0;
+
         existing.betCount += 1;
         existing.bettingProfit += plNok;
         existing.totalStake += stakeNok;
@@ -3510,10 +3804,11 @@ export type CreateBetForImportParams = {
   screenshotId: string;
   market: string;
   selection: string;
-  odds: string;
-  stake: string;
+  odds: number;
+  stake: number;
   exchange: string;
   currency: string;
+  accountId?: string | null;
   placedAt?: Date | null;
   notes?: string | null;
 };
@@ -3524,24 +3819,30 @@ export type CreateBetForImportParams = {
 export async function createBetForImport(params: CreateBetForImportParams) {
   try {
     const now = new Date();
-    const table = params.kind === "back" ? backBet : layBet;
+    const betInput: BetInputBase = {
+      market: params.market,
+      selection: params.selection,
+      odds: params.odds,
+      stake: params.stake,
+      exchange: params.exchange,
+      currency: params.currency,
+      accountId: params.accountId ?? null,
+      placedAt: params.placedAt ?? null,
+      status: "placed",
+    };
 
-    const [result] = await db
-      .insert(table)
-      .values({
-        createdAt: now,
-        userId: params.userId,
-        screenshotId: params.screenshotId,
-        market: params.market,
-        selection: params.selection,
-        odds: params.odds,
-        stake: params.stake,
-        exchange: params.exchange,
-        currency: params.currency,
-        placedAt: params.placedAt,
-        status: "placed",
-      })
-      .returning();
+    const result =
+      params.kind === "back"
+        ? await saveBackBet({
+            userId: params.userId,
+            screenshotId: params.screenshotId,
+            ...betInput,
+          })
+        : await saveLayBet({
+            userId: params.userId,
+            screenshotId: params.screenshotId,
+            ...betInput,
+          });
 
     // Create audit entry
     await db.insert(auditLog).values({
@@ -3684,19 +3985,18 @@ export async function getDashboardSummary({
 
     // Run all queries in parallel for performance
     const [
-      settledBetsData,
+      settledAggregates,
       openExposureData,
       pendingReview,
       recentActivity,
     ] = await Promise.all([
-      // Fetch settled bets with P/L and currency for FX conversion
+      // Aggregate settled bets using stored NOK values
       db
         .select({
-          backProfitLoss: backBet.profitLoss,
-          backCurrency: backBet.currency,
-          backStake: backBet.stake,
-          layProfitLoss: layBet.profitLoss,
-          layCurrency: layBet.currency,
+          totalBackProfitLossNok: sql<string>`COALESCE(${sum(backBet.profitLossNok)}, 0)`,
+          totalLayProfitLossNok: sql<string>`COALESCE(${sum(layBet.profitLossNok)}, 0)`,
+          totalBackStakeNok: sql<string>`COALESCE(${sum(backBet.stakeNok)}, 0)`,
+          settledCount: count(matchedBet.id),
         })
         .from(matchedBet)
         .leftJoin(backBet, eq(matchedBet.backBetId, backBet.id))
@@ -3729,26 +4029,18 @@ export async function getDashboardSummary({
         ),
     ]);
 
-    // Convert all P/L values to NOK and sum
-    let totalProfit = 0;
-    let totalStake = 0;
-    for (const bet of settledBetsData) {
-      const backPL = bet.backProfitLoss ? Number.parseFloat(bet.backProfitLoss) : 0;
-      const layPL = bet.layProfitLoss ? Number.parseFloat(bet.layProfitLoss) : 0;
-      const backCurrency = bet.backCurrency ?? "NOK";
-      const layCurrency = bet.layCurrency ?? "NOK";
-      
-      const backPLNok = await convertAmountToNok(backPL, backCurrency);
-      const layPLNok = await convertAmountToNok(layPL, layCurrency);
-      totalProfit += backPLNok + layPLNok;
-      
-      // Stake is also converted for ROI calculation
-      const backStake = bet.backStake ? Number.parseFloat(bet.backStake) : 0;
-      const backStakeNok = await convertAmountToNok(backStake, backCurrency);
-      totalStake += backStakeNok;
-    }
-    
-    const settledCount = settledBetsData.length;
+    const totals = settledAggregates[0];
+    const backProfitNok = totals?.totalBackProfitLossNok
+      ? Number.parseFloat(totals.totalBackProfitLossNok)
+      : 0;
+    const layProfitNok = totals?.totalLayProfitLossNok
+      ? Number.parseFloat(totals.totalLayProfitLossNok)
+      : 0;
+    const totalProfit = backProfitNok + layProfitNok;
+    const totalStake = totals?.totalBackStakeNok
+      ? Number.parseFloat(totals.totalBackStakeNok)
+      : 0;
+    const settledCount = totals?.settledCount ?? 0;
     const roi = totalStake > 0 ? (totalProfit / totalStake) * 100 : 0;
 
     return {

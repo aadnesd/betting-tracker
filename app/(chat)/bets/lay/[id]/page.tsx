@@ -26,7 +26,7 @@ export default async function Page({ params }: PageProps) {
   const session = await auth();
 
   if (!session) {
-    redirect("/api/auth/guest");
+    redirect("/login");
   }
 
   const userId = session.user.id;
@@ -55,8 +55,9 @@ export default async function Page({ params }: PageProps) {
     ? await getBackBetById({ id: matchedBet.backBetId, userId })
     : null;
 
-  const footballMatch = matchedBet?.matchId
-    ? await getFootballMatchById({ id: matchedBet.matchId })
+  const matchId = bet.matchId ?? matchedBet?.matchId ?? null;
+  const footballMatch = matchId
+    ? await getFootballMatchById({ id: matchId })
     : null;
 
   const settlementEntry = auditEntries.find(
