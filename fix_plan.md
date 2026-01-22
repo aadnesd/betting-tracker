@@ -8,7 +8,7 @@ Prioritized implementation tasks. Check off when complete with tests passing.
 **Last updated**: 22 January 2026
 **Build**: ✅ Passing
 **Tests**: ✅ `pnpm exec vitest run` (573 tests passing)
-**Tag**: v0.0.56
+**Tag**: v0.0.59
 
 Remaining blocker: Rerun Playwright route tests in an environment that permits binding the dev server.
 
