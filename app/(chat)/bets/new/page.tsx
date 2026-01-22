@@ -1,7 +1,7 @@
 import { connection } from "next/server";
 import { redirect } from "next/navigation";
 import { auth } from "@/app/(auth)/auth";
-import { BetIngestForm } from "@/components/bets/bet-ingest-form";
+import { BetIntakeWrapper } from "@/components/bets/bet-intake-wrapper";
 import { listAccountsByUser } from "@/lib/db/queries";
 
 export const metadata = {
@@ -48,11 +48,11 @@ export default async function Page() {
           Upload back & lay screenshots
         </h1>
         <p className="text-muted-foreground text-sm">
-          We will parse both slips, align markets, and create a matched bet
-          record.
+          Paste screenshots from your clipboard (⌘V), drag & drop, or browse files.
+          AI parsing starts automatically when both screenshots are ready.
         </p>
       </div>
-      <BetIngestForm bookmakers={bookmakers} exchanges={exchanges} />
+      <BetIntakeWrapper bookmakers={bookmakers} exchanges={exchanges} />
     </div>
   );
 }
