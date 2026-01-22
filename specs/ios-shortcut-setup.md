@@ -12,8 +12,8 @@ This guide walks you through creating an iOS Shortcut to submit bet screenshots 
 
 ## Step 1: Generate Your API Key
 
-1. Open the tracker in Safari: `https://your-domain.com/bets`
-2. Navigate to **Settings → API Keys** (or go directly to `/bets/settings/api-keys`)
+1. Open the tracker in Safari: `https://nextjs-ai-chatbot-xi-red-23.vercel.app/bets`
+2. Navigate to **Settings → API Keys** (or go directly to `https://nextjs-ai-chatbot-xi-red-23.vercel.app/bets/settings/api-keys`)
 3. Click **Generate API Key**
 4. **Copy the key immediately** — it will only be shown once
 5. Save it somewhere secure (e.g., Notes app, password manager)
@@ -59,7 +59,7 @@ This guide walks you through creating an iOS Shortcut to submit bet screenshots 
 
 | Field | Value |
 |-------|-------|
-| URL | `https://your-domain.com/api/bets/shortcut` |
+| URL | `https://nextjs-ai-chatbot-xi-red-23.vercel.app/api/bets/shortcut` |
 | Method | **POST** |
 | Request Body | **Form** |
 
@@ -103,8 +103,8 @@ This guide walks you through creating an iOS Shortcut to submit bet screenshots 
 ┌─────────────────────────────────────────┐
 │  Get Contents of URL                    │
 │  ─────────────────────────────────────  │
-│  URL: https://your-domain.com/          │
-│       api/bets/shortcut                 │
+│  URL: https://nextjs-ai-chatbot-xi-red- │
+│       23.vercel.app/api/bets/shortcut   │
 │  Method: POST                           │
 │  Request Body: Form                     │
 │    • back: [Images]                     │
