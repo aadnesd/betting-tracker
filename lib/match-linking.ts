@@ -212,6 +212,8 @@ export async function selectMatchWithLLM({
     })
     .join("\n");
 
+  console.log(`[match-linking] LLM prompt candidates:\n${candidateList}`);
+
   const prompt = `You are matching a betting slip to a football match in our database.
 
 PARSED BET FROM SCREENSHOT:
