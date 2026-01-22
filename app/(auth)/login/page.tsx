@@ -1,6 +1,5 @@
 "use client";
 
-import { Github } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn, useSession } from "next-auth/react";
 import { Suspense, useEffect } from "react";
@@ -37,15 +36,6 @@ function LoginContent() {
           >
             <LogoGoogle />
             Continue with Google
-          </Button>
-          <Button
-            className="w-full justify-center gap-2"
-            onClick={() => signIn("github", { redirectTo: callbackUrl })}
-            type="button"
-            variant="outline"
-          >
-            <Github className="size-4" />
-            Continue with GitHub
           </Button>
         </div>
       </div>
