@@ -55,6 +55,9 @@ export function DashboardActions({ pendingReviewCount, accounts }: DashboardActi
       <Button asChild variant="ghost" size="sm" className="md:size-default">
         <Link href="/bets/settings/competitions">Competitions</Link>
       </Button>
+      <Button asChild variant="ghost" size="sm" className="md:size-default">
+        <Link href="/bets/settings/api-keys">API Keys</Link>
+      </Button>
       <QuickTransactionSheet 
         accounts={accounts} 
         onSuccess={handleTransactionSuccess}
