@@ -18,6 +18,13 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  if (process.env.PLAYWRIGHT) {
+    const testUserId = request.headers.get("x-test-user-id");
+    if (testUserId) {
+      return NextResponse.next();
+    }
+  }
+
   // Allow cron jobs to bypass authentication (they use CRON_SECRET for auth)
   if (pathname.startsWith("/api/cron")) {
     return NextResponse.next();

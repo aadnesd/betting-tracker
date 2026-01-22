@@ -156,8 +156,12 @@ Flag needsReview=true if the markets or selections don't align between back and 
   // Apply defaults for lay bet
   const layWithDefaults: ParsedBet = {
     ...normalizeNumbers(pair.lay),
-    exchange: pair.lay.exchange || "bfb247",
-    currency: pair.lay.currency || "NOK",
+    exchange: pair.lay.exchange?.trim()
+      ? pair.lay.exchange
+      : "bfb247",
+    currency: pair.lay.currency?.trim()
+      ? pair.lay.currency
+      : "NOK",
   };
 
   // Cross-validate the pair

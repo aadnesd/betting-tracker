@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { auth } from "@/app/(auth)/auth";
+import { getTestAwareSession } from "@/lib/auth";
 import {
   evaluateNeedsReview,
   formatNeedsReviewNote,
@@ -134,7 +134,7 @@ async function resolvePromoId({
 }
 
 export async function POST(request: Request) {
-  const session = await auth();
+  const session = await getTestAwareSession();
 
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -189,7 +189,8 @@ export async function POST(request: Request) {
     }
 
     const layExchange = body.lay?.exchange?.trim() || "bfb247";
-    const layCurrency = "NOK";
+    const layCurrency =
+      body.lay?.currency?.toUpperCase() ?? (hasLay ? "NOK" : undefined);
     const betStatusFallback = needsReview
       ? "needs_review"
       : missingLeg
@@ -217,7 +218,7 @@ export async function POST(request: Request) {
             accountId: body.lay.accountId,
             exchange: layExchange,
             kind: "exchange",
-            currency: layCurrency,
+            currency: layCurrency ?? "NOK",
           })
         : Promise.resolve(null),
     ]);
@@ -258,6 +259,7 @@ export async function POST(request: Request) {
           odds: body.back.odds,
           stake: body.back.stake,
           exchange: backExchange,
+          matchId: body.matchId ?? null,
           accountId: backAccountId,
           currency: backCurrency ?? null,
           placedAt: safeDate(body.back.placedAt),
@@ -277,8 +279,9 @@ export async function POST(request: Request) {
           odds: body.lay.odds,
           stake: body.lay.stake,
           exchange: layExchange,
+          matchId: body.matchId ?? null,
           accountId: layAccountId,
-          currency: layCurrency,
+          currency: layCurrency ?? "NOK",
           placedAt: safeDate(body.lay.placedAt),
           settledAt: safeDate(body.lay.settledAt),
           profitLoss: body.lay.profitLoss ?? null,
@@ -305,7 +308,7 @@ export async function POST(request: Request) {
 
       const [backProfitNok, layLiabilityNok] = await Promise.all([
         convertAmountToNok(backProfit, backCurrency ?? "NOK"),
-        convertAmountToNok(layLiability, layCurrency),
+        convertAmountToNok(layLiability, layCurrency ?? "NOK"),
       ]);
 
       console.log(`[NET EXPOSURE] backProfitNok=${backProfitNok}, layLiabilityNok=${layLiabilityNok}`);

@@ -69,6 +69,7 @@ You - agent-browser snapshot                # Accessibility tree with refs (best
 - Test images for AI autoparse live in `tests/test-images/` (e.g., `bet2.png`, `bet3.png`).
 - Local runs require `.env.local` (pulled from Vercel) so app and DB resolve correctly.
 - When adding UI, include minimal happy-path and error-path coverage; keep fixtures deterministic.
+- Sandbox tip: if Playwright webServer fails to bind with `EPERM`, run tests in a local environment that allows binding or reuse an already-running dev server.
 
 ## Database & Configuration
 - Drizzle schema: `lib/db/schema.ts`; queries: `lib/db/queries.ts`; helpers: `lib/db/helpers/`.

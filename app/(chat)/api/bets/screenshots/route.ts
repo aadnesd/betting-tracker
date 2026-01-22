@@ -2,7 +2,7 @@ import { Buffer } from "node:buffer";
 import { put } from "@vercel/blob";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { auth } from "@/app/(auth)/auth";
+import { getTestAwareSession } from "@/lib/auth";
 import { isTestEnvironment } from "@/lib/constants";
 import { saveScreenshotUpload } from "@/lib/db/queries";
 
@@ -40,7 +40,7 @@ const FileSchema = z.instanceof(Blob).refine((file) => {
 
 export async function POST(request: Request) {
   const timer = createTimer();
-  const session = await auth();
+  const session = await getTestAwareSession();
   timer.mark("auth");
 
   if (!session?.user) {

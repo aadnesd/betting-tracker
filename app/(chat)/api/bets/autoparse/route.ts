@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { auth } from "@/app/(auth)/auth";
+import { getTestAwareSession } from "@/lib/auth";
 import type { ParsedBet, ParsedPair } from "@/lib/bet-parser";
 import {
   parseMatchedBetFromScreenshots,
@@ -88,7 +88,7 @@ function enrichBetWithAccountMatch(
 
 export async function POST(request: Request) {
   const timer = createTimer();
-  const session = await auth();
+  const session = await getTestAwareSession();
   timer.mark("auth");
 
   if (!session?.user) {

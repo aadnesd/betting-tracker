@@ -148,6 +148,20 @@
       "when": 1769007726462,
       "tag": "0020_illegal_wrecking_crew",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1769011200000,
+      "tag": "0021_store_nok_values",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1769073249579,
+      "tag": "0022_add_match_id_to_individual_bets",
+      "breakpoints": true
     }
   ]
 }

@@ -73,6 +73,7 @@ vi.mock("@/lib/db/queries", () => ({
   deleteBet: vi.fn(),
   deleteMatchedBet: vi.fn(),
   getMatchedBetByLegId: vi.fn(),
+  getFootballMatchById: vi.fn(),
 }));
 
 const makeBlob = (content = "stub") =>
@@ -643,7 +644,7 @@ describe("bets API routes (unit)", () => {
       odds: 2.32,
       stake: 21,
       exchange: "bfb247",
-      currency: "NOK",
+      currency: "SEK",
     },
 };
 
@@ -663,9 +664,13 @@ describe("bets API routes (unit)", () => {
       expect.objectContaining({ accountId: "acc-back" })
     );
     expect(dbQueries.saveLayBet).toHaveBeenCalledWith(
-      expect.objectContaining({ accountId: "acc-lay" })
+      expect.objectContaining({ accountId: "acc-lay", currency: "SEK" })
     );
     expect(convertAmountToNok).toHaveBeenCalled();
+    expect(convertAmountToNok).toHaveBeenCalledWith(
+      expect.closeTo(27.72, 5),
+      "SEK"
+    );
   });
 
   it("create matched allows draft with missing leg", async () => {
@@ -1697,6 +1702,65 @@ describe("bets API routes (unit)", () => {
       );
     });
 
+    it("stores a linked match when provided", async () => {
+      const accountId = "22222222-2222-2222-2222-222222222222";
+      const matchId = "123e4567-e89b-12d3-a456-426614174000";
+
+      (dbQueries.createManualScreenshot as vi.Mock).mockResolvedValue({
+        id: "screenshot-1",
+      });
+      (dbQueries.getAccountById as vi.Mock).mockResolvedValue({
+        id: accountId,
+        name: "bet365",
+        kind: "bookmaker",
+      });
+      (dbQueries.getFootballMatchById as vi.Mock).mockResolvedValue({
+        id: matchId,
+      });
+      (dbQueries.saveBackBet as vi.Mock).mockResolvedValue({
+        id: "bet-1",
+        market: "Man Utd v Liverpool",
+        selection: "Man Utd",
+        odds: "2.50",
+        stake: "100.00",
+        status: "placed",
+        currency: "NOK",
+        matchId,
+        placedAt: new Date(),
+        createdAt: new Date(),
+        accountId,
+      });
+      (dbQueries.createAuditEntry as vi.Mock).mockResolvedValue({
+        id: "audit-1",
+      });
+
+      const payload = {
+        kind: "back",
+        market: "Man Utd v Liverpool",
+        selection: "Man Utd",
+        odds: 2.5,
+        stake: 100,
+        accountId,
+        currency: "NOK",
+        matchId,
+      };
+
+      const res = await standaloneRoute(
+        new Request("http://localhost/api/bets/standalone", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        })
+      );
+
+      expect(res.status).toBe(200);
+      const json = await res.json();
+      expect(json.bet.matchId).toBe(matchId);
+      expect(dbQueries.getFootballMatchById).toHaveBeenCalledWith({ id: matchId });
+      expect(dbQueries.saveBackBet).toHaveBeenCalledWith(
+        expect.objectContaining({ matchId })
+      );
+    });
+
     it("creates a standalone lay bet", async () => {
       (dbQueries.createManualScreenshot as vi.Mock).mockResolvedValue({
         id: "screenshot-2",
@@ -2002,6 +2066,7 @@ describe("bets API routes (unit)", () => {
           id: betId,
           status: "settled",
           profitLoss: "150",
+          profitLossNok: "150.00",
         })
       );
 

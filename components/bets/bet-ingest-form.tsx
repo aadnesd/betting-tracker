@@ -1,6 +1,7 @@
 "use client";
 import { LinkIcon } from "lucide-react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { type ComponentProps, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { BetStatusBadge } from "@/components/bets/bet-status-badge";
@@ -9,6 +10,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectSeparator,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -17,6 +26,10 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  applyAccountSelection,
+  type AccountOption,
+} from "@/lib/bet-accounts";
 import type { ParsedPair } from "@/lib/bet-parser";
 import { cn } from "@/lib/utils";
 
@@ -41,7 +54,13 @@ type ParsedForm = {
   lay: ParsedPair["lay"];
 };
 
-export function BetIngestForm() {
+interface BetIngestFormProps {
+  bookmakers: AccountOption[];
+  exchanges: AccountOption[];
+}
+
+export function BetIngestForm({ bookmakers, exchanges }: BetIngestFormProps) {
+  const router = useRouter();
   const [backFile, setBackFile] = useState<File | null>(null);
   const [layFile, setLayFile] = useState<File | null>(null);
   const [screenshots, setScreenshots] = useState<{
@@ -115,6 +134,10 @@ export function BetIngestForm() {
         matchCandidates?: number | null;
       } = await parseResp.json();
 
+      const normalizedLayCurrency = parsedJson.lay.currency
+        ? parsedJson.lay.currency.toUpperCase()
+        : "NOK";
+
       setParsed({
         market: parsedJson.back.market ?? parsedJson.lay.market,
         selection: parsedJson.back.selection ?? parsedJson.lay.selection,
@@ -124,7 +147,10 @@ export function BetIngestForm() {
         matchConfidence: parsedJson.matchConfidence,
         matchCandidates: parsedJson.matchCandidates,
         back: parsedJson.back,
-        lay: parsedJson.lay,
+        lay: {
+          ...parsedJson.lay,
+          currency: normalizedLayCurrency,
+        },
       });
 
       toast.success("Screenshots parsed. Review & confirm below.");
@@ -172,6 +198,10 @@ export function BetIngestForm() {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleAddAccount = () => {
+    router.push("/bets/settings/accounts/new");
   };
 
   const handleMatchChange = (match: MatchOption | null) => {
@@ -365,19 +395,25 @@ export function BetIngestForm() {
             {parsed && (
               <>
                 <BetFields
+                  accountOptions={bookmakers}
+                  accountPlaceholder="Select bookmaker account"
                   allowCurrencyEdit
                   label="Back bet"
+                  onAddAccount={handleAddAccount}
                   onChange={(val) =>
                     setParsed((prev) => (prev ? { ...prev, back: val } : prev))
                   }
                   value={parsed.back}
                 />
                 <BetFields
+                  accountOptions={exchanges}
+                  accountPlaceholder="Select exchange account"
+                  allowCurrencyEdit
                   label="Lay bet"
+                  onAddAccount={handleAddAccount}
                   onChange={(val) =>
                     setParsed((prev) => (prev ? { ...prev, lay: val } : prev))
                   }
-                  readOnlyCurrency="NOK"
                   value={parsed.lay}
                 />
               </>
@@ -417,15 +453,25 @@ function BetFields({
   onChange,
   allowCurrencyEdit,
   readOnlyCurrency,
+  accountOptions,
+  accountPlaceholder,
+  onAddAccount,
 }: {
   label: string;
   value: ParsedPair["back"];
   onChange: (value: ParsedPair["back"]) => void;
   allowCurrencyEdit?: boolean;
   readOnlyCurrency?: string;
+  accountOptions: AccountOption[];
+  accountPlaceholder: string;
+  onAddAccount: () => void;
 }) {
   const currencyValue = readOnlyCurrency ?? value.currency ?? "";
   const placedAtValue = formatDateTimeLocal(value.placedAt);
+  const selectedAccount =
+    accountOptions.find((account) => account.id === value.accountId) ?? null;
+  const showAccountWarning =
+    value.unmatchedAccount && !selectedAccount && value.exchange;
 
   return (
     <div className="space-y-2">
@@ -436,6 +482,64 @@ function BetFields({
         </span>
       </div>
       <div className="grid gap-2 md:grid-cols-2">
+        <div className="space-y-1 md:col-span-2">
+          <Label className="text-xs">{accountPlaceholder}</Label>
+          <Select
+            onValueChange={(selectedId) => {
+              if (selectedId === "__add_new__") {
+                onAddAccount();
+                return;
+              }
+              if (selectedId === "__clear__") {
+                onChange(
+                  applyAccountSelection({
+                    bet: value,
+                    account: null,
+                    enforceCurrency: Boolean(allowCurrencyEdit),
+                  })
+                );
+                return;
+              }
+              const account =
+                accountOptions.find((option) => option.id === selectedId) ??
+                null;
+              if (!account) {
+                return;
+              }
+              onChange(
+                applyAccountSelection({
+                  bet: value,
+                  account,
+                  enforceCurrency: Boolean(allowCurrencyEdit),
+                })
+              );
+            }}
+            value={selectedAccount?.id ?? ""}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder={accountPlaceholder} />
+            </SelectTrigger>
+            <SelectContent>
+              {accountOptions.map((account) => (
+                <SelectItem key={account.id} value={account.id}>
+                  {account.name}
+                  {account.currency ? ` · ${account.currency}` : ""}
+                </SelectItem>
+              ))}
+              <SelectSeparator />
+              <SelectItem value="__add_new__">Add new account</SelectItem>
+              {selectedAccount ? (
+                <SelectItem value="__clear__">Clear selection</SelectItem>
+              ) : null}
+            </SelectContent>
+          </Select>
+          {showAccountWarning ? (
+            <p className="text-amber-700 text-xs">
+              No matching account found for "{value.exchange}". Select or create
+              one to link this bet.
+            </p>
+          ) : null}
+        </div>
         <ConfidenceInput
           onChange={(e) =>
             onChange({
@@ -467,7 +571,19 @@ function BetFields({
           value={value.stake}
         />
         <ConfidenceInput
-          onChange={(e) => onChange({ ...value, exchange: e.target.value })}
+          onChange={(e) => {
+            const nextExchange = e.target.value;
+            const shouldClearAccount =
+              selectedAccount && nextExchange !== selectedAccount.name;
+            onChange({
+              ...value,
+              exchange: nextExchange,
+              accountId: shouldClearAccount ? null : value.accountId,
+              unmatchedAccount: shouldClearAccount
+                ? true
+                : value.unmatchedAccount,
+            });
+          }}
           placeholder="Exchange / Bookmaker"
           score={resolveConfidence(value.confidence, "exchange")}
           value={value.exchange ?? ""}

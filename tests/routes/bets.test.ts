@@ -36,10 +36,7 @@ async function uploadScreenshots({
   return upload.json();
 }
 
-// TODO: These tests need to be updated to work with the new OAuth-only auth system.
-// The test auth mechanism needs to properly set cookies that work with next-auth's getToken().
-// See: app/(auth)/api/auth/test/route.ts and tests/helpers.ts
-test.describe.skip("/api/bets", () => {
+test.describe("/api/bets", () => {
   test("can upload screenshots, auto-parse, and save matched bet (happy path)", async ({
     adaContext,
   }) => {

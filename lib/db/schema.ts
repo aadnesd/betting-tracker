@@ -124,15 +124,18 @@ export const backBet = pgTable("BackBet", {
   screenshotId: uuid("screenshotId")
     .references(() => screenshotUpload.id)
     .notNull(),
+  matchId: uuid("matchId"),
   market: text("market").notNull(),
   selection: text("selection").notNull(),
   odds: numeric("odds", { precision: 12, scale: 4 }).notNull(),
   stake: numeric("stake", { precision: 12, scale: 2 }).notNull(),
+  stakeNok: numeric("stakeNok", { precision: 14, scale: 2 }),
   exchange: text("exchange").notNull(),
   currency: varchar("currency", { length: 3 }),
   placedAt: timestamp("placedAt"),
   settledAt: timestamp("settledAt"),
   profitLoss: numeric("profitLoss", { precision: 14, scale: 2 }),
+  profitLossNok: numeric("profitLossNok", { precision: 14, scale: 2 }),
   confidence: jsonb("confidence"),
   status: varchar("status", { enum: betStatusEnum })
     .notNull()
@@ -152,15 +155,18 @@ export const layBet = pgTable("LayBet", {
   screenshotId: uuid("screenshotId")
     .references(() => screenshotUpload.id)
     .notNull(),
+  matchId: uuid("matchId"),
   market: text("market").notNull(),
   selection: text("selection").notNull(),
   odds: numeric("odds", { precision: 12, scale: 4 }).notNull(),
   stake: numeric("stake", { precision: 12, scale: 2 }).notNull(),
+  stakeNok: numeric("stakeNok", { precision: 14, scale: 2 }),
   exchange: text("exchange").notNull(),
   currency: varchar("currency", { length: 3 }),
   placedAt: timestamp("placedAt"),
   settledAt: timestamp("settledAt"),
   profitLoss: numeric("profitLoss", { precision: 14, scale: 2 }),
+  profitLossNok: numeric("profitLossNok", { precision: 14, scale: 2 }),
   confidence: jsonb("confidence"),
   status: varchar("status", { enum: betStatusEnum })
     .notNull()

@@ -14,10 +14,7 @@ import {
 } from "@/lib/reporting";
 import type { BackBet, LayBet, MatchedBet } from "@/lib/db/schema";
 
-// Mock convertAmountToNok to return the same amount (assume all are NOK in tests)
-vi.mock("@/lib/fx-rates", () => ({
-  convertAmountToNok: vi.fn(async (amount: number, _currency?: string) => amount),
-}));
+// FX conversion no longer used in reporting calculations (stored NOK values are used instead)
 
 /**
  * Unit tests for reporting helper functions.
@@ -56,6 +53,7 @@ function createMockMatchedBet(
     ...overrides.matched,
   };
 
+  const backOverrides = overrides.back ?? {};
   const back: BackBet | null =
     overrides.back === null
       ? null
@@ -69,17 +67,21 @@ function createMockMatchedBet(
           selection: "Team A",
           odds: "2.0",
           stake: "100.00",
+          stakeNok: backOverrides.stakeNok ?? backOverrides.stake ?? "100.00",
           exchange: "Bet365",
           currency: "NOK",
           placedAt: now,
           settledAt: now,
           profitLoss: "50.00",
+          profitLossNok:
+            backOverrides.profitLossNok ?? backOverrides.profitLoss ?? "50.00",
           confidence: null,
           status: "settled",
           error: null,
-          ...overrides.back,
+          ...backOverrides,
         };
 
+  const layOverrides = overrides.lay ?? {};
   const lay: LayBet | null =
     overrides.lay === null
       ? null
@@ -93,15 +95,18 @@ function createMockMatchedBet(
           selection: "Team A",
           odds: "2.1",
           stake: "95.24",
+          stakeNok: layOverrides.stakeNok ?? layOverrides.stake ?? "95.24",
           exchange: "Betfair",
           currency: "NOK",
           placedAt: now,
           settledAt: now,
           profitLoss: "-45.00",
+          profitLossNok:
+            layOverrides.profitLossNok ?? layOverrides.profitLoss ?? "-45.00",
           confidence: null,
           status: "settled",
           error: null,
-          ...overrides.lay,
+          ...layOverrides,
         };
 
   return { matched, back, lay };
