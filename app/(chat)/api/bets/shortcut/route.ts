@@ -182,7 +182,8 @@ export async function POST(request: Request) {
   let formData: FormData;
   try {
     formData = await request.formData();
-  } catch {
+  } catch (e) {
+    console.error("[shortcut] Failed to parse FormData:", e);
     return errorResponse(
       "MISSING_IMAGES",
       "Request must be multipart/form-data with image files",
@@ -194,6 +195,15 @@ export async function POST(request: Request) {
   const layFile = formData.get("lay");
   const promoType = formData.get("promoType");
   const notes = formData.get("notes");
+
+  // Debug: log what we received
+  console.log("[shortcut] FormData received:", {
+    backType: backFile ? (backFile instanceof File ? `File(${backFile.name}, ${backFile.type}, ${backFile.size}b)` : typeof backFile) : "null",
+    layType: layFile ? (layFile instanceof File ? `File(${layFile.name}, ${layFile.type}, ${layFile.size}b)` : typeof layFile) : "null",
+    promoType: promoType ?? "null",
+    notes: notes ? "present" : "null",
+    allKeys: Array.from(formData.keys()),
+  });
 
   // Validate both files
   const backValidation = validateFile(backFile);
