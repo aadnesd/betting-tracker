@@ -136,7 +136,7 @@ export async function findCandidateMatches({
           searchTerm: term,
           fromDate,
           limit: 10,
-          similarityThreshold: 0.15, // Low threshold to cast wide net, LLM will filter
+          similarityThreshold: 0.35, // Reasonable threshold - must match at least 35%
         })
       )
     );
@@ -168,15 +168,22 @@ export async function findCandidateMatches({
       }
     }
 
-    return Array.from(candidateMap.values())
+    let candidates = Array.from(candidateMap.values())
       .sort((a, b) => {
         const simDiff = (b.similarity ?? 0) - (a.similarity ?? 0);
         if (simDiff !== 0) {
           return simDiff;
         }
         return a.matchDate.getTime() - b.matchDate.getTime();
-      })
-      .slice(0, 15);
+      });
+
+    // If we have a high-quality match (>70%), filter out low-quality noise (<50%)
+    const hasHighQuality = candidates.some((c) => (c.similarity ?? 0) > 0.7);
+    if (hasHighQuality) {
+      candidates = candidates.filter((c) => (c.similarity ?? 0) >= 0.5);
+    }
+
+    return candidates.slice(0, 10);
   } catch (error) {
     console.warn(`[match-linking] Search failed for "${market}":`, error);
     return [];
