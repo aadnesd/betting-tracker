@@ -63,11 +63,17 @@ This guide walks you through creating an iOS Shortcut to submit bet screenshots 
 | Method | **POST** |
 | Request Body | **Form** |
 
-4. Add form fields by tapping **Add new field** → **File**:
-   - Key: `back`
-   - Value: Tap and select **Shortcut Input** or **Images**
+4. Add form fields:
+   - Tap **Add new field**
+   - Select **Text** (we'll change the value to the image)
+   - For **Key**, enter: `back`
+   - For **Value**, tap and select the **Images** variable from above (or "Shortcut Input")
+   
+   Note: Even though you select "Text" as the field type, iOS Shortcuts will automatically send it as a file when the value is an image.
 
-5. Add Headers by tapping **Show More** → **Headers** → **Add new header**:
+5. Add Headers:
+   - Tap **Show More** (arrow next to Request Body)
+   - Tap **Headers** → **Add new header**
    - Key: `Authorization`
    - Value: `Bearer YOUR_API_KEY_HERE`
 
