@@ -30,6 +30,11 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // Allow iOS Shortcut API to bypass session auth (uses its own API key auth)
+  if (pathname === "/api/bets/shortcut") {
+    return NextResponse.next();
+  }
+
   // Allow login and register pages for unauthenticated users
   if (["/login", "/register"].includes(pathname)) {
     const token = await getToken({
