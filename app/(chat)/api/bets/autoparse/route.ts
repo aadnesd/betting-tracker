@@ -7,10 +7,16 @@ import {
   parseMatchedBetWithOcr,
   isOcrConfigured,
 } from "@/lib/bet-parser";
+import {
+  parseMatchedBetWithAgent,
+  type AgentAccount,
+  type AgentParsedPair,
+} from "@/lib/bet-parser-agent";
 import { evaluateNeedsReview } from "@/lib/bet-review";
 import {
   getAccountByName,
   getScreenshotById,
+  listAccountsByUser,
   updateScreenshotStatus,
 } from "@/lib/db/queries";
 import { linkBetToMatch, type MatchLinkResult } from "@/lib/match-linking";
@@ -122,45 +128,85 @@ export async function POST(request: Request) {
   }
 
   try {
+    // Fetch user's accounts for context-aware parsing
+    const userAccounts = await listAccountsByUser({ userId: session.user.id });
+    const agentAccounts: AgentAccount[] = userAccounts.map((a) => ({
+      id: a.id,
+      name: a.name,
+      kind: a.kind as "bookmaker" | "exchange",
+      currency: a.currency,
+    }));
+    timer.mark("fetchAccounts");
+
     // Use OCR-based parsing if Azure Document Intelligence is configured (faster)
     // Otherwise fall back to vision LLM approach
     const useOcr = isOcrConfigured();
-    console.log(`[bets/autoparse] Using ${useOcr ? "OCR + LLM" : "Vision LLM"} approach`);
+    const hasAccounts = agentAccounts.length > 0;
 
-    let parsed: ParsedPair;
-    if (useOcr) {
+    // Use agent-based parser when OCR is configured (accounts in context for better matching)
+    // Fall back to legacy parsers when OCR is not available
+    console.log(
+      `[bets/autoparse] Using ${useOcr ? (hasAccounts ? "Agent + OCR" : "OCR + LLM") : "Vision LLM"} approach ` +
+      `(${agentAccounts.length} accounts)`
+    );
+
+    let enrichedBack: ParsedBet;
+    let enrichedLay: ParsedBet;
+    let parsed: ParsedPair | AgentParsedPair;
+
+    if (useOcr && hasAccounts) {
+      // Use agent-based parser with account context
+      const agentResult = await parseMatchedBetWithAgent({
+        backImageUrl: backShot.url,
+        layImageUrl: layShot.url,
+        accounts: agentAccounts,
+      });
+      parsed = agentResult;
+      enrichedBack = agentResult.back;
+      enrichedLay = agentResult.lay;
+      timer.mark(
+        `aiParsing (Agent OCR: ${agentResult.ocrDurationMs}ms, LLM: ${agentResult.llmDurationMs}ms)`
+      );
+    } else if (useOcr) {
+      // Use OCR + LLM without account context (no accounts to match)
       const ocrResult = await parseMatchedBetWithOcr({
         backImageUrl: backShot.url,
         layImageUrl: layShot.url,
       });
       parsed = ocrResult;
-      timer.mark(`aiParsing (OCR: ${ocrResult.ocrDurationMs}ms, LLM: ${ocrResult.llmDurationMs}ms)`);
+      // No accounts exist, so no matching needed
+      enrichedBack = { ...ocrResult.back, accountId: null, unmatchedAccount: true };
+      enrichedLay = { ...ocrResult.lay, accountId: null, unmatchedAccount: true };
+      timer.mark(
+        `aiParsing (OCR: ${ocrResult.ocrDurationMs}ms, LLM: ${ocrResult.llmDurationMs}ms)`
+      );
     } else {
+      // Fall back to vision LLM (no OCR configured)
       parsed = await parseMatchedBetFromScreenshots({
         backImageUrl: backShot.url,
         layImageUrl: layShot.url,
       });
       timer.mark("aiParsing");
+
+      // Match parsed exchange/bookmaker names against user's existing accounts
+      const [backAccountId, layAccountId] = await Promise.all([
+        matchAccountForBet({
+          userId: session.user.id,
+          exchangeName: parsed.back.exchange,
+          kind: "bookmaker",
+        }),
+        matchAccountForBet({
+          userId: session.user.id,
+          exchangeName: parsed.lay.exchange,
+          kind: "exchange",
+        }),
+      ]);
+      timer.mark("accountMatching");
+
+      // Enrich bets with account matching results
+      enrichedBack = enrichBetWithAccountMatch(parsed.back, backAccountId);
+      enrichedLay = enrichBetWithAccountMatch(parsed.lay, layAccountId);
     }
-
-    // Match parsed exchange/bookmaker names against user's existing accounts
-    const [backAccountId, layAccountId] = await Promise.all([
-      matchAccountForBet({
-        userId: session.user.id,
-        exchangeName: parsed.back.exchange,
-        kind: "bookmaker",
-      }),
-      matchAccountForBet({
-        userId: session.user.id,
-        exchangeName: parsed.lay.exchange,
-        kind: "exchange",
-      }),
-    ]);
-    timer.mark("accountMatching");
-
-    // Enrich bets with account matching results
-    const enrichedBack = enrichBetWithAccountMatch(parsed.back, backAccountId);
-    const enrichedLay = enrichBetWithAccountMatch(parsed.lay, layAccountId);
 
     // Attempt to link the bet to a football match from synced matches
     // Uses team names from market/selection to find candidates
