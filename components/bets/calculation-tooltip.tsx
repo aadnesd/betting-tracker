@@ -85,11 +85,11 @@ export function CalculationTooltip({
         </TooltipTrigger>
         <TooltipContent side={side} className="max-w-xs">
           <div className="space-y-1">
-            <p className="font-medium">{explanation.title}</p>
-            <p className="font-mono text-xs text-muted-foreground">
+            <span className="font-medium block">{explanation.title}</span>
+            <span className="font-mono text-xs text-muted-foreground block">
               {explanation.formula}
-            </p>
-            <p className="text-xs">{explanation.description}</p>
+            </span>
+            <span className="text-xs block">{explanation.description}</span>
           </div>
         </TooltipContent>
       </Tooltip>

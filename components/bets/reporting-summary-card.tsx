@@ -108,15 +108,15 @@ function StatCard({ title, value, trend = "neutral", subtitle, tooltipType }: St
 
   return (
     <div className="rounded-lg border bg-card p-4">
-      <p className="font-medium text-muted-foreground text-sm inline-flex items-center gap-1">
+      <div className="font-medium text-muted-foreground text-sm inline-flex items-center gap-1">
         {title}
         {tooltipType && <CalculationTooltip type={tooltipType} />}
-      </p>
-      <p className={cn("mt-1 font-bold text-2xl", trendColors[trend])}>
+      </div>
+      <div className={cn("mt-1 font-bold text-2xl", trendColors[trend])}>
         {value}
-      </p>
+      </div>
       {subtitle && (
-        <p className="mt-1 text-muted-foreground text-xs">{subtitle}</p>
+        <div className="mt-1 text-muted-foreground text-xs">{subtitle}</div>
       )}
     </div>
   );
