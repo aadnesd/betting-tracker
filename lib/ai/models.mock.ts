@@ -1,8 +1,8 @@
-import type { LanguageModelV2 } from "@ai-sdk/provider";
+import type { LanguageModelV3 } from "@ai-sdk/provider";
 
-const createMockModel = (): LanguageModelV2 => {
+const createMockModel = (): LanguageModelV3 => {
   return {
-    specificationVersion: "v2",
+    specificationVersion: "v3",
     provider: "mock",
     modelId: "mock-model",
     defaultObjectGenerationMode: "tool",
@@ -28,7 +28,7 @@ const createMockModel = (): LanguageModelV2 => {
       }),
       rawCall: { rawPrompt: null, rawSettings: {} },
     }),
-  } as unknown as LanguageModelV2;
+  } as unknown as LanguageModelV3;
 };
 
 export const chatModel = createMockModel();
