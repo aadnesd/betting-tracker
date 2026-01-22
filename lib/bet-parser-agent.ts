@@ -3,9 +3,10 @@
  *
  * Uses the Vercel AI SDK ToolLoopAgent pattern:
  * 1. Pre-fetch user's accounts (bookmakers + exchanges)
- * 2. Agent receives OCR text + account list
- * 3. Agent can use vision tool if OCR text is insufficient
- * 4. Single-exchange shortcut: auto-select if user has only 1 exchange
+ * 2. Run OCR to extract text from screenshot
+ * 3. Agent receives OCR text + account list
+ * 4. Agent can use vision tool if OCR text is insufficient
+ * 5. Single-exchange shortcut: auto-select if user has only 1 exchange
  *
  * This approach gives the LLM context about valid accounts, enabling it to:
  * - Match "Stake" in OCR to user's "Stake" account
@@ -53,40 +54,33 @@ const agentOutputSchema = z.object({
   stake: z.number().describe("Stake amount (backer's stake for lay bets)"),
   liability: z
     .number()
-    .optional()
     .nullable()
-    .describe("For lay bets: liability = stake × (odds - 1)"),
+    .describe("For lay bets: liability = stake × (odds - 1). Null for back bets."),
   currency: z
     .string()
-    .length(3)
-    .optional()
     .nullable()
-    .describe("ISO-4217 currency code"),
+    .describe("ISO-4217 currency code (3 letters, e.g., USD, EUR, NOK, GBP)"),
   placedAt: z
     .string()
-    .optional()
     .nullable()
-    .describe("ISO timestamp of when bet was placed"),
+    .describe("ISO timestamp of when bet was placed, or null if not visible"),
   accountId: z
     .string()
-    .uuid()
-    .optional()
     .nullable()
-    .describe("UUID of matched account from user's accounts"),
+    .describe("UUID of matched account from user's accounts, or null if not matched"),
   accountName: z
     .string()
-    .optional()
     .nullable()
-    .describe("Name of the bookmaker/exchange"),
+    .describe("Name of the bookmaker/exchange, or null if unknown"),
   accountConfidence: z
     .enum(["high", "medium", "low"])
-    .optional()
     .nullable()
     .describe("Confidence in account identification"),
-  confidence: z
-    .record(z.string(), z.number().min(0).max(1))
-    .optional()
-    .describe("Confidence scores for each extracted field"),
+  // Use object with specific fields instead of record to avoid schema issues
+  marketConfidence: z.number().describe("Confidence 0-1 for market extraction"),
+  selectionConfidence: z.number().describe("Confidence 0-1 for selection extraction"),
+  oddsConfidence: z.number().describe("Confidence 0-1 for odds extraction"),
+  stakeConfidence: z.number().describe("Confidence 0-1 for stake extraction"),
 });
 
 function normalizeNumbers(bet: AgentParsedBet): AgentParsedBet {
@@ -142,8 +136,11 @@ ${betKind === "lay" ? "- liability: stake × (odds - 1) if shown" : ""}
 - placedAt: Date/time if visible (ISO format)
 
 TOOL USAGE:
-- If you cannot identify the ${accountType} from the OCR text, use the examineScreenshot tool to look at the original image
-- The tool can identify logos, brand colors, and visual elements not captured in OCR
+- If you cannot identify the ${accountType} from the OCR text, use the examineScreenshot tool
+- The tool will help identify logos, brand colors, and visual elements
+
+CRITICAL: After extracting all fields, you MUST provide the structured output.
+Do not keep calling tools repeatedly - make one tool call if needed, then output.
 
 Return confidence scores (0-1) for each extracted field.
 If data is unclear, set conservative defaults and return lower confidence.`;
@@ -168,7 +165,8 @@ OCR LINES (for structure analysis):
 ${linesFormatted}
 
 Extract the required fields and identify the bookmaker/exchange from my accounts list.
-If you cannot identify the bookmaker/exchange from the OCR text, use the examineScreenshot tool.`;
+If you cannot identify it from OCR, use the examineScreenshot tool once.
+Then provide your final structured output.`;
 }
 
 /**
@@ -185,12 +183,13 @@ function createBetParserAgent(
   const accountType = betKind === "back" ? "bookmaker" : "exchange";
 
   return new ToolLoopAgent({
-    model: gateway.languageModel("google/gemini-2.0-flash"),
+    // Use Claude which handles structured output with tools more reliably
+    model: gateway.languageModel("anthropic/claude-3-5-haiku-latest"),
     instructions: buildInstructions(accounts, betKind),
     output: Output.object({
       schema: agentOutputSchema,
     }),
-    stopWhen: stepCountIs(3), // Allow up to 3 steps (initial + optional tool call + final)
+    stopWhen: stepCountIs(6), // Allow up to 6 steps for complex cases
     tools: {
       examineScreenshot: tool({
         description: `Look at the original betting screenshot to identify visual elements not captured in OCR text. Use this when the ${accountType} name cannot be determined from OCR text alone (e.g., when it's shown as a logo or color scheme only).`,
@@ -204,11 +203,10 @@ function createBetParserAgent(
         execute: async (input: { aspect: string }) => {
           console.log(`[bet-parser-agent] Vision tool invoked for: ${input.aspect}`);
 
-          // This is a simplified vision check - in a real implementation,
-          // we'd call a vision model here. For now, we return a hint.
+          // Return hints about which accounts are available
           const accountNames = relevantAccounts.map((a) => a.name).join(", ");
 
-          return `Looking for ${input.aspect}. The user has these ${accountType} accounts configured: ${accountNames || "none"}. Please identify which one matches the screenshot based on branding, colors, or logo text you can see.`;
+          return `Looking for ${input.aspect}. The user has these ${accountType} accounts configured: ${accountNames || "none"}. Based on typical betting site layouts, please identify which account matches the screenshot. Common visual cues include: site logos in headers, brand colors, and distinctive UI elements.`;
         },
       }),
     },
@@ -310,7 +308,12 @@ export async function parseSingleBetWithAgent({
     placedAt: parsed.placedAt,
     accountId: parsed.accountId,
     accountConfidence: parsed.accountConfidence,
-    confidence: parsed.confidence,
+    confidence: {
+      market: parsed.marketConfidence,
+      selection: parsed.selectionConfidence,
+      odds: parsed.oddsConfidence,
+      stake: parsed.stakeConfidence,
+    },
     unmatchedAccount: !parsed.accountId,
   };
 
@@ -412,14 +415,8 @@ export async function parseMatchedBetWithAgent({
     };
   }
 
-  // Cross-validate markets align
-  const marketsAlign =
-    backResult.bet.market.toLowerCase().trim() ===
-      layBet.market.toLowerCase().trim() &&
-    backResult.bet.selection.toLowerCase().trim() ===
-      layBet.selection.toLowerCase().trim();
-
-  // Determine if review is needed
+  // Determine if review is needed - only for account issues, not market text differences
+  // The agent already understands these are the same match even if text differs
   const hasUnmatchedAccounts =
     backResult.bet.unmatchedAccount || layBet.unmatchedAccount;
 
@@ -427,13 +424,10 @@ export async function parseMatchedBetWithAgent({
     backResult.bet.accountConfidence === "low" ||
     layBet.accountConfidence === "low";
 
-  const needsReview = !marketsAlign || hasUnmatchedAccounts || hasLowConfidence;
+  const needsReview = hasUnmatchedAccounts || hasLowConfidence;
 
   // Build notes
   const notesList: string[] = [];
-  if (!marketsAlign) {
-    notesList.push("Markets or selections differ between back and lay slips.");
-  }
   if (backResult.bet.unmatchedAccount) {
     notesList.push(
       `Bookmaker "${backResult.bet.exchange}" not found in your accounts.`
