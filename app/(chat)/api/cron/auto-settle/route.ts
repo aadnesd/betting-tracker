@@ -9,6 +9,7 @@ import {
   calculateMatchedBetProfitLoss,
   isFreeBetPromoType,
   resolveOutcome,
+  resolveOutcomeWithNormalizedSelection,
   type BetOutcome,
 } from "@/lib/settlement";
 
@@ -48,11 +49,17 @@ async function processBet(
   const { homeScore, awayScore, homeTeam, awayTeam } = bet.footballMatch;
   const matchResult = `${homeTeam} ${homeScore}-${awayScore} ${awayTeam}`;
 
-  // Resolve the outcome using settlement logic
-  const outcomeResult = resolveOutcome(bet.market, bet.selection, {
-    homeScore,
-    awayScore,
-  });
+  // Use normalized selection if available (more reliable for Match Odds bets)
+  // Otherwise fall back to text-based selection parsing
+  const outcomeResult = bet.normalizedSelection
+    ? resolveOutcomeWithNormalizedSelection(bet.normalizedSelection, {
+        homeScore,
+        awayScore,
+      })
+    : resolveOutcome(bet.market, bet.selection, {
+        homeScore,
+        awayScore,
+      });
 
   // If confidence is low or outcome is unknown, flag for review
   if (

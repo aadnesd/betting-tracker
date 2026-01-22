@@ -11,6 +11,8 @@ import { generateText } from "ai";
 import { myProvider } from "@/lib/ai/providers";
 import { searchFootballMatches } from "@/lib/db/queries";
 
+import type { NormalizedSelection } from "@/lib/db/schema";
+
 export interface MatchCandidate {
   id: string;
   externalId: string;
@@ -27,6 +29,8 @@ export interface MatchLinkResult {
   matchConfidence: "high" | "medium" | "low" | null;
   matchCandidates: number;
   linkedMatch?: MatchCandidate;
+  /** Normalized selection for Match Odds: HOME_TEAM, AWAY_TEAM, DRAW */
+  normalizedSelection?: NormalizedSelection | null;
 }
 
 const TEAM_NAME_NORMALIZATION: Record<string, string> = {
@@ -180,8 +184,9 @@ export async function findCandidateMatches({
 }
 
 /**
- * Use LLM to select the correct match from candidates.
+ * Use LLM to select the correct match from candidates and normalize the selection.
  * The LLM understands team name variations and can match based on context.
+ * Also determines if the selection is HOME_TEAM, AWAY_TEAM, or DRAW for Match Odds markets.
  */
 export async function selectMatchWithLLM({
   market,
@@ -193,7 +198,11 @@ export async function selectMatchWithLLM({
   selection: string;
   betDate?: string | null;
   candidates: MatchCandidate[];
-}): Promise<{ matchIndex: number; confidence: "high" | "medium" | "low" }> {
+}): Promise<{
+  matchIndex: number;
+  confidence: "high" | "medium" | "low";
+  normalizedSelection: NormalizedSelection | null;
+}> {
   const candidateList = candidates
     .map((c, i) => {
       const dateStr = c.matchDate.toISOString().split("T")[0];
@@ -213,14 +222,20 @@ PARSED BET FROM SCREENSHOT:
 CANDIDATE MATCHES FROM DATABASE:
 ${candidateList}
 
-TASK: Which match (1-${candidates.length}) does this bet belong to?
+TASK: 
+1. Which match (1-${candidates.length}) does this bet belong to? Return 0 if no match is clearly correct.
+2. For Match Odds (1X2) bets, determine if the selection is HOME_TEAM, AWAY_TEAM, or DRAW.
 
 RULES:
 1. Match team names even with variations (Man Utd = Manchester United, Real = Real Madrid, etc.)
 2. The bet date should be on or before the match date
-3. Return 0 if no match is clearly correct
+3. For selection normalization:
+   - If the selection mentions the HOME team (listed first) → HOME_TEAM
+   - If the selection mentions the AWAY team (listed second) → AWAY_TEAM
+   - If the selection is "Draw", "X", "Tie", or similar → DRAW
+   - If it's not a 1X2/Match Odds bet or you can't determine → null
 
-Respond with ONLY a single number (1-${candidates.length} for a match, or 0 for no match).`;
+Respond with JSON only: {"matchIndex": N, "normalizedSelection": "HOME_TEAM" | "AWAY_TEAM" | "DRAW" | null}`;
 
   try {
     const { text } = await generateText({
@@ -228,12 +243,34 @@ Respond with ONLY a single number (1-${candidates.length} for a match, or 0 for 
       messages: [{ role: "user", content: prompt }],
     });
 
-    const matchIndex = Number.parseInt(text.trim(), 10);
-
-    if (Number.isNaN(matchIndex) || matchIndex < 0 || matchIndex > candidates.length) {
-      console.warn(`[match-linking] LLM returned invalid response: "${text}"`);
-      return { matchIndex: 0, confidence: "low" };
+    // Parse JSON response
+    let parsed: { matchIndex: number; normalizedSelection: NormalizedSelection | null };
+    try {
+      // Try to extract JSON from the response
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        parsed = JSON.parse(jsonMatch[0]);
+      } else {
+        // Fallback: try parsing as a simple number (backwards compatibility)
+        const matchIndex = Number.parseInt(text.trim(), 10);
+        parsed = { matchIndex: Number.isNaN(matchIndex) ? 0 : matchIndex, normalizedSelection: null };
+      }
+    } catch {
+      console.warn(`[match-linking] Failed to parse LLM JSON response: "${text}"`);
+      const matchIndex = Number.parseInt(text.trim(), 10);
+      parsed = { matchIndex: Number.isNaN(matchIndex) ? 0 : matchIndex, normalizedSelection: null };
     }
+
+    const { matchIndex, normalizedSelection } = parsed;
+
+    if (matchIndex < 0 || matchIndex > candidates.length) {
+      console.warn(`[match-linking] LLM returned invalid match index: ${matchIndex}`);
+      return { matchIndex: 0, confidence: "low", normalizedSelection: null };
+    }
+
+    // Validate normalizedSelection
+    const validSelections: (NormalizedSelection | null)[] = ["HOME_TEAM", "AWAY_TEAM", "DRAW", null];
+    const validatedSelection = validSelections.includes(normalizedSelection) ? normalizedSelection : null;
 
     // Confidence based on similarity score if available
     let confidence: "high" | "medium" | "low";
@@ -250,11 +287,54 @@ Respond with ONLY a single number (1-${candidates.length} for a match, or 0 for 
       }
     }
 
-    return { matchIndex, confidence };
+    return { matchIndex, confidence, normalizedSelection: validatedSelection };
   } catch (error) {
     console.error("[match-linking] LLM selection failed:", error);
-    return { matchIndex: 0, confidence: "low" };
+    return { matchIndex: 0, confidence: "low", normalizedSelection: null };
   }
+}
+
+/**
+ * Determine normalized selection for a single candidate without LLM call.
+ * Used when we auto-link to a single candidate.
+ */
+function determineNormalizedSelection(
+  selection: string,
+  match: MatchCandidate
+): NormalizedSelection | null {
+  const normalizedSelection = selection.toLowerCase().trim();
+  const homeTeam = match.homeTeam.toLowerCase();
+  const awayTeam = match.awayTeam.toLowerCase();
+
+  // Check for draw
+  if (
+    normalizedSelection === "draw" ||
+    normalizedSelection === "x" ||
+    normalizedSelection === "tie" ||
+    normalizedSelection.includes("draw")
+  ) {
+    return "DRAW";
+  }
+
+  // Check if selection mentions home team
+  const homeWords = homeTeam.split(/\s+/);
+  const awayWords = awayTeam.split(/\s+/);
+
+  // Check for significant words from team names
+  for (const word of homeWords) {
+    if (word.length >= 4 && normalizedSelection.includes(word)) {
+      return "HOME_TEAM";
+    }
+  }
+
+  for (const word of awayWords) {
+    if (word.length >= 4 && normalizedSelection.includes(word)) {
+      return "AWAY_TEAM";
+    }
+  }
+
+  // Couldn't determine - will need LLM for this
+  return null;
 }
 
 /**
@@ -292,6 +372,7 @@ export async function linkBetToMatch({
         matchId: null,
         matchConfidence: null,
         matchCandidates: 0,
+        normalizedSelection: null,
       };
     }
 
@@ -305,16 +386,20 @@ export async function linkBetToMatch({
         `[match-linking] Auto-linked single candidate: ${candidate.homeTeam} vs ${candidate.awayTeam}`
       );
 
+      // Try to determine normalized selection without LLM
+      const normalizedSel = determineNormalizedSelection(selection, candidate);
+
       return {
         matchId: candidate.id,
         matchConfidence: "high",
         matchCandidates: 1,
         linkedMatch: candidate,
+        normalizedSelection: normalizedSel,
       };
     }
 
     // Always use LLM to select the match
-    const { matchIndex, confidence } = await selectMatchWithLLM({
+    const { matchIndex, confidence, normalizedSelection } = await selectMatchWithLLM({
       market,
       selection,
       betDate,
@@ -327,12 +412,13 @@ export async function linkBetToMatch({
         matchId: null,
         matchConfidence: "low",
         matchCandidates: candidates.length,
+        normalizedSelection: null,
       };
     }
 
     const selectedMatch = candidates[matchIndex - 1];
     console.log(
-      `[match-linking] LLM selected: ${selectedMatch.homeTeam} vs ${selectedMatch.awayTeam} (confidence: ${confidence})`
+      `[match-linking] LLM selected: ${selectedMatch.homeTeam} vs ${selectedMatch.awayTeam} (confidence: ${confidence}, normalizedSelection: ${normalizedSelection})`
     );
     
     return {
@@ -340,6 +426,7 @@ export async function linkBetToMatch({
       matchConfidence: confidence,
       matchCandidates: candidates.length,
       linkedMatch: selectedMatch,
+      normalizedSelection,
     };
   } catch (error) {
     console.error("[match-linking] Failed to link bet to match:", error);
@@ -347,6 +434,7 @@ export async function linkBetToMatch({
       matchId: null,
       matchConfidence: null,
       matchCandidates: 0,
+      normalizedSelection: null,
     };
   }
 }

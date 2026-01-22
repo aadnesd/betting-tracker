@@ -61,6 +61,43 @@ export function isFreeBetPromoType(promoType: string | null): boolean {
 }
 
 /**
+ * Determine match winner from match result.
+ * Returns the normalized selection that would win: HOME_TEAM, AWAY_TEAM, or DRAW.
+ */
+export function getMatchWinner(result: MatchResult): "HOME_TEAM" | "AWAY_TEAM" | "DRAW" {
+  if (result.homeScore > result.awayScore) {
+    return "HOME_TEAM";
+  }
+  if (result.awayScore > result.homeScore) {
+    return "AWAY_TEAM";
+  }
+  return "DRAW";
+}
+
+/**
+ * Resolve outcome using normalizedSelection for Match Odds (1X2) bets.
+ * This is the simplest and most reliable settlement method when normalizedSelection is available.
+ *
+ * @param normalizedSelection - The normalized selection: HOME_TEAM, AWAY_TEAM, or DRAW
+ * @param result - The match result with home and away scores
+ * @returns OutcomeResult with high confidence when normalizedSelection is available
+ */
+export function resolveOutcomeWithNormalizedSelection(
+  normalizedSelection: "HOME_TEAM" | "AWAY_TEAM" | "DRAW",
+  result: MatchResult
+): OutcomeResult {
+  const winner = getMatchWinner(result);
+  const isWin = normalizedSelection === winner;
+
+  return {
+    outcome: isWin ? "win" : "loss",
+    confidence: "high",
+    reason: `Normalized selection: ${normalizedSelection}. Match result: ${result.homeScore}-${result.awayScore} (${winner === "DRAW" ? "Draw" : winner === "HOME_TEAM" ? "Home wins" : "Away wins"})`,
+    detectedMarket: "match_odds",
+  };
+}
+
+/**
  * Detect the market type from market name
  */
 export function detectMarketType(market: string): MarketType {

@@ -13,6 +13,8 @@ import {
   calculateProfitLoss,
   calculateLayProfitLoss,
   calculateMatchedBetProfitLoss,
+  getMatchWinner,
+  resolveOutcomeWithNormalizedSelection,
   type BetOutcome,
   type MatchResult,
 } from "@/lib/settlement";
@@ -456,6 +458,104 @@ describe("settlement outcome logic", () => {
       expect(result.backProfitLoss).toBe(0); // Free bet loss = 0
       expect(result.layProfitLoss).toBeCloseTo(78.4); // 80 * (1 - 0.02)
       expect(result.netProfitLoss).toBeCloseTo(78.4);
+    });
+  });
+
+  describe("getMatchWinner", () => {
+    it("returns HOME_TEAM when home score is higher", () => {
+      const result = getMatchWinner({ homeScore: 2, awayScore: 1 });
+      expect(result).toBe("HOME_TEAM");
+    });
+
+    it("returns AWAY_TEAM when away score is higher", () => {
+      const result = getMatchWinner({ homeScore: 0, awayScore: 3 });
+      expect(result).toBe("AWAY_TEAM");
+    });
+
+    it("returns DRAW when scores are equal", () => {
+      const result = getMatchWinner({ homeScore: 1, awayScore: 1 });
+      expect(result).toBe("DRAW");
+    });
+
+    it("returns DRAW for 0-0 matches", () => {
+      const result = getMatchWinner({ homeScore: 0, awayScore: 0 });
+      expect(result).toBe("DRAW");
+    });
+  });
+
+  describe("resolveOutcomeWithNormalizedSelection", () => {
+    it("returns win when HOME_TEAM selection and home wins", () => {
+      const result = resolveOutcomeWithNormalizedSelection(
+        "HOME_TEAM",
+        { homeScore: 2, awayScore: 1 }
+      );
+      expect(result.outcome).toBe("win");
+      expect(result.confidence).toBe("high");
+      expect(result.detectedMarket).toBe("match_odds");
+    });
+
+    it("returns loss when HOME_TEAM selection and away wins", () => {
+      const result = resolveOutcomeWithNormalizedSelection(
+        "HOME_TEAM",
+        { homeScore: 1, awayScore: 2 }
+      );
+      expect(result.outcome).toBe("loss");
+    });
+
+    it("returns loss when HOME_TEAM selection and draw", () => {
+      const result = resolveOutcomeWithNormalizedSelection(
+        "HOME_TEAM",
+        { homeScore: 1, awayScore: 1 }
+      );
+      expect(result.outcome).toBe("loss");
+    });
+
+    it("returns win when AWAY_TEAM selection and away wins", () => {
+      const result = resolveOutcomeWithNormalizedSelection(
+        "AWAY_TEAM",
+        { homeScore: 0, awayScore: 2 }
+      );
+      expect(result.outcome).toBe("win");
+    });
+
+    it("returns loss when AWAY_TEAM selection and home wins", () => {
+      const result = resolveOutcomeWithNormalizedSelection(
+        "AWAY_TEAM",
+        { homeScore: 3, awayScore: 0 }
+      );
+      expect(result.outcome).toBe("loss");
+    });
+
+    it("returns loss when AWAY_TEAM selection and draw", () => {
+      const result = resolveOutcomeWithNormalizedSelection(
+        "AWAY_TEAM",
+        { homeScore: 2, awayScore: 2 }
+      );
+      expect(result.outcome).toBe("loss");
+    });
+
+    it("returns win when DRAW selection and draw", () => {
+      const result = resolveOutcomeWithNormalizedSelection(
+        "DRAW",
+        { homeScore: 0, awayScore: 0 }
+      );
+      expect(result.outcome).toBe("win");
+    });
+
+    it("returns loss when DRAW selection and home wins", () => {
+      const result = resolveOutcomeWithNormalizedSelection(
+        "DRAW",
+        { homeScore: 1, awayScore: 0 }
+      );
+      expect(result.outcome).toBe("loss");
+    });
+
+    it("returns loss when DRAW selection and away wins", () => {
+      const result = resolveOutcomeWithNormalizedSelection(
+        "DRAW",
+        { homeScore: 0, awayScore: 1 }
+      );
+      expect(result.outcome).toBe("loss");
     });
   });
 });

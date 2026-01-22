@@ -162,6 +162,13 @@
       "when": 1769073249579,
       "tag": "0022_add_match_id_to_individual_bets",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1769186400000,
+      "tag": "0023_add_normalized_selection",
+      "breakpoints": true
     }
   ]
 }
