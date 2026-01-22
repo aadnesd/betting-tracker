@@ -42,6 +42,7 @@ type ParsedForm = {
   matchId?: string | null;
   matchConfidence?: string | null;
   matchCandidates?: number | null;
+  normalizedSelection?: "HOME_TEAM" | "AWAY_TEAM" | "DRAW" | null;
   back: ParsedPair["back"];
   lay: ParsedPair["lay"];
 };
@@ -53,6 +54,7 @@ interface BetReviewFormProps {
     matchId?: string | null;
     matchConfidence?: string | null;
     matchCandidates?: number | null;
+    normalizedSelection?: "HOME_TEAM" | "AWAY_TEAM" | "DRAW" | null;
     notes?: string;
     needsReview: boolean;
   };
@@ -87,6 +89,7 @@ export function BetReviewForm({
     matchId: parsedData.matchId,
     matchConfidence: parsedData.matchConfidence,
     matchCandidates: parsedData.matchCandidates,
+    normalizedSelection: parsedData.normalizedSelection,
     back: parsedData.back,
     lay: {
       ...parsedData.lay,
@@ -115,6 +118,7 @@ export function BetReviewForm({
           market: parsed.market,
           selection: parsed.selection,
           matchId: parsed.matchId,
+          normalizedSelection: parsed.normalizedSelection,
           needsReview: parsed.needsReview,
           notes: parsed.notes,
           back: parsed.back,
