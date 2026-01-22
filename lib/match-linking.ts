@@ -127,14 +127,17 @@ export async function findCandidateMatches({
     return [];
   }
 
-  const fromDate = betDate ?? new Date();
+  // Allow matches that started up to 3 hours before the bet (for in-play bets)
+  const searchFromDate = betDate 
+    ? new Date(betDate.getTime() - 3 * 60 * 60 * 1000) 
+    : new Date();
 
   try {
     const results = await Promise.all(
       searchTerms.map((term) =>
         searchFootballMatches({
           searchTerm: term,
-          fromDate,
+          fromDate: searchFromDate,
           limit: 10,
           similarityThreshold: 0.35, // Reasonable threshold - must match at least 35%
         })
