@@ -31,7 +31,7 @@ Remaining blocker: Rerun Playwright route tests in an environment that permits b
 - Fixed nullable field handling in `listMatchedBetsForList` query for left-joined columns (`exchange`, `status`, `odds`, `stake`)
 - Fixed type assertion in `scripts/backfill-nok-values.ts` for generic table update
 
-**Tests:** 498 unit tests passing; build passes.
+**Tests:** 535 unit tests passing; build passes.
 
 - [x] **Create-matched lay currency override**: The create-matched API hardcoded lay currency to NOK, ignoring the currency submitted from the review form. This violated the “manual override on any field” requirement and produced incorrect FX conversions for users with non-NOK exchange accounts. DoD: preserve lay currency from the request payload, default to NOK only when missing, and ensure net exposure conversion uses the provided currency. Implementation: updated `app/(chat)/api/bets/create-matched/route.ts` to normalize `layCurrency` from the payload with NOK fallback only when missing, use it for account resolution, lay bet persistence, and FX conversion. Tests: `pnpm exec vitest run tests/unit/bets-api.test.ts` (why: validates lay currency persists and FX conversion uses the submitted currency for exposure).
 
@@ -173,17 +173,48 @@ Remaining blocker: Rerun Playwright route tests in an environment that permits b
 
 ## P9 — UX Improvements
 
-- [ ] **Clipboard paste intake**: Add clipboard paste as a primary input method for screenshot intake on desktop, **keeping file upload as a fallback**. Users can paste screenshots directly from OS snippet tools (Cmd+Shift+4 on Mac, Snipping Tool on Windows) instead of saving files first. DoD: `/bets/new` page has two input zones (back bet, lay bet) supporting both paste and file upload, shows thumbnail preview after image is added, auto-triggers parsing when both images are present. File drag-and-drop and "Browse" button remain for mobile users and those with saved files. Single-image mode creates a draft. See `specs/clipboard-paste-intake.md` for full requirements.
+- [x] **Clipboard paste intake**: Add clipboard paste as a primary input method for screenshot intake on desktop, **keeping file upload as a fallback**. Users can paste screenshots directly from OS snippet tools (Cmd+Shift+4 on Mac, Snipping Tool on Windows) instead of saving files first. DoD: `/bets/new` page has two input zones (back bet, lay bet) supporting both paste and file upload, shows thumbnail preview after image is added, auto-triggers parsing when both images are present. File drag-and-drop and "Browse" button remain for mobile users and those with saved files. Single-image mode creates a draft. See `specs/clipboard-paste-intake.md` for full requirements.
   
-  **Implementation plan:**
-  1. Create `components/bets/paste-zone.tsx` - reusable component handling paste events, drag-drop fallback, thumbnail preview, remove button
-  2. Create `components/bets/screenshot-intake-form.tsx` - client component with two PasteZones, auto-parse trigger, loading states
-  3. Update `/bets/new` page to use new intake form
-  4. Convert clipboard blobs to File objects for existing upload API
-  5. Auto-trigger `/api/bets/autoparse` when both zones have images
+  **Implementation completed:**
+  1. Created `components/bets/paste-zone.tsx` - Reusable PasteZone component handling:
+     - Clipboard paste events (Cmd+V / Ctrl+V)
+     - Drag-and-drop file upload
+     - File browser fallback ("Browse files" button)
+     - Thumbnail preview with remove button
+     - Loading and error states
+     - Keyboard navigation (Delete/Backspace to remove)
+     - File validation (type and size constraints, max 10MB)
   
-  **Tests:** Unit tests for paste handling, blob conversion, auto-trigger logic.
-  **Why:** Eliminates file-save step, reduces intake time by ~50%.
+  2. Created `components/bets/screenshot-intake-form.tsx` - Client component that:
+     - Displays two PasteZones side-by-side (back/lay)
+     - Auto-triggers parsing when both images are ready (500ms delay)
+     - Supports single-image draft mode with "Parse as Draft" button
+     - Shows upload/parsing progress indicators
+     - Handles errors with retry capability
+  
+  3. Created `components/bets/bet-review-form.tsx` - Review phase component extracted from BetIngestForm with:
+     - All field editing (market, selection, odds, stake, currency, etc.)
+     - Account selection with currency sync
+     - Match picker integration
+     - Confidence score highlighting
+     - Net exposure calculation
+  
+  4. Created `components/bets/bet-intake-wrapper.tsx` - Orchestrator component managing:
+     - Two-phase flow (intake → review)
+     - Data handoff from intake to review
+     - Back navigation to re-upload screenshots
+  
+  5. Updated `app/(chat)/bets/new/page.tsx` to use new BetIntakeWrapper
+  
+  **Tests:** 26 tests in `tests/unit/clipboard-paste-intake.test.ts` covering:
+  - PasteZone props and validation constraints
+  - ScreenshotIntakeForm behavior (auto-parse trigger, state tracking)
+  - File handling (blob conversion, MIME types)
+  - Phase transitions
+  - Error handling
+  - API integration contracts
+  
+  **Why:** Eliminates the file-save step for desktop users, reducing intake time by ~50%. Users can now take a screenshot snippet (Cmd+Shift+4 on Mac) and immediately paste it into the intake form.
 
 - [x] **Matched bets list page**: The product spec calls for a matched sets list with expandable details, but only the dashboard shows recent matched bets and there is no dedicated list view. DoD: create `/bets/matched` list with filters (status, date range, search) and expandable leg details (back/lay odds, stake, accounts, profit/loss), plus navigation links from dashboard and sidebar. Implementation: added `listMatchedBetsForList` in `lib/db/queries.ts` with filters and joins for legs/accounts/matches plus numeric normalization; built `/bets/matched` server page with filters and expandable leg details, match info, and notes; added nav links in `components/app-sidebar.tsx` and `components/bets/dashboard-actions.tsx`. Tests: `HOME=$PWD/.home pnpm exec vitest run tests/unit/matched-bets-list.test.ts` (why: ensures the list query normalizes numeric fields and safely handles null legs/match data so the expandable UI is reliable). Why: users need a full audit-friendly matched set list beyond recent activity.
 
