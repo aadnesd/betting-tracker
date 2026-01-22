@@ -169,6 +169,13 @@
       "when": 1769186400000,
       "tag": "0023_add_normalized_selection",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1769270400000,
+      "tag": "0024_add_shortcut_api_key",
+      "breakpoints": true
     }
   ]
 }

@@ -5865,3 +5865,163 @@ export async function deleteMatchedBet({
     throw new ChatSDKError("bad_request:database", "Failed to delete matched bet");
   }
 }
+
+// ============================================================================
+// iOS Shortcut API Key Management
+// ============================================================================
+
+/**
+ * Generate a new shortcut API key for a user.
+ * Returns the plaintext key (only time it's visible) and stores the hash.
+ * The key is a 64-character hex string (256-bit random).
+ * 
+ * Why: Enables authentication for iOS Shortcut API requests without session cookies.
+ */
+export async function generateShortcutApiKey({ userId }: { userId: string }): Promise<{
+  key: string;
+  hint: string;
+  createdAt: Date;
+}> {
+  try {
+    // Generate 32 random bytes (256 bits) as hex string
+    const keyBytes = crypto.getRandomValues(new Uint8Array(32));
+    const key = Array.from(keyBytes)
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+
+    // Hash the key using SHA-256 for storage
+    const encoder = new TextEncoder();
+    const hashBuffer = await crypto.subtle.digest("SHA-256", encoder.encode(key));
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const hash = hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+
+    // Get last 8 characters for display hint
+    const hint = key.slice(-8);
+    const now = new Date();
+
+    await db
+      .insert(userSettings)
+      .values({
+        userId,
+        shortcutApiKeyHash: hash,
+        shortcutApiKeyHint: hint,
+        shortcutApiKeyCreatedAt: now,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .onConflictDoUpdate({
+        target: userSettings.userId,
+        set: {
+          shortcutApiKeyHash: hash,
+          shortcutApiKeyHint: hint,
+          shortcutApiKeyCreatedAt: now,
+          updatedAt: now,
+        },
+      });
+
+    return { key, hint, createdAt: now };
+  } catch (_error) {
+    throw new ChatSDKError("bad_request:database", "Failed to generate API key");
+  }
+}
+
+/**
+ * Validate a shortcut API key and return the user ID if valid.
+ * Also checks rate limiting (10 seconds between requests).
+ * 
+ * Returns: { valid: true, userId } or { valid: false, error, retryAfter? }
+ */
+export async function validateShortcutApiKey(key: string): Promise<
+  | { valid: true; userId: string }
+  | { valid: false; error: "invalid" | "rate_limited"; retryAfter?: number }
+> {
+  try {
+    // Hash the provided key
+    const encoder = new TextEncoder();
+    const hashBuffer = await crypto.subtle.digest("SHA-256", encoder.encode(key));
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const hash = hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+
+    // Look up the user by hash
+    const [settings] = await db
+      .select()
+      .from(userSettings)
+      .where(eq(userSettings.shortcutApiKeyHash, hash))
+      .limit(1);
+
+    if (!settings) {
+      return { valid: false, error: "invalid" };
+    }
+
+    // Check rate limiting (10 seconds between requests)
+    const now = new Date();
+    if (settings.lastShortcutRequestAt) {
+      const elapsed = now.getTime() - settings.lastShortcutRequestAt.getTime();
+      const minInterval = 10000; // 10 seconds
+      if (elapsed < minInterval) {
+        const retryAfter = Math.ceil((minInterval - elapsed) / 1000);
+        return { valid: false, error: "rate_limited", retryAfter };
+      }
+    }
+
+    // Update last request timestamp
+    await db
+      .update(userSettings)
+      .set({ lastShortcutRequestAt: now, updatedAt: now })
+      .where(eq(userSettings.id, settings.id));
+
+    return { valid: true, userId: settings.userId };
+  } catch (_error) {
+    // On error, treat as invalid to avoid leaking information
+    return { valid: false, error: "invalid" };
+  }
+}
+
+/**
+ * Revoke a user's shortcut API key.
+ * Immediately invalidates the key.
+ */
+export async function revokeShortcutApiKey({ userId }: { userId: string }): Promise<boolean> {
+  try {
+    const [result] = await db
+      .update(userSettings)
+      .set({
+        shortcutApiKeyHash: null,
+        shortcutApiKeyHint: null,
+        shortcutApiKeyCreatedAt: null,
+        lastShortcutRequestAt: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(userSettings.userId, userId))
+      .returning({ id: userSettings.id });
+
+    return !!result;
+  } catch (_error) {
+    throw new ChatSDKError("bad_request:database", "Failed to revoke API key");
+  }
+}
+
+/**
+ * Get the shortcut API key info for display (hint only, not the full key).
+ */
+export async function getShortcutApiKeyInfo({ userId }: { userId: string }): Promise<{
+  hasKey: boolean;
+  hint: string | null;
+  createdAt: Date | null;
+} | null> {
+  try {
+    const settings = await getUserSettings({ userId });
+
+    if (!settings) {
+      return { hasKey: false, hint: null, createdAt: null };
+    }
+
+    return {
+      hasKey: !!settings.shortcutApiKeyHash,
+      hint: settings.shortcutApiKeyHint ?? null,
+      createdAt: settings.shortcutApiKeyCreatedAt ?? null,
+    };
+  } catch (_error) {
+    throw new ChatSDKError("bad_request:database", "Failed to get API key info");
+  }
+}

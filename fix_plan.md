@@ -5,9 +5,9 @@ Prioritized implementation tasks. Check off when complete with tests passing.
 ---
 ## Status
 
-**Last updated**: 23 January 2026
+**Last updated**: 22 January 2026
 **Build**: ✅ Passing
-**Tests**: ✅ `pnpm exec vitest run` (548 tests passing)
+**Tests**: ✅ `pnpm exec vitest run` (573 tests passing)
 **Tag**: v0.0.56
 
 Remaining blocker: Rerun Playwright route tests in an environment that permits binding the dev server.
@@ -172,6 +172,32 @@ Remaining blocker: Rerun Playwright route tests in an environment that permits b
   **Why:** Reduces FX API calls, improves dashboard/report performance, and locks in consistent historical NOK values.
 
 ## P9 — UX Improvements
+
+- [x] **iOS Shortcut API for matched bet intake**: Create a single API endpoint that accepts two screenshots and automatically parses, links, and saves a matched bet - authenticated via per-user API key. This allows users to take screenshots on their phone and use an iOS Shortcut to submit them without opening the web app.
+  
+  **DoD:** ✅ All criteria met
+  - Per-user API key stored in `UserSettings` with generation/revocation UI at `/bets/settings/api-keys`
+  - Single endpoint `POST /api/bets/shortcut` accepts Bearer auth + FormData with back/lay images
+  - Endpoint chains: upload → agent parse → match link → save matched bet
+  - Rate limiting: 10 seconds between requests per user (prevents accidental double-taps)
+  - Low confidence results saved as `needs_review` status
+  - Promo type defaults to "None"
+  - Returns JSON summary suitable for iOS Shortcuts (matched bet ID, market, selection, status)
+  
+  **Implementation completed:**
+  1. Added `shortcutApiKeyHash`, `shortcutApiKeyHint`, `shortcutApiKeyCreatedAt`, `lastShortcutRequestAt` columns to `UserSettings` schema
+  2. Created migration `0024_add_shortcut_api_key.sql`
+  3. Added query functions: `generateShortcutApiKey`, `validateShortcutApiKey`, `revokeShortcutApiKey`, `getShortcutApiKeyInfo`
+  4. Created `POST /api/bets/shortcut` endpoint that chains: upload → agent parse → match link → save matched bet
+  5. Created `/api/bets/settings/api-keys` GET/POST/DELETE endpoints for key management
+  6. Created `/bets/settings/api-keys` settings page with `ApiKeyManager` component
+  7. Added "API Keys" link to dashboard navigation
+  8. Rate limiting: 10 seconds between requests per user
+  9. SHA-256 hashing for secure key storage
+  
+  **Tests:** 25 new unit tests in `tests/unit/shortcut-api.test.ts` (573 total tests passing)
+  
+  See `specs/ios-shortcut-api.md` for full requirements.
 
 - [x] **Clipboard paste intake**: Add clipboard paste as a primary input method for screenshot intake on desktop, **keeping file upload as a fallback**. Users can paste screenshots directly from OS snippet tools (Cmd+Shift+4 on Mac, Snipping Tool on Windows) instead of saving files first. DoD: `/bets/new` page has two input zones (back bet, lay bet) supporting both paste and file upload, shows thumbnail preview after image is added, auto-triggers parsing when both images are present. File drag-and-drop and "Browse" button remain for mobile users and those with saved files. Single-image mode creates a draft. See `specs/clipboard-paste-intake.md` for full requirements.
   

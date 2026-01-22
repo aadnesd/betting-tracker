@@ -351,7 +351,7 @@ export type FootballMatchStatus = (typeof matchStatusEnum)[number];
 
 /**
  * UserSettings - Stores user preferences for the matched betting tracker.
- * Why: Enables per-user configuration of features like competition sync.
+ * Why: Enables per-user configuration of features like competition sync and iOS Shortcut API access.
  */
 export const userSettings = pgTable("UserSettings", {
   id: uuid("id").primaryKey().notNull().defaultRandom(),
@@ -361,6 +361,14 @@ export const userSettings = pgTable("UserSettings", {
     .unique(),
   // Array of competition codes to sync (e.g., ["PL", "CL", "BL1"])
   enabledCompetitions: jsonb("enabledCompetitions").$type<string[]>(),
+  // iOS Shortcut API key (SHA-256 hash of the actual key, 64 hex chars)
+  shortcutApiKeyHash: varchar("shortcutApiKeyHash", { length: 64 }),
+  // Last 8 characters of the API key for display purposes
+  shortcutApiKeyHint: varchar("shortcutApiKeyHint", { length: 8 }),
+  // When the API key was created
+  shortcutApiKeyCreatedAt: timestamp("shortcutApiKeyCreatedAt"),
+  // Last time a shortcut request was made (for rate limiting)
+  lastShortcutRequestAt: timestamp("lastShortcutRequestAt"),
   createdAt: timestamp("createdAt").notNull(),
   updatedAt: timestamp("updatedAt").notNull(),
 });
