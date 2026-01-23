@@ -758,7 +758,8 @@ export async function getTransactionTrends({
 
 /**
  * Get balance trends (net deposits/withdrawals/bonuses/adjustments) grouped by day/week/month.
- * All amounts are converted to NOK for consistent aggregation.
+ * Uses pre-computed amountNok from the database (no FX API calls needed).
+ * Falls back to live FX conversion for legacy rows without amountNok.
  */
 export async function getBalanceTrends({
   userId,
@@ -792,6 +793,7 @@ export async function getBalanceTrends({
       .select({
         periodDate: sql<string>`${dateTrunc}::date`.as("period_date"),
         amount: accountTransaction.amount,
+        amountNok: accountTransaction.amountNok,
         currency: accountTransaction.currency,
         type: accountTransaction.type,
       })
@@ -801,9 +803,16 @@ export async function getBalanceTrends({
 
     const totals = new Map<string, number>();
     for (const row of rows) {
-      const amount = row.amount ? Number.parseFloat(row.amount) : 0;
-      const currency = row.currency ?? "NOK";
-      const amountNok = await convertAmountToNok(amount, currency);
+      // Use pre-computed amountNok if available, otherwise fall back to live conversion
+      let amountNok: number;
+      if (row.amountNok != null) {
+        amountNok = Number.parseFloat(row.amountNok);
+      } else {
+        // Legacy row without amountNok - convert on the fly
+        const amount = row.amount ? Number.parseFloat(row.amount) : 0;
+        const currency = row.currency ?? "NOK";
+        amountNok = await convertAmountToNok(amount, currency);
+      }
       const signedAmount =
         row.type === "withdrawal" ? -amountNok : amountNok;
       const key = String(row.periodDate);
@@ -971,13 +980,18 @@ export async function createAccountTransaction({
   linkedWalletTransactionId?: string | null;
 }) {
   try {
+    // Pre-compute NOK equivalent at write time to avoid FX API calls on read
+    const normalizedCurrency = currency.toUpperCase();
+    const amountNok = await convertAmountToNok(amount, normalizedCurrency);
+
     const values: typeof accountTransaction.$inferInsert = {
       createdAt: new Date(),
       userId,
       accountId,
       type,
       amount: amount.toString(),
-      currency: currency.toUpperCase(),
+      currency: normalizedCurrency,
+      amountNok: amountNok.toString(),
       occurredAt: occurredAt ?? new Date(),
       notes: notes ?? null,
       linkedWalletTransactionId: linkedWalletTransactionId ?? null,

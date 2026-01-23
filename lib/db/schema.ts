@@ -99,6 +99,8 @@ export const accountTransaction = pgTable("AccountTransaction", {
   type: varchar("type", { enum: transactionTypeEnum }).notNull(),
   amount: numeric("amount", { precision: 14, scale: 2 }).notNull(),
   currency: varchar("currency", { length: 3 }).notNull(),
+  // Pre-computed NOK equivalent (computed at write-time to avoid FX API calls on read)
+  amountNok: numeric("amountNok", { precision: 14, scale: 2 }),
   occurredAt: timestamp("occurredAt").notNull(),
   notes: text("notes"),
   // Link to corresponding wallet transaction (for deposit/withdrawal linked to wallet)
