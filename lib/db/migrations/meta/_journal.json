@@ -176,6 +176,13 @@
       "when": 1769164019662,
       "tag": "0024_shiny_roland_deschain",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1769169491832,
+      "tag": "0025_moaning_speed_demon",
+      "breakpoints": true
     }
   ]
 }

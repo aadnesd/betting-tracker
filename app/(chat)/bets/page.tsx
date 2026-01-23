@@ -20,6 +20,7 @@ import {
   getExposureTimeline,
   getPendingSettlementBets,
   listAccountsWithBalances,
+  listActiveWalletsByUser,
   listMatchedBetsByUser,
 } from "@/lib/db/queries";
 
@@ -36,7 +37,7 @@ export default async function Page() {
 
   const userId = session.user.id;
 
-  const [bets, summary, expiringFreeBetsCount, exposureData7, exposureData14, exposureData30, exposureData90, exposureByEvent, pendingSettlementBets, pendingSettlementCount, accountsWithBalances] = await Promise.all([
+  const [bets, summary, expiringFreeBetsCount, exposureData7, exposureData14, exposureData30, exposureData90, exposureByEvent, pendingSettlementBets, pendingSettlementCount, accountsWithBalances, activeWallets] = await Promise.all([
     listMatchedBetsByUser({
       userId,
       limit: 50,
@@ -51,6 +52,7 @@ export default async function Page() {
     getPendingSettlementBets({ userId, filter: "all", limit: 10 }),
     countPendingSettlementBets({ userId }),
     listAccountsWithBalances({ userId }),
+    listActiveWalletsByUser(userId),
   ]);
 
   // Helper to check if an account is active (treats null/undefined as active for backwards compatibility)
@@ -67,6 +69,14 @@ export default async function Page() {
       currentBalance: String(a.currentBalance),
     }));
 
+  // Transform wallets for QuickTransactionSheet
+  const wallets = activeWallets.map((w) => ({
+    id: w.id,
+    name: w.name,
+    type: w.type as "fiat" | "crypto" | "hybrid",
+    currency: w.currency,
+  }));
+
   return (
     <div className="space-y-6 p-4 md:p-8">
       <div className="flex flex-col items-start justify-between gap-3 md:flex-row md:items-center">
@@ -82,6 +92,7 @@ export default async function Page() {
         <DashboardActions 
           pendingReviewCount={summary.pendingReviewCount} 
           accounts={accounts}
+          wallets={wallets}
         />
       </div>
 

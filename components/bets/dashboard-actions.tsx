@@ -2,19 +2,20 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AccountOption, QuickTransactionSheet } from "@/components/bets/quick-transaction-sheet";
+import { AccountOption, QuickTransactionSheet, WalletOption } from "@/components/bets/quick-transaction-sheet";
 import { Button } from "@/components/ui/button";
 
 interface DashboardActionsProps {
   pendingReviewCount: number;
   accounts: AccountOption[];
+  wallets?: WalletOption[];
 }
 
 /**
  * Client component for dashboard action buttons including QuickTransactionSheet.
  * Separated from the server component to allow client-side interactivity.
  */
-export function DashboardActions({ pendingReviewCount, accounts }: DashboardActionsProps) {
+export function DashboardActions({ pendingReviewCount, accounts, wallets = [] }: DashboardActionsProps) {
   const router = useRouter();
 
   const handleTransactionSuccess = () => {
@@ -60,6 +61,7 @@ export function DashboardActions({ pendingReviewCount, accounts }: DashboardActi
       </Button>
       <QuickTransactionSheet 
         accounts={accounts} 
+        wallets={wallets}
         onSuccess={handleTransactionSuccess}
       />
       <Button asChild variant="outline" size="sm" className="md:size-default">

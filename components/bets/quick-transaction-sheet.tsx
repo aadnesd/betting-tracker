@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowDownCircle, ArrowUpCircle, Gift, Loader2, Settings } from "lucide-react";
+import { ArrowDownCircle, ArrowUpCircle, Gift, Loader2, Settings, Wallet } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -34,8 +34,16 @@ export interface AccountOption {
   currentBalance: string;
 }
 
+export interface WalletOption {
+  id: string;
+  name: string;
+  type: "fiat" | "crypto" | "hybrid";
+  currency: string;
+}
+
 interface QuickTransactionSheetProps {
   accounts: AccountOption[];
+  wallets?: WalletOption[];
   /** Trigger button element (default: "Quick Transaction" button) */
   trigger?: React.ReactNode;
   /** Called after successful transaction creation */
@@ -51,6 +59,8 @@ interface FormData {
   currency: string;
   occurredAt: Date;
   notes: string;
+  walletId: string;
+  walletAmount: string;
 }
 
 const CURRENCIES = ["NOK", "EUR", "GBP", "USD", "SEK", "DKK"] as const;
@@ -84,6 +94,7 @@ const TRANSACTION_TYPES: { value: TransactionType; label: string; icon: React.Re
 
 export function QuickTransactionSheet({
   accounts,
+  wallets = [],
   trigger,
   onSuccess,
 }: QuickTransactionSheetProps) {
@@ -96,11 +107,15 @@ export function QuickTransactionSheet({
     currency: "NOK",
     occurredAt: new Date(),
     notes: "",
+    walletId: "",
+    walletAmount: "",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<Partial<Record<keyof FormData, string>>>({});
 
   const selectedAccount = accounts.find((a) => a.id === formData.accountId);
+  const selectedWallet = wallets.find(w => w.id === formData.walletId);
+  const showWalletAmount = selectedWallet && selectedWallet.currency !== formData.currency;
 
   const updateField = <K extends keyof FormData>(field: K, value: FormData[K]) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -129,6 +144,8 @@ export function QuickTransactionSheet({
       currency: "NOK",
       occurredAt: new Date(),
       notes: "",
+      walletId: "",
+      walletAmount: "",
     });
     setErrors({});
   };
@@ -151,6 +168,16 @@ export function QuickTransactionSheet({
       newErrors.currency = "Currency is required";
     }
 
+    // Validate wallet amount if currencies differ
+    if (showWalletAmount) {
+      const walletAmt = Number.parseFloat(formData.walletAmount);
+      if (!formData.walletAmount || Number.isNaN(walletAmt)) {
+        newErrors.walletAmount = "Wallet amount is required for cross-currency transfers";
+      } else if (walletAmt <= 0) {
+        newErrors.walletAmount = "Wallet amount must be positive";
+      }
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -166,16 +193,25 @@ export function QuickTransactionSheet({
     setIsSubmitting(true);
 
     try {
+      const payload: Record<string, unknown> = {
+        type: formData.type,
+        amount: Number.parseFloat(formData.amount),
+        currency: formData.currency,
+        occurredAt: formData.occurredAt.toISOString(),
+        notes: formData.notes.trim() || null,
+        walletId: formData.walletId || null,
+      };
+
+      // Add wallet amount/currency for cross-currency transfers
+      if (showWalletAmount && selectedWallet) {
+        payload.walletAmount = Number.parseFloat(formData.walletAmount);
+        payload.walletCurrency = selectedWallet.currency;
+      }
+
       const response = await fetch(`/api/bets/accounts/${formData.accountId}/transactions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          type: formData.type,
-          amount: Number.parseFloat(formData.amount),
-          currency: formData.currency,
-          occurredAt: formData.occurredAt.toISOString(),
-          notes: formData.notes.trim() || null,
-        }),
+        body: JSON.stringify(payload),
       });
 
       const data = await response.json();
@@ -308,7 +344,14 @@ export function QuickTransactionSheet({
                   type="button"
                   variant={formData.type === t.value ? "default" : "outline"}
                   className="justify-start"
-                  onClick={() => updateField("type", t.value)}
+                  onClick={() => {
+                    updateField("type", t.value);
+                    // Clear wallet selection when switching to bonus/adjustment
+                    if (t.value !== "deposit" && t.value !== "withdrawal") {
+                      updateField("walletId", "");
+                      updateField("walletAmount", "");
+                    }
+                  }}
                 >
                   {t.icon}
                   <span className="ml-2">{t.label}</span>
@@ -319,6 +362,73 @@ export function QuickTransactionSheet({
               {TRANSACTION_TYPES.find((t) => t.value === formData.type)?.description}
             </p>
           </div>
+
+          {/* Wallet Selector - Only for deposits and withdrawals */}
+          {(formData.type === "deposit" || formData.type === "withdrawal") && wallets.length > 0 && (
+            <div className="space-y-2">
+              <Label htmlFor="wallet">
+                <span className="flex items-center gap-2">
+                  <Wallet className="h-4 w-4" />
+                  {formData.type === "deposit" ? "From Wallet (optional)" : "To Wallet (optional)"}
+                </span>
+              </Label>
+              <Select
+                value={formData.walletId}
+                onValueChange={(value) => updateField("walletId", value === "none" ? "" : value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a wallet..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">
+                    <span className="text-muted-foreground">No wallet (manual entry)</span>
+                  </SelectItem>
+                  {wallets.map((w) => (
+                    <SelectItem key={w.id} value={w.id}>
+                      <div className="flex items-center gap-2">
+                        <span>{w.name}</span>
+                        <span className="text-xs text-muted-foreground">
+                          ({w.currency})
+                        </span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                {formData.type === "deposit"
+                  ? "If selected, the wallet balance will decrease by this amount."
+                  : "If selected, the wallet balance will increase by this amount."}
+              </p>
+            </div>
+          )}
+
+          {/* Wallet Amount for cross-currency transfers */}
+          {showWalletAmount && selectedWallet && (
+            <div className="space-y-2 rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950">
+              <Label htmlFor="walletAmount" className="flex items-center gap-2">
+                <Wallet className="h-4 w-4" />
+                Amount in {selectedWallet.currency}
+              </Label>
+              <Input
+                id="walletAmount"
+                type="number"
+                step="0.01"
+                min="0.01"
+                placeholder={`0.00 ${selectedWallet.currency}`}
+                value={formData.walletAmount}
+                onChange={(e) => updateField("walletAmount", e.target.value)}
+                className={errors.walletAmount ? "border-destructive" : ""}
+              />
+              {errors.walletAmount && (
+                <p className="text-xs text-destructive">{errors.walletAmount}</p>
+              )}
+              <p className="text-xs text-muted-foreground">
+                Account uses {formData.currency}, wallet uses {selectedWallet.currency}. 
+                Enter the equivalent amount in {selectedWallet.currency}.
+              </p>
+            </div>
+          )}
 
           {/* Amount and Currency */}
           <div className="grid gap-4 sm:grid-cols-2">
