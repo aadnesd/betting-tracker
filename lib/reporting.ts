@@ -541,3 +541,73 @@ export function calculateCumulativeBalanceData(
     };
   });
 }
+
+/**
+ * Transform balance snapshots into chart data points.
+ * Snapshots are direct capital values, not deltas - so cumulative = snapshot value.
+ */
+export function snapshotsToBalanceData(
+  snapshots: Array<{
+    createdAt: Date;
+    totalCapitalNok: number;
+  }>,
+  grouping: "day" | "week" | "month" = "day"
+): BalanceDataPoint[] {
+  if (snapshots.length === 0) {
+    return [];
+  }
+
+  // Group snapshots by the specified period and take the latest value per period
+  const groups = new Map<string, { date: string; label: string; value: number }>();
+
+  for (const snapshot of snapshots) {
+    const date = snapshot.createdAt;
+    let key: string;
+    let label: string;
+
+    switch (grouping) {
+      case "week": {
+        // Get the Monday of the week
+        const day = date.getDay();
+        const diff = date.getDate() - day + (day === 0 ? -6 : 1);
+        const monday = new Date(date);
+        monday.setDate(diff);
+        key = monday.toISOString().split("T")[0];
+        label = `Week of ${monday.toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`;
+        break;
+      }
+      case "month": {
+        key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-01`;
+        label = date.toLocaleDateString("en-GB", { month: "short", year: "numeric" });
+        break;
+      }
+      case "day":
+      default: {
+        key = date.toISOString().split("T")[0];
+        label = date.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+        break;
+      }
+    }
+
+    // Always overwrite with latest value for this period
+    groups.set(key, { date: key, label, value: snapshot.totalCapitalNok });
+  }
+
+  // Sort by date and convert to data points
+  const sorted = Array.from(groups.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([_, point]) => point);
+
+  // Since snapshots are already cumulative values, net = difference from previous
+  let prevValue = sorted[0]?.value ?? 0;
+  return sorted.map((point, i) => {
+    const net = i === 0 ? 0 : point.value - prevValue;
+    prevValue = point.value;
+    return {
+      date: point.date,
+      label: point.label,
+      net: Math.round(net * 100) / 100,
+      cumulative: Math.round(point.value * 100) / 100,
+    };
+  });
+}

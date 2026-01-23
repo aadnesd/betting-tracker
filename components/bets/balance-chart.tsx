@@ -67,8 +67,8 @@ export function BalanceChart({ data, title = "Total Balance Over Time" }: Balanc
   const strokeColor = finalCumulative >= 0 ? "#16a34a" : "#dc2626";
 
   const cumulativeValues = data.map((d) => d.cumulative);
-  const minValue = Math.min(...cumulativeValues, 0);
-  const maxValue = Math.max(...cumulativeValues, 0);
+  const minValue = Math.min(...cumulativeValues);
+  const maxValue = Math.max(...cumulativeValues);
   const padding = Math.abs(maxValue - minValue) * 0.1 || 100;
   const yMin = Math.floor(minValue - padding);
   const yMax = Math.ceil(maxValue + padding);
@@ -160,8 +160,8 @@ export function BalanceChartWithControls({
   const strokeColor = finalCumulative >= 0 ? "#16a34a" : "#dc2626";
 
   const cumulativeValues = data.map((d) => d.cumulative);
-  const minValue = Math.min(...cumulativeValues, 0);
-  const maxValue = Math.max(...cumulativeValues, 0);
+  const minValue = Math.min(...cumulativeValues);
+  const maxValue = Math.max(...cumulativeValues);
   const padding = Math.abs(maxValue - minValue) * 0.1 || 100;
   const yMin = Math.floor(minValue - padding);
   const yMax = Math.ceil(maxValue + padding);

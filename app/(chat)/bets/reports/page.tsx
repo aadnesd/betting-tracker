@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   getBookmakerProfitWithBonuses,
-  getBalanceTrends,
+  getBalanceSnapshots,
   getMatchedBetsForReporting,
   getOpenExposure,
   getProfitByBookmaker,
@@ -24,11 +24,11 @@ import {
   getTotalBonusesForUser,
 } from "@/lib/db/queries";
 import {
-  calculateCumulativeBalanceData,
   calculateCumulativeProfitData,
   calculateReportingSummary,
   enrichWithROI,
   getDateRange,
+  snapshotsToBalanceData,
   type MatchedBetWithLegs,
 } from "@/lib/reporting";
 
@@ -110,9 +110,7 @@ async function ReportingContent({
     promoData,
     bookmakerWithBonuses,
     totalBonuses,
-    dayBalanceData,
-    weekBalanceData,
-    monthBalanceData,
+    balanceSnapshots,
   ] = await Promise.all([
     getMatchedBetsForReporting({
       userId,
@@ -126,9 +124,7 @@ async function ReportingContent({
     getProfitByPromoType({ userId, startDate, endDate }),
     getBookmakerProfitWithBonuses({ userId, startDate, endDate }),
     getTotalBonusesForUser({ userId, startDate, endDate }),
-    getBalanceTrends({ userId, startDate: startDate ?? undefined, endDate, groupBy: "day" }),
-    getBalanceTrends({ userId, startDate: startDate ?? undefined, endDate, groupBy: "week" }),
-    getBalanceTrends({ userId, startDate: startDate ?? undefined, endDate, groupBy: "month" }),
+    getBalanceSnapshots({ userId, startDate: startDate ?? undefined, endDate }),
   ]);
 
   // Transform matched bets to the format expected by calculateReportingSummary
@@ -146,9 +142,10 @@ async function ReportingContent({
     calculateCumulativeProfitData(betsWithLegs, "month"),
   ]);
 
-  const balanceDayChartData = calculateCumulativeBalanceData(dayBalanceData);
-  const balanceWeekChartData = calculateCumulativeBalanceData(weekBalanceData);
-  const balanceMonthChartData = calculateCumulativeBalanceData(monthBalanceData);
+  // Generate balance chart data from snapshots (grouped by day/week/month)
+  const balanceDayChartData = snapshotsToBalanceData(balanceSnapshots, "day");
+  const balanceWeekChartData = snapshotsToBalanceData(balanceSnapshots, "week");
+  const balanceMonthChartData = snapshotsToBalanceData(balanceSnapshots, "month");
 
   // Enrich breakdown data with ROI
   const bookmakerBreakdown = enrichWithROI(

@@ -29,6 +29,10 @@ import {
   accountTransaction,
   auditLog,
   backBet,
+  balanceSnapshot,
+  bonusQualifyingBet,
+  depositBonus,
+  type DepositBonusStatus,
   footballMatch,
   type FootballMatchStatus,
   freeBet,
@@ -42,6 +46,7 @@ import {
   userSettings,
   wallet,
   walletTransaction,
+  type WageringBase,
   type WalletType,
   type WalletStatus,
   type WalletTransactionType,
@@ -758,6 +763,13 @@ export async function getTransactionTrends({
 
 /**
  * Get balance trends (net deposits/withdrawals/bonuses/adjustments) grouped by day/week/month.
+ * Includes both account transactions (bookmakers/exchanges) and wallet transactions.
+ * 
+ * IMPORTANT: Internal transfers (wallet <-> account) are excluded to avoid double-counting.
+ * Only external money flows are counted:
+ * - Account deposits/withdrawals NOT linked to wallet transactions
+ * - Wallet deposits/withdrawals NOT linked to account transactions
+ * 
  * Uses pre-computed amountNok from the database (no FX API calls needed).
  * Falls back to live FX conversion for legacy rows without amountNok.
  */
@@ -773,36 +785,75 @@ export async function getBalanceTrends({
   groupBy?: "day" | "week" | "month";
 }): Promise<BalanceTrendPoint[]> {
   try {
-    const conditions: SQL[] = [eq(accountTransaction.userId, userId)];
+    // 1. Fetch account transactions (bookmakers/exchanges)
+    // Exclude transactions linked to wallet transactions (internal transfers) to avoid double-counting
+    const accountConditions: SQL[] = [
+      eq(accountTransaction.userId, userId),
+      isNull(accountTransaction.linkedWalletTransactionId), // Exclude internal wallet<->account transfers
+    ];
 
     if (startDate) {
-      conditions.push(gte(accountTransaction.occurredAt, startDate));
+      accountConditions.push(gte(accountTransaction.occurredAt, startDate));
     }
     if (endDate) {
-      conditions.push(lte(accountTransaction.occurredAt, endDate));
+      accountConditions.push(lte(accountTransaction.occurredAt, endDate));
     }
 
-    const dateTrunc =
+    const accountDateTrunc =
       groupBy === "month"
         ? sql`DATE_TRUNC('month', ${accountTransaction.occurredAt})`
         : groupBy === "week"
           ? sql`DATE_TRUNC('week', ${accountTransaction.occurredAt})`
           : sql`DATE_TRUNC('day', ${accountTransaction.occurredAt})`;
 
-    const rows = await db
+    const accountRows = await db
       .select({
-        periodDate: sql<string>`${dateTrunc}::date`.as("period_date"),
+        periodDate: sql<string>`${accountDateTrunc}::date`.as("period_date"),
         amount: accountTransaction.amount,
         amountNok: accountTransaction.amountNok,
         currency: accountTransaction.currency,
         type: accountTransaction.type,
       })
       .from(accountTransaction)
-      .where(and(...conditions))
-      .orderBy(asc(sql`${dateTrunc}`));
+      .where(and(...accountConditions))
+      .orderBy(asc(sql`${accountDateTrunc}`));
+
+    // 2. Fetch wallet transactions (excluding those linked to account transactions to avoid double-counting)
+    const walletConditions: SQL[] = [
+      eq(wallet.userId, userId),
+      isNull(walletTransaction.linkedAccountTransactionId), // Exclude linked transfers
+    ];
+
+    if (startDate) {
+      walletConditions.push(gte(walletTransaction.date, startDate));
+    }
+    if (endDate) {
+      walletConditions.push(lte(walletTransaction.date, endDate));
+    }
+
+    const walletDateTrunc =
+      groupBy === "month"
+        ? sql`DATE_TRUNC('month', ${walletTransaction.date})`
+        : groupBy === "week"
+          ? sql`DATE_TRUNC('week', ${walletTransaction.date})`
+          : sql`DATE_TRUNC('day', ${walletTransaction.date})`;
+
+    const walletRows = await db
+      .select({
+        periodDate: sql<string>`${walletDateTrunc}::date`.as("period_date"),
+        amount: walletTransaction.amount,
+        currency: walletTransaction.currency,
+        type: walletTransaction.type,
+      })
+      .from(walletTransaction)
+      .innerJoin(wallet, eq(walletTransaction.walletId, wallet.id))
+      .where(and(...walletConditions))
+      .orderBy(asc(sql`${walletDateTrunc}`));
 
     const totals = new Map<string, number>();
-    for (const row of rows) {
+
+    // Process account transactions
+    for (const row of accountRows) {
       // Use pre-computed amountNok if available, otherwise fall back to live conversion
       let amountNok: number;
       if (row.amountNok != null) {
@@ -815,6 +866,29 @@ export async function getBalanceTrends({
       }
       const signedAmount =
         row.type === "withdrawal" ? -amountNok : amountNok;
+      const key = String(row.periodDate);
+
+      totals.set(key, (totals.get(key) ?? 0) + signedAmount);
+    }
+
+    // Process wallet transactions
+    // Wallet transaction types that increase balance: deposit, transfer_from_account, transfer_from_wallet
+    // Wallet transaction types that decrease balance: withdrawal, transfer_to_account, transfer_to_wallet, fee
+    const walletOutflowTypes = new Set([
+      "withdrawal",
+      "transfer_to_account",
+      "transfer_to_wallet",
+      "fee",
+    ]);
+
+    for (const row of walletRows) {
+      const amount = row.amount ? Number.parseFloat(row.amount) : 0;
+      const currency = row.currency ?? "NOK";
+      const amountNok = await convertAmountToNok(amount, currency);
+
+      const signedAmount = walletOutflowTypes.has(row.type)
+        ? -amountNok
+        : amountNok;
       const key = String(row.periodDate);
 
       totals.set(key, (totals.get(key) ?? 0) + signedAmount);
@@ -6993,5 +7067,772 @@ export async function getWalletTotals(userId: string): Promise<{
       cryptoBalanceNok: 0,
       walletCount: 0,
     };
+  }
+}
+
+// ============================================================================
+// Balance Snapshots
+// ============================================================================
+
+/**
+ * Create a balance snapshot for a user.
+ * Called by cron job twice daily to track total capital over time.
+ */
+export async function createBalanceSnapshot({
+  userId,
+  totalCapitalNok,
+  accountsNok,
+  walletsNok,
+}: {
+  userId: string;
+  totalCapitalNok: number;
+  accountsNok?: number;
+  walletsNok?: number;
+}): Promise<void> {
+  try {
+    await db.insert(balanceSnapshot).values({
+      createdAt: new Date(),
+      userId,
+      totalCapitalNok: totalCapitalNok.toFixed(2),
+      accountsNok: accountsNok?.toFixed(2) ?? null,
+      walletsNok: walletsNok?.toFixed(2) ?? null,
+    });
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to create balance snapshot"
+    );
+  }
+}
+
+/**
+ * Get balance snapshots for a user within a date range.
+ * Returns snapshots for building the balance trend chart.
+ */
+export async function getBalanceSnapshots({
+  userId,
+  startDate,
+  endDate,
+  limit = 1000,
+}: {
+  userId: string;
+  startDate?: Date;
+  endDate?: Date;
+  limit?: number;
+}): Promise<
+  Array<{
+    createdAt: Date;
+    totalCapitalNok: number;
+    accountsNok: number | null;
+    walletsNok: number | null;
+  }>
+> {
+  try {
+    const conditions: SQL[] = [eq(balanceSnapshot.userId, userId)];
+
+    if (startDate) {
+      conditions.push(gte(balanceSnapshot.createdAt, startDate));
+    }
+    if (endDate) {
+      conditions.push(lte(balanceSnapshot.createdAt, endDate));
+    }
+
+    const rows = await db
+      .select({
+        createdAt: balanceSnapshot.createdAt,
+        totalCapitalNok: balanceSnapshot.totalCapitalNok,
+        accountsNok: balanceSnapshot.accountsNok,
+        walletsNok: balanceSnapshot.walletsNok,
+      })
+      .from(balanceSnapshot)
+      .where(and(...conditions))
+      .orderBy(asc(balanceSnapshot.createdAt))
+      .limit(limit);
+
+    return rows.map((row) => ({
+      createdAt: row.createdAt,
+      totalCapitalNok: Number.parseFloat(row.totalCapitalNok ?? "0"),
+      accountsNok: row.accountsNok
+        ? Number.parseFloat(row.accountsNok)
+        : null,
+      walletsNok: row.walletsNok ? Number.parseFloat(row.walletsNok) : null,
+    }));
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get balance snapshots"
+    );
+  }
+}
+
+/**
+ * Get all user IDs for taking balance snapshots.
+ * Used by cron job to iterate over all users.
+ */
+export async function getAllUserIds(): Promise<string[]> {
+  try {
+    const rows = await db.select({ id: user.id }).from(user);
+    return rows.map((r) => r.id);
+  } catch (_error) {
+    throw new ChatSDKError("bad_request:database", "Failed to get user IDs");
+  }
+}
+
+// ============================================================================
+// DEPOSIT BONUS QUERIES
+// ============================================================================
+
+export type CreateDepositBonusParams = {
+  userId: string;
+  accountId: string;
+  name: string;
+  depositAmount: number;
+  bonusAmount: number;
+  currency: string;
+  wageringMultiplier: number;
+  wageringBase: WageringBase;
+  minOdds: number;
+  maxBetPercent?: number | null;
+  expiresAt?: Date | null;
+  linkedTransactionId?: string | null;
+  notes?: string | null;
+};
+
+/**
+ * Calculate wagering requirement based on base type.
+ */
+function calculateWageringRequirement(
+  depositAmount: number,
+  bonusAmount: number,
+  wageringBase: WageringBase,
+  wageringMultiplier: number
+): number {
+  let base: number;
+  switch (wageringBase) {
+    case "deposit":
+      base = depositAmount;
+      break;
+    case "bonus":
+      base = bonusAmount;
+      break;
+    case "deposit_plus_bonus":
+      base = depositAmount + bonusAmount;
+      break;
+    default:
+      base = depositAmount;
+  }
+  return base * wageringMultiplier;
+}
+
+/**
+ * Create a new deposit bonus.
+ */
+export async function createDepositBonus(params: CreateDepositBonusParams) {
+  try {
+    const wageringRequirement = calculateWageringRequirement(
+      params.depositAmount,
+      params.bonusAmount,
+      params.wageringBase,
+      params.wageringMultiplier
+    );
+
+    const [result] = await db
+      .insert(depositBonus)
+      .values({
+        createdAt: new Date(),
+        userId: params.userId,
+        accountId: params.accountId,
+        name: params.name,
+        depositAmount: params.depositAmount.toString(),
+        bonusAmount: params.bonusAmount.toString(),
+        currency: params.currency.toUpperCase(),
+        wageringMultiplier: params.wageringMultiplier.toString(),
+        wageringBase: params.wageringBase,
+        wageringRequirement: wageringRequirement.toString(),
+        wageringProgress: "0",
+        minOdds: params.minOdds.toString(),
+        maxBetPercent: params.maxBetPercent?.toString() ?? null,
+        expiresAt: params.expiresAt ?? null,
+        status: "active",
+        linkedTransactionId: params.linkedTransactionId ?? null,
+        notes: params.notes ?? null,
+      })
+      .returning();
+
+    // Create audit entry
+    await db.insert(auditLog).values({
+      createdAt: new Date(),
+      userId: params.userId,
+      entityType: "deposit_bonus",
+      entityId: result.id,
+      action: "create",
+      changes: {
+        depositAmount: params.depositAmount,
+        bonusAmount: params.bonusAmount,
+        wageringRequirement,
+      },
+      notes: `Created deposit bonus: ${params.name}`,
+    });
+
+    return result;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to create deposit bonus"
+    );
+  }
+}
+
+/**
+ * Get a deposit bonus by ID.
+ */
+export async function getDepositBonusById({
+  id,
+  userId,
+}: {
+  id: string;
+  userId: string;
+}) {
+  try {
+    const [row] = await db
+      .select({
+        id: depositBonus.id,
+        createdAt: depositBonus.createdAt,
+        userId: depositBonus.userId,
+        accountId: depositBonus.accountId,
+        name: depositBonus.name,
+        depositAmount: depositBonus.depositAmount,
+        bonusAmount: depositBonus.bonusAmount,
+        currency: depositBonus.currency,
+        wageringMultiplier: depositBonus.wageringMultiplier,
+        wageringBase: depositBonus.wageringBase,
+        wageringRequirement: depositBonus.wageringRequirement,
+        wageringProgress: depositBonus.wageringProgress,
+        minOdds: depositBonus.minOdds,
+        maxBetPercent: depositBonus.maxBetPercent,
+        expiresAt: depositBonus.expiresAt,
+        status: depositBonus.status,
+        linkedTransactionId: depositBonus.linkedTransactionId,
+        clearedAt: depositBonus.clearedAt,
+        notes: depositBonus.notes,
+        accountName: account.name,
+      })
+      .from(depositBonus)
+      .leftJoin(account, eq(depositBonus.accountId, account.id))
+      .where(and(eq(depositBonus.id, id), eq(depositBonus.userId, userId)))
+      .limit(1);
+    return row ?? null;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to fetch deposit bonus"
+    );
+  }
+}
+
+/**
+ * List all deposit bonuses for a user.
+ * Can optionally filter by status.
+ */
+export async function listDepositBonusesByUser({
+  userId,
+  status,
+  limit = 100,
+}: {
+  userId: string;
+  status?: DepositBonusStatus;
+  limit?: number;
+}) {
+  try {
+    const conditions: SQL[] = [eq(depositBonus.userId, userId)];
+    if (status) {
+      conditions.push(eq(depositBonus.status, status));
+    }
+
+    return await db
+      .select({
+        id: depositBonus.id,
+        createdAt: depositBonus.createdAt,
+        userId: depositBonus.userId,
+        accountId: depositBonus.accountId,
+        name: depositBonus.name,
+        depositAmount: depositBonus.depositAmount,
+        bonusAmount: depositBonus.bonusAmount,
+        currency: depositBonus.currency,
+        wageringMultiplier: depositBonus.wageringMultiplier,
+        wageringBase: depositBonus.wageringBase,
+        wageringRequirement: depositBonus.wageringRequirement,
+        wageringProgress: depositBonus.wageringProgress,
+        minOdds: depositBonus.minOdds,
+        maxBetPercent: depositBonus.maxBetPercent,
+        expiresAt: depositBonus.expiresAt,
+        status: depositBonus.status,
+        linkedTransactionId: depositBonus.linkedTransactionId,
+        clearedAt: depositBonus.clearedAt,
+        notes: depositBonus.notes,
+        accountName: account.name,
+      })
+      .from(depositBonus)
+      .leftJoin(account, eq(depositBonus.accountId, account.id))
+      .where(and(...conditions))
+      .orderBy(desc(depositBonus.createdAt))
+      .limit(limit);
+  } catch (_error) {
+    console.error("listDepositBonusesByUser error:", _error);
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to list deposit bonuses"
+    );
+  }
+}
+
+/**
+ * List active deposit bonuses for a specific account.
+ * Used to check if settled bets should contribute to wagering.
+ */
+export async function listActiveDepositBonusesForAccount({
+  accountId,
+  userId,
+}: {
+  accountId: string;
+  userId: string;
+}) {
+  try {
+    return await db
+      .select()
+      .from(depositBonus)
+      .where(
+        and(
+          eq(depositBonus.accountId, accountId),
+          eq(depositBonus.userId, userId),
+          eq(depositBonus.status, "active")
+        )
+      )
+      .orderBy(asc(depositBonus.expiresAt));
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to list active deposit bonuses for account"
+    );
+  }
+}
+
+export type UpdateDepositBonusParams = {
+  id: string;
+  userId: string;
+  name?: string;
+  expiresAt?: Date | null;
+  notes?: string | null;
+  status?: DepositBonusStatus;
+};
+
+/**
+ * Update a deposit bonus.
+ */
+export async function updateDepositBonus(params: UpdateDepositBonusParams) {
+  try {
+    const updates: Record<string, unknown> = {};
+    if (params.name !== undefined) updates.name = params.name;
+    if (params.expiresAt !== undefined) updates.expiresAt = params.expiresAt;
+    if (params.notes !== undefined) updates.notes = params.notes;
+    if (params.status !== undefined) updates.status = params.status;
+
+    if (Object.keys(updates).length === 0) {
+      return await getDepositBonusById({
+        id: params.id,
+        userId: params.userId,
+      });
+    }
+
+    const [result] = await db
+      .update(depositBonus)
+      .set(updates)
+      .where(
+        and(eq(depositBonus.id, params.id), eq(depositBonus.userId, params.userId))
+      )
+      .returning();
+
+    return result ?? null;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to update deposit bonus"
+    );
+  }
+}
+
+/**
+ * Update wagering progress for a deposit bonus.
+ * If progress >= requirement, automatically mark as cleared.
+ */
+export async function updateDepositBonusProgress({
+  id,
+  userId,
+  additionalProgress,
+}: {
+  id: string;
+  userId: string;
+  additionalProgress: number;
+}) {
+  try {
+    // Get current bonus state
+    const bonus = await getDepositBonusById({ id, userId });
+    if (!bonus || bonus.status !== "active") {
+      return null;
+    }
+
+    const currentProgress = Number.parseFloat(bonus.wageringProgress ?? "0");
+    const requirement = Number.parseFloat(bonus.wageringRequirement ?? "0");
+    const newProgress = currentProgress + additionalProgress;
+
+    const updates: Record<string, unknown> = {
+      wageringProgress: newProgress.toString(),
+    };
+
+    // Check if wagering is now complete
+    if (newProgress >= requirement) {
+      updates.status = "cleared";
+      updates.clearedAt = new Date();
+    }
+
+    const [result] = await db
+      .update(depositBonus)
+      .set(updates)
+      .where(
+        and(eq(depositBonus.id, id), eq(depositBonus.userId, userId))
+      )
+      .returning();
+
+    // Create audit entry for progress update
+    if (result) {
+      await db.insert(auditLog).values({
+        createdAt: new Date(),
+        userId,
+        entityType: "deposit_bonus",
+        entityId: id,
+        action: updates.status === "cleared" ? "status_change" : "update",
+        changes: {
+          previousProgress: currentProgress,
+          additionalProgress,
+          newProgress,
+          cleared: updates.status === "cleared",
+        },
+        notes: updates.status === "cleared"
+          ? "Wagering complete - bonus cleared"
+          : `Wagering progress updated: ${newProgress.toFixed(2)} / ${requirement.toFixed(2)}`,
+      });
+    }
+
+    return result ?? null;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to update deposit bonus progress"
+    );
+  }
+}
+
+/**
+ * Mark a deposit bonus as forfeited.
+ */
+export async function forfeitDepositBonus({
+  id,
+  userId,
+  reason,
+}: {
+  id: string;
+  userId: string;
+  reason?: string;
+}) {
+  try {
+    const [result] = await db
+      .update(depositBonus)
+      .set({ status: "forfeited" })
+      .where(
+        and(eq(depositBonus.id, id), eq(depositBonus.userId, userId))
+      )
+      .returning();
+
+    if (result) {
+      await db.insert(auditLog).values({
+        createdAt: new Date(),
+        userId,
+        entityType: "deposit_bonus",
+        entityId: id,
+        action: "status_change",
+        changes: { status: "forfeited" },
+        notes: reason ?? "Bonus forfeited",
+      });
+    }
+
+    return result ?? null;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to forfeit deposit bonus"
+    );
+  }
+}
+
+/**
+ * Delete a deposit bonus and its qualifying bets.
+ */
+export async function deleteDepositBonus({
+  id,
+  userId,
+}: {
+  id: string;
+  userId: string;
+}) {
+  try {
+    // Delete qualifying bets first
+    await db
+      .delete(bonusQualifyingBet)
+      .where(eq(bonusQualifyingBet.depositBonusId, id));
+
+    // Delete the bonus
+    const [result] = await db
+      .delete(depositBonus)
+      .where(
+        and(eq(depositBonus.id, id), eq(depositBonus.userId, userId))
+      )
+      .returning();
+
+    if (result) {
+      await db.insert(auditLog).values({
+        createdAt: new Date(),
+        userId,
+        entityType: "deposit_bonus",
+        entityId: id,
+        action: "delete",
+        changes: { name: result.name },
+        notes: `Deleted deposit bonus: ${result.name}`,
+      });
+    }
+
+    return result ?? null;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to delete deposit bonus"
+    );
+  }
+}
+
+/**
+ * Add a qualifying bet to a deposit bonus.
+ * If the bet meets min odds, it contributes to wagering progress.
+ */
+export async function addBonusQualifyingBet({
+  depositBonusId,
+  backBetId,
+  matchedBetId,
+  stake,
+  odds,
+  userId,
+}: {
+  depositBonusId: string;
+  backBetId?: string | null;
+  matchedBetId?: string | null;
+  stake: number;
+  odds: number;
+  userId: string;
+}) {
+  try {
+    // Get the bonus to check min odds
+    const bonus = await getDepositBonusById({ id: depositBonusId, userId });
+    if (!bonus || bonus.status !== "active") {
+      return null;
+    }
+
+    const minOdds = Number.parseFloat(bonus.minOdds ?? "0");
+    const qualified = odds >= minOdds;
+
+    // Insert the qualifying bet record
+    const [result] = await db
+      .insert(bonusQualifyingBet)
+      .values({
+        createdAt: new Date(),
+        depositBonusId,
+        backBetId: backBetId ?? null,
+        matchedBetId: matchedBetId ?? null,
+        stake: stake.toString(),
+        odds: odds.toString(),
+        qualified: qualified ? "true" : "false",
+      })
+      .returning();
+
+    // If qualified, update wagering progress
+    if (qualified) {
+      await updateDepositBonusProgress({
+        id: depositBonusId,
+        userId,
+        additionalProgress: stake,
+      });
+    }
+
+    return result;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to add bonus qualifying bet"
+    );
+  }
+}
+
+/**
+ * List qualifying bets for a deposit bonus.
+ */
+export async function listBonusQualifyingBets({
+  depositBonusId,
+  limit = 100,
+}: {
+  depositBonusId: string;
+  limit?: number;
+}) {
+  try {
+    return await db
+      .select({
+        id: bonusQualifyingBet.id,
+        createdAt: bonusQualifyingBet.createdAt,
+        depositBonusId: bonusQualifyingBet.depositBonusId,
+        backBetId: bonusQualifyingBet.backBetId,
+        matchedBetId: bonusQualifyingBet.matchedBetId,
+        stake: bonusQualifyingBet.stake,
+        odds: bonusQualifyingBet.odds,
+        qualified: bonusQualifyingBet.qualified,
+        // Join back bet info
+        backBetMarket: backBet.market,
+        backBetSelection: backBet.selection,
+        backBetPlacedAt: backBet.placedAt,
+        // Join matched bet info
+        matchedBetMarket: matchedBet.market,
+        matchedBetSelection: matchedBet.selection,
+      })
+      .from(bonusQualifyingBet)
+      .leftJoin(backBet, eq(bonusQualifyingBet.backBetId, backBet.id))
+      .leftJoin(matchedBet, eq(bonusQualifyingBet.matchedBetId, matchedBet.id))
+      .where(eq(bonusQualifyingBet.depositBonusId, depositBonusId))
+      .orderBy(desc(bonusQualifyingBet.createdAt))
+      .limit(limit);
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to list bonus qualifying bets"
+    );
+  }
+}
+
+/**
+ * Get summary of active deposit bonuses for a user.
+ */
+export async function getActiveDepositBonusesSummary({
+  userId,
+}: {
+  userId: string;
+}): Promise<{
+  count: number;
+  totalBonusValue: number;
+  totalWageringRemaining: number;
+}> {
+  try {
+    const bonuses = await listDepositBonusesByUser({ userId, status: "active" });
+    
+    let totalBonusValue = 0;
+    let totalWageringRemaining = 0;
+
+    for (const bonus of bonuses) {
+      totalBonusValue += Number.parseFloat(bonus.bonusAmount ?? "0");
+      const requirement = Number.parseFloat(bonus.wageringRequirement ?? "0");
+      const progress = Number.parseFloat(bonus.wageringProgress ?? "0");
+      totalWageringRemaining += Math.max(0, requirement - progress);
+    }
+
+    return {
+      count: bonuses.length,
+      totalBonusValue,
+      totalWageringRemaining,
+    };
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get deposit bonus summary"
+    );
+  }
+}
+
+/**
+ * Count deposit bonuses expiring within N days.
+ */
+export async function countExpiringDepositBonuses({
+  userId,
+  daysUntilExpiry = 7,
+}: {
+  userId: string;
+  daysUntilExpiry?: number;
+}): Promise<number> {
+  try {
+    const now = new Date();
+    const expiryThreshold = new Date(
+      now.getTime() + daysUntilExpiry * 24 * 60 * 60 * 1000
+    );
+
+    const [result] = await db
+      .select({ count: count() })
+      .from(depositBonus)
+      .where(
+        and(
+          eq(depositBonus.userId, userId),
+          eq(depositBonus.status, "active"),
+          isNotNull(depositBonus.expiresAt),
+          lte(depositBonus.expiresAt, expiryThreshold)
+        )
+      );
+
+    return result?.count ?? 0;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to count expiring deposit bonuses"
+    );
+  }
+}
+
+/**
+ * Get recent deposit transactions for an account (for linking to bonus).
+ */
+export async function getRecentDepositsForAccount({
+  accountId,
+  userId,
+  limit = 10,
+}: {
+  accountId: string;
+  userId: string;
+  limit?: number;
+}) {
+  try {
+    return await db
+      .select({
+        id: accountTransaction.id,
+        amount: accountTransaction.amount,
+        currency: accountTransaction.currency,
+        occurredAt: accountTransaction.occurredAt,
+        notes: accountTransaction.notes,
+      })
+      .from(accountTransaction)
+      .where(
+        and(
+          eq(accountTransaction.accountId, accountId),
+          eq(accountTransaction.userId, userId),
+          eq(accountTransaction.type, "deposit")
+        )
+      )
+      .orderBy(desc(accountTransaction.occurredAt))
+      .limit(limit);
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get recent deposits"
+    );
   }
 }

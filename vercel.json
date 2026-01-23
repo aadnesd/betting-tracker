@@ -7,6 +7,10 @@
     {
       "path": "/api/cron/auto-settle",
       "schedule": "30 6 * * *"
+    },
+    {
+      "path": "/api/cron/balance-snapshot",
+      "schedule": "0 8,20 * * *"
     }
   ]
 }
