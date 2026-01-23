@@ -260,7 +260,7 @@ export function IndividualBetDetail({
 
       <div className="grid gap-6 lg:grid-cols-[1.4fr,0.9fr]">
         <div className="space-y-6">
-          {screenshot?.url && (
+          {screenshot?.url && /^https?:\/\//.test(screenshot.url) && (
             <Card>
               <CardHeader>
                 <CardTitle>Screenshot</CardTitle>

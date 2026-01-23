@@ -254,8 +254,8 @@ function BetCard({
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Screenshot */}
-        {screenshot?.url && (
+        {/* Screenshot - only show if URL is a valid http(s) URL */}
+        {screenshot?.url && /^https?:\/\//.test(screenshot.url) && (
           <div className="overflow-hidden rounded-md border">
             <Image
               alt={`${label} screenshot`}

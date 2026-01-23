@@ -3,6 +3,7 @@ import {
   applyAutoSettlement,
   findBetsReadyForAutoSettlement,
   flagBetForReview,
+  processWageringProgressOnSettle,
   type BetReadyForSettlement,
 } from "@/lib/db/queries";
 import {
@@ -116,6 +117,20 @@ async function processBet(
     selection: bet.selection,
     matchResult,
   });
+
+  // Process deposit bonus wagering progress for back bets
+  // Only back bets count towards wagering (not lay bets on exchanges)
+  if (bet.backAccountId && bet.backBetPlacedAt) {
+    await processWageringProgressOnSettle({
+      accountId: bet.backAccountId,
+      userId: bet.userId,
+      backBetId: bet.backBetId,
+      matchedBetId: bet.id,
+      stake: backStake,
+      odds: backOdds,
+      placedAt: bet.backBetPlacedAt,
+    });
+  }
 
   return {
     matchedBetId: bet.id,
