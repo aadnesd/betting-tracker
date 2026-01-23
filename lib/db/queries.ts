@@ -665,6 +665,12 @@ export interface TransactionTrendPoint {
   net: number;
 }
 
+export interface BalanceTrendPoint {
+  date: string;
+  label: string;
+  net: number;
+}
+
 /**
  * Get transaction trends grouped by day/week/month for charts.
  * Why: Enables visualization of deposit/withdrawal patterns over time.
@@ -746,6 +752,86 @@ export async function getTransactionTrends({
     throw new ChatSDKError(
       "bad_request:database",
       "Failed to get transaction trends"
+    );
+  }
+}
+
+/**
+ * Get balance trends (net deposits/withdrawals/bonuses/adjustments) grouped by day/week/month.
+ * All amounts are converted to NOK for consistent aggregation.
+ */
+export async function getBalanceTrends({
+  userId,
+  startDate,
+  endDate,
+  groupBy = "day",
+}: {
+  userId: string;
+  startDate?: Date;
+  endDate?: Date;
+  groupBy?: "day" | "week" | "month";
+}): Promise<BalanceTrendPoint[]> {
+  try {
+    const conditions: SQL[] = [eq(accountTransaction.userId, userId)];
+
+    if (startDate) {
+      conditions.push(gte(accountTransaction.occurredAt, startDate));
+    }
+    if (endDate) {
+      conditions.push(lte(accountTransaction.occurredAt, endDate));
+    }
+
+    const dateTrunc =
+      groupBy === "month"
+        ? sql`DATE_TRUNC('month', ${accountTransaction.occurredAt})`
+        : groupBy === "week"
+          ? sql`DATE_TRUNC('week', ${accountTransaction.occurredAt})`
+          : sql`DATE_TRUNC('day', ${accountTransaction.occurredAt})`;
+
+    const rows = await db
+      .select({
+        periodDate: sql<string>`${dateTrunc}::date`.as("period_date"),
+        amount: accountTransaction.amount,
+        currency: accountTransaction.currency,
+        type: accountTransaction.type,
+      })
+      .from(accountTransaction)
+      .where(and(...conditions))
+      .orderBy(asc(sql`${dateTrunc}`));
+
+    const totals = new Map<string, number>();
+    for (const row of rows) {
+      const amount = row.amount ? Number.parseFloat(row.amount) : 0;
+      const currency = row.currency ?? "NOK";
+      const amountNok = await convertAmountToNok(amount, currency);
+      const signedAmount =
+        row.type === "withdrawal" ? -amountNok : amountNok;
+      const key = String(row.periodDate);
+
+      totals.set(key, (totals.get(key) ?? 0) + signedAmount);
+    }
+
+    const sortedKeys = Array.from(totals.keys()).sort();
+
+    return sortedKeys.map((dateStr) => {
+      const date = new Date(dateStr);
+      const label =
+        groupBy === "month"
+          ? date.toLocaleDateString("en-GB", { month: "short", year: "numeric" })
+          : groupBy === "week"
+            ? `Week of ${date.toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`
+            : date.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+
+      return {
+        date: dateStr,
+        label,
+        net: Math.round((totals.get(dateStr) ?? 0) * 100) / 100,
+      };
+    });
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get balance trends"
     );
   }
 }
