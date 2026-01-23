@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { auth } from "@/app/(auth)/auth";
 import { BookmakerProfitWithBonusesTable } from "@/components/bets/bookmaker-profit-with-bonuses-table";
+import { BalanceChartWithControls } from "@/components/bets/balance-chart";
 import { BreakdownChartWithToggle } from "@/components/bets/breakdown-charts";
 import { ExportButton } from "@/components/bets/export-button";
 import { ProfitChartWithControls } from "@/components/bets/profit-chart";
@@ -14,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   getBookmakerProfitWithBonuses,
+  getBalanceTrends,
   getMatchedBetsForReporting,
   getOpenExposure,
   getProfitByBookmaker,
@@ -22,6 +24,7 @@ import {
   getTotalBonusesForUser,
 } from "@/lib/db/queries";
 import {
+  calculateCumulativeBalanceData,
   calculateCumulativeProfitData,
   calculateReportingSummary,
   enrichWithROI,
@@ -99,21 +102,34 @@ async function ReportingContent({
   endDate: Date;
 }) {
   // Fetch all data in parallel
-  const [matchedBets, openExposureData, bookmakerData, exchangeData, promoData, bookmakerWithBonuses, totalBonuses] =
-    await Promise.all([
-      getMatchedBetsForReporting({
-        userId,
-        startDate,
-        endDate,
-        statuses: ["settled"],
-      }),
-      getOpenExposure({ userId }),
-      getProfitByBookmaker({ userId, startDate, endDate }),
-      getProfitByExchange({ userId, startDate, endDate }),
-      getProfitByPromoType({ userId, startDate, endDate }),
-      getBookmakerProfitWithBonuses({ userId, startDate, endDate }),
-      getTotalBonusesForUser({ userId, startDate, endDate }),
-    ]);
+  const [
+    matchedBets,
+    openExposureData,
+    bookmakerData,
+    exchangeData,
+    promoData,
+    bookmakerWithBonuses,
+    totalBonuses,
+    dayBalanceData,
+    weekBalanceData,
+    monthBalanceData,
+  ] = await Promise.all([
+    getMatchedBetsForReporting({
+      userId,
+      startDate,
+      endDate,
+      statuses: ["settled"],
+    }),
+    getOpenExposure({ userId }),
+    getProfitByBookmaker({ userId, startDate, endDate }),
+    getProfitByExchange({ userId, startDate, endDate }),
+    getProfitByPromoType({ userId, startDate, endDate }),
+    getBookmakerProfitWithBonuses({ userId, startDate, endDate }),
+    getTotalBonusesForUser({ userId, startDate, endDate }),
+    getBalanceTrends({ userId, startDate: startDate ?? undefined, endDate, groupBy: "day" }),
+    getBalanceTrends({ userId, startDate: startDate ?? undefined, endDate, groupBy: "week" }),
+    getBalanceTrends({ userId, startDate: startDate ?? undefined, endDate, groupBy: "month" }),
+  ]);
 
   // Transform matched bets to the format expected by calculateReportingSummary
   const betsWithLegs: MatchedBetWithLegs[] = matchedBets.map((row) => ({
@@ -129,6 +145,10 @@ async function ReportingContent({
     calculateCumulativeProfitData(betsWithLegs, "week"),
     calculateCumulativeProfitData(betsWithLegs, "month"),
   ]);
+
+  const balanceDayChartData = calculateCumulativeBalanceData(dayBalanceData);
+  const balanceWeekChartData = calculateCumulativeBalanceData(weekBalanceData);
+  const balanceMonthChartData = calculateCumulativeBalanceData(monthBalanceData);
 
   // Enrich breakdown data with ROI
   const bookmakerBreakdown = enrichWithROI(
@@ -167,6 +187,13 @@ async function ReportingContent({
         weekData={weekChartData}
         monthData={monthChartData}
         title="Cumulative Profit"
+      />
+
+      <BalanceChartWithControls
+        dayData={balanceDayChartData}
+        weekData={balanceWeekChartData}
+        monthData={balanceMonthChartData}
+        title="Cumulative Total Balance"
       />
 
       {/* Performance Breakdown Charts - show matched set profit by category */}
