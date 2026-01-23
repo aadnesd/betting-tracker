@@ -371,6 +371,23 @@ Remaining blocker: Rerun Playwright route tests in an environment that permits b
 
 - [x] **Bankroll dashboard**: New page `/bets/bankroll` showing total capital across all accounts, breakdown by bookmaker vs exchange, deposit/withdrawal trends. DoD: page renders real aggregated data. Why: Holistic view of funds. Implementation: Created `getBankrollSummary` query in `lib/db/queries.ts` that aggregates: totalCapital (sum of all account balances), bookmakerBalance/exchangeBalance (by account kind), depositTotal/withdrawalTotal/bonusTotal (summed from transactions). Created `getTransactionTrends` query that groups transactions by day (30d) or week (90d) for charting deposits, withdrawals, and bonuses over time. Created `app/(chat)/bets/bankroll/page.tsx` with: 4 summary cards (Total Capital, Bookmaker Balance, Exchange Balance, Net Deposits), 3 transaction flow cards (Deposits, Withdrawals, Bonuses), account breakdown lists for bookmakers and exchanges sorted by balance. Created `components/bets/bankroll-transaction-chart.tsx` client component with bar/area chart toggle and 30d/90d time range toggle using Recharts. Added "Bankroll" navigation link to dashboard header. Build passes with all 170 tests passing.
 
+- [ ] **Wallet tracking**: Add `Wallet` and `WalletTransaction` tables to track payment intermediaries (e-wallets like Revolut, Skrill, Neteller; crypto wallets like Exodus, MetaMask). Unlike betting accounts, wallets are used for money transfers between bank and bookies.
+  
+  **DoD:**
+  - `Wallet` table: id, userId, name, type (fiat/crypto/hybrid), currency, notes, status, createdAt
+  - `WalletTransaction` table: id, walletId, type (deposit/withdrawal/transfer_to_account/transfer_from_account/transfer_to_wallet/transfer_from_wallet/fee/adjustment), amount, currency, relatedAccountId, relatedWalletId, externalRef, date, notes, createdAt
+  - Wallet list page at `/bets/settings/wallets` with balance display
+  - Wallet detail page with transaction history
+  - Create/edit wallet form with type selector
+  - Add transaction form supporting transfers to/from accounts and other wallets
+  - Linked transactions: transfer to account creates both WalletTransaction and AccountTransaction
+  - Bankroll page includes wallet balances in total capital
+  - "Wallets" tab in settings alongside "Accounts"
+  
+  **Why:** Users fund bookmakers via e-wallets (Revolut, Skrill) and need to track the flow of funds from bank → wallet → bookie and back. Crypto users need to track BTC/ETH/USDT balances in wallets like Exodus.
+  
+  See `specs/wallets.md` for full requirements.
+
 ## P10 — Individual Bet Management
 
 - [x] **Individual bets list page**: Create `/bets/all` page showing all back and lay bets separately (not grouped as matched sets). DoD: Page displays individual bets in a table/list format with one bet per row, sorted by date (newest first). Each row shows: bet type (back/lay), bookmaker/exchange, market, selection, odds, stake, status, placed date, and action buttons. Support filtering by status (placed/settled), account, and date range. Include search/filter controls at top. Why: Users need to see and manage individual bets independently of matched sets, especially for bets that don't have a corresponding hedge. Implementation: Added `listAllBetsByUser` query in `lib/db/queries.ts` that merges back and lay bets with account + matched set info, supports status/account/date/search filters, and returns a unified list sorted by placed date. Added `/bets/all` server page with filter form (status, account, date range, search), results table, and matched-set link for linked bets. Added “All bets” link to dashboard actions for discoverability. Tests: `pnpm exec vitest run tests/unit/individual-bets.test.ts`.

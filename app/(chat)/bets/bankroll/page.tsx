@@ -20,7 +20,7 @@ import {
   getTransactionTrends,
   listAccountsWithBalances,
 } from "@/lib/db/queries";
-import { formatNOK } from "@/lib/reporting";
+import { formatCurrency, formatNOK } from "@/lib/reporting";
 
 export const metadata = {
   title: "Bankroll",
@@ -263,7 +263,7 @@ export default async function BankrollPage() {
                           : "text-red-600"
                       }`}
                     >
-                      {formatNOK(acc.currentBalance)}
+                      {formatCurrency(acc.currentBalance, acc.currency ?? "NOK")}
                     </p>
                   </Link>
                 ))
@@ -318,7 +318,7 @@ export default async function BankrollPage() {
                           : "text-red-600"
                       }`}
                     >
-                      {formatNOK(acc.currentBalance)}
+                      {formatCurrency(acc.currentBalance, acc.currency ?? "NOK")}
                     </p>
                   </Link>
                 ))
