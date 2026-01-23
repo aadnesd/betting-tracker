@@ -653,6 +653,16 @@ export interface TransactionTrendPoint {
 }
 
 /**
+ * Balance trend data point for charts.
+ */
+export interface BalanceTrendPoint {
+  date: string;
+  label: string;
+  balanceChange: number;
+  cumulative: number;
+}
+
+/**
  * Get transaction trends grouped by day/week/month for charts.
  * Why: Enables visualization of deposit/withdrawal patterns over time.
  */
@@ -726,6 +736,97 @@ export async function getTransactionTrends({
     throw new ChatSDKError(
       "bad_request:database",
       "Failed to get transaction trends"
+    );
+  }
+}
+
+/**
+ * Get cumulative account balance movement grouped by day/week/month.
+ * Returns amounts converted to NOK for consistent charting.
+ */
+export async function getCumulativeBalanceSeries({
+  userId,
+  startDate,
+  endDate,
+  groupBy = "day",
+}: {
+  userId: string;
+  startDate?: Date;
+  endDate?: Date;
+  groupBy?: "day" | "week" | "month";
+}): Promise<BalanceTrendPoint[]> {
+  try {
+    const conditions: SQL[] = [eq(accountTransaction.userId, userId)];
+
+    if (startDate) {
+      conditions.push(gte(accountTransaction.occurredAt, startDate));
+    }
+    if (endDate) {
+      conditions.push(lte(accountTransaction.occurredAt, endDate));
+    }
+
+    const dateTrunc = groupBy === "month"
+      ? sql`DATE_TRUNC('month', ${accountTransaction.occurredAt})`
+      : groupBy === "week"
+        ? sql`DATE_TRUNC('week', ${accountTransaction.occurredAt})`
+        : sql`DATE_TRUNC('day', ${accountTransaction.occurredAt})`;
+
+    const rows = await db
+      .select({
+        periodDate: sql<string>`${dateTrunc}::date`.as("period_date"),
+        currency: accountTransaction.currency,
+        netAmount: sql<string>`COALESCE(SUM(CASE WHEN ${accountTransaction.type} IN ('deposit', 'bonus', 'adjustment') THEN ${accountTransaction.amount}::numeric ELSE -${accountTransaction.amount}::numeric END), 0)`,
+      })
+      .from(accountTransaction)
+      .where(and(...conditions))
+      .groupBy(dateTrunc, accountTransaction.currency)
+      .orderBy(asc(sql`${dateTrunc}`));
+
+    const converted = await Promise.all(
+      rows.map(async (row) => {
+        const netAmount = Number.parseFloat(String(row.netAmount || "0"));
+        const netNok = await convertAmountToNok(netAmount, row.currency);
+        return {
+          periodDate: String(row.periodDate),
+          netNok,
+        };
+      })
+    );
+
+    const totalsByPeriod = new Map<string, number>();
+    for (const entry of converted) {
+      const current = totalsByPeriod.get(entry.periodDate) ?? 0;
+      totalsByPeriod.set(entry.periodDate, current + entry.netNok);
+    }
+
+    const sortedKeys = Array.from(totalsByPeriod.keys()).sort();
+    let cumulative = 0;
+
+    return sortedKeys.map((key) => {
+      const balanceChange = totalsByPeriod.get(key) ?? 0;
+      cumulative += balanceChange;
+      const date = new Date(key);
+
+      let label: string;
+      if (groupBy === "month") {
+        label = date.toLocaleDateString("en-GB", { month: "short", year: "numeric" });
+      } else if (groupBy === "week") {
+        label = `Week of ${date.toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`;
+      } else {
+        label = date.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+      }
+
+      return {
+        date: key,
+        label,
+        balanceChange: Math.round(balanceChange * 100) / 100,
+        cumulative: Math.round(cumulative * 100) / 100,
+      };
+    });
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get cumulative balance series"
     );
   }
 }
