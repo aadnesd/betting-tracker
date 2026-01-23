@@ -20,6 +20,7 @@ import {
   getTransactionTrends,
   listAccountsWithBalances,
 } from "@/lib/db/queries";
+import { getDisplayRates } from "@/lib/fx-rates";
 import { formatCurrency, formatNOK } from "@/lib/reporting";
 
 export const metadata = {
@@ -36,7 +37,7 @@ export default async function BankrollPage() {
   const userId = session.user.id;
 
   // Fetch all data in parallel
-  const [summary, accounts, trends30, trends90] = await Promise.all([
+  const [summary, accounts, trends30, trends90, fxRates] = await Promise.all([
     getBankrollSummary({ userId }),
     listAccountsWithBalances({ userId, status: "active" }),
     getTransactionTrends({
@@ -49,6 +50,7 @@ export default async function BankrollPage() {
       startDate: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000),
       groupBy: "week",
     }),
+    getDisplayRates(),
   ]);
 
   const bookmakers = accounts.filter((a) => a.kind === "bookmaker");
@@ -325,6 +327,27 @@ export default async function BankrollPage() {
             )}
           </CardContent>
         </Card>
+      </div>
+
+      {/* FX Rates */}
+      <div className="rounded-lg border border-muted bg-muted/30 p-4">
+        <h3 className="mb-3 font-medium text-muted-foreground text-sm">
+          <Banknote className="mb-0.5 mr-2 inline h-4 w-4" />
+          Exchange Rates
+        </h3>
+        <div className="flex flex-wrap gap-4">
+          {fxRates.rates.map(({ from, to, rate }) => (
+            <div key={`${from}-${to}`} className="text-sm">
+              <span className="font-medium">{from}/{to}:</span>{" "}
+              <span className={rate ? "text-foreground" : "text-muted-foreground"}>
+                {rate ? rate.toLocaleString("en-US", { maximumFractionDigits: 2 }) : "—"}
+              </span>
+            </div>
+          ))}
+        </div>
+        <p className="mt-2 text-muted-foreground text-xs">
+          Updated: {fxRates.lastUpdated.toLocaleTimeString("nb-NO", { hour: "2-digit", minute: "2-digit" })}
+        </p>
       </div>
 
       {/* Quick Info */}

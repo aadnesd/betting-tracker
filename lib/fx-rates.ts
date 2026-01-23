@@ -66,3 +66,39 @@ export async function convertAmountToNok(
     return amount;
   }
 }
+
+/**
+ * Get current FX rates for display purposes.
+ * Returns rates for common currency pairs to verify API is working.
+ */
+export async function getDisplayRates(): Promise<{
+  rates: Array<{ from: string; to: string; rate: number | null }>;
+  lastUpdated: Date;
+}> {
+  const pairs = [
+    { from: "USD", to: "NOK" },
+    { from: "EUR", to: "NOK" },
+    { from: "GBP", to: "NOK" },
+    { from: "BTC", to: "USD" },
+  ];
+
+  const rates = await Promise.all(
+    pairs.map(async ({ from, to }) => {
+      try {
+        // For BTC/USD, we need to fetch BTC → USD rate differently
+        if (to === "USD") {
+          const btcToNok = await fetchRate(from);
+          const usdToNok = await fetchRate("USD");
+          const rate = btcToNok / usdToNok;
+          return { from, to, rate };
+        }
+        const rate = await fetchRate(from);
+        return { from, to, rate };
+      } catch {
+        return { from, to, rate: null };
+      }
+    })
+  );
+
+  return { rates, lastUpdated: new Date() };
+}
