@@ -317,7 +317,7 @@ export async function POST(request: Request) {
       ]);
 
       console.log(`[NET EXPOSURE] backProfitNok=${backProfitNok}, layLiabilityNok=${layLiabilityNok}`);
-      netExposure = layLiabilityNok - backProfitNok;
+      netExposure = backProfitNok - layLiabilityNok;
       console.log(`[NET EXPOSURE] Final netExposure=${netExposure}`);
     }
 
