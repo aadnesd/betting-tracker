@@ -758,7 +758,8 @@ export async function getTransactionTrends({
 
 /**
  * Get balance trends (net deposits/withdrawals/bonuses/adjustments) grouped by day/week/month.
- * All amounts are converted to NOK for consistent aggregation.
+ * Uses pre-computed amountNok from the database (no FX API calls needed).
+ * Falls back to live FX conversion for legacy rows without amountNok.
  */
 export async function getBalanceTrends({
   userId,
@@ -792,6 +793,7 @@ export async function getBalanceTrends({
       .select({
         periodDate: sql<string>`${dateTrunc}::date`.as("period_date"),
         amount: accountTransaction.amount,
+        amountNok: accountTransaction.amountNok,
         currency: accountTransaction.currency,
         type: accountTransaction.type,
       })
@@ -801,9 +803,16 @@ export async function getBalanceTrends({
 
     const totals = new Map<string, number>();
     for (const row of rows) {
-      const amount = row.amount ? Number.parseFloat(row.amount) : 0;
-      const currency = row.currency ?? "NOK";
-      const amountNok = await convertAmountToNok(amount, currency);
+      // Use pre-computed amountNok if available, otherwise fall back to live conversion
+      let amountNok: number;
+      if (row.amountNok != null) {
+        amountNok = Number.parseFloat(row.amountNok);
+      } else {
+        // Legacy row without amountNok - convert on the fly
+        const amount = row.amount ? Number.parseFloat(row.amount) : 0;
+        const currency = row.currency ?? "NOK";
+        amountNok = await convertAmountToNok(amount, currency);
+      }
       const signedAmount =
         row.type === "withdrawal" ? -amountNok : amountNok;
       const key = String(row.periodDate);
@@ -971,13 +980,18 @@ export async function createAccountTransaction({
   linkedWalletTransactionId?: string | null;
 }) {
   try {
+    // Pre-compute NOK equivalent at write time to avoid FX API calls on read
+    const normalizedCurrency = currency.toUpperCase();
+    const amountNok = await convertAmountToNok(amount, normalizedCurrency);
+
     const values: typeof accountTransaction.$inferInsert = {
       createdAt: new Date(),
       userId,
       accountId,
       type,
       amount: amount.toString(),
-      currency: currency.toUpperCase(),
+      currency: normalizedCurrency,
+      amountNok: amountNok.toString(),
       occurredAt: occurredAt ?? new Date(),
       notes: notes ?? null,
       linkedWalletTransactionId: linkedWalletTransactionId ?? null,
@@ -3509,6 +3523,7 @@ export async function getBookmakerProfitWithBonuses({
         accountId: accountTransaction.accountId,
         accountName: account.name,
         amount: accountTransaction.amount,
+        amountNok: accountTransaction.amountNok,
         currency: account.currency,
       })
       .from(accountTransaction)
@@ -3571,12 +3586,18 @@ export async function getBookmakerProfitWithBonuses({
       }
     }
 
-    // Process bonus data with FX conversion
+    // Process bonus data using pre-computed amountNok (with fallback for legacy rows)
     for (const row of bonusRows) {
       const existing = accountMap.get(row.accountId);
-      const amount = row.amount ? Number.parseFloat(row.amount) : 0;
-      const currency = row.currency ?? "NOK";
-      const amountNok = await convertAmountToNok(amount, currency);
+      let amountNok: number;
+      if (row.amountNok != null) {
+        amountNok = Number.parseFloat(row.amountNok);
+      } else {
+        // Legacy row without amountNok - convert on the fly
+        const amount = row.amount ? Number.parseFloat(row.amount) : 0;
+        const currency = row.currency ?? "NOK";
+        amountNok = await convertAmountToNok(amount, currency);
+      }
 
       if (existing) {
         existing.bonusTotal += amountNok;
@@ -3651,23 +3672,29 @@ export async function getTotalBonusesForUser({
       conditions.push(lte(accountTransaction.occurredAt, endDate));
     }
 
-    // Fetch individual transactions with account currency for FX conversion
+    // Fetch individual transactions with pre-computed amountNok
     const transactions = await db
       .select({
         amount: accountTransaction.amount,
+        amountNok: accountTransaction.amountNok,
         currency: account.currency,
       })
       .from(accountTransaction)
       .innerJoin(account, eq(accountTransaction.accountId, account.id))
       .where(and(...conditions));
 
-    // Convert each bonus to NOK and sum
+    // Sum using pre-computed amountNok (with fallback for legacy rows)
     let total = 0;
     for (const tx of transactions) {
-      const amount = tx.amount ? Number.parseFloat(tx.amount) : 0;
-      const currency = tx.currency ?? "NOK";
-      const amountNok = await convertAmountToNok(amount, currency);
-      total += amountNok;
+      if (tx.amountNok != null) {
+        total += Number.parseFloat(tx.amountNok);
+      } else {
+        // Legacy row without amountNok - convert on the fly
+        const amount = tx.amount ? Number.parseFloat(tx.amount) : 0;
+        const currency = tx.currency ?? "NOK";
+        const amountNok = await convertAmountToNok(amount, currency);
+        total += amountNok;
+      }
     }
 
     return Math.round(total * 100) / 100;
