@@ -101,6 +101,8 @@ export const accountTransaction = pgTable("AccountTransaction", {
   currency: varchar("currency", { length: 3 }).notNull(),
   occurredAt: timestamp("occurredAt").notNull(),
   notes: text("notes"),
+  // Link to corresponding wallet transaction (for deposit/withdrawal linked to wallet)
+  linkedWalletTransactionId: uuid("linkedWalletTransactionId"),
 });
 
 export type AccountTransaction = InferSelectModel<typeof accountTransaction>;
@@ -471,6 +473,8 @@ export const walletTransaction = pgTable("WalletTransaction", {
   relatedAccountId: uuid("relatedAccountId").references(() => account.id),
   // FK to Wallet for wallet-to-wallet transfers
   relatedWalletId: uuid("relatedWalletId").references(() => wallet.id),
+  // Link to corresponding account transaction (for transfers to/from accounts)
+  linkedAccountTransactionId: uuid("linkedAccountTransactionId"),
   // External reference (e.g., blockchain tx hash)
   externalRef: text("externalRef"),
   // When the transaction occurred

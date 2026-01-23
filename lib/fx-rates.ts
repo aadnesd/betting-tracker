@@ -5,10 +5,21 @@ const TARGET_CURRENCY = "NOK";
 const cache = new Map<string, { rate: number; expiresAt: number }>();
 const CACHE_TTL_MS = 5 * 60 * 1000;
 
+// Stablecoins pegged to USD - use USD rate as fallback
+const USD_STABLECOINS = new Set(["USDT", "USDC", "DAI", "BUSD", "TUSD", "USDP", "GUSD", "FRAX"]);
+
 async function fetchRate(fromCurrency: string): Promise<number> {
   const base = fromCurrency.toUpperCase();
-  const cached = cache.get(base);
+  
+  // For USD stablecoins, use USD rate directly
+  const effectiveBase = USD_STABLECOINS.has(base) ? "USD" : base;
+  
+  const cached = cache.get(effectiveBase);
   if (cached && cached.expiresAt > Date.now()) {
+    // Also cache the original currency if it's a stablecoin
+    if (effectiveBase !== base) {
+      cache.set(base, cached);
+    }
     return cached.rate;
   }
 
@@ -18,7 +29,7 @@ async function fetchRate(fromCurrency: string): Promise<number> {
   }
 
   const url = new URL(FX_BASE_URL);
-  url.searchParams.set("base", base);
+  url.searchParams.set("base", effectiveBase);
   url.searchParams.set("symbols", TARGET_CURRENCY);
 
   const response = await fetch(url.toString(), {
@@ -40,10 +51,15 @@ async function fetchRate(fromCurrency: string): Promise<number> {
 
   const rate = data.rates?.[TARGET_CURRENCY] ?? data.data?.[TARGET_CURRENCY];
   if (typeof rate !== "number" || Number.isNaN(rate)) {
-    throw new Error("FX API response missing NOK rate");
+    console.error(`[FX] API response missing NOK rate for ${effectiveBase}:`, JSON.stringify(data));
+    throw new Error(`FX API response missing NOK rate for ${effectiveBase}`);
   }
 
-  cache.set(base, { rate, expiresAt: Date.now() + CACHE_TTL_MS });
+  cache.set(effectiveBase, { rate, expiresAt: Date.now() + CACHE_TTL_MS });
+  // Also cache the original currency if it's a stablecoin
+  if (effectiveBase !== base) {
+    cache.set(base, { rate, expiresAt: Date.now() + CACHE_TTL_MS });
+  }
   return rate;
 }
 

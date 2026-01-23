@@ -4,7 +4,10 @@ import { auth } from "@/app/(auth)/auth";
 import {
   createAccountTransaction,
   createAuditEntry,
+  createTransferFromAccount,
+  createTransferToAccount,
   getAccountById,
+  getWalletById,
   listTransactionsByAccount,
 } from "@/lib/db/queries";
 
@@ -14,6 +17,10 @@ const createTransactionSchema = z.object({
   currency: z.string().length(3, "Currency must be 3 characters"),
   occurredAt: z.string().transform((val) => new Date(val)),
   notes: z.string().nullable().optional(),
+  walletId: z.string().uuid().nullable().optional(),
+  // Amount in wallet currency (for cross-currency transfers)
+  walletAmount: z.number().positive().nullable().optional(),
+  walletCurrency: z.string().min(2).max(10).nullable().optional(),
 });
 
 export async function POST(
@@ -53,15 +60,57 @@ export async function POST(
   }
 
   try {
-    const transaction = await createAccountTransaction({
-      userId: session.user.id,
-      accountId,
-      type: body.type,
-      amount: body.amount,
-      currency: body.currency,
-      occurredAt: body.occurredAt,
-      notes: body.notes ?? null,
-    });
+    let transaction;
+    
+    // If wallet is specified for deposit/withdrawal, create linked transactions
+    if (body.walletId && (body.type === "deposit" || body.type === "withdrawal")) {
+      // Verify wallet exists and belongs to user
+      const wallet = await getWalletById(body.walletId);
+      if (!wallet || wallet.userId !== session.user.id) {
+        return NextResponse.json({ error: "Wallet not found" }, { status: 404 });
+      }
+      
+      if (body.type === "deposit") {
+        // Deposit = money FROM wallet TO account
+        const result = await createTransferToAccount({
+          walletId: body.walletId,
+          accountId,
+          amount: body.amount,
+          currency: body.currency,
+          walletAmount: body.walletAmount ?? body.amount,
+          walletCurrency: body.walletCurrency ?? body.currency,
+          date: body.occurredAt,
+          notes: body.notes ?? null,
+          userId: session.user.id,
+        });
+        transaction = result.accountTx;
+      } else {
+        // Withdrawal = money FROM account TO wallet
+        const result = await createTransferFromAccount({
+          walletId: body.walletId,
+          accountId,
+          amount: body.amount,
+          currency: body.currency,
+          walletAmount: body.walletAmount ?? body.amount,
+          walletCurrency: body.walletCurrency ?? body.currency,
+          date: body.occurredAt,
+          notes: body.notes ?? null,
+          userId: session.user.id,
+        });
+        transaction = result.accountTx;
+      }
+    } else {
+      // No wallet - just create account transaction
+      transaction = await createAccountTransaction({
+        userId: session.user.id,
+        accountId,
+        type: body.type,
+        amount: body.amount,
+        currency: body.currency,
+        occurredAt: body.occurredAt,
+        notes: body.notes ?? null,
+      });
+    }
 
     // Create audit entry
     await createAuditEntry({
@@ -75,9 +124,10 @@ export async function POST(
           type: body.type,
           amount: body.amount,
           currency: body.currency,
+          walletId: body.walletId ?? null,
         },
       },
-      notes: `Recorded ${body.type}: ${body.currency} ${body.amount.toFixed(2)}`,
+      notes: `Recorded ${body.type}: ${body.currency} ${body.amount.toFixed(2)}${body.walletId ? " (linked to wallet)" : ""}`,
     });
 
     return NextResponse.json({

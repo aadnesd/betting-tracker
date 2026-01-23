@@ -4,7 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { auth } from "@/app/(auth)/auth";
 import { TransactionForm } from "@/components/bets/transaction-form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getAccountById } from "@/lib/db/queries";
+import { getAccountById, listActiveWalletsByUser } from "@/lib/db/queries";
 
 export const metadata = {
   title: "Record Transaction",
@@ -22,14 +22,25 @@ export default async function NewTransactionPage({
 
   const { id } = await params;
 
-  const account = await getAccountById({
-    id,
-    userId: session.user.id,
-  });
+  const [account, wallets] = await Promise.all([
+    getAccountById({
+      id,
+      userId: session.user.id,
+    }),
+    listActiveWalletsByUser(session.user.id),
+  ]);
 
   if (!account) {
     notFound();
   }
+
+  // Map wallets to the format expected by TransactionForm
+  const walletOptions = wallets.map((w) => ({
+    id: w.id,
+    name: w.name,
+    type: w.type as "fiat" | "crypto" | "hybrid",
+    currency: w.currency,
+  }));
 
   return (
     <div className="container mx-auto max-w-xl px-4 py-8">
@@ -52,6 +63,7 @@ export default async function NewTransactionPage({
             accountId={id}
             accountName={account.name}
             defaultCurrency={account.currency ?? "NOK"}
+            wallets={walletOptions}
           />
         </CardContent>
       </Card>
