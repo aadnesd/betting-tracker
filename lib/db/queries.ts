@@ -3523,6 +3523,7 @@ export async function getBookmakerProfitWithBonuses({
         accountId: accountTransaction.accountId,
         accountName: account.name,
         amount: accountTransaction.amount,
+        amountNok: accountTransaction.amountNok,
         currency: account.currency,
       })
       .from(accountTransaction)
@@ -3585,12 +3586,18 @@ export async function getBookmakerProfitWithBonuses({
       }
     }
 
-    // Process bonus data with FX conversion
+    // Process bonus data using pre-computed amountNok (with fallback for legacy rows)
     for (const row of bonusRows) {
       const existing = accountMap.get(row.accountId);
-      const amount = row.amount ? Number.parseFloat(row.amount) : 0;
-      const currency = row.currency ?? "NOK";
-      const amountNok = await convertAmountToNok(amount, currency);
+      let amountNok: number;
+      if (row.amountNok != null) {
+        amountNok = Number.parseFloat(row.amountNok);
+      } else {
+        // Legacy row without amountNok - convert on the fly
+        const amount = row.amount ? Number.parseFloat(row.amount) : 0;
+        const currency = row.currency ?? "NOK";
+        amountNok = await convertAmountToNok(amount, currency);
+      }
 
       if (existing) {
         existing.bonusTotal += amountNok;
@@ -3665,23 +3672,29 @@ export async function getTotalBonusesForUser({
       conditions.push(lte(accountTransaction.occurredAt, endDate));
     }
 
-    // Fetch individual transactions with account currency for FX conversion
+    // Fetch individual transactions with pre-computed amountNok
     const transactions = await db
       .select({
         amount: accountTransaction.amount,
+        amountNok: accountTransaction.amountNok,
         currency: account.currency,
       })
       .from(accountTransaction)
       .innerJoin(account, eq(accountTransaction.accountId, account.id))
       .where(and(...conditions));
 
-    // Convert each bonus to NOK and sum
+    // Sum using pre-computed amountNok (with fallback for legacy rows)
     let total = 0;
     for (const tx of transactions) {
-      const amount = tx.amount ? Number.parseFloat(tx.amount) : 0;
-      const currency = tx.currency ?? "NOK";
-      const amountNok = await convertAmountToNok(amount, currency);
-      total += amountNok;
+      if (tx.amountNok != null) {
+        total += Number.parseFloat(tx.amountNok);
+      } else {
+        // Legacy row without amountNok - convert on the fly
+        const amount = tx.amount ? Number.parseFloat(tx.amount) : 0;
+        const currency = tx.currency ?? "NOK";
+        const amountNok = await convertAmountToNok(amount, currency);
+        total += amountNok;
+      }
     }
 
     return Math.round(total * 100) / 100;
