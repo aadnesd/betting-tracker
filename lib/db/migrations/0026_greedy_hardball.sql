@@ -1,0 +1,1 @@
+ALTER TABLE "AccountTransaction" ADD COLUMN "amountNok" numeric(14, 2);
