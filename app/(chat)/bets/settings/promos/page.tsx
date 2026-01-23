@@ -6,6 +6,8 @@ import {
   Lock,
   Plus,
   Tag,
+  TrendingUp,
+  Wallet,
   X,
 } from "lucide-react";
 import Link from "next/link";
@@ -18,6 +20,9 @@ import {
   countExpiringFreeBets,
   getActiveFreeBetsSummary,
   listFreeBetsByUser,
+  listDepositBonusesByUser,
+  getActiveDepositBonusesSummary,
+  countExpiringDepositBonuses,
 } from "@/lib/db/queries";
 
 export const metadata = {
@@ -98,10 +103,13 @@ export default async function PromosSettingsPage({
   const filterExpiring = params.filter === "expiring";
 
   // Fetch all data in parallel
-  const [freeBets, summary, expiringCount] = await Promise.all([
+  const [freeBets, summary, expiringCount, depositBonuses, depositSummary, expiringDepositCount] = await Promise.all([
     listFreeBetsByUser({ userId }),
     getActiveFreeBetsSummary({ userId }),
     countExpiringFreeBets({ userId, daysUntilExpiry: 7 }),
+    listDepositBonusesByUser({ userId }),
+    getActiveDepositBonusesSummary({ userId }),
+    countExpiringDepositBonuses({ userId, daysUntilExpiry: 7 }),
   ]);
 
   let activeFreeBets = freeBets.filter((fb) => fb.status === "active");
@@ -115,6 +123,11 @@ export default async function PromosSettingsPage({
   const usedFreeBets = freeBets.filter((fb) => fb.status === "used");
   const expiredFreeBets = freeBets.filter((fb) => fb.status === "expired");
 
+  // Deposit bonus categories
+  const activeDepositBonuses = depositBonuses.filter((db) => db.status === "active");
+  const clearedDepositBonuses = depositBonuses.filter((db) => db.status === "cleared");
+  const inactiveDepositBonuses = depositBonuses.filter((db) => db.status === "forfeited" || db.status === "expired");
+
   return (
     <div className="space-y-6 p-4 md:p-8">
       <div className="flex flex-col items-start justify-between gap-3 md:flex-row md:items-center">
@@ -126,7 +139,7 @@ export default async function PromosSettingsPage({
             bookmakers.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button asChild variant="outline">
             <Link href="/bets">← Back to dashboard</Link>
           </Button>
@@ -138,6 +151,12 @@ export default async function PromosSettingsPage({
               </Link>
             </Button>
           )}
+          <Button asChild variant="outline">
+            <Link href="/bets/settings/promos/deposit-bonus/new">
+              <Wallet className="mr-2 h-4 w-4" />
+              Add Deposit Bonus
+            </Link>
+          </Button>
           <Button asChild>
             <Link href="/bets/settings/promos/new">
               <Plus className="mr-2 h-4 w-4" />
@@ -187,7 +206,7 @@ export default async function PromosSettingsPage({
       )}
 
       {/* Summary Cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -201,7 +220,7 @@ export default async function PromosSettingsPage({
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Total Value
+              Free Bet Value
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -214,16 +233,29 @@ export default async function PromosSettingsPage({
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
+              Deposit Bonuses
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold text-blue-600">{depositSummary.count}</p>
+            <p className="text-muted-foreground text-sm">
+              {depositSummary.totalBonusValue.toFixed(0)} in bonuses
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
               Expiring Soon
             </CardTitle>
           </CardHeader>
           <CardContent>
             <p
               className={`text-2xl font-bold ${
-                expiringCount > 0 ? "text-amber-600" : "text-muted-foreground"
+                expiringCount + expiringDepositCount > 0 ? "text-amber-600" : "text-muted-foreground"
               }`}
             >
-              {expiringCount}
+              {expiringCount + expiringDepositCount}
             </p>
             <p className="text-muted-foreground text-sm">Within 7 days</p>
           </CardContent>
@@ -231,12 +263,14 @@ export default async function PromosSettingsPage({
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Used This Period
+              Wagering Left
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold">{usedFreeBets.length}</p>
-            <p className="text-muted-foreground text-sm">Free bets utilized</p>
+            <p className="text-2xl font-bold">
+              {depositSummary.totalWageringRemaining.toFixed(0)}
+            </p>
+            <p className="text-muted-foreground text-sm">To clear bonuses</p>
           </CardContent>
         </Card>
       </div>
@@ -386,6 +420,163 @@ export default async function PromosSettingsPage({
                 </Link>
               );
             })}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Active Deposit Bonuses */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <Wallet className="h-5 w-5 text-blue-600" />
+              Deposit Bonuses ({activeDepositBonuses.length})
+            </CardTitle>
+            <Button asChild variant="outline" size="sm">
+              <Link href="/bets/settings/promos/deposit-bonus/new">
+                <Plus className="mr-1 h-3 w-3" />
+                Add
+              </Link>
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {activeDepositBonuses.length === 0 && (
+            <div className="py-8 text-center">
+              <Wallet className="mx-auto mb-3 h-12 w-12 text-muted-foreground/50" />
+              <p className="mb-2 font-medium">No active deposit bonuses</p>
+              <p className="mb-4 text-muted-foreground text-sm">
+                Track deposit bonuses with wagering requirements here.
+              </p>
+              <Button asChild>
+                <Link href="/bets/settings/promos/deposit-bonus/new">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Deposit Bonus
+                </Link>
+              </Button>
+            </div>
+          )}
+
+          {activeDepositBonuses.map((db) => {
+            const wageringRequirement = Number.parseFloat(db.wageringRequirement);
+            const wageringProgress = Number.parseFloat(db.wageringProgress);
+            const progressPercent = wageringRequirement > 0
+              ? Math.min((wageringProgress / wageringRequirement) * 100, 100)
+              : 0;
+            const remaining = Math.max(0, wageringRequirement - wageringProgress);
+
+            return (
+              <Link
+                key={db.id}
+                href={`/bets/settings/promos/deposit-bonus/${db.id}`}
+                className="block rounded-md border border-blue-200 bg-blue-50/30 p-4 transition-colors hover:bg-blue-50/50"
+              >
+                <div className="space-y-3">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold">{db.name}</span>
+                        <span className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-blue-700 text-xs">
+                          <TrendingUp className="mr-1 h-3 w-3" />
+                          {progressPercent.toFixed(0)}%
+                        </span>
+                        {isExpiringSoon(db.expiresAt) && (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-amber-700 text-xs">
+                            <AlertTriangle className="h-3 w-3" />
+                            Expiring
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+                        {db.accountName && (
+                          <span className="flex items-center gap-1">
+                            <Tag className="h-3 w-3" />
+                            {db.accountName}
+                          </span>
+                        )}
+                        <span>
+                          Min odds: {Number.parseFloat(db.minOdds).toFixed(2)}
+                        </span>
+                        <span>
+                          {db.currency} {remaining.toFixed(0)} remaining
+                        </span>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-semibold text-lg text-blue-600">
+                        {db.currency} {Number.parseFloat(db.bonusAmount).toFixed(0)}
+                      </p>
+                      <p className="text-muted-foreground text-xs">Bonus value</p>
+                    </div>
+                  </div>
+                  {/* Wagering Progress bar */}
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>
+                        {db.currency} {wageringProgress.toFixed(0)} / {wageringRequirement.toFixed(0)}
+                      </span>
+                      <span>{progressPercent.toFixed(0)}%</span>
+                    </div>
+                    <Progress value={progressPercent} className="h-2 bg-blue-100" />
+                  </div>
+                </div>
+              </Link>
+            );
+          })}
+        </CardContent>
+      </Card>
+
+      {/* Cleared/Forfeited Deposit Bonuses */}
+      {(clearedDepositBonuses.length > 0 || inactiveDepositBonuses.length > 0) && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-muted-foreground">
+              <Wallet className="h-5 w-5" />
+              Deposit Bonus History ({clearedDepositBonuses.length + inactiveDepositBonuses.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {[...clearedDepositBonuses, ...inactiveDepositBonuses].map((db) => (
+              <Link
+                key={db.id}
+                href={`/bets/settings/promos/deposit-bonus/${db.id}`}
+                className="block rounded-md border border-muted bg-muted/30 p-4 transition-colors hover:bg-muted/50"
+              >
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-muted-foreground">
+                        {db.name}
+                      </span>
+                      {db.status === "cleared" ? (
+                        <span className="rounded-full border border-green-200 bg-green-50 px-2 py-0.5 text-green-600 text-xs">
+                          Cleared
+                        </span>
+                      ) : db.status === "forfeited" ? (
+                        <span className="rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-gray-600 text-xs">
+                          Forfeited
+                        </span>
+                      ) : (
+                        <span className="rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-red-600 text-xs">
+                          Expired
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+                      {db.accountName && <span>{db.accountName}</span>}
+                      {db.clearedAt && (
+                        <span>Cleared: {formatDate(db.clearedAt)}</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-medium text-muted-foreground">
+                      {db.currency} {Number.parseFloat(db.bonusAmount).toFixed(0)}
+                    </p>
+                  </div>
+                </div>
+              </Link>
+            ))}
           </CardContent>
         </Card>
       )}
