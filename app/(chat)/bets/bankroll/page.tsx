@@ -18,7 +18,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   getBankrollSummary,
   getTransactionTrends,
+  getWalletTotals,
   listAccountsWithBalances,
+  listWalletsByUser,
 } from "@/lib/db/queries";
 import { getDisplayRates } from "@/lib/fx-rates";
 import { formatCurrency, formatNOK } from "@/lib/reporting";
@@ -37,9 +39,11 @@ export default async function BankrollPage() {
   const userId = session.user.id;
 
   // Fetch all data in parallel
-  const [summary, accounts, trends30, trends90, fxRates] = await Promise.all([
+  const [summary, accounts, wallets, walletTotals, trends30, trends90, fxRates] = await Promise.all([
     getBankrollSummary({ userId }),
     listAccountsWithBalances({ userId, status: "active" }),
+    listWalletsByUser(userId),
+    getWalletTotals(userId),
     getTransactionTrends({
       userId,
       startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
@@ -55,6 +59,12 @@ export default async function BankrollPage() {
 
   const bookmakers = accounts.filter((a) => a.kind === "bookmaker");
   const exchanges = accounts.filter((a) => a.kind === "exchange");
+  const activeWallets = wallets.filter((w) => w.status === "active");
+  const fiatWallets = activeWallets.filter((w) => w.type !== "crypto");
+  const cryptoWallets = activeWallets.filter((w) => w.type === "crypto");
+
+  // Total capital now includes wallet balances
+  const totalCapitalWithWallets = summary.totalCapital + walletTotals.totalBalanceNok;
 
   return (
     <div className="space-y-6 p-4 md:p-8">
@@ -75,6 +85,9 @@ export default async function BankrollPage() {
           <Button asChild variant="outline" size="sm">
             <Link href="/bets/settings/accounts">Manage Accounts</Link>
           </Button>
+          <Button asChild variant="outline" size="sm">
+            <Link href="/bets/settings/wallets">Manage Wallets</Link>
+          </Button>
         </div>
       </div>
 
@@ -90,14 +103,17 @@ export default async function BankrollPage() {
           <CardContent>
             <p
               className={`text-2xl font-bold ${
-                summary.totalCapital >= 0 ? "text-emerald-600" : "text-red-600"
+                totalCapitalWithWallets >= 0 ? "text-emerald-600" : "text-red-600"
               }`}
             >
-              {formatNOK(summary.totalCapital)}
+              {formatNOK(totalCapitalWithWallets)}
             </p>
             <p className="text-muted-foreground text-xs">
-              Across {summary.activeAccountCount} active account
+              Across {summary.activeAccountCount} account
               {summary.activeAccountCount !== 1 ? "s" : ""}
+              {walletTotals.walletCount > 0 && (
+                <> + {walletTotals.walletCount} wallet{walletTotals.walletCount !== 1 ? "s" : ""}</>
+              )}
             </p>
           </CardContent>
         </Card>
@@ -151,27 +167,50 @@ export default async function BankrollPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="font-medium text-muted-foreground text-sm">
-              Net Deposits
+              Wallet Balance
             </CardTitle>
             <Wallet className="h-5 w-5 text-amber-600" />
           </CardHeader>
           <CardContent>
             <p
               className={`text-2xl font-bold ${
-                summary.netDeposits >= 0 ? "text-emerald-600" : "text-red-600"
+                walletTotals.totalBalanceNok >= 0 ? "text-emerald-600" : "text-red-600"
               }`}
             >
-              {formatNOK(summary.netDeposits)}
+              {formatNOK(walletTotals.totalBalanceNok)}
             </p>
             <p className="text-muted-foreground text-xs">
-              Deposits minus withdrawals
+              {walletTotals.walletCount} wallet{walletTotals.walletCount !== 1 ? "s" : ""}
+              {walletTotals.walletCount > 0 && (
+                <Link href="/bets/settings/wallets" className="ml-1 text-primary hover:underline">
+                  View
+                </Link>
+              )}
             </p>
           </CardContent>
         </Card>
       </div>
 
       {/* Transaction Flow Cards */}
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="font-medium text-muted-foreground text-sm">
+              Net Deposits
+            </CardTitle>
+            <TrendingUp className="h-5 w-5 text-blue-600" />
+          </CardHeader>
+          <CardContent>
+            <p
+              className={`text-xl font-bold ${
+                summary.netDeposits >= 0 ? "text-emerald-600" : "text-red-600"
+              }`}
+            >
+              {formatNOK(summary.netDeposits)}
+            </p>
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="font-medium text-muted-foreground text-sm">
@@ -328,6 +367,105 @@ export default async function BankrollPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Wallets */}
+      {activeWallets.length > 0 && (
+        <div className="grid gap-6 lg:grid-cols-2">
+          {/* Fiat Wallets */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Wallet className="h-5 w-5 text-amber-600" />
+                E-Wallets ({fiatWallets.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {fiatWallets.length === 0 ? (
+                <p className="text-muted-foreground text-sm">
+                  No e-wallets yet.{" "}
+                  <Link
+                    href="/bets/settings/wallets/new"
+                    className="text-primary hover:underline"
+                  >
+                    Add one
+                  </Link>
+                </p>
+              ) : (
+                fiatWallets
+                  .sort((a, b) => b.balance - a.balance)
+                  .map((w) => (
+                    <Link
+                      key={w.id}
+                      href={`/bets/settings/wallets/${w.id}`}
+                      className="flex items-center justify-between rounded-md border p-3 transition-colors hover:bg-muted/50"
+                    >
+                      <div>
+                        <p className="font-medium">{w.name}</p>
+                        <p className="text-muted-foreground text-xs">
+                          {w.type} • {w.currency}
+                        </p>
+                      </div>
+                      <p
+                        className={`font-semibold ${
+                          w.balance >= 0 ? "text-emerald-600" : "text-red-600"
+                        }`}
+                      >
+                        {formatCurrency(w.balance, w.currency)}
+                      </p>
+                    </Link>
+                  ))
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Crypto Wallets */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Wallet className="h-5 w-5 text-orange-600" />
+                Crypto Wallets ({cryptoWallets.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {cryptoWallets.length === 0 ? (
+                <p className="text-muted-foreground text-sm">
+                  No crypto wallets yet.{" "}
+                  <Link
+                    href="/bets/settings/wallets/new"
+                    className="text-primary hover:underline"
+                  >
+                    Add one
+                  </Link>
+                </p>
+              ) : (
+                cryptoWallets
+                  .sort((a, b) => b.balance - a.balance)
+                  .map((w) => (
+                    <Link
+                      key={w.id}
+                      href={`/bets/settings/wallets/${w.id}`}
+                      className="flex items-center justify-between rounded-md border p-3 transition-colors hover:bg-muted/50"
+                    >
+                      <div>
+                        <p className="font-medium">{w.name}</p>
+                        <p className="text-muted-foreground text-xs">
+                          {w.currency}
+                        </p>
+                      </div>
+                      <p
+                        className={`font-semibold ${
+                          w.balance >= 0 ? "text-emerald-600" : "text-red-600"
+                        }`}
+                      >
+                        {formatCurrency(w.balance, w.currency)}
+                      </p>
+                    </Link>
+                  ))
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* FX Rates */}
       <div className="rounded-lg border border-muted bg-muted/30 p-4">

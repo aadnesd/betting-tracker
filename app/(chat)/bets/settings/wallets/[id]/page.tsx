@@ -1,0 +1,265 @@
+import {
+	ArrowDownRight,
+	ArrowUpRight,
+	Bitcoin,
+	CreditCard,
+	Banknote,
+	Plus,
+	Settings,
+	Trash2,
+	Wallet,
+} from "lucide-react";
+import Link from "next/link";
+import { redirect, notFound } from "next/navigation";
+import { auth } from "@/app/(auth)/auth";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+	calculateWalletBalance,
+	getWalletById,
+	listWalletTransactionsWithDetails,
+} from "@/lib/db/queries";
+import type { WalletType, WalletTransactionType } from "@/lib/db/schema";
+import { WalletTransactionForm } from "@/components/bets/wallet-transaction-form";
+import { WalletActions } from "@/components/bets/wallet-actions";
+
+export const metadata = {
+	title: "Wallet Details",
+};
+
+function formatCurrency(value: number, currency: string): string {
+	const decimals = ["BTC", "ETH", "LTC", "SOL", "DOT", "AVAX", "MATIC", "ADA", "BNB", "XRP"].includes(currency)
+		? value < 0.01 ? 8 : 4
+		: 2;
+	return `${currency} ${value.toFixed(decimals)}`;
+}
+
+function WalletTypeBadge({ type }: { type: WalletType }) {
+	switch (type) {
+		case "crypto":
+			return (
+				<span className="inline-flex items-center gap-1 rounded-full border border-orange-200 bg-orange-50 px-2 py-0.5 text-orange-800 text-xs">
+					<Bitcoin className="h-3 w-3" />
+					Crypto
+				</span>
+			);
+		case "hybrid":
+			return (
+				<span className="inline-flex items-center gap-1 rounded-full border border-purple-200 bg-purple-50 px-2 py-0.5 text-purple-800 text-xs">
+					<CreditCard className="h-3 w-3" />
+					Hybrid
+				</span>
+			);
+		default:
+			return (
+				<span className="inline-flex items-center gap-1 rounded-full border border-green-200 bg-green-50 px-2 py-0.5 text-green-800 text-xs">
+					<Banknote className="h-3 w-3" />
+					Fiat
+				</span>
+			);
+	}
+}
+
+function TransactionTypeIcon({ type }: { type: WalletTransactionType }) {
+	switch (type) {
+		case "deposit":
+		case "transfer_from_account":
+		case "transfer_from_wallet":
+			return <ArrowDownRight className="h-4 w-4 text-green-600" />;
+		case "withdrawal":
+		case "transfer_to_account":
+		case "transfer_to_wallet":
+		case "fee":
+			return <ArrowUpRight className="h-4 w-4 text-red-600" />;
+		default:
+			return <Settings className="h-4 w-4 text-gray-600" />;
+	}
+}
+
+function transactionTypeLabel(type: WalletTransactionType): string {
+	switch (type) {
+		case "deposit":
+			return "Deposit";
+		case "withdrawal":
+			return "Withdrawal";
+		case "transfer_to_account":
+			return "Transfer to Account";
+		case "transfer_from_account":
+			return "Transfer from Account";
+		case "transfer_to_wallet":
+			return "Transfer to Wallet";
+		case "transfer_from_wallet":
+			return "Transfer from Wallet";
+		case "fee":
+			return "Fee";
+		case "adjustment":
+			return "Adjustment";
+		default:
+			return type;
+	}
+}
+
+function isInflow(type: WalletTransactionType): boolean {
+	return ["deposit", "transfer_from_account", "transfer_from_wallet"].includes(type);
+}
+
+export default async function WalletDetailPage({
+	params,
+}: {
+	params: Promise<{ id: string }>;
+}) {
+	const session = await auth();
+
+	if (!session?.user) {
+		redirect("/login");
+	}
+
+	const { id } = await params;
+	const wallet = await getWalletById(id);
+
+	if (!wallet) {
+		notFound();
+	}
+
+	if (wallet.userId !== session.user.id) {
+		redirect("/bets/settings/wallets");
+	}
+
+	const [balance, transactions] = await Promise.all([
+		calculateWalletBalance(id),
+		listWalletTransactionsWithDetails(id),
+	]);
+
+	return (
+		<div className="space-y-6 p-4 md:p-8">
+			<div className="flex flex-col items-start justify-between gap-3 md:flex-row md:items-center">
+				<div>
+					<p className="font-medium text-muted-foreground text-sm">
+						Wallet Settings
+					</p>
+					<div className="flex items-center gap-2">
+						<h1 className="font-semibold text-2xl">{wallet.name}</h1>
+						<WalletTypeBadge type={wallet.type as WalletType} />
+						{wallet.status === "archived" && (
+							<span className="rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-gray-600 text-xs">
+								Archived
+							</span>
+						)}
+					</div>
+					{wallet.notes && (
+						<p className="text-muted-foreground text-sm">{wallet.notes}</p>
+					)}
+				</div>
+				<div className="flex items-center gap-2">
+					<Button asChild variant="outline">
+						<Link href="/bets/settings/wallets">← Back to wallets</Link>
+					</Button>
+					<Button asChild variant="outline">
+						<Link href={`/bets/settings/wallets/${id}/edit`}>
+							<Settings className="mr-2 h-4 w-4" />
+							Edit
+						</Link>
+					</Button>
+					<WalletActions walletId={id} walletName={wallet.name} />
+				</div>
+			</div>
+
+			{/* Balance Card */}
+			<Card>
+				<CardHeader className="pb-2">
+					<CardTitle className="text-sm font-medium text-muted-foreground">
+						Current Balance
+					</CardTitle>
+				</CardHeader>
+				<CardContent>
+					<p className="text-3xl font-bold">
+						{formatCurrency(balance, wallet.currency)}
+					</p>
+				</CardContent>
+			</Card>
+
+			{/* Add Transaction */}
+			<Card>
+				<CardHeader>
+					<CardTitle className="flex items-center gap-2">
+						<Plus className="h-5 w-5" />
+						Add Transaction
+					</CardTitle>
+				</CardHeader>
+				<CardContent>
+					<WalletTransactionForm walletId={id} walletCurrency={wallet.currency} />
+				</CardContent>
+			</Card>
+
+			{/* Transaction History */}
+			<Card>
+				<CardHeader>
+					<CardTitle className="flex items-center gap-2">
+						<Wallet className="h-5 w-5" />
+						Transaction History
+					</CardTitle>
+				</CardHeader>
+				<CardContent className="space-y-3">
+					{transactions.length === 0 && (
+						<div className="py-8 text-center">
+							<Wallet className="mx-auto mb-3 h-12 w-12 text-muted-foreground/50" />
+							<p className="mb-2 font-medium">No transactions yet</p>
+							<p className="text-muted-foreground text-sm">
+								Add your first transaction to start tracking.
+							</p>
+						</div>
+					)}
+
+					{transactions.map((tx) => (
+						<div
+							key={tx.id}
+							className="flex items-center justify-between rounded-md border p-3"
+						>
+							<div className="flex items-center gap-3">
+								<TransactionTypeIcon type={tx.type as WalletTransactionType} />
+								<div>
+									<p className="font-medium">
+										{transactionTypeLabel(tx.type as WalletTransactionType)}
+									</p>
+									<div className="flex items-center gap-2 text-muted-foreground text-xs">
+										<span>
+											{new Date(tx.date).toLocaleDateString()}
+										</span>
+										{tx.relatedAccountName && (
+											<span>• {tx.relatedAccountName}</span>
+										)}
+										{tx.relatedWalletName && (
+											<span>• {tx.relatedWalletName}</span>
+										)}
+										{tx.externalRef && (
+											<span className="truncate max-w-[150px]">
+												• Ref: {tx.externalRef}
+											</span>
+										)}
+									</div>
+									{tx.notes && (
+										<p className="text-muted-foreground text-xs mt-1">
+											{tx.notes}
+										</p>
+									)}
+								</div>
+							</div>
+							<div className="text-right">
+								<p
+									className={`font-semibold ${
+										isInflow(tx.type as WalletTransactionType)
+											? "text-green-600"
+											: "text-red-600"
+									}`}
+								>
+									{isInflow(tx.type as WalletTransactionType) ? "+" : "-"}
+									{formatCurrency(Math.abs(Number(tx.amount)), tx.currency)}
+								</p>
+							</div>
+						</div>
+					))}
+				</CardContent>
+			</Card>
+		</div>
+	);
+}
