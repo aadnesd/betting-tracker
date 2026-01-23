@@ -240,6 +240,62 @@ export function formatNOK(amount: number): string {
 }
 
 /**
+ * Crypto currencies that need special formatting (more decimal places).
+ */
+const CRYPTO_CURRENCIES = new Set([
+  "BTC",
+  "ETH",
+  "BNB",
+  "XRP",
+  "SOL",
+  "DOT",
+  "AVAX",
+  "MATIC",
+  "LTC",
+  "ADA",
+  "USDT",
+  "USDC",
+  "DAI",
+  "BUSD",
+  "ARB",
+  "OP",
+]);
+
+/**
+ * Format a number in its native currency.
+ * For crypto: uses more decimal places and symbol prefix.
+ * For fiat: uses locale-appropriate formatting.
+ */
+export function formatCurrency(amount: number, currency: string): string {
+  const curr = currency.toUpperCase();
+
+  // Crypto formatting with appropriate decimals
+  if (CRYPTO_CURRENCIES.has(curr)) {
+    // Stablecoins use 2 decimals, others use up to 8
+    const isStablecoin = ["USDT", "USDC", "DAI", "BUSD"].includes(curr);
+    const decimals = isStablecoin ? 2 : amount < 1 ? 8 : 4;
+    const formatted = amount.toLocaleString("en-US", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: decimals,
+    });
+    return `${formatted} ${curr}`;
+  }
+
+  // Fiat formatting
+  try {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: curr,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(amount);
+  } catch {
+    // Fallback for unknown currencies
+    return `${amount.toFixed(2)} ${curr}`;
+  }
+}
+
+/**
  * Format a percentage with sign.
  */
 export function formatPercentage(value: number): string {
