@@ -1,6 +1,6 @@
 {
-  "id": "95683858-b991-4975-9b0b-9f63b9a90546",
-  "prevId": "d11acd9f-df43-4f0e-8c9f-8576c1f2d899",
+  "id": "a0a0a022-0022-4000-8000-000000000022",
+  "prevId": "a0a0a021-0021-4000-8000-000000000021",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -378,10 +378,6 @@
         "matchId": {
           "name": "matchId",
           "type": "uuid",
-          "typeSchema": {
-            "type": "uuid"
-          },
-          "default": null,
           "primaryKey": false,
           "notNull": false
         }
@@ -795,10 +791,6 @@
         "matchId": {
           "name": "matchId",
           "type": "uuid",
-          "typeSchema": {
-            "type": "uuid"
-          },
-          "default": null,
           "primaryKey": false,
           "notNull": false
         }

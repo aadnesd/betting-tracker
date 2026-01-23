@@ -119,7 +119,11 @@ const betStatusEnum = [
  * Matches the football-data.org API's `winner` field format.
  * Why: Enables reliable auto-settlement by comparing with match result directly.
  */
-export const normalizedSelectionEnum = ["HOME_TEAM", "AWAY_TEAM", "DRAW"] as const;
+export const normalizedSelectionEnum = [
+  "HOME_TEAM",
+  "AWAY_TEAM",
+  "DRAW",
+] as const;
 export type NormalizedSelection = (typeof normalizedSelectionEnum)[number];
 
 export const backBet = pgTable("BackBet", {
@@ -149,9 +153,7 @@ export const backBet = pgTable("BackBet", {
   profitLoss: numeric("profitLoss", { precision: 14, scale: 2 }),
   profitLossNok: numeric("profitLossNok", { precision: 14, scale: 2 }),
   confidence: jsonb("confidence"),
-  status: varchar("status", { enum: betStatusEnum })
-    .notNull()
-    .default("draft"),
+  status: varchar("status", { enum: betStatusEnum }).notNull().default("draft"),
   error: text("error"),
 });
 
@@ -184,9 +186,7 @@ export const layBet = pgTable("LayBet", {
   profitLoss: numeric("profitLoss", { precision: 14, scale: 2 }),
   profitLossNok: numeric("profitLossNok", { precision: 14, scale: 2 }),
   confidence: jsonb("confidence"),
-  status: varchar("status", { enum: betStatusEnum })
-    .notNull()
-    .default("draft"),
+  status: varchar("status", { enum: betStatusEnum }).notNull().default("draft"),
   error: text("error"),
 });
 
@@ -278,7 +278,9 @@ export const freeBet = pgTable("FreeBet", {
   status: varchar("status", { enum: freeBetStatusEnum })
     .notNull()
     .default("active"),
-  usedInMatchedBetId: uuid("usedInMatchedBetId").references(() => matchedBet.id),
+  usedInMatchedBetId: uuid("usedInMatchedBetId").references(
+    () => matchedBet.id
+  ),
   notes: text("notes"),
   // Progress tracking for recurring/multi-step promos
   // unlockType: null = already unlocked, 'stake' = total stake required, 'bets' = number of bets required
@@ -288,7 +290,10 @@ export const freeBet = pgTable("FreeBet", {
   // Minimum odds required for qualifying bets (separate from minOdds for using the free bet)
   unlockMinOdds: numeric("unlockMinOdds", { precision: 12, scale: 4 }),
   // Current progress toward unlock
-  unlockProgress: numeric("unlockProgress", { precision: 14, scale: 2 }).default("0"),
+  unlockProgress: numeric("unlockProgress", {
+    precision: 14,
+    scale: 2,
+  }).default("0"),
 });
 
 export type FreeBet = InferSelectModel<typeof freeBet>;
@@ -331,14 +336,18 @@ export const footballMatch = pgTable("FootballMatch", {
   id: uuid("id").primaryKey().notNull().defaultRandom(),
   createdAt: timestamp("createdAt").notNull(),
   // External ID from football-data.org API
-  externalId: numeric("externalId", { precision: 10, scale: 0 }).notNull().unique(),
+  externalId: numeric("externalId", { precision: 10, scale: 0 })
+    .notNull()
+    .unique(),
   homeTeam: text("homeTeam").notNull(),
   awayTeam: text("awayTeam").notNull(),
   competition: text("competition").notNull(),
   // Competition code from football-data.org (e.g., "PL" for Premier League)
   competitionCode: varchar("competitionCode", { length: 10 }),
   matchDate: timestamp("matchDate").notNull(),
-  status: varchar("status", { enum: matchStatusEnum }).notNull().default("SCHEDULED"),
+  status: varchar("status", { enum: matchStatusEnum })
+    .notNull()
+    .default("SCHEDULED"),
   homeScore: numeric("homeScore", { precision: 3, scale: 0 }),
   awayScore: numeric("awayScore", { precision: 3, scale: 0 }),
   // When the match data was last synced from the API
@@ -397,4 +406,77 @@ export const AVAILABLE_COMPETITIONS = [
   { code: "CLI", name: "Copa Libertadores", country: "South America" },
 ] as const;
 
-export const DEFAULT_COMPETITION_CODES = ["PL", "CL", "EL", "FL1", "BL1", "SA", "PD"];
+export const DEFAULT_COMPETITION_CODES = [
+  "PL",
+  "CL",
+  "EL",
+  "FL1",
+  "BL1",
+  "SA",
+  "PD",
+];
+
+/**
+ * Wallet - Payment intermediary for funding bookmaker accounts.
+ * Examples: Revolut, Skrill, Neteller (fiat), Exodus, MetaMask (crypto)
+ * Why: Users fund bookmakers via e-wallets and need to track fund flow.
+ */
+const walletTypeEnum = ["fiat", "crypto", "hybrid"] as const;
+const walletStatusEnum = ["active", "archived"] as const;
+
+export const wallet = pgTable("Wallet", {
+  id: uuid("id").primaryKey().notNull().defaultRandom(),
+  createdAt: timestamp("createdAt").notNull(),
+  userId: uuid("userId")
+    .notNull()
+    .references(() => user.id),
+  name: text("name").notNull(),
+  type: varchar("type", { enum: walletTypeEnum }).notNull(),
+  currency: varchar("currency", { length: 10 }).notNull(), // Allow longer codes for crypto (e.g., "USDT", "MATIC")
+  notes: text("notes"),
+  status: varchar("status", { enum: walletStatusEnum })
+    .notNull()
+    .default("active"),
+});
+
+export type Wallet = InferSelectModel<typeof wallet>;
+export type WalletType = (typeof walletTypeEnum)[number];
+export type WalletStatus = (typeof walletStatusEnum)[number];
+
+/**
+ * WalletTransaction - Records money movement in/out of wallets.
+ * Why: Tracks deposits, withdrawals, and transfers between wallets and betting accounts.
+ */
+const walletTransactionTypeEnum = [
+  "deposit",
+  "withdrawal",
+  "transfer_to_account",
+  "transfer_from_account",
+  "transfer_to_wallet",
+  "transfer_from_wallet",
+  "fee",
+  "adjustment",
+] as const;
+
+export const walletTransaction = pgTable("WalletTransaction", {
+  id: uuid("id").primaryKey().notNull().defaultRandom(),
+  createdAt: timestamp("createdAt").notNull(),
+  walletId: uuid("walletId")
+    .notNull()
+    .references(() => wallet.id),
+  type: varchar("type", { enum: walletTransactionTypeEnum }).notNull(),
+  amount: numeric("amount", { precision: 20, scale: 8 }).notNull(), // 8 decimals for crypto
+  currency: varchar("currency", { length: 10 }).notNull(),
+  // FK to Account for bookmaker/exchange transfers
+  relatedAccountId: uuid("relatedAccountId").references(() => account.id),
+  // FK to Wallet for wallet-to-wallet transfers
+  relatedWalletId: uuid("relatedWalletId").references(() => wallet.id),
+  // External reference (e.g., blockchain tx hash)
+  externalRef: text("externalRef"),
+  // When the transaction occurred
+  date: timestamp("date").notNull(),
+  notes: text("notes"),
+});
+
+export type WalletTransaction = InferSelectModel<typeof walletTransaction>;
+export type WalletTransactionType = (typeof walletTransactionTypeEnum)[number];

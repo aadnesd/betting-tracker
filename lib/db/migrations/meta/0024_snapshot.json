@@ -1,6 +1,6 @@
 {
-  "id": "a0a0a021-0021-4000-8000-000000000021",
-  "prevId": "a0a0a020-0020-4000-8000-000000000020",
+  "id": "01350757-e4b1-4501-ab84-4b909999c5e3",
+  "prevId": "a0a0a023-0023-4000-8000-000000000023",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -290,6 +290,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "matchId": {
+          "name": "matchId",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
         "market": {
           "name": "market",
           "type": "text",
@@ -301,6 +307,12 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true
+        },
+        "normalizedSelection": {
+          "name": "normalizedSelection",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": false
         },
         "odds": {
           "name": "odds",
@@ -697,6 +709,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "matchId": {
+          "name": "matchId",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
         "market": {
           "name": "market",
           "type": "text",
@@ -708,6 +726,12 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true
+        },
+        "normalizedSelection": {
+          "name": "normalizedSelection",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": false
         },
         "odds": {
           "name": "odds",
@@ -880,6 +904,12 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true
+        },
+        "normalizedSelection": {
+          "name": "normalizedSelection",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": false
         },
         "promoId": {
           "name": "promoId",
@@ -1280,6 +1310,30 @@
           "primaryKey": false,
           "notNull": false
         },
+        "shortcutApiKeyHash": {
+          "name": "shortcutApiKeyHash",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "shortcutApiKeyHint": {
+          "name": "shortcutApiKeyHint",
+          "type": "varchar(8)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "shortcutApiKeyCreatedAt": {
+          "name": "shortcutApiKeyCreatedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "lastShortcutRequestAt": {
+          "name": "lastShortcutRequestAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
         "createdAt": {
           "name": "createdAt",
           "type": "timestamp",
@@ -1319,6 +1373,197 @@
           ]
         }
       }
+    },
+    "public.Wallet": {
+      "name": "Wallet",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "userId": {
+          "name": "userId",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "type": {
+          "name": "type",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "currency": {
+          "name": "currency",
+          "type": "varchar(10)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "notes": {
+          "name": "notes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'active'"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "Wallet_userId_User_id_fk": {
+          "name": "Wallet_userId_User_id_fk",
+          "tableFrom": "Wallet",
+          "tableTo": "User",
+          "columnsFrom": [
+            "userId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {}
+    },
+    "public.WalletTransaction": {
+      "name": "WalletTransaction",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "walletId": {
+          "name": "walletId",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "type": {
+          "name": "type",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "amount": {
+          "name": "amount",
+          "type": "numeric(20, 8)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "currency": {
+          "name": "currency",
+          "type": "varchar(10)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "relatedAccountId": {
+          "name": "relatedAccountId",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "relatedWalletId": {
+          "name": "relatedWalletId",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "externalRef": {
+          "name": "externalRef",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "date": {
+          "name": "date",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "notes": {
+          "name": "notes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "WalletTransaction_walletId_Wallet_id_fk": {
+          "name": "WalletTransaction_walletId_Wallet_id_fk",
+          "tableFrom": "WalletTransaction",
+          "tableTo": "Wallet",
+          "columnsFrom": [
+            "walletId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "WalletTransaction_relatedAccountId_Account_id_fk": {
+          "name": "WalletTransaction_relatedAccountId_Account_id_fk",
+          "tableFrom": "WalletTransaction",
+          "tableTo": "Account",
+          "columnsFrom": [
+            "relatedAccountId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "WalletTransaction_relatedWalletId_Wallet_id_fk": {
+          "name": "WalletTransaction_relatedWalletId_Wallet_id_fk",
+          "tableFrom": "WalletTransaction",
+          "tableTo": "Wallet",
+          "columnsFrom": [
+            "relatedWalletId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {}
     }
   },
   "enums": {},

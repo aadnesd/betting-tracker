@@ -371,22 +371,7 @@ Remaining blocker: Rerun Playwright route tests in an environment that permits b
 
 - [x] **Bankroll dashboard**: New page `/bets/bankroll` showing total capital across all accounts, breakdown by bookmaker vs exchange, deposit/withdrawal trends. DoD: page renders real aggregated data. Why: Holistic view of funds. Implementation: Created `getBankrollSummary` query in `lib/db/queries.ts` that aggregates: totalCapital (sum of all account balances), bookmakerBalance/exchangeBalance (by account kind), depositTotal/withdrawalTotal/bonusTotal (summed from transactions). Created `getTransactionTrends` query that groups transactions by day (30d) or week (90d) for charting deposits, withdrawals, and bonuses over time. Created `app/(chat)/bets/bankroll/page.tsx` with: 4 summary cards (Total Capital, Bookmaker Balance, Exchange Balance, Net Deposits), 3 transaction flow cards (Deposits, Withdrawals, Bonuses), account breakdown lists for bookmakers and exchanges sorted by balance. Created `components/bets/bankroll-transaction-chart.tsx` client component with bar/area chart toggle and 30d/90d time range toggle using Recharts. Added "Bankroll" navigation link to dashboard header. Build passes with all 170 tests passing.
 
-- [ ] **Wallet tracking**: Add `Wallet` and `WalletTransaction` tables to track payment intermediaries (e-wallets like Revolut, Skrill, Neteller; crypto wallets like Exodus, MetaMask). Unlike betting accounts, wallets are used for money transfers between bank and bookies.
-  
-  **DoD:**
-  - `Wallet` table: id, userId, name, type (fiat/crypto/hybrid), currency, notes, status, createdAt
-  - `WalletTransaction` table: id, walletId, type (deposit/withdrawal/transfer_to_account/transfer_from_account/transfer_to_wallet/transfer_from_wallet/fee/adjustment), amount, currency, relatedAccountId, relatedWalletId, externalRef, date, notes, createdAt
-  - Wallet list page at `/bets/settings/wallets` with balance display
-  - Wallet detail page with transaction history
-  - Create/edit wallet form with type selector
-  - Add transaction form supporting transfers to/from accounts and other wallets
-  - Linked transactions: transfer to account creates both WalletTransaction and AccountTransaction
-  - Bankroll page includes wallet balances in total capital
-  - "Wallets" tab in settings alongside "Accounts"
-  
-  **Why:** Users fund bookmakers via e-wallets (Revolut, Skrill) and need to track the flow of funds from bank → wallet → bookie and back. Crypto users need to track BTC/ETH/USDT balances in wallets like Exodus.
-  
-  See `specs/wallets.md` for full requirements.
+- [x] **Wallet tracking**: Add `Wallet` and `WalletTransaction` tables to track payment intermediaries (e-wallets like Revolut, Skrill, Neteller; crypto wallets like Exodus, MetaMask). Unlike betting accounts, wallets are used for money transfers between bank and bookies. Implementation: Added `wallet` table (id, userId, name, type enum fiat/crypto/hybrid, currency, notes, status enum active/archived, createdAt) and `walletTransaction` table (id, walletId, type enum deposit/withdrawal/transfer_to_account/transfer_from_account/transfer_to_wallet/transfer_from_wallet/fee/adjustment, amount, currency, amountNok, relatedAccountId, relatedWalletId, externalRef, date, notes, createdAt) to `lib/db/schema.ts`. Generated migration `0024_shiny_roland_deschain.sql`. Added 15+ wallet CRUD queries to `lib/db/queries.ts`: createWallet, getWalletById, listWalletsByUser, listActiveWalletsByUser, updateWallet, archiveWallet, deleteWallet, calculateWalletBalance, createWalletTransaction, listWalletTransactionsWithDetails, createTransferToAccount, createTransferFromAccount, createTransferBetweenWallets, getWalletTotals. Created wallet settings pages: `/bets/settings/wallets` (list), `/bets/settings/wallets/new` (create), `/bets/settings/wallets/[id]` (detail with transactions), `/bets/settings/wallets/[id]/edit` (edit). Created API endpoints: `/api/bets/wallets` (GET/POST), `/api/bets/wallets/[id]` (GET/PATCH/DELETE), `/api/bets/wallets/[id]/transactions` (GET/POST). Created components: `wallet-form.tsx` (create/edit), `wallet-transaction-form.tsx` (add transactions with type selector and linked wallet/account selectors), `wallet-actions.tsx` (archive/delete with confirmation dialogs). Updated bankroll page to show wallet balances in Total Capital card and added E-Wallets/Crypto Wallets sections with links. Added "Wallets" navigation tab to sidebar settings. Linked transactions: transfers to/from accounts create both WalletTransaction and AccountTransaction records via `createTransferToAccount`/`createTransferFromAccount` helpers.
 
 ## P10 — Individual Bet Management
 

@@ -39,6 +39,7 @@ const navigation = [
 
 const settingsNavigation = [
   { name: "Accounts", href: "/bets/settings/accounts" },
+  { name: "Wallets", href: "/bets/settings/wallets" },
   { name: "Competitions", href: "/bets/settings/competitions" },
 ];
 

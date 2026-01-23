@@ -1,6 +1,6 @@
 {
-  "id": "a0a0a021-0021-4000-8000-000000000021",
-  "prevId": "a0a0a020-0020-4000-8000-000000000020",
+  "id": "a0a0a023-0023-4000-8000-000000000023",
+  "prevId": "a0a0a022-0022-4000-8000-000000000022",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -372,6 +372,18 @@
         "error": {
           "name": "error",
           "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "matchId": {
+          "name": "matchId",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "normalizedSelection": {
+          "name": "normalizedSelection",
+          "type": "varchar",
           "primaryKey": false,
           "notNull": false
         }
@@ -781,6 +793,18 @@
           "type": "text",
           "primaryKey": false,
           "notNull": false
+        },
+        "matchId": {
+          "name": "matchId",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "normalizedSelection": {
+          "name": "normalizedSelection",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {},
@@ -921,6 +945,12 @@
         "lastError": {
           "name": "lastError",
           "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "normalizedSelection": {
+          "name": "normalizedSelection",
+          "type": "varchar",
           "primaryKey": false,
           "notNull": false
         }
@@ -1291,6 +1321,30 @@
           "type": "timestamp",
           "primaryKey": false,
           "notNull": true
+        },
+        "shortcutApiKeyHash": {
+          "name": "shortcutApiKeyHash",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "shortcutApiKeyHint": {
+          "name": "shortcutApiKeyHint",
+          "type": "varchar(8)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "shortcutApiKeyCreatedAt": {
+          "name": "shortcutApiKeyCreatedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "lastShortcutRequestAt": {
+          "name": "lastShortcutRequestAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {},

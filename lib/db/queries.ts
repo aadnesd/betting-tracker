@@ -40,6 +40,11 @@ import {
   type User,
   user,
   userSettings,
+  wallet,
+  walletTransaction,
+  type WalletType,
+  type WalletStatus,
+  type WalletTransactionType,
   DEFAULT_COMPETITION_CODES,
 } from "./schema";
 import { generateHashedPassword } from "./utils";
@@ -81,10 +86,7 @@ export async function getUserById(id: string): Promise<User | null> {
     const [found] = await db.select().from(user).where(eq(user.id, id));
     return found ?? null;
   } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to get user by id"
-    );
+    throw new ChatSDKError("bad_request:database", "Failed to get user by id");
   }
 }
 
@@ -96,7 +98,10 @@ export async function createOAuthUser(email: string) {
       .returning({ id: user.id, email: user.email });
     return created;
   } catch (_error) {
-    throw new ChatSDKError("bad_request:database", "Failed to create OAuth user");
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to create OAuth user"
+    );
   }
 }
 
@@ -173,7 +178,9 @@ async function transferUserData({
         .from(userSettings)
         .where(eq(userSettings.userId, toUserId));
       if (existingSettings.length > 0) {
-        await tx.delete(userSettings).where(eq(userSettings.userId, fromUserId));
+        await tx
+          .delete(userSettings)
+          .where(eq(userSettings.userId, fromUserId));
       } else {
         await tx
           .update(userSettings)
@@ -203,7 +210,10 @@ export async function findOrCreateOAuthUser({
 
   if (existingUser) {
     if (guestUserId && guestUserId !== existingUser.id) {
-      await transferUserData({ fromUserId: guestUserId, toUserId: existingUser.id });
+      await transferUserData({
+        fromUserId: guestUserId,
+        toUserId: existingUser.id,
+      });
       return { userId: existingUser.id, linkedFromGuest: true };
     }
 
@@ -348,10 +358,7 @@ export async function listAccountsByUser({
       .orderBy(desc(account.createdAt))
       .limit(limit);
   } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to list accounts"
-    );
+    throw new ChatSDKError("bad_request:database", "Failed to list accounts");
   }
 }
 
@@ -613,9 +620,15 @@ export async function getBankrollSummary({
       .from(accountTransaction)
       .where(eq(accountTransaction.userId, userId));
 
-    const totalDeposits = Number.parseFloat(String(txTotals?.totalDeposits || "0"));
-    const totalWithdrawals = Number.parseFloat(String(txTotals?.totalWithdrawals || "0"));
-    const totalBonuses = Number.parseFloat(String(txTotals?.totalBonuses || "0"));
+    const totalDeposits = Number.parseFloat(
+      String(txTotals?.totalDeposits || "0")
+    );
+    const totalWithdrawals = Number.parseFloat(
+      String(txTotals?.totalWithdrawals || "0")
+    );
+    const totalBonuses = Number.parseFloat(
+      String(txTotals?.totalBonuses || "0")
+    );
 
     // Treat null/undefined status as active for backwards compatibility
     const isActive = (status: string | null | undefined) =>
@@ -678,11 +691,12 @@ export async function getTransactionTrends({
     }
 
     // Date truncation based on groupBy
-    const dateTrunc = groupBy === "month"
-      ? sql`DATE_TRUNC('month', ${accountTransaction.createdAt})`
-      : groupBy === "week"
-        ? sql`DATE_TRUNC('week', ${accountTransaction.createdAt})`
-        : sql`DATE_TRUNC('day', ${accountTransaction.createdAt})`;
+    const dateTrunc =
+      groupBy === "month"
+        ? sql`DATE_TRUNC('month', ${accountTransaction.createdAt})`
+        : groupBy === "week"
+          ? sql`DATE_TRUNC('week', ${accountTransaction.createdAt})`
+          : sql`DATE_TRUNC('day', ${accountTransaction.createdAt})`;
 
     const rows = await db
       .select({
@@ -706,11 +720,17 @@ export async function getTransactionTrends({
       // Format label based on groupBy
       let label: string;
       if (groupBy === "month") {
-        label = date.toLocaleDateString("en-GB", { month: "short", year: "numeric" });
+        label = date.toLocaleDateString("en-GB", {
+          month: "short",
+          year: "numeric",
+        });
       } else if (groupBy === "week") {
         label = `Week of ${date.toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`;
       } else {
-        label = date.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+        label = date.toLocaleDateString("en-GB", {
+          day: "numeric",
+          month: "short",
+        });
       }
 
       return {
@@ -874,7 +894,10 @@ export async function createAccountTransaction({
       notes: notes ?? null,
     };
 
-    const [row] = await db.insert(accountTransaction).values(values).returning();
+    const [row] = await db
+      .insert(accountTransaction)
+      .values(values)
+      .returning();
     return row;
   } catch (_error) {
     throw new ChatSDKError(
@@ -927,7 +950,13 @@ type BetInputBase = {
   profitLoss?: number | null;
   confidence?: Record<string, number> | null;
   error?: string | null;
-  status?: "draft" | "placed" | "matched" | "settled" | "needs_review" | "error";
+  status?:
+    | "draft"
+    | "placed"
+    | "matched"
+    | "settled"
+    | "needs_review"
+    | "error";
   /** Normalized selection for Match Odds: HOME_TEAM, AWAY_TEAM, DRAW */
   normalizedSelection?: "HOME_TEAM" | "AWAY_TEAM" | "DRAW" | null;
 };
@@ -1038,10 +1067,7 @@ export async function saveBackBet({
   ...bet
 }: BetInputBase & { userId: string; screenshotId: string }) {
   try {
-    const stakeNok = await convertAmountToNok(
-      bet.stake,
-      bet.currency ?? "NOK"
-    );
+    const stakeNok = await convertAmountToNok(bet.stake, bet.currency ?? "NOK");
     const profitLossNok =
       bet.profitLoss === undefined || bet.profitLoss === null
         ? null
@@ -1086,10 +1112,7 @@ export async function saveLayBet({
   ...bet
 }: BetInputBase & { userId: string; screenshotId: string }) {
   try {
-    const stakeNok = await convertAmountToNok(
-      bet.stake,
-      bet.currency ?? "NOK"
-    );
+    const stakeNok = await convertAmountToNok(bet.stake, bet.currency ?? "NOK");
     const profitLossNok =
       bet.profitLoss === undefined || bet.profitLoss === null
         ? null
@@ -1183,7 +1206,13 @@ export async function updateBackBet({
 }: {
   id: string;
   userId: string;
-  status?: "draft" | "placed" | "matched" | "settled" | "needs_review" | "error";
+  status?:
+    | "draft"
+    | "placed"
+    | "matched"
+    | "settled"
+    | "needs_review"
+    | "error";
   settledAt?: Date | null;
   profitLoss?: string | null;
   profitLossNok?: string | null;
@@ -1276,7 +1305,13 @@ export async function updateLayBet({
 }: {
   id: string;
   userId: string;
-  status?: "draft" | "placed" | "matched" | "settled" | "needs_review" | "error";
+  status?:
+    | "draft"
+    | "placed"
+    | "matched"
+    | "settled"
+    | "needs_review"
+    | "error";
   settledAt?: Date | null;
   profitLoss?: string | null;
   profitLossNok?: string | null;
@@ -1464,7 +1499,13 @@ export type MatchedBetListItem = {
     stake: number;
     exchange: string;
     currency: string | null;
-    status: "draft" | "placed" | "matched" | "settled" | "needs_review" | "error";
+    status:
+      | "draft"
+      | "placed"
+      | "matched"
+      | "settled"
+      | "needs_review"
+      | "error";
     placedAt: Date | null;
     profitLoss: number | null;
     accountId: string | null;
@@ -1476,7 +1517,13 @@ export type MatchedBetListItem = {
     stake: number;
     exchange: string;
     currency: string | null;
-    status: "draft" | "placed" | "matched" | "settled" | "needs_review" | "error";
+    status:
+      | "draft"
+      | "placed"
+      | "matched"
+      | "settled"
+      | "needs_review"
+      | "error";
     placedAt: Date | null;
     profitLoss: number | null;
     accountId: string | null;
@@ -1601,7 +1648,7 @@ export async function listMatchedBetsForList({
               stake: Number.parseFloat((row.back.stake ?? 0).toString()),
               exchange: row.back.exchange ?? "",
               currency: row.back.currency ?? null,
-              status: row.back.status ?? "draft" as const,
+              status: row.back.status ?? ("draft" as const),
               placedAt: row.back.placedAt ?? null,
               profitLoss: parseNumber(row.back.profitLoss),
               accountId: row.back.accountId ?? null,
@@ -1617,7 +1664,7 @@ export async function listMatchedBetsForList({
               stake: Number.parseFloat((row.lay.stake ?? 0).toString()),
               exchange: row.lay.exchange ?? "",
               currency: row.lay.currency ?? null,
-              status: row.lay.status ?? "draft" as const,
+              status: row.lay.status ?? ("draft" as const),
               placedAt: row.lay.placedAt ?? null,
               profitLoss: parseNumber(row.lay.profitLoss),
               accountId: row.lay.accountId ?? null,
@@ -1633,7 +1680,9 @@ export async function listMatchedBetsForList({
               awayTeam: row.footballMatch.awayTeam ?? "",
               competition: row.footballMatch.competition ?? "",
               matchDate: row.footballMatch.matchDate ?? new Date(),
-              status: row.footballMatch.status ?? "SCHEDULED" as FootballMatchStatus,
+              status:
+                row.footballMatch.status ??
+                ("SCHEDULED" as FootballMatchStatus),
               homeScore:
                 row.footballMatch.homeScore === null
                   ? null
@@ -1674,13 +1723,7 @@ export type IndividualBetListItem = {
   selection: string;
   odds: number;
   stake: number;
-  status:
-    | "draft"
-    | "placed"
-    | "matched"
-    | "settled"
-    | "needs_review"
-    | "error";
+  status: "draft" | "placed" | "matched" | "settled" | "needs_review" | "error";
   currency: string | null;
   placedAt: Date | null;
   createdAt: Date;
@@ -1780,9 +1823,7 @@ export async function listAllBetsByUser({
         .leftJoin(account, eq(backBet.accountId, account.id))
         .leftJoin(matchedBet, eq(matchedBet.backBetId, backBet.id))
         .where(and(...backConditions))
-        .orderBy(
-          desc(sql`COALESCE(${backBet.placedAt}, ${backBet.createdAt})`)
-        )
+        .orderBy(desc(sql`COALESCE(${backBet.placedAt}, ${backBet.createdAt})`))
         .limit(limit),
       db
         .select({
@@ -1809,9 +1850,7 @@ export async function listAllBetsByUser({
         .leftJoin(account, eq(layBet.accountId, account.id))
         .leftJoin(matchedBet, eq(matchedBet.layBetId, layBet.id))
         .where(and(...layConditions))
-        .orderBy(
-          desc(sql`COALESCE(${layBet.placedAt}, ${layBet.createdAt})`)
-        )
+        .orderBy(desc(sql`COALESCE(${layBet.placedAt}, ${layBet.createdAt})`))
         .limit(limit),
     ]);
 
@@ -1834,8 +1873,8 @@ export async function listAllBetsByUser({
         accountId: row.accountId ?? null,
         accountName: row.accountName ?? null,
         accountKind: row.accountKind ?? null,
-        accountCommission: row.accountCommission 
-          ? Number.parseFloat(row.accountCommission) 
+        accountCommission: row.accountCommission
+          ? Number.parseFloat(row.accountCommission)
           : null,
         matchedBetId: row.matchedBetId ?? null,
         matchedBetStatus: row.matchedBetStatus ?? null,
@@ -1858,8 +1897,8 @@ export async function listAllBetsByUser({
         accountId: row.accountId ?? null,
         accountName: row.accountName ?? null,
         accountKind: row.accountKind ?? null,
-        accountCommission: row.accountCommission 
-          ? Number.parseFloat(row.accountCommission) 
+        accountCommission: row.accountCommission
+          ? Number.parseFloat(row.accountCommission)
           : null,
         matchedBetId: row.matchedBetId ?? null,
         matchedBetStatus: row.matchedBetStatus ?? null,
@@ -1914,7 +1953,8 @@ export async function getMatchedBetByLegId({
   userId: string;
 }) {
   try {
-    const foreignKeyColumn = kind === "back" ? matchedBet.backBetId : matchedBet.layBetId;
+    const foreignKeyColumn =
+      kind === "back" ? matchedBet.backBetId : matchedBet.layBetId;
     const [row] = await db
       .select()
       .from(matchedBet)
@@ -2098,10 +2138,10 @@ export type PendingSettlementBet = {
 /**
  * Get matched bets awaiting settlement, optionally filtered by match date range.
  * Bets are considered pending settlement when status is 'matched' (not draft, settled, or needs_review).
- * 
+ *
  * Results include linked football match info for display in the pending settlement queue.
  * Groups bets by match date to streamline the settlement workflow.
- * 
+ *
  * @param userId - User ID to filter bets
  * @param filter - Optional filter: 'today', 'thisWeek', or 'all' (default: 'all')
  * @param limit - Maximum number of bets to return (default: 50)
@@ -2147,14 +2187,15 @@ export async function getPendingSettlementBets({
       // Start of current week (Monday)
       const startOfWeek = new Date(now);
       const dayOfWeek = startOfWeek.getDay();
-      const diff = startOfWeek.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
+      const diff =
+        startOfWeek.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
       startOfWeek.setDate(diff);
       startOfWeek.setHours(0, 0, 0, 0);
       // End of week (Sunday)
       const endOfWeek = new Date(startOfWeek);
       endOfWeek.setDate(endOfWeek.getDate() + 6);
       endOfWeek.setHours(23, 59, 59, 999);
-      
+
       conditions.push(
         or(
           and(
@@ -2245,10 +2286,7 @@ export async function countPendingSettlementBets({
       .select({ count: count(matchedBet.id) })
       .from(matchedBet)
       .where(
-        and(
-          eq(matchedBet.userId, userId),
-          eq(matchedBet.status, "matched")
-        )
+        and(eq(matchedBet.userId, userId), eq(matchedBet.status, "matched"))
       );
     return result?.count ?? 0;
   } catch (_error) {
@@ -2301,14 +2339,14 @@ export type BetReadyForSettlement = {
 
 /**
  * Find matched bets ready for auto-settlement.
- * 
+ *
  * A bet is ready for auto-settlement when:
  * 1. Status is 'matched' (not already settled, draft, or needs_review)
  * 2. It's linked to a football match (has matchId)
  * 3. The linked match has status 'FINISHED' with scores available
- * 
+ *
  * Returns bets with all necessary info to determine outcome and calculate P&L.
- * 
+ *
  * @param limit - Maximum number of bets to return (default: 100)
  */
 export async function findBetsReadyForAutoSettlement({
@@ -2319,7 +2357,7 @@ export async function findBetsReadyForAutoSettlement({
   try {
     // Alias for the exchange account to get commission
     const exchangeAccount = aliasedTable(account, "exchangeAccount");
-    
+
     const rows = await db
       .select({
         id: matchedBet.id,
@@ -2383,7 +2421,11 @@ export async function findBetsReadyForAutoSettlement({
         userId: row.userId,
         market: row.market,
         selection: row.selection,
-        normalizedSelection: row.normalizedSelection as "HOME_TEAM" | "AWAY_TEAM" | "DRAW" | null,
+        normalizedSelection: row.normalizedSelection as
+          | "HOME_TEAM"
+          | "AWAY_TEAM"
+          | "DRAW"
+          | null,
         status: row.status,
         promoType: row.promoType,
         matchId: row.matchId!,
@@ -2395,7 +2437,7 @@ export async function findBetsReadyForAutoSettlement({
         layOdds: row.layOdds,
         layStake: row.layStake,
         layAccountId: row.layAccountId,
-        layAccountCommission: row.layAccountCommission 
+        layAccountCommission: row.layAccountCommission
           ? Number.parseFloat(row.layAccountCommission)
           : null,
         footballMatch: {
@@ -2656,10 +2698,7 @@ export async function flagBetForReview({
       notes: `Flagged for review: ${reason}`,
     });
   } catch (error) {
-    console.error(
-      `[flagBetForReview] Failed for bet ${matchedBetId}:`,
-      error
-    );
+    console.error(`[flagBetForReview] Failed for bet ${matchedBetId}:`, error);
     throw new ChatSDKError(
       "bad_request:database",
       `Failed to flag bet ${matchedBetId} for review`
@@ -2736,7 +2775,10 @@ export async function listAuditEntriesByEntity({
       .select()
       .from(auditLog)
       .where(
-        and(eq(auditLog.entityType, entityType), eq(auditLog.entityId, entityId))
+        and(
+          eq(auditLog.entityType, entityType),
+          eq(auditLog.entityId, entityId)
+        )
       )
       .orderBy(desc(auditLog.createdAt))
       .limit(limit);
@@ -2800,10 +2842,7 @@ export async function listMatchedBetsByStatus({
       })
       .from(matchedBet)
       .where(
-        and(
-          eq(matchedBet.userId, userId),
-          inArray(matchedBet.status, statuses)
-        )
+        and(eq(matchedBet.userId, userId), inArray(matchedBet.status, statuses))
       )
       .orderBy(desc(matchedBet.createdAt))
       .limit(limit);
@@ -2828,10 +2867,7 @@ export async function countMatchedBetsByStatus({
       .select({ count: count(matchedBet.id) })
       .from(matchedBet)
       .where(
-        and(
-          eq(matchedBet.userId, userId),
-          inArray(matchedBet.status, statuses)
-        )
+        and(eq(matchedBet.userId, userId), inArray(matchedBet.status, statuses))
       );
     return result?.count ?? 0;
   } catch (_error) {
@@ -3180,9 +3216,7 @@ export async function getProfitByExchange({
       totalProfitLoss: row.totalLayProfitLoss
         ? Number.parseFloat(row.totalLayProfitLoss)
         : 0,
-      totalStake: row.totalLayStake
-        ? Number.parseFloat(row.totalLayStake)
-        : 0,
+      totalStake: row.totalLayStake ? Number.parseFloat(row.totalLayStake) : 0,
     }));
   } catch (_error) {
     throw new ChatSDKError(
@@ -3303,7 +3337,7 @@ export async function getBookmakerProfitWithBonuses({
           totalStake: 0,
           bonusTotal: 0,
         };
-        
+
         const currency = row.currency ?? "NOK";
         const plNok = row.profitLossNok
           ? Number.parseFloat(row.profitLossNok)
@@ -3319,7 +3353,7 @@ export async function getBookmakerProfitWithBonuses({
         existing.betCount += 1;
         existing.bettingProfit += plNok;
         existing.totalStake += stakeNok;
-        
+
         accountMap.set(row.accountId, existing);
       }
     }
@@ -3330,7 +3364,7 @@ export async function getBookmakerProfitWithBonuses({
       const amount = row.amount ? Number.parseFloat(row.amount) : 0;
       const currency = row.currency ?? "NOK";
       const amountNok = await convertAmountToNok(amount, currency);
-      
+
       if (existing) {
         existing.bonusTotal += amountNok;
       } else {
@@ -3349,8 +3383,10 @@ export async function getBookmakerProfitWithBonuses({
     // Calculate totals and ROI
     const results: BookmakerProfitWithBonuses[] = [];
     for (const data of accountMap.values()) {
-      const totalProfit = Math.round((data.bettingProfit + data.bonusTotal) * 100) / 100;
-      const roi = data.totalStake > 0 ? (totalProfit / data.totalStake) * 100 : 0;
+      const totalProfit =
+        Math.round((data.bettingProfit + data.bonusTotal) * 100) / 100;
+      const roi =
+        data.totalStake > 0 ? (totalProfit / data.totalStake) * 100 : 0;
       results.push({
         accountId: data.accountId,
         accountName: data.accountName,
@@ -3433,11 +3469,7 @@ export async function getTotalBonusesForUser({
 /**
  * Get total open exposure (non-settled matched bets).
  */
-export async function getOpenExposure({
-  userId,
-}: {
-  userId: string;
-}) {
+export async function getOpenExposure({ userId }: { userId: string }) {
   try {
     const [result] = await db
       .select({
@@ -3485,7 +3517,7 @@ export type ExposureDataPoint = {
 /**
  * Get exposure timeline data for chart visualization.
  * Returns exposure levels over time based on matched bet creation and settlement dates.
- * 
+ *
  * Algorithm:
  * 1. Get all matched bets with exposure
  * 2. Create events for bet creation (adds exposure) and settlement (removes exposure)
@@ -3511,10 +3543,7 @@ export async function getExposureTimeline({
       })
       .from(matchedBet)
       .where(
-        and(
-          eq(matchedBet.userId, userId),
-          isNotNull(matchedBet.netExposure)
-        )
+        and(eq(matchedBet.userId, userId), isNotNull(matchedBet.netExposure))
       )
       .orderBy(matchedBet.createdAt);
 
@@ -3536,9 +3565,7 @@ export async function getExposureTimeline({
     startDate.setHours(0, 0, 0, 0);
 
     for (const bet of bets) {
-      const exposure = bet.netExposure
-        ? Number.parseFloat(bet.netExposure)
-        : 0;
+      const exposure = bet.netExposure ? Number.parseFloat(bet.netExposure) : 0;
 
       if (exposure === 0) continue;
 
@@ -3565,14 +3592,17 @@ export async function getExposureTimeline({
     events.sort((a, b) => a.date.getTime() - b.date.getTime());
 
     // Calculate running exposure by day
-    const dailyExposure = new Map<string, { exposure: number; change: number; openPositions: number }>();
+    const dailyExposure = new Map<
+      string,
+      { exposure: number; change: number; openPositions: number }
+    >();
     let runningExposure = 0;
     let openPositions = 0;
 
     // Process all events to build up the exposure state
     for (const event of events) {
       const dayKey = event.date.toISOString().split("T")[0];
-      
+
       runningExposure += event.exposureChange;
       if (event.type === "add") {
         openPositions += 1;
@@ -3580,7 +3610,11 @@ export async function getExposureTimeline({
         openPositions -= 1;
       }
 
-      const existing = dailyExposure.get(dayKey) ?? { exposure: 0, change: 0, openPositions: 0 };
+      const existing = dailyExposure.get(dayKey) ?? {
+        exposure: 0,
+        change: 0,
+        openPositions: 0,
+      };
       existing.exposure = runningExposure;
       existing.change += event.exposureChange;
       existing.openPositions = openPositions;
@@ -3623,7 +3657,10 @@ export async function getExposureTimeline({
       if (dayData) {
         result.push({
           date: day,
-          label: date.toLocaleDateString("en-GB", { day: "numeric", month: "short" }),
+          label: date.toLocaleDateString("en-GB", {
+            day: "numeric",
+            month: "short",
+          }),
           exposure: Math.round(dayData.exposure * 100) / 100,
           openPositions: dayData.openPositions,
           change: Math.round(dayData.change * 100) / 100,
@@ -3634,7 +3671,10 @@ export async function getExposureTimeline({
         // Carry forward the previous day's exposure
         result.push({
           date: day,
-          label: date.toLocaleDateString("en-GB", { day: "numeric", month: "short" }),
+          label: date.toLocaleDateString("en-GB", {
+            day: "numeric",
+            month: "short",
+          }),
           exposure: Math.round(lastExposure * 100) / 100,
           openPositions: lastOpenPositions,
           change: 0,
@@ -3679,7 +3719,7 @@ export type ExposureByEvent = {
 /**
  * Get open exposure grouped by football match/event.
  * Returns exposure breakdown per event for users with multiple bets on same match.
- * 
+ *
  * Why: Users may have multiple bets on the same match (e.g., Match Odds + Over 2.5)
  * and need to see their total exposure to that single event for risk management.
  */
@@ -3717,12 +3757,15 @@ export async function getExposureByEvent({
     }
 
     // Group bets by matchId (or null for unlinked bets)
-    const exposureMap = new Map<string | null, {
-      matchInfo: ExposureByEvent["match"];
-      totalExposure: number;
-      betIds: string[];
-      promoTypes: Set<string>;
-    }>();
+    const exposureMap = new Map<
+      string | null,
+      {
+        matchInfo: ExposureByEvent["match"];
+        totalExposure: number;
+        betIds: string[];
+        promoTypes: Set<string>;
+      }
+    >();
 
     for (const bet of openBets) {
       const key = bet.matchId;
@@ -3737,15 +3780,17 @@ export async function getExposureByEvent({
         }
       } else {
         exposureMap.set(key, {
-          matchInfo: bet.matchId && bet.homeTeam && bet.awayTeam
-            ? {
-                homeTeam: bet.homeTeam,
-                awayTeam: bet.awayTeam,
-                competition: bet.competition || "",
-                matchDate: bet.matchDate!,
-                status: (bet.matchStatus || "SCHEDULED") as FootballMatchStatus,
-              }
-            : null,
+          matchInfo:
+            bet.matchId && bet.homeTeam && bet.awayTeam
+              ? {
+                  homeTeam: bet.homeTeam,
+                  awayTeam: bet.awayTeam,
+                  competition: bet.competition || "",
+                  matchDate: bet.matchDate!,
+                  status: (bet.matchStatus ||
+                    "SCHEDULED") as FootballMatchStatus,
+                }
+              : null,
           totalExposure: exposure,
           betIds: [bet.betId],
           promoTypes: new Set(bet.promoType ? [bet.promoType] : []),
@@ -3884,7 +3929,10 @@ export async function createBetForImport(params: CreateBetForImportParams) {
 
     return result;
   } catch (_error) {
-    throw new ChatSDKError("bad_request:database", "Failed to create bet from import");
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to create bet from import"
+    );
   }
 }
 
@@ -3971,7 +4019,10 @@ export async function findOrCreateAccount({
 
     return newAccount;
   } catch (_error) {
-    throw new ChatSDKError("bad_request:database", "Failed to find or create account");
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to find or create account"
+    );
   }
 }
 
@@ -4011,50 +4062,48 @@ export async function getDashboardSummary({
     const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
     // Run all queries in parallel for performance
-    const [
-      settledAggregates,
-      openExposureData,
-      pendingReview,
-      recentActivity,
-    ] = await Promise.all([
-      // Aggregate settled bets using stored NOK values
-      db
-        .select({
-          totalBackProfitLossNok: sql<string>`COALESCE(${sum(backBet.profitLossNok)}, 0)`,
-          totalLayProfitLossNok: sql<string>`COALESCE(${sum(layBet.profitLossNok)}, 0)`,
-          totalBackStakeNok: sql<string>`COALESCE(${sum(backBet.stakeNok)}, 0)`,
-          settledCount: count(matchedBet.id),
-        })
-        .from(matchedBet)
-        .leftJoin(backBet, eq(matchedBet.backBetId, backBet.id))
-        .leftJoin(layBet, eq(matchedBet.layBetId, layBet.id))
-        .where(and(eq(matchedBet.userId, userId), eq(matchedBet.status, "settled"))),
+    const [settledAggregates, openExposureData, pendingReview, recentActivity] =
+      await Promise.all([
+        // Aggregate settled bets using stored NOK values
+        db
+          .select({
+            totalBackProfitLossNok: sql<string>`COALESCE(${sum(backBet.profitLossNok)}, 0)`,
+            totalLayProfitLossNok: sql<string>`COALESCE(${sum(layBet.profitLossNok)}, 0)`,
+            totalBackStakeNok: sql<string>`COALESCE(${sum(backBet.stakeNok)}, 0)`,
+            settledCount: count(matchedBet.id),
+          })
+          .from(matchedBet)
+          .leftJoin(backBet, eq(matchedBet.backBetId, backBet.id))
+          .leftJoin(layBet, eq(matchedBet.layBetId, layBet.id))
+          .where(
+            and(eq(matchedBet.userId, userId), eq(matchedBet.status, "settled"))
+          ),
 
-      // Open exposure
-      getOpenExposure({ userId }),
+        // Open exposure
+        getOpenExposure({ userId }),
 
-      // Pending review count
-      db
-        .select({ count: count(matchedBet.id) })
-        .from(matchedBet)
-        .where(
-          and(
-            eq(matchedBet.userId, userId),
-            inArray(matchedBet.status, ["needs_review", "draft"])
-          )
-        ),
+        // Pending review count
+        db
+          .select({ count: count(matchedBet.id) })
+          .from(matchedBet)
+          .where(
+            and(
+              eq(matchedBet.userId, userId),
+              inArray(matchedBet.status, ["needs_review", "draft"])
+            )
+          ),
 
-      // Recent activity (last 7 days)
-      db
-        .select({ count: count(matchedBet.id) })
-        .from(matchedBet)
-        .where(
-          and(
-            eq(matchedBet.userId, userId),
-            gte(matchedBet.createdAt, sevenDaysAgo)
-          )
-        ),
-    ]);
+        // Recent activity (last 7 days)
+        db
+          .select({ count: count(matchedBet.id) })
+          .from(matchedBet)
+          .where(
+            and(
+              eq(matchedBet.userId, userId),
+              gte(matchedBet.createdAt, sevenDaysAgo)
+            )
+          ),
+      ]);
 
     const totals = settledAggregates[0];
     const backProfitNok = totals?.totalBackProfitLossNok
@@ -4080,7 +4129,10 @@ export async function getDashboardSummary({
       roi: Math.round(roi * 100) / 100,
     };
   } catch (_error) {
-    throw new ChatSDKError("bad_request:database", "Failed to get dashboard summary");
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get dashboard summary"
+    );
   }
 }
 
@@ -4313,7 +4365,8 @@ export async function updateFreeBet(params: UpdateFreeBetParams) {
       updates.currency = params.currency.toUpperCase();
     }
     if (params.minOdds !== undefined) {
-      updates.minOdds = params.minOdds === null ? null : params.minOdds.toString();
+      updates.minOdds =
+        params.minOdds === null ? null : params.minOdds.toString();
     }
     if (params.expiresAt !== undefined) {
       updates.expiresAt = params.expiresAt;
@@ -4427,11 +4480,7 @@ export async function countExpiringFreeBets({
  * Get total value of active free bets for a user.
  * Used for dashboard summary.
  */
-export async function getActiveFreeBetsSummary({
-  userId,
-}: {
-  userId: string;
-}) {
+export async function getActiveFreeBetsSummary({ userId }: { userId: string }) {
   try {
     const [result] = await db
       .select({
@@ -4443,9 +4492,7 @@ export async function getActiveFreeBetsSummary({
 
     return {
       count: result?.count ?? 0,
-      totalValue: result?.totalValue
-        ? Number.parseFloat(result.totalValue)
-        : 0,
+      totalValue: result?.totalValue ? Number.parseFloat(result.totalValue) : 0,
     };
   } catch (_error) {
     throw new ChatSDKError(
@@ -4563,13 +4610,12 @@ export async function listFreeBetsWithProgress({
       .orderBy(desc(freeBet.createdAt));
 
     return rows.map((row) => {
-      const target = row.unlockTarget
-        ? Number.parseFloat(row.unlockTarget)
-        : 0;
+      const target = row.unlockTarget ? Number.parseFloat(row.unlockTarget) : 0;
       const progress = row.unlockProgress
         ? Number.parseFloat(row.unlockProgress)
         : 0;
-      const progressPercent = target > 0 ? Math.min((progress / target) * 100, 100) : 100;
+      const progressPercent =
+        target > 0 ? Math.min((progress / target) * 100, 100) : 100;
       const isLocked = row.unlockType !== null && progress < target;
 
       return {
@@ -4715,9 +4761,7 @@ export async function addQualifyingBet({
       ? Number.parseFloat(fb.unlockProgress)
       : 0;
     const newProgress = currentProgress + contribution;
-    const target = fb.unlockTarget
-      ? Number.parseFloat(fb.unlockTarget)
-      : 0;
+    const target = fb.unlockTarget ? Number.parseFloat(fb.unlockTarget) : 0;
 
     // Check if unlocked
     const isUnlocked = newProgress >= target;
@@ -4793,9 +4837,7 @@ export async function removeQualifyingBet({
     }
 
     // Remove the qualifying bet
-    await db
-      .delete(qualifyingBet)
-      .where(eq(qualifyingBet.id, qualifyingBetId));
+    await db.delete(qualifyingBet).where(eq(qualifyingBet.id, qualifyingBetId));
 
     // Update progress
     const currentProgress = fb.unlockProgress
@@ -5292,7 +5334,7 @@ export async function updateFootballMatch({
 /**
  * Search for matches by team name using trigram fuzzy matching.
  * Uses pg_trgm extension for similarity search - handles typos and abbreviations.
- * 
+ *
  * Examples that will match "Manchester United FC":
  * - "Man United" (similarity ~0.4)
  * - "Manchster United" (typo, similarity ~0.7)
@@ -5312,7 +5354,7 @@ export async function searchFootballMatches({
 }) {
   try {
     const term = searchTerm.trim();
-    
+
     // Use trigram similarity for fuzzy matching
     // GREATEST picks the higher similarity between home and away team
     const conditions: SQL<unknown>[] = [
@@ -5381,7 +5423,10 @@ export async function getUserSettings({ userId }: { userId: string }) {
 
     return result ?? null;
   } catch (_error) {
-    throw new ChatSDKError("bad_request:database", "Failed to get user settings");
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get user settings"
+    );
   }
 }
 
@@ -5418,7 +5463,10 @@ export async function upsertUserSettings({
 
     return result;
   } catch (_error) {
-    throw new ChatSDKError("bad_request:database", "Failed to upsert user settings");
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to upsert user settings"
+    );
   }
 }
 
@@ -5426,19 +5474,29 @@ export async function upsertUserSettings({
  * Get enabled competitions for a user.
  * Returns default competitions if user has no settings or hasn't configured any.
  */
-export async function getEnabledCompetitions({ userId }: { userId: string }): Promise<string[]> {
+export async function getEnabledCompetitions({
+  userId,
+}: {
+  userId: string;
+}): Promise<string[]> {
   try {
     const settings = await getUserSettings({ userId });
 
     // Return user's competitions if set, otherwise return defaults
-    if (settings?.enabledCompetitions && settings.enabledCompetitions.length > 0) {
+    if (
+      settings?.enabledCompetitions &&
+      settings.enabledCompetitions.length > 0
+    ) {
       return settings.enabledCompetitions;
     }
 
     return DEFAULT_COMPETITION_CODES;
   } catch (_error) {
     // On error, return defaults rather than failing
-    console.error("Failed to get enabled competitions, using defaults:", _error);
+    console.error(
+      "Failed to get enabled competitions, using defaults:",
+      _error
+    );
     return DEFAULT_COMPETITION_CODES;
   }
 }
@@ -5456,7 +5514,10 @@ export async function getAllEnabledCompetitions(): Promise<string[]> {
     const allCodes = new Set<string>();
 
     for (const settings of allSettings) {
-      if (settings.enabledCompetitions && Array.isArray(settings.enabledCompetitions)) {
+      if (
+        settings.enabledCompetitions &&
+        Array.isArray(settings.enabledCompetitions)
+      ) {
         for (const code of settings.enabledCompetitions) {
           allCodes.add(code);
         }
@@ -5470,7 +5531,10 @@ export async function getAllEnabledCompetitions(): Promise<string[]> {
 
     return Array.from(allCodes);
   } catch (_error) {
-    console.error("Failed to get all enabled competitions, using defaults:", _error);
+    console.error(
+      "Failed to get all enabled competitions, using defaults:",
+      _error
+    );
     return DEFAULT_COMPETITION_CODES;
   }
 }
@@ -5495,7 +5559,12 @@ export async function deleteAccountTransaction({
     const [existing] = await db
       .select()
       .from(accountTransaction)
-      .where(and(eq(accountTransaction.id, id), eq(accountTransaction.userId, userId)));
+      .where(
+        and(
+          eq(accountTransaction.id, id),
+          eq(accountTransaction.userId, userId)
+        )
+      );
 
     if (!existing) {
       return null;
@@ -5503,7 +5572,12 @@ export async function deleteAccountTransaction({
 
     await db
       .delete(accountTransaction)
-      .where(and(eq(accountTransaction.id, id), eq(accountTransaction.userId, userId)));
+      .where(
+        and(
+          eq(accountTransaction.id, id),
+          eq(accountTransaction.userId, userId)
+        )
+      );
 
     // Create audit entry
     await db.insert(auditLog).values({
@@ -5526,7 +5600,10 @@ export async function deleteAccountTransaction({
     if (error instanceof ChatSDKError) {
       throw error;
     }
-    throw new ChatSDKError("bad_request:database", "Failed to delete account transaction");
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to delete account transaction"
+    );
   }
 }
 
@@ -5641,7 +5718,8 @@ export async function deleteBet({
 }) {
   try {
     const betTable = kind === "back" ? backBet : layBet;
-    const foreignKeyColumn = kind === "back" ? matchedBet.backBetId : matchedBet.layBetId;
+    const foreignKeyColumn =
+      kind === "back" ? matchedBet.backBetId : matchedBet.layBetId;
 
     // Verify the bet exists and belongs to user
     const [existing] = await db
@@ -5735,7 +5813,9 @@ export async function deleteBet({
         .limit(1);
 
       if (!otherBackBet && !otherLayBet) {
-        await db.delete(screenshotUpload).where(eq(screenshotUpload.id, screenshot.id));
+        await db
+          .delete(screenshotUpload)
+          .where(eq(screenshotUpload.id, screenshot.id));
       }
     }
 
@@ -5810,7 +5890,11 @@ export async function deleteMatchedBet({
 
     // Check for qualifying bets referencing this matched bet
     const linkedQualifyingBets = await db
-      .select({ id: qualifyingBet.id, freeBetId: qualifyingBet.freeBetId, contribution: qualifyingBet.contribution })
+      .select({
+        id: qualifyingBet.id,
+        freeBetId: qualifyingBet.freeBetId,
+        contribution: qualifyingBet.contribution,
+      })
       .from(qualifyingBet)
       .where(eq(qualifyingBet.matchedBetId, id));
 
@@ -5849,9 +5933,11 @@ export async function deleteMatchedBet({
     }
 
     // Delete audit entries for this matched bet (after cascade cleanup)
-    await db.delete(auditLog).where(
-      and(eq(auditLog.entityType, "matched_bet"), eq(auditLog.entityId, id))
-    );
+    await db
+      .delete(auditLog)
+      .where(
+        and(eq(auditLog.entityType, "matched_bet"), eq(auditLog.entityId, id))
+      );
 
     // Delete the matched bet
     await db.delete(matchedBet).where(eq(matchedBet.id, id));
@@ -5877,7 +5963,10 @@ export async function deleteMatchedBet({
     if (error instanceof ChatSDKError) {
       throw error;
     }
-    throw new ChatSDKError("bad_request:database", "Failed to delete matched bet");
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to delete matched bet"
+    );
   }
 }
 
@@ -5889,10 +5978,14 @@ export async function deleteMatchedBet({
  * Generate a new shortcut API key for a user.
  * Returns the plaintext key (only time it's visible) and stores the hash.
  * The key is a 64-character hex string (256-bit random).
- * 
+ *
  * Why: Enables authentication for iOS Shortcut API requests without session cookies.
  */
-export async function generateShortcutApiKey({ userId }: { userId: string }): Promise<{
+export async function generateShortcutApiKey({
+  userId,
+}: {
+  userId: string;
+}): Promise<{
   key: string;
   hint: string;
   createdAt: Date;
@@ -5906,7 +5999,10 @@ export async function generateShortcutApiKey({ userId }: { userId: string }): Pr
 
     // Hash the key using SHA-256 for storage
     const encoder = new TextEncoder();
-    const hashBuffer = await crypto.subtle.digest("SHA-256", encoder.encode(key));
+    const hashBuffer = await crypto.subtle.digest(
+      "SHA-256",
+      encoder.encode(key)
+    );
     const hashArray = Array.from(new Uint8Array(hashBuffer));
     const hash = hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
 
@@ -5936,24 +6032,32 @@ export async function generateShortcutApiKey({ userId }: { userId: string }): Pr
 
     return { key, hint, createdAt: now };
   } catch (_error) {
-    throw new ChatSDKError("bad_request:database", "Failed to generate API key");
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to generate API key"
+    );
   }
 }
 
 /**
  * Validate a shortcut API key and return the user ID if valid.
  * Also checks rate limiting (10 seconds between requests).
- * 
+ *
  * Returns: { valid: true, userId } or { valid: false, error, retryAfter? }
  */
-export async function validateShortcutApiKey(key: string): Promise<
+export async function validateShortcutApiKey(
+  key: string
+): Promise<
   | { valid: true; userId: string }
   | { valid: false; error: "invalid" | "rate_limited"; retryAfter?: number }
 > {
   try {
     // Hash the provided key
     const encoder = new TextEncoder();
-    const hashBuffer = await crypto.subtle.digest("SHA-256", encoder.encode(key));
+    const hashBuffer = await crypto.subtle.digest(
+      "SHA-256",
+      encoder.encode(key)
+    );
     const hashArray = Array.from(new Uint8Array(hashBuffer));
     const hash = hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
 
@@ -5996,7 +6100,11 @@ export async function validateShortcutApiKey(key: string): Promise<
  * Revoke a user's shortcut API key.
  * Immediately invalidates the key.
  */
-export async function revokeShortcutApiKey({ userId }: { userId: string }): Promise<boolean> {
+export async function revokeShortcutApiKey({
+  userId,
+}: {
+  userId: string;
+}): Promise<boolean> {
   try {
     const [result] = await db
       .update(userSettings)
@@ -6019,7 +6127,11 @@ export async function revokeShortcutApiKey({ userId }: { userId: string }): Prom
 /**
  * Get the shortcut API key info for display (hint only, not the full key).
  */
-export async function getShortcutApiKeyInfo({ userId }: { userId: string }): Promise<{
+export async function getShortcutApiKeyInfo({
+  userId,
+}: {
+  userId: string;
+}): Promise<{
   hasKey: boolean;
   hint: string | null;
   createdAt: Date | null;
@@ -6037,6 +6149,539 @@ export async function getShortcutApiKeyInfo({ userId }: { userId: string }): Pro
       createdAt: settings.shortcutApiKeyCreatedAt ?? null,
     };
   } catch (_error) {
-    throw new ChatSDKError("bad_request:database", "Failed to get API key info");
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get API key info"
+    );
+  }
+}
+
+// =============================================================================
+// WALLET QUERIES
+// =============================================================================
+
+/**
+ * Wallet type definitions for API responses and form data
+ */
+export interface CreateWalletParams {
+  userId: string;
+  name: string;
+  type: WalletType;
+  currency: string;
+  notes?: string | null;
+}
+
+export interface UpdateWalletParams {
+  name?: string;
+  type?: WalletType;
+  currency?: string;
+  notes?: string | null;
+  status?: WalletStatus;
+}
+
+export interface WalletWithBalance {
+  id: string;
+  createdAt: Date;
+  userId: string;
+  name: string;
+  type: WalletType;
+  currency: string;
+  notes: string | null;
+  status: WalletStatus;
+  balance: number;
+}
+
+/**
+ * Create a new wallet for a user.
+ */
+export async function createWallet(params: CreateWalletParams) {
+  try {
+    const [created] = await db
+      .insert(wallet)
+      .values({
+        userId: params.userId,
+        name: params.name,
+        type: params.type,
+        currency: params.currency,
+        notes: params.notes ?? null,
+        status: "active",
+        createdAt: new Date(),
+      })
+      .returning();
+    return created;
+  } catch (_error) {
+    throw new ChatSDKError("bad_request:database", "Failed to create wallet");
+  }
+}
+
+/**
+ * Get a wallet by ID.
+ */
+export async function getWalletById(id: string) {
+  try {
+    const [found] = await db.select().from(wallet).where(eq(wallet.id, id));
+    return found ?? null;
+  } catch (_error) {
+    throw new ChatSDKError("bad_request:database", "Failed to get wallet");
+  }
+}
+
+/**
+ * List all wallets for a user with calculated balances.
+ */
+export async function listWalletsByUser(
+  userId: string
+): Promise<WalletWithBalance[]> {
+  try {
+    const wallets = await db
+      .select()
+      .from(wallet)
+      .where(eq(wallet.userId, userId))
+      .orderBy(desc(wallet.createdAt));
+
+    // Calculate balance for each wallet
+    const walletsWithBalance: WalletWithBalance[] = [];
+    for (const w of wallets) {
+      const balance = await calculateWalletBalance(w.id);
+      walletsWithBalance.push({
+        id: w.id,
+        createdAt: w.createdAt,
+        userId: w.userId,
+        name: w.name,
+        type: w.type as WalletType,
+        currency: w.currency,
+        notes: w.notes,
+        status: w.status as WalletStatus,
+        balance,
+      });
+    }
+
+    return walletsWithBalance;
+  } catch (_error) {
+    throw new ChatSDKError("bad_request:database", "Failed to list wallets");
+  }
+}
+
+/**
+ * List active wallets for a user (for dropdown selectors).
+ */
+export async function listActiveWalletsByUser(userId: string) {
+  try {
+    return await db
+      .select()
+      .from(wallet)
+      .where(and(eq(wallet.userId, userId), eq(wallet.status, "active")))
+      .orderBy(asc(wallet.name));
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to list active wallets"
+    );
+  }
+}
+
+/**
+ * Update a wallet.
+ */
+export async function updateWallet(id: string, params: UpdateWalletParams) {
+  try {
+    const [updated] = await db
+      .update(wallet)
+      .set(params)
+      .where(eq(wallet.id, id))
+      .returning();
+    return updated ?? null;
+  } catch (_error) {
+    throw new ChatSDKError("bad_request:database", "Failed to update wallet");
+  }
+}
+
+/**
+ * Archive a wallet (soft delete).
+ */
+export async function archiveWallet(id: string) {
+  return updateWallet(id, { status: "archived" });
+}
+
+/**
+ * Delete a wallet and all its transactions (hard delete).
+ */
+export async function deleteWallet(id: string) {
+  try {
+    // First delete all transactions
+    await db
+      .delete(walletTransaction)
+      .where(eq(walletTransaction.walletId, id));
+    // Then delete the wallet
+    await db.delete(wallet).where(eq(wallet.id, id));
+  } catch (_error) {
+    throw new ChatSDKError("bad_request:database", "Failed to delete wallet");
+  }
+}
+
+/**
+ * Calculate wallet balance from transactions.
+ * Balance = deposits + transfer_from_account + transfer_from_wallet + adjustment
+ *         - withdrawals - transfer_to_account - transfer_to_wallet - fee
+ */
+export async function calculateWalletBalance(
+  walletId: string
+): Promise<number> {
+  try {
+    const transactions = await db
+      .select({
+        type: walletTransaction.type,
+        amount: walletTransaction.amount,
+      })
+      .from(walletTransaction)
+      .where(eq(walletTransaction.walletId, walletId));
+
+    let balance = 0;
+    for (const tx of transactions) {
+      const amount = Number(tx.amount);
+      switch (tx.type) {
+        case "deposit":
+        case "transfer_from_account":
+        case "transfer_from_wallet":
+          balance += amount;
+          break;
+        case "withdrawal":
+        case "transfer_to_account":
+        case "transfer_to_wallet":
+        case "fee":
+          balance -= amount;
+          break;
+        case "adjustment":
+          balance += amount; // Can be positive or negative
+          break;
+      }
+    }
+
+    return balance;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to calculate wallet balance"
+    );
+  }
+}
+
+// =============================================================================
+// WALLET TRANSACTION QUERIES
+// =============================================================================
+
+export interface CreateWalletTransactionParams {
+  walletId: string;
+  type: WalletTransactionType;
+  amount: number;
+  currency: string;
+  date: Date;
+  relatedAccountId?: string | null;
+  relatedWalletId?: string | null;
+  externalRef?: string | null;
+  notes?: string | null;
+}
+
+/**
+ * Create a wallet transaction.
+ */
+export async function createWalletTransaction(
+  params: CreateWalletTransactionParams
+) {
+  try {
+    const [created] = await db
+      .insert(walletTransaction)
+      .values({
+        walletId: params.walletId,
+        type: params.type,
+        amount: params.amount.toString(),
+        currency: params.currency,
+        date: params.date,
+        relatedAccountId: params.relatedAccountId ?? null,
+        relatedWalletId: params.relatedWalletId ?? null,
+        externalRef: params.externalRef ?? null,
+        notes: params.notes ?? null,
+        createdAt: new Date(),
+      })
+      .returning();
+    return created;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to create wallet transaction"
+    );
+  }
+}
+
+/**
+ * Get wallet transaction by ID.
+ */
+export async function getWalletTransactionById(id: string) {
+  try {
+    const [found] = await db
+      .select()
+      .from(walletTransaction)
+      .where(eq(walletTransaction.id, id));
+    return found ?? null;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get wallet transaction"
+    );
+  }
+}
+
+/**
+ * List transactions for a wallet.
+ */
+export async function listWalletTransactions(walletId: string) {
+  try {
+    return await db
+      .select()
+      .from(walletTransaction)
+      .where(eq(walletTransaction.walletId, walletId))
+      .orderBy(desc(walletTransaction.date), desc(walletTransaction.createdAt));
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to list wallet transactions"
+    );
+  }
+}
+
+/**
+ * List wallet transactions with related entity names.
+ */
+export async function listWalletTransactionsWithDetails(walletId: string) {
+  try {
+    const relatedAccount = aliasedTable(account, "relatedAccount");
+    const relatedWallet = aliasedTable(wallet, "relatedWallet");
+
+    const transactions = await db
+      .select({
+        id: walletTransaction.id,
+        createdAt: walletTransaction.createdAt,
+        walletId: walletTransaction.walletId,
+        type: walletTransaction.type,
+        amount: walletTransaction.amount,
+        currency: walletTransaction.currency,
+        relatedAccountId: walletTransaction.relatedAccountId,
+        relatedWalletId: walletTransaction.relatedWalletId,
+        externalRef: walletTransaction.externalRef,
+        date: walletTransaction.date,
+        notes: walletTransaction.notes,
+        relatedAccountName: relatedAccount.name,
+        relatedWalletName: relatedWallet.name,
+      })
+      .from(walletTransaction)
+      .leftJoin(
+        relatedAccount,
+        eq(walletTransaction.relatedAccountId, relatedAccount.id)
+      )
+      .leftJoin(
+        relatedWallet,
+        eq(walletTransaction.relatedWalletId, relatedWallet.id)
+      )
+      .where(eq(walletTransaction.walletId, walletId))
+      .orderBy(desc(walletTransaction.date), desc(walletTransaction.createdAt));
+
+    return transactions;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to list wallet transactions"
+    );
+  }
+}
+
+/**
+ * Delete a wallet transaction.
+ */
+export async function deleteWalletTransaction(id: string) {
+  try {
+    await db.delete(walletTransaction).where(eq(walletTransaction.id, id));
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to delete wallet transaction"
+    );
+  }
+}
+
+/**
+ * Create a linked transfer from wallet to betting account.
+ * Creates both a WalletTransaction and an AccountTransaction.
+ */
+export async function createTransferToAccount(params: {
+  walletId: string;
+  accountId: string;
+  amount: number;
+  currency: string;
+  date: Date;
+  notes?: string | null;
+  userId: string;
+}) {
+  try {
+    // Create wallet transaction (outgoing)
+    const walletTx = await createWalletTransaction({
+      walletId: params.walletId,
+      type: "transfer_to_account",
+      amount: params.amount,
+      currency: params.currency,
+      date: params.date,
+      relatedAccountId: params.accountId,
+      notes: params.notes,
+    });
+
+    // Create account transaction (incoming deposit)
+    const accountTx = await createAccountTransaction({
+      userId: params.userId,
+      accountId: params.accountId,
+      type: "deposit",
+      amount: params.amount,
+      currency: params.currency,
+      occurredAt: params.date,
+      notes: params.notes
+        ? `From wallet: ${params.notes}`
+        : "Transfer from wallet",
+    });
+
+    return { walletTx, accountTx };
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to create transfer to account"
+    );
+  }
+}
+
+/**
+ * Create a linked transfer from betting account to wallet.
+ * Creates both an AccountTransaction and a WalletTransaction.
+ */
+export async function createTransferFromAccount(params: {
+  walletId: string;
+  accountId: string;
+  amount: number;
+  currency: string;
+  date: Date;
+  notes?: string | null;
+  userId: string;
+}) {
+  try {
+    // Create account transaction (outgoing withdrawal)
+    const accountTx = await createAccountTransaction({
+      userId: params.userId,
+      accountId: params.accountId,
+      type: "withdrawal",
+      amount: -params.amount, // Negative for withdrawal
+      currency: params.currency,
+      occurredAt: params.date,
+      notes: params.notes ? `To wallet: ${params.notes}` : "Transfer to wallet",
+    });
+
+    // Create wallet transaction (incoming)
+    const walletTx = await createWalletTransaction({
+      walletId: params.walletId,
+      type: "transfer_from_account",
+      amount: params.amount,
+      currency: params.currency,
+      date: params.date,
+      relatedAccountId: params.accountId,
+      notes: params.notes,
+    });
+
+    return { walletTx, accountTx };
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to create transfer from account"
+    );
+  }
+}
+
+/**
+ * Create a linked transfer between two wallets.
+ * Creates transactions on both wallets.
+ */
+export async function createTransferBetweenWallets(params: {
+  fromWalletId: string;
+  toWalletId: string;
+  amount: number;
+  currency: string;
+  date: Date;
+  notes?: string | null;
+}) {
+  try {
+    // Create outgoing transaction on source wallet
+    const fromTx = await createWalletTransaction({
+      walletId: params.fromWalletId,
+      type: "transfer_to_wallet",
+      amount: params.amount,
+      currency: params.currency,
+      date: params.date,
+      relatedWalletId: params.toWalletId,
+      notes: params.notes,
+    });
+
+    // Create incoming transaction on destination wallet
+    const toTx = await createWalletTransaction({
+      walletId: params.toWalletId,
+      type: "transfer_from_wallet",
+      amount: params.amount,
+      currency: params.currency,
+      date: params.date,
+      relatedWalletId: params.fromWalletId,
+      notes: params.notes,
+    });
+
+    return { fromTx, toTx };
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to create transfer between wallets"
+    );
+  }
+}
+
+/**
+ * Get total wallet balances for a user, converted to NOK.
+ */
+export async function getWalletTotals(userId: string): Promise<{
+  totalBalanceNok: number;
+  fiatBalanceNok: number;
+  cryptoBalanceNok: number;
+  walletCount: number;
+}> {
+  try {
+    const wallets = await listWalletsByUser(userId);
+    const activeWallets = wallets.filter((w) => w.status === "active");
+
+    let totalBalanceNok = 0;
+    let fiatBalanceNok = 0;
+    let cryptoBalanceNok = 0;
+
+    for (const w of activeWallets) {
+      const balanceNok = await convertAmountToNok(w.balance, w.currency);
+      totalBalanceNok += balanceNok;
+
+      if (w.type === "crypto") {
+        cryptoBalanceNok += balanceNok;
+      } else {
+        fiatBalanceNok += balanceNok;
+      }
+    }
+
+    return {
+      totalBalanceNok,
+      fiatBalanceNok,
+      cryptoBalanceNok,
+      walletCount: activeWallets.length,
+    };
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get wallet totals"
+    );
   }
 }
