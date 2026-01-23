@@ -173,7 +173,7 @@ Remaining blocker: Rerun Playwright route tests in an environment that permits b
 
 ## P9 — UX Improvements
 
-- [ ] **Vercel Analytics & Speed Insights**: Add visitor tracking, page views, and Core Web Vitals monitoring using @vercel/analytics and @vercel/speed-insights. Analytics provides insights into user behavior, popular pages, and bounce rates. Speed Insights tracks performance metrics (LCP, FID, CLS, TTFB) to identify slow pages. DoD: Both components added to app layout, metrics visible in Vercel dashboard. Implementation: Install `@vercel/analytics` and `@vercel/speed-insights`, add `<Analytics />` and `<SpeedInsights />` components to root layout. Why: Understand user behavior and identify performance bottlenecks.
+- [x] **Vercel Analytics & Speed Insights**: Add visitor tracking, page views, and Core Web Vitals monitoring using @vercel/analytics and @vercel/speed-insights. Analytics provides insights into user behavior, popular pages, and bounce rates. Speed Insights tracks performance metrics (LCP, FID, CLS, TTFB) to identify slow pages. DoD: Both components added to app layout, metrics visible in Vercel dashboard. Implementation: Installed `@vercel/analytics` and `@vercel/speed-insights`, added `<Analytics />` and `<SpeedInsights />` components to root layout (`app/layout.tsx`). Why: Understand user behavior and identify performance bottlenecks.
 
 - [x] **iOS Shortcut API for matched bet intake**: Create a single API endpoint that accepts two screenshots and automatically parses, links, and saves a matched bet - authenticated via per-user API key. This allows users to take screenshots on their phone and use an iOS Shortcut to submit them without opening the web app.
   
