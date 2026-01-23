@@ -572,6 +572,7 @@ const SidebarMenuButton = React.forwardRef<
         data-sidebar="menu-button"
         data-size={size}
         ref={ref}
+        suppressHydrationWarning
         {...props}
       />
     );
