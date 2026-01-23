@@ -169,22 +169,17 @@ async function ReportingContent({
         title="Cumulative Profit"
       />
 
-      {/* Performance Breakdown Charts */}
-      <div className="grid gap-6 lg:grid-cols-3">
+      {/* Performance Breakdown Charts - show matched set profit by category */}
+      <div className="grid gap-6 lg:grid-cols-2">
         <BreakdownChartWithToggle
-          title="By Promo Type"
+          title="Profit by Strategy"
           data={promoBreakdown}
           emptyMessage="No promo data"
         />
         <BreakdownChartWithToggle
-          title="By Bookmaker"
+          title="Profit by Bookmaker"
           data={bookmakerBreakdown}
           emptyMessage="No bookmaker data"
-        />
-        <BreakdownChartWithToggle
-          title="By Exchange"
-          data={exchangeBreakdown}
-          emptyMessage="No exchange data"
         />
       </div>
 
@@ -193,24 +188,19 @@ async function ReportingContent({
         emptyMessage="No bookmaker data. Settle bets or add bonus transactions to see performance."
       />
 
+      {/* Detailed breakdown tables */}
       <div className="grid gap-6 lg:grid-cols-2">
         <ReportingBreakdownTable
-          title="By Bookmaker"
-          data={bookmakerBreakdown}
-          emptyMessage="No settled bets with bookmaker data"
+          title="By Strategy"
+          data={promoBreakdown}
+          emptyMessage="No settled matched bets"
         />
         <ReportingBreakdownTable
           title="By Exchange"
           data={exchangeBreakdown}
-          emptyMessage="No settled bets with exchange data"
+          emptyMessage="No settled matched bets"
         />
       </div>
-
-      <ReportingBreakdownTable
-        title="By Promo Type"
-        data={promoBreakdown}
-        emptyMessage="No settled bets with promo data"
-      />
     </div>
   );
 }
