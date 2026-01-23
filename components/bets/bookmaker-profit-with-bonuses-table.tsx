@@ -33,9 +33,9 @@ export function BookmakerProfitWithBonusesTable({
   return (
     <div className={cn("rounded-lg border bg-card", className)}>
       <div className="border-b px-4 py-3">
-        <h3 className="font-semibold text-lg">Bookmaker Performance (incl. Bonuses)</h3>
+        <h3 className="font-semibold text-lg">Bookmaker Performance</h3>
         <p className="text-muted-foreground text-sm">
-          Compare profit from betting combined with bonuses and rewards
+          Net profit per bookmaker including matched set results and bonuses
         </p>
       </div>
       {sorted.length === 0 ? (
@@ -48,9 +48,9 @@ export function BookmakerProfitWithBonusesTable({
             <TableHeader>
               <TableRow>
                 <TableHead>Bookmaker</TableHead>
-                <TableHead className="text-right">Bets</TableHead>
+                <TableHead className="text-right">Matched Sets</TableHead>
                 <TableHead className="text-right">Stake</TableHead>
-                <TableHead className="text-right">Betting P/L</TableHead>
+                <TableHead className="text-right">Net P/L</TableHead>
                 <TableHead className="text-right">
                   <span className="inline-flex items-center gap-1">
                     <Gift className="h-3.5 w-3.5" />
@@ -117,7 +117,7 @@ export function BookmakerProfitWithBonusesTable({
             </span>
             <div className="flex gap-6">
               <span>
-                <span className="text-muted-foreground">Total Betting: </span>
+                <span className="text-muted-foreground">Net P/L: </span>
                 <span
                   className={cn(
                     "font-medium",

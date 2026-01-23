@@ -873,6 +873,7 @@ export async function createAccountTransaction({
   currency,
   occurredAt,
   notes,
+  linkedWalletTransactionId,
 }: {
   userId: string;
   accountId: string;
@@ -881,6 +882,7 @@ export async function createAccountTransaction({
   currency: string;
   occurredAt?: Date | null;
   notes?: string | null;
+  linkedWalletTransactionId?: string | null;
 }) {
   try {
     const values: typeof accountTransaction.$inferInsert = {
@@ -892,6 +894,7 @@ export async function createAccountTransaction({
       currency: currency.toUpperCase(),
       occurredAt: occurredAt ?? new Date(),
       notes: notes ?? null,
+      linkedWalletTransactionId: linkedWalletTransactionId ?? null,
     };
 
     const [row] = await db
@@ -3071,15 +3074,15 @@ export async function getProfitByPromoType({
       conditions.push(lte(matchedBet.createdAt, endDate));
     }
 
-    // Sum profitLoss from back and lay bets grouped by promo type
+    // Sum profitLoss from back and lay bets grouped by promo type (using NOK-converted values)
     const rows = await db
       .select({
         promoType: matchedBet.promoType,
         count: count(matchedBet.id),
-        totalBackProfitLoss: sum(backBet.profitLoss),
-        totalLayProfitLoss: sum(layBet.profitLoss),
-        totalBackStake: sum(backBet.stake),
-        totalLayStake: sum(layBet.stake),
+        totalBackProfitLossNok: sum(backBet.profitLossNok),
+        totalLayProfitLossNok: sum(layBet.profitLossNok),
+        totalBackStakeNok: sum(backBet.stakeNok),
+        totalLayStakeNok: sum(layBet.stakeNok),
       })
       .from(matchedBet)
       .leftJoin(backBet, eq(matchedBet.backBetId, backBet.id))
@@ -3091,15 +3094,15 @@ export async function getProfitByPromoType({
       promoType: row.promoType ?? "Unspecified",
       count: row.count,
       totalProfitLoss:
-        (row.totalBackProfitLoss
-          ? Number.parseFloat(row.totalBackProfitLoss)
+        (row.totalBackProfitLossNok
+          ? Number.parseFloat(row.totalBackProfitLossNok)
           : 0) +
-        (row.totalLayProfitLoss
-          ? Number.parseFloat(row.totalLayProfitLoss)
+        (row.totalLayProfitLossNok
+          ? Number.parseFloat(row.totalLayProfitLossNok)
           : 0),
       totalStake:
-        (row.totalBackStake ? Number.parseFloat(row.totalBackStake) : 0) +
-        (row.totalLayStake ? Number.parseFloat(row.totalLayStake) : 0),
+        (row.totalBackStakeNok ? Number.parseFloat(row.totalBackStakeNok) : 0) +
+        (row.totalLayStakeNok ? Number.parseFloat(row.totalLayStakeNok) : 0),
     }));
   } catch (_error) {
     throw new ChatSDKError(
@@ -3110,7 +3113,12 @@ export async function getProfitByPromoType({
 }
 
 /**
- * Get profit/loss aggregates by bookmaker (back bet account).
+ * Get matched set profit/loss aggregates by bookmaker.
+ * This calculates the FULL matched bet profit (back P/L + lay P/L) per bookmaker,
+ * which is the correct way to evaluate bookmaker performance in matched betting.
+ *
+ * In matched betting, you always win one leg and lose the other, so showing
+ * only the back bet P/L is misleading. The real profit is the net of both legs.
  */
 export async function getProfitByBookmaker({
   userId,
@@ -3134,32 +3142,78 @@ export async function getProfitByBookmaker({
       conditions.push(lte(matchedBet.createdAt, endDate));
     }
 
-    // Join with account for bookmaker name
+    // Fetch individual matched bets with both legs for proper P/L calculation
     const rows = await db
       .select({
         accountId: backBet.accountId,
         accountName: account.name,
-        count: count(matchedBet.id),
-        totalBackProfitLoss: sum(backBet.profitLoss),
-        totalBackStake: sum(backBet.stake),
+        // Back bet values
+        backProfitLoss: backBet.profitLoss,
+        backProfitLossNok: backBet.profitLossNok,
+        backStake: backBet.stake,
+        backStakeNok: backBet.stakeNok,
+        backCurrency: backBet.currency,
+        // Lay bet values (the other leg of the matched bet)
+        layProfitLoss: layBet.profitLoss,
+        layProfitLossNok: layBet.profitLossNok,
+        layCurrency: layBet.currency,
       })
       .from(matchedBet)
       .leftJoin(backBet, eq(matchedBet.backBetId, backBet.id))
+      .leftJoin(layBet, eq(matchedBet.layBetId, layBet.id))
       .leftJoin(account, eq(backBet.accountId, account.id))
-      .where(and(...conditions))
-      .groupBy(backBet.accountId, account.name);
+      .where(and(...conditions));
 
-    return rows.map((row) => ({
-      accountId: row.accountId,
-      accountName: row.accountName ?? "Unknown Bookmaker",
-      count: row.count,
-      totalProfitLoss: row.totalBackProfitLoss
-        ? Number.parseFloat(row.totalBackProfitLoss)
-        : 0,
-      totalStake: row.totalBackStake
-        ? Number.parseFloat(row.totalBackStake)
-        : 0,
-    }));
+    // Aggregate matched set profit by bookmaker
+    const accountMap = new Map<
+      string,
+      {
+        accountId: string;
+        accountName: string;
+        count: number;
+        totalProfitLoss: number;
+        totalStake: number;
+      }
+    >();
+
+    for (const row of rows) {
+      if (!row.accountId) continue;
+
+      const existing = accountMap.get(row.accountId) ?? {
+        accountId: row.accountId,
+        accountName: row.accountName ?? "Unknown Bookmaker",
+        count: 0,
+        totalProfitLoss: 0,
+        totalStake: 0,
+      };
+
+      // Calculate matched set P/L (back + lay combined) using NOK values
+      const backPLNok = row.backProfitLossNok
+        ? Number.parseFloat(row.backProfitLossNok)
+        : row.backCurrency === "NOK" && row.backProfitLoss
+          ? Number.parseFloat(row.backProfitLoss)
+          : 0;
+      const layPLNok = row.layProfitLossNok
+        ? Number.parseFloat(row.layProfitLossNok)
+        : row.layCurrency === "NOK" && row.layProfitLoss
+          ? Number.parseFloat(row.layProfitLoss)
+          : 0;
+
+      // Back stake for ROI calculation
+      const stakeNok = row.backStakeNok
+        ? Number.parseFloat(row.backStakeNok)
+        : row.backCurrency === "NOK" && row.backStake
+          ? Number.parseFloat(row.backStake)
+          : 0;
+
+      existing.count += 1;
+      existing.totalProfitLoss += backPLNok + layPLNok; // Full matched set profit
+      existing.totalStake += stakeNok;
+
+      accountMap.set(row.accountId, existing);
+    }
+
+    return Array.from(accountMap.values());
   } catch (_error) {
     throw new ChatSDKError(
       "bad_request:database",
@@ -3169,7 +3223,12 @@ export async function getProfitByBookmaker({
 }
 
 /**
- * Get profit/loss aggregates by exchange (lay bet account).
+ * Get matched set profit/loss aggregates by exchange.
+ * This calculates the FULL matched bet profit (back P/L + lay P/L) per exchange,
+ * which shows which exchange you've used for your most profitable matched sets.
+ *
+ * Note: This is the same matched set profit as by bookmaker, just grouped by
+ * the exchange account instead. Useful for comparing commission impact.
  */
 export async function getProfitByExchange({
   userId,
@@ -3193,31 +3252,81 @@ export async function getProfitByExchange({
       conditions.push(lte(matchedBet.createdAt, endDate));
     }
 
-    // Join with lay bet's account for exchange name
+    // Alias for lay account
     const layAccount = account;
+
+    // Fetch individual matched bets with both legs
     const rows = await db
       .select({
         accountId: layBet.accountId,
         accountName: layAccount.name,
-        count: count(matchedBet.id),
-        totalLayProfitLoss: sum(layBet.profitLoss),
-        totalLayStake: sum(layBet.stake),
+        // Back bet values
+        backProfitLoss: backBet.profitLoss,
+        backProfitLossNok: backBet.profitLossNok,
+        backCurrency: backBet.currency,
+        // Lay bet values
+        layProfitLoss: layBet.profitLoss,
+        layProfitLossNok: layBet.profitLossNok,
+        layStake: layBet.stake,
+        layStakeNok: layBet.stakeNok,
+        layCurrency: layBet.currency,
       })
       .from(matchedBet)
+      .leftJoin(backBet, eq(matchedBet.backBetId, backBet.id))
       .leftJoin(layBet, eq(matchedBet.layBetId, layBet.id))
       .leftJoin(layAccount, eq(layBet.accountId, layAccount.id))
-      .where(and(...conditions))
-      .groupBy(layBet.accountId, layAccount.name);
+      .where(and(...conditions));
 
-    return rows.map((row) => ({
-      accountId: row.accountId,
-      accountName: row.accountName ?? "Unknown Exchange",
-      count: row.count,
-      totalProfitLoss: row.totalLayProfitLoss
-        ? Number.parseFloat(row.totalLayProfitLoss)
-        : 0,
-      totalStake: row.totalLayStake ? Number.parseFloat(row.totalLayStake) : 0,
-    }));
+    // Aggregate matched set profit by exchange
+    const accountMap = new Map<
+      string,
+      {
+        accountId: string;
+        accountName: string;
+        count: number;
+        totalProfitLoss: number;
+        totalStake: number;
+      }
+    >();
+
+    for (const row of rows) {
+      if (!row.accountId) continue;
+
+      const existing = accountMap.get(row.accountId) ?? {
+        accountId: row.accountId,
+        accountName: row.accountName ?? "Unknown Exchange",
+        count: 0,
+        totalProfitLoss: 0,
+        totalStake: 0,
+      };
+
+      // Calculate matched set P/L (back + lay combined) using NOK values
+      const backPLNok = row.backProfitLossNok
+        ? Number.parseFloat(row.backProfitLossNok)
+        : row.backCurrency === "NOK" && row.backProfitLoss
+          ? Number.parseFloat(row.backProfitLoss)
+          : 0;
+      const layPLNok = row.layProfitLossNok
+        ? Number.parseFloat(row.layProfitLossNok)
+        : row.layCurrency === "NOK" && row.layProfitLoss
+          ? Number.parseFloat(row.layProfitLoss)
+          : 0;
+
+      // Lay stake for this exchange
+      const stakeNok = row.layStakeNok
+        ? Number.parseFloat(row.layStakeNok)
+        : row.layCurrency === "NOK" && row.layStake
+          ? Number.parseFloat(row.layStake)
+          : 0;
+
+      existing.count += 1;
+      existing.totalProfitLoss += backPLNok + layPLNok; // Full matched set profit
+      existing.totalStake += stakeNok;
+
+      accountMap.set(row.accountId, existing);
+    }
+
+    return Array.from(accountMap.values());
   } catch (_error) {
     throw new ChatSDKError(
       "bad_request:database",
@@ -3229,11 +3338,11 @@ export async function getProfitByExchange({
 export type BookmakerProfitWithBonuses = {
   accountId: string;
   accountName: string;
-  /** Number of settled bets */
+  /** Number of settled matched bets */
   betCount: number;
-  /** Profit/loss from betting (sum of profitLoss on back bets) */
+  /** Net profit/loss from matched sets (back P/L + lay P/L combined) */
   bettingProfit: number;
-  /** Total stake wagered */
+  /** Total back stake wagered */
   totalStake: number;
   /** Total bonus/reward transaction amounts */
   bonusTotal: number;
@@ -3245,8 +3354,9 @@ export type BookmakerProfitWithBonuses = {
 
 /**
  * Get bookmaker profit/loss including bonus/reward transactions.
- * Combines betting profit from matched bets with bonus transactions from accounts.
- * This allows users to see which bookmaker reward programs offer the best ROI.
+ * Combines FULL matched bet profit (back + lay P/L) with bonus transactions.
+ * This shows which bookmaker offers the best overall value when accounting
+ * for both the matched betting results and their bonus programs.
  * All amounts are converted to NOK for consistent aggregation.
  */
 export async function getBookmakerProfitWithBonuses({
@@ -3259,7 +3369,7 @@ export async function getBookmakerProfitWithBonuses({
   endDate?: Date | null;
 }): Promise<BookmakerProfitWithBonuses[]> {
   try {
-    // Get betting profit per bookmaker account (with currency for FX conversion)
+    // Get matched set profit per bookmaker (back + lay P/L combined)
     const bettingConditions: SQL<unknown>[] = [
       eq(matchedBet.userId, userId),
       eq(matchedBet.status, "settled"),
@@ -3272,19 +3382,25 @@ export async function getBookmakerProfitWithBonuses({
       bettingConditions.push(lte(matchedBet.createdAt, endDate));
     }
 
-    // Fetch individual bets for FX conversion instead of aggregating in SQL
+    // Fetch individual matched bets with BOTH legs for full P/L calculation
     const bettingRows = await db
       .select({
         accountId: backBet.accountId,
         accountName: account.name,
-        profitLoss: backBet.profitLoss,
-        profitLossNok: backBet.profitLossNok,
-        stake: backBet.stake,
-        stakeNok: backBet.stakeNok,
-        currency: backBet.currency,
+        // Back bet
+        backProfitLoss: backBet.profitLoss,
+        backProfitLossNok: backBet.profitLossNok,
+        backStake: backBet.stake,
+        backStakeNok: backBet.stakeNok,
+        backCurrency: backBet.currency,
+        // Lay bet (the other leg)
+        layProfitLoss: layBet.profitLoss,
+        layProfitLossNok: layBet.profitLossNok,
+        layCurrency: layBet.currency,
       })
       .from(matchedBet)
       .leftJoin(backBet, eq(matchedBet.backBetId, backBet.id))
+      .leftJoin(layBet, eq(matchedBet.layBetId, layBet.id))
       .leftJoin(account, eq(backBet.accountId, account.id))
       .where(and(...bettingConditions));
 
@@ -3326,7 +3442,7 @@ export async function getBookmakerProfitWithBonuses({
       }
     >();
 
-    // Process betting data with FX conversion
+    // Process betting data - calculate FULL matched set P/L (back + lay)
     for (const row of bettingRows) {
       if (row.accountId) {
         const existing = accountMap.get(row.accountId) ?? {
@@ -3338,20 +3454,31 @@ export async function getBookmakerProfitWithBonuses({
           bonusTotal: 0,
         };
 
-        const currency = row.currency ?? "NOK";
-        const plNok = row.profitLossNok
-          ? Number.parseFloat(row.profitLossNok)
-          : currency === "NOK" && row.profitLoss
-            ? Number.parseFloat(row.profitLoss)
+        // Back bet P/L
+        const backCurrency = row.backCurrency ?? "NOK";
+        const backPLNok = row.backProfitLossNok
+          ? Number.parseFloat(row.backProfitLossNok)
+          : backCurrency === "NOK" && row.backProfitLoss
+            ? Number.parseFloat(row.backProfitLoss)
             : 0;
-        const stakeNok = row.stakeNok
-          ? Number.parseFloat(row.stakeNok)
-          : currency === "NOK" && row.stake
-            ? Number.parseFloat(row.stake)
+
+        // Lay bet P/L (the other leg of the matched bet)
+        const layCurrency = row.layCurrency ?? "NOK";
+        const layPLNok = row.layProfitLossNok
+          ? Number.parseFloat(row.layProfitLossNok)
+          : layCurrency === "NOK" && row.layProfitLoss
+            ? Number.parseFloat(row.layProfitLoss)
+            : 0;
+
+        // Back stake for ROI
+        const stakeNok = row.backStakeNok
+          ? Number.parseFloat(row.backStakeNok)
+          : backCurrency === "NOK" && row.backStake
+            ? Number.parseFloat(row.backStake)
             : 0;
 
         existing.betCount += 1;
-        existing.bettingProfit += plNok;
+        existing.bettingProfit += backPLNok + layPLNok; // FULL matched set profit
         existing.totalStake += stakeNok;
 
         accountMap.set(row.accountId, existing);
@@ -5546,6 +5673,7 @@ export async function getAllEnabledCompetitions(): Promise<string[]> {
 /**
  * Delete an account transaction by ID.
  * Only the owner can delete transactions. Creates an audit entry.
+ * If the transaction is linked to a wallet transaction, that is also deleted.
  */
 export async function deleteAccountTransaction({
   id,
@@ -5570,6 +5698,13 @@ export async function deleteAccountTransaction({
       return null;
     }
 
+    // If there's a linked wallet transaction, delete it first
+    if (existing.linkedWalletTransactionId) {
+      await db
+        .delete(walletTransaction)
+        .where(eq(walletTransaction.id, existing.linkedWalletTransactionId));
+    }
+
     await db
       .delete(accountTransaction)
       .where(
@@ -5591,8 +5726,11 @@ export async function deleteAccountTransaction({
         type: existing.type,
         amount: existing.amount,
         currency: existing.currency,
+        linkedWalletTransactionId: existing.linkedWalletTransactionId,
       },
-      notes: `Deleted ${existing.type} transaction: ${existing.currency} ${existing.amount}`,
+      notes: existing.linkedWalletTransactionId
+        ? `Deleted ${existing.type} transaction: ${existing.currency} ${existing.amount} (and linked wallet transaction)`
+        : `Deleted ${existing.type} transaction: ${existing.currency} ${existing.amount}`,
     });
 
     return { success: true };
@@ -6378,6 +6516,7 @@ export interface CreateWalletTransactionParams {
   date: Date;
   relatedAccountId?: string | null;
   relatedWalletId?: string | null;
+  linkedAccountTransactionId?: string | null;
   externalRef?: string | null;
   notes?: string | null;
 }
@@ -6399,6 +6538,7 @@ export async function createWalletTransaction(
         date: params.date,
         relatedAccountId: params.relatedAccountId ?? null,
         relatedWalletId: params.relatedWalletId ?? null,
+        linkedAccountTransactionId: params.linkedAccountTransactionId ?? null,
         externalRef: params.externalRef ?? null,
         notes: params.notes ?? null,
         createdAt: new Date(),
@@ -6496,10 +6636,34 @@ export async function listWalletTransactionsWithDetails(walletId: string) {
 
 /**
  * Delete a wallet transaction.
+ * If the transaction is linked to an account transaction, that is also deleted.
  */
-export async function deleteWalletTransaction(id: string) {
+export async function deleteWalletTransaction(id: string, userId?: string) {
   try {
+    // First get the transaction to check for linked account transaction
+    const [existing] = await db
+      .select()
+      .from(walletTransaction)
+      .where(eq(walletTransaction.id, id));
+
+    if (!existing) {
+      return null;
+    }
+
+    // If there's a linked account transaction, delete it first
+    if (existing.linkedAccountTransactionId && userId) {
+      await db
+        .delete(accountTransaction)
+        .where(
+          and(
+            eq(accountTransaction.id, existing.linkedAccountTransactionId),
+            eq(accountTransaction.userId, userId)
+          )
+        );
+    }
+
     await db.delete(walletTransaction).where(eq(walletTransaction.id, id));
+    return { success: true };
   } catch (_error) {
     throw new ChatSDKError(
       "bad_request:database",
@@ -6511,29 +6675,36 @@ export async function deleteWalletTransaction(id: string) {
 /**
  * Create a linked transfer from wallet to betting account.
  * Creates both a WalletTransaction and an AccountTransaction.
+ * Supports cross-currency transfers with separate amounts for wallet and account.
+ * The transactions are linked so deleting one will delete the other.
  */
 export async function createTransferToAccount(params: {
   walletId: string;
   accountId: string;
-  amount: number;
-  currency: string;
+  amount: number; // Account amount
+  currency: string; // Account currency
+  walletAmount?: number; // Wallet amount (defaults to amount)
+  walletCurrency?: string; // Wallet currency (defaults to currency)
   date: Date;
   notes?: string | null;
   userId: string;
 }) {
+  const walletAmount = params.walletAmount ?? params.amount;
+  const walletCurrency = params.walletCurrency ?? params.currency;
+
   try {
-    // Create wallet transaction (outgoing)
+    // First create the wallet transaction (outgoing)
     const walletTx = await createWalletTransaction({
       walletId: params.walletId,
       type: "transfer_to_account",
-      amount: params.amount,
-      currency: params.currency,
+      amount: walletAmount,
+      currency: walletCurrency,
       date: params.date,
       relatedAccountId: params.accountId,
       notes: params.notes,
     });
 
-    // Create account transaction (incoming deposit)
+    // Create account transaction (incoming deposit) with link to wallet tx
     const accountTx = await createAccountTransaction({
       userId: params.userId,
       accountId: params.accountId,
@@ -6544,9 +6715,16 @@ export async function createTransferToAccount(params: {
       notes: params.notes
         ? `From wallet: ${params.notes}`
         : "Transfer from wallet",
+      linkedWalletTransactionId: walletTx.id,
     });
 
-    return { walletTx, accountTx };
+    // Update wallet transaction with link back to account tx
+    await db
+      .update(walletTransaction)
+      .set({ linkedAccountTransactionId: accountTx.id })
+      .where(eq(walletTransaction.id, walletTx.id));
+
+    return { walletTx: { ...walletTx, linkedAccountTransactionId: accountTx.id }, accountTx };
   } catch (_error) {
     throw new ChatSDKError(
       "bad_request:database",
@@ -6558,40 +6736,54 @@ export async function createTransferToAccount(params: {
 /**
  * Create a linked transfer from betting account to wallet.
  * Creates both an AccountTransaction and a WalletTransaction.
+ * Supports cross-currency transfers with separate amounts for wallet and account.
+ * The transactions are linked so deleting one will delete the other.
  */
 export async function createTransferFromAccount(params: {
   walletId: string;
   accountId: string;
-  amount: number;
-  currency: string;
+  amount: number; // Account amount
+  currency: string; // Account currency
+  walletAmount?: number; // Wallet amount (defaults to amount)
+  walletCurrency?: string; // Wallet currency (defaults to currency)
   date: Date;
   notes?: string | null;
   userId: string;
 }) {
+  const walletAmount = params.walletAmount ?? params.amount;
+  const walletCurrency = params.walletCurrency ?? params.currency;
+
   try {
-    // Create account transaction (outgoing withdrawal)
+    // First create the account transaction (outgoing withdrawal)
     const accountTx = await createAccountTransaction({
       userId: params.userId,
       accountId: params.accountId,
       type: "withdrawal",
-      amount: -params.amount, // Negative for withdrawal
+      amount: params.amount, // Positive - balance calculation handles sign based on type
       currency: params.currency,
       occurredAt: params.date,
       notes: params.notes ? `To wallet: ${params.notes}` : "Transfer to wallet",
     });
 
-    // Create wallet transaction (incoming)
+    // Create wallet transaction (incoming) with link to account tx
     const walletTx = await createWalletTransaction({
       walletId: params.walletId,
       type: "transfer_from_account",
-      amount: params.amount,
-      currency: params.currency,
+      amount: walletAmount,
+      currency: walletCurrency,
       date: params.date,
       relatedAccountId: params.accountId,
       notes: params.notes,
+      linkedAccountTransactionId: accountTx.id,
     });
 
-    return { walletTx, accountTx };
+    // Update account transaction with link back to wallet tx
+    await db
+      .update(accountTransaction)
+      .set({ linkedWalletTransactionId: walletTx.id })
+      .where(eq(accountTransaction.id, accountTx.id));
+
+    return { walletTx, accountTx: { ...accountTx, linkedWalletTransactionId: walletTx.id } };
   } catch (_error) {
     throw new ChatSDKError(
       "bad_request:database",
@@ -6646,6 +6838,7 @@ export async function createTransferBetweenWallets(params: {
 
 /**
  * Get total wallet balances for a user, converted to NOK.
+ * Returns zero values if wallet table doesn't exist or query fails.
  */
 export async function getWalletTotals(userId: string): Promise<{
   totalBalanceNok: number;
@@ -6679,9 +6872,13 @@ export async function getWalletTotals(userId: string): Promise<{
       walletCount: activeWallets.length,
     };
   } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to get wallet totals"
-    );
+    // Return empty data if wallet table doesn't exist yet or query fails
+    // This allows the bankroll page to work before migrations are run
+    return {
+      totalBalanceNok: 0,
+      fiatBalanceNok: 0,
+      cryptoBalanceNok: 0,
+      walletCount: 0,
+    };
   }
 }
