@@ -395,6 +395,20 @@ export type ProfitDataPoint = {
 };
 
 /**
+ * Data point for total balance chart visualization.
+ */
+export type BalanceDataPoint = {
+  /** Date string for the x-axis (ISO format date) */
+  date: string;
+  /** Display label for the date */
+  label: string;
+  /** Net balance change for this period */
+  net: number;
+  /** Cumulative balance up to and including this period */
+  cumulative: number;
+};
+
+/**
  * Calculate cumulative profit data points for chart visualization.
  * Returns data points sorted chronologically with cumulative profit.
  * All profits are normalized to NOK for consistent aggregation.
@@ -501,4 +515,29 @@ export async function calculateCumulativeProfitData(
   }
 
   return dataPoints;
+}
+
+/**
+ * Calculate cumulative balance data points for chart visualization.
+ * Balance data is derived from account transactions (already normalized to NOK).
+ */
+export function calculateCumulativeBalanceData(
+  transactions: { date: string; label: string; net: number }[]
+): BalanceDataPoint[] {
+  if (transactions.length === 0) {
+    return [];
+  }
+
+  const sorted = [...transactions].sort((a, b) => a.date.localeCompare(b.date));
+  let cumulative = 0;
+
+  return sorted.map((transaction) => {
+    cumulative += transaction.net;
+    return {
+      date: transaction.date,
+      label: transaction.label,
+      net: Math.round(transaction.net * 100) / 100,
+      cumulative: Math.round(cumulative * 100) / 100,
+    };
+  });
 }
