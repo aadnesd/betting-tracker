@@ -247,7 +247,7 @@ export async function POST(request: Request) {
           convertAmountToNok(layLiability, lay.currency ?? "NOK"),
         ]);
 
-        nextNetExposure = Number((layLiabilityNok - backProfitNok).toFixed(2));
+        nextNetExposure = Number((backProfitNok - layLiabilityNok).toFixed(2));
       }
 
       const currentExposure =

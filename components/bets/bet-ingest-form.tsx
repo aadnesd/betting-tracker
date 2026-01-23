@@ -81,7 +81,7 @@ export function BetIngestForm({ bookmakers, exchanges }: BetIngestFormProps) {
     }
     const backProfit = parsed.back.stake * (parsed.back.odds - 1);
     const layLiability = parsed.lay.stake * (parsed.lay.odds - 1);
-    return Number((layLiability - backProfit).toFixed(2));
+    return Number((backProfit - layLiability).toFixed(2));
   }, [parsed]);
 
   const handleUploadAndParse = async () => {

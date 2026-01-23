@@ -159,7 +159,7 @@ export async function POST(request: Request) {
       convertAmountToNok(layLiability, body.lay.currency),
     ]);
 
-    const netExposure = layLiabilityNok - backProfitNok;
+    const netExposure = backProfitNok - layLiabilityNok;
 
     // Create the matched bet record
     const matched = await createMatchedBetRecord({

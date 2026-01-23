@@ -91,7 +91,7 @@ export async function POST(request: Request) {
       convertAmountToNok(layLiability, layCurrency),
     ]);
 
-    const newNetExposure = layLiabilityNok - backProfitNok;
+    const newNetExposure = backProfitNok - layLiabilityNok;
 
     console.log(
       `[RECALC] backProfitNok=${backProfitNok}, layLiabilityNok=${layLiabilityNok}, newNetExposure=${newNetExposure}`
