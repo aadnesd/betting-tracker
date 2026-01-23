@@ -11,6 +11,7 @@ import {
   updateMatchedBetRecord,
   updateBackBet,
   updateLayBet,
+  processWageringProgressOnSettle,
 } from "@/lib/db/queries";
 import {
   calculateProfitLoss,
@@ -174,6 +175,20 @@ export async function POST(request: Request) {
         body.notes ??
         `Manual settlement: ${body.outcome}. P&L: ${profitLoss.toFixed(2)} ${currency}`,
     });
+
+    // Process deposit bonus wagering progress for back bets
+    // Only back bets count towards wagering (not lay bets on exchanges)
+    if (body.betKind === "back" && bet.accountId && bet.placedAt) {
+      await processWageringProgressOnSettle({
+        accountId: bet.accountId,
+        userId: session.user.id,
+        backBetId: body.betId,
+        matchedBetId: matchedBet?.id ?? null,
+        stake,
+        odds,
+        placedAt: bet.placedAt,
+      });
+    }
 
     if (matchedBet && matchedBet.status !== "settled") {
       const otherBetId =

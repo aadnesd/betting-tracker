@@ -2493,6 +2493,7 @@ export type BetReadyForSettlement = {
   backOdds: string | null;
   backStake: string | null;
   backAccountId: string | null;
+  backBetPlacedAt: Date | null;
   // Lay bet info
   layBetId: string | null;
   layOdds: string | null;
@@ -2550,6 +2551,7 @@ export async function findBetsReadyForAutoSettlement({
         backOdds: backBet.odds,
         backStake: backBet.stake,
         backAccountId: backBet.accountId,
+        backBetPlacedAt: backBet.placedAt,
         // Lay bet
         layBetId: layBet.id,
         layOdds: layBet.odds,
@@ -2610,6 +2612,7 @@ export async function findBetsReadyForAutoSettlement({
         backOdds: row.backOdds,
         backStake: row.backStake,
         backAccountId: row.backAccountId,
+        backBetPlacedAt: row.backBetPlacedAt,
         layBetId: row.layBetId,
         layOdds: row.layOdds,
         layStake: row.layStake,
@@ -7834,5 +7837,79 @@ export async function getRecentDepositsForAccount({
       "bad_request:database",
       "Failed to get recent deposits"
     );
+  }
+}
+
+/**
+ * Process wagering progress when a back bet settles.
+ * Checks all active deposit bonuses for the account and adds qualifying bets.
+ * Only counts bets placed AFTER the bonus was created.
+ *
+ * @param accountId - The account the bet was placed on
+ * @param userId - The user ID
+ * @param backBetId - The back bet ID (for standalone bets)
+ * @param matchedBetId - The matched bet ID (for matched bets)
+ * @param stake - The back bet stake amount
+ * @param odds - The back bet odds
+ * @param placedAt - When the bet was placed (to compare against bonus creation)
+ */
+export async function processWageringProgressOnSettle({
+  accountId,
+  userId,
+  backBetId,
+  matchedBetId,
+  stake,
+  odds,
+  placedAt,
+}: {
+  accountId: string;
+  userId: string;
+  backBetId?: string | null;
+  matchedBetId?: string | null;
+  stake: number;
+  odds: number;
+  placedAt: Date;
+}): Promise<{ bonusesUpdated: number; totalProgressAdded: number }> {
+  let bonusesUpdated = 0;
+  let totalProgressAdded = 0;
+
+  try {
+    // Get all active deposit bonuses for this account
+    const activeBonuses = await listActiveDepositBonusesForAccount({
+      accountId,
+      userId,
+    });
+
+    for (const bonus of activeBonuses) {
+      // Only count bets placed AFTER the bonus was created
+      if (bonus.createdAt && placedAt < bonus.createdAt) {
+        continue;
+      }
+
+      // Check if bet odds meet minimum requirement
+      const minOdds = Number.parseFloat(bonus.minOdds ?? "0");
+      const qualified = odds >= minOdds;
+
+      // Add the qualifying bet record
+      await addBonusQualifyingBet({
+        depositBonusId: bonus.id,
+        backBetId: backBetId ?? null,
+        matchedBetId: matchedBetId ?? null,
+        stake,
+        odds,
+        userId,
+      });
+
+      if (qualified) {
+        bonusesUpdated++;
+        totalProgressAdded += stake;
+      }
+    }
+
+    return { bonusesUpdated, totalProgressAdded };
+  } catch (error) {
+    // Log but don't fail settlement if wagering tracking fails
+    console.error("[processWageringProgressOnSettle] Error:", error);
+    return { bonusesUpdated: 0, totalProgressAdded: 0 };
   }
 }
