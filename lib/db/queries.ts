@@ -1749,7 +1749,7 @@ export async function listMatchedBetsForList({
     if (normalizedSearch) {
       const pattern = `%${normalizedSearch}%`;
       conditions.push(
-        sql`(LOWER(${matchedBet.market}) LIKE ${pattern} OR LOWER(${matchedBet.selection}) LIKE ${pattern})`
+        sql`(LOWER(${matchedBet.market}) LIKE ${pattern} OR LOWER(${matchedBet.selection}) LIKE ${pattern} OR LOWER(${matchedBet.exchange}) LIKE ${pattern})`
       );
     }
 
@@ -3333,6 +3333,8 @@ export async function getProfitByBookmaker({
         // Lay bet values (the other leg of the matched bet)
         layProfitLoss: layBet.profitLoss,
         layProfitLossNok: layBet.profitLossNok,
+        layStake: layBet.stake,
+        layStakeNok: layBet.stakeNok,
         layCurrency: layBet.currency,
       })
       .from(matchedBet)
@@ -3376,7 +3378,7 @@ export async function getProfitByBookmaker({
           ? Number.parseFloat(row.layProfitLoss)
           : 0;
 
-      // Back stake for ROI calculation
+      // Back stake for ROI
       const stakeNok = row.backStakeNok
         ? Number.parseFloat(row.backStakeNok)
         : row.backCurrency === "NOK" && row.backStake
@@ -3573,6 +3575,8 @@ export async function getBookmakerProfitWithBonuses({
         // Lay bet (the other leg)
         layProfitLoss: layBet.profitLoss,
         layProfitLossNok: layBet.profitLossNok,
+        layStake: layBet.stake,
+        layStakeNok: layBet.stakeNok,
         layCurrency: layBet.currency,
       })
       .from(matchedBet)
@@ -6100,6 +6104,7 @@ export async function deleteBet({
       .where(eq(screenshotUpload.id, existing.screenshotId));
 
     // Reverse settlement if needed (create adjustment to offset prior P/L)
+    // Only create reversal if there's a corresponding settlement transaction
     let reversalTransactionId: string | null = null;
     if (
       existing.status === "settled" &&
@@ -6109,17 +6114,119 @@ export async function deleteBet({
     ) {
       const profitLossValue = Number.parseFloat(existing.profitLoss.toString());
       if (!Number.isNaN(profitLossValue) && profitLossValue !== 0) {
-        const reversal = await createAccountTransaction({
-          userId,
-          accountId: existing.accountId,
-          type: "adjustment",
-          amount: -profitLossValue,
-          currency: (existing.currency ?? "NOK").toUpperCase(),
-          occurredAt: new Date(),
-          notes: `Reversal: deleted ${kind} bet ${existing.selection} @ ${existing.odds}`,
-        });
-        reversalTransactionId = reversal.id ?? null;
+        // Check if there's a matching settlement transaction that should be reversed
+        // Look for settlement transactions with matching amount and selection in notes
+        const settlementPattern = `%${existing.selection}%`;
+        const existingSettlements = await db
+          .select({ id: accountTransaction.id, notes: accountTransaction.notes })
+          .from(accountTransaction)
+          .where(
+            and(
+              eq(accountTransaction.accountId, existing.accountId),
+              eq(accountTransaction.type, "adjustment"),
+              sql`${accountTransaction.notes} LIKE ${settlementPattern}`,
+              sql`${accountTransaction.notes} LIKE 'Settlement:%' OR ${accountTransaction.notes} LIKE 'Auto-settlement:%' OR ${accountTransaction.notes} LIKE 'Manual settlement:%'`
+            )
+          );
+
+        // Check if we already created a reversal for this bet (prevent duplicates)
+        const reversalPattern = `Reversal:%${existing.selection}%`;
+        const existingReversals = await db
+          .select({ id: accountTransaction.id })
+          .from(accountTransaction)
+          .where(
+            and(
+              eq(accountTransaction.accountId, existing.accountId),
+              eq(accountTransaction.type, "adjustment"),
+              sql`${accountTransaction.notes} LIKE ${reversalPattern}`
+            )
+          );
+
+        // Only create reversal if there's a settlement AND we haven't already reversed it
+        // (more settlements than reversals means there's one to reverse)
+        if (existingSettlements.length > existingReversals.length) {
+          const reversal = await createAccountTransaction({
+            userId,
+            accountId: existing.accountId,
+            type: "adjustment",
+            amount: -profitLossValue,
+            currency: (existing.currency ?? "NOK").toUpperCase(),
+            occurredAt: new Date(),
+            notes: `Reversal: deleted ${kind} bet ${existing.selection} @ ${existing.odds}`,
+          });
+          reversalTransactionId = reversal.id ?? null;
+        }
       }
+    }
+
+    // Handle bonus qualifying bet records - update wagering progress before deleting
+    if (kind === "back") {
+      // Get all qualifying bets that reference this back bet
+      const qualifyingBets = await db
+        .select({
+          id: bonusQualifyingBet.id,
+          depositBonusId: bonusQualifyingBet.depositBonusId,
+          stake: bonusQualifyingBet.stake,
+          qualified: bonusQualifyingBet.qualified,
+        })
+        .from(bonusQualifyingBet)
+        .where(eq(bonusQualifyingBet.backBetId, id));
+
+      // Decrement wagering progress for each qualified bet
+      for (const qb of qualifyingBets) {
+        if (qb.qualified === "true") {
+          const stakeValue = Number.parseFloat(qb.stake);
+
+          // Get the deposit bonus
+          const [bonus] = await db
+            .select()
+            .from(depositBonus)
+            .where(eq(depositBonus.id, qb.depositBonusId));
+
+          if (bonus) {
+            const currentProgress = Number.parseFloat(bonus.wageringProgress ?? "0");
+            const requirement = Number.parseFloat(bonus.wageringRequirement ?? "0");
+            const newProgress = Math.max(0, currentProgress - stakeValue);
+
+            const updates: Record<string, unknown> = {
+              wageringProgress: newProgress.toString(),
+            };
+
+            // If bonus was cleared but now falls below requirement, revert to active
+            if (bonus.status === "cleared" && newProgress < requirement) {
+              updates.status = "active";
+              updates.clearedAt = null;
+            }
+
+            await db
+              .update(depositBonus)
+              .set(updates)
+              .where(eq(depositBonus.id, qb.depositBonusId));
+
+            // Create audit entry for progress update
+            await db.insert(auditLog).values({
+              createdAt: new Date(),
+              userId,
+              entityType: "deposit_bonus",
+              entityId: qb.depositBonusId,
+              action: "update",
+              changes: {
+                previousProgress: currentProgress,
+                removedStake: stakeValue,
+                newProgress,
+                reason: "qualifying_bet_deleted",
+                statusReverted: updates.status === "active" ? true : undefined,
+              },
+              notes: `Wagering progress reduced due to bet deletion: ${newProgress.toFixed(2)} / ${requirement.toFixed(2)}`,
+            });
+          }
+        }
+      }
+
+      // Now delete the qualifying bet records
+      await db
+        .delete(bonusQualifyingBet)
+        .where(eq(bonusQualifyingBet.backBetId, id));
     }
 
     // Delete the bet
@@ -6247,6 +6354,71 @@ export async function deleteMatchedBet({
 
       // Delete the qualifying bet link
       await db.delete(qualifyingBet).where(eq(qualifyingBet.id, qb.id));
+    }
+
+    // Handle bonus qualifying bets referencing this matched bet (deposit bonus progress)
+    const linkedBonusQualifyingBets = await db
+      .select({
+        id: bonusQualifyingBet.id,
+        depositBonusId: bonusQualifyingBet.depositBonusId,
+        stake: bonusQualifyingBet.stake,
+        qualified: bonusQualifyingBet.qualified,
+      })
+      .from(bonusQualifyingBet)
+      .where(eq(bonusQualifyingBet.matchedBetId, id));
+
+    // Remove bonus qualifying bet references and update deposit bonus progress
+    for (const bqb of linkedBonusQualifyingBets) {
+      if (bqb.qualified === "true") {
+        const stakeValue = Number.parseFloat(bqb.stake);
+
+        // Get the deposit bonus
+        const [bonus] = await db
+          .select()
+          .from(depositBonus)
+          .where(eq(depositBonus.id, bqb.depositBonusId));
+
+        if (bonus) {
+          const currentProgress = Number.parseFloat(bonus.wageringProgress ?? "0");
+          const requirement = Number.parseFloat(bonus.wageringRequirement ?? "0");
+          const newProgress = Math.max(0, currentProgress - stakeValue);
+
+          const updates: Record<string, unknown> = {
+            wageringProgress: newProgress.toString(),
+          };
+
+          // If bonus was cleared but now falls below requirement, revert to active
+          if (bonus.status === "cleared" && newProgress < requirement) {
+            updates.status = "active";
+            updates.clearedAt = null;
+          }
+
+          await db
+            .update(depositBonus)
+            .set(updates)
+            .where(eq(depositBonus.id, bqb.depositBonusId));
+
+          // Create audit entry for progress update
+          await db.insert(auditLog).values({
+            createdAt: new Date(),
+            userId,
+            entityType: "deposit_bonus",
+            entityId: bqb.depositBonusId,
+            action: "update",
+            changes: {
+              previousProgress: currentProgress,
+              removedStake: stakeValue,
+              newProgress,
+              reason: "matched_bet_deleted",
+              statusReverted: updates.status === "active" ? true : undefined,
+            },
+            notes: `Wagering progress reduced due to matched bet deletion: ${newProgress.toFixed(2)} / ${requirement.toFixed(2)}`,
+          });
+        }
+      }
+
+      // Delete the bonus qualifying bet link
+      await db.delete(bonusQualifyingBet).where(eq(bonusQualifyingBet.id, bqb.id));
     }
 
     if (cascade) {
