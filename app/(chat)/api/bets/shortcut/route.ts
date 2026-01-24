@@ -357,24 +357,26 @@ export async function POST(request: Request) {
 
     // 9. Resolve accounts (NO auto-creation - must use existing accounts matched by parser)
     const backExchange = parsed.back.exchange?.trim() || "Unknown";
-    const layExchange = parsed.lay.exchange?.trim() || "bfb247";
-    const backCurrency = parsed.back.currency?.toUpperCase() ?? "NOK";
-    const layCurrency = parsed.lay.currency?.toUpperCase() ?? "NOK";
+    let layExchange = parsed.lay.exchange?.trim() || "bfb247";
+    
+    // Start with parsed currencies, but will override with account currency if matched
+    let backCurrency = parsed.back.currency?.toUpperCase() ?? "NOK";
+    let layCurrency = parsed.lay.currency?.toUpperCase() ?? "NOK";
 
-    // Validate matched accounts exist and have matching currency
+    // Validate matched accounts exist - use account's currency when matched
     let backAccountId: string | null = null;
     let layAccountId: string | null = null;
 
     if (parsed.back.accountId) {
       const backAccount = await getAccountById({ id: parsed.back.accountId, userId });
       if (backAccount) {
-        // Validate currency matches
-        if (backAccount.currency && backAccount.currency.toUpperCase() !== backCurrency) {
-          reviewReasons.push(
-            `Bet currency ${backCurrency} does not match bookmaker "${backAccount.name}" account currency ${backAccount.currency}`
-          );
-        } else {
-          backAccountId = backAccount.id;
+        backAccountId = backAccount.id;
+        // Use account's currency - trust the account config over OCR
+        if (backAccount.currency) {
+          if (backAccount.currency.toUpperCase() !== backCurrency) {
+            console.log(`[shortcut] Back bet currency override: ${backCurrency} -> ${backAccount.currency} (from account)`);
+          }
+          backCurrency = backAccount.currency.toUpperCase();
         }
       } else {
         reviewReasons.push(
@@ -386,18 +388,35 @@ export async function POST(request: Request) {
     if (parsed.lay.accountId) {
       const layAccount = await getAccountById({ id: parsed.lay.accountId, userId });
       if (layAccount) {
-        // Validate currency matches
-        if (layAccount.currency && layAccount.currency.toUpperCase() !== layCurrency) {
-          reviewReasons.push(
-            `Bet currency ${layCurrency} does not match exchange "${layAccount.name}" account currency ${layAccount.currency}`
-          );
-        } else {
-          layAccountId = layAccount.id;
+        layAccountId = layAccount.id;
+        // Use account's currency - trust the account config over OCR
+        if (layAccount.currency) {
+          if (layAccount.currency.toUpperCase() !== layCurrency) {
+            console.log(`[shortcut] Lay bet currency override: ${layCurrency} -> ${layAccount.currency} (from account)`);
+          }
+          layCurrency = layAccount.currency.toUpperCase();
         }
       } else {
         reviewReasons.push(
           `Exchange account "${parsed.lay.exchange}" not found (ID: ${parsed.lay.accountId})`
         );
+      }
+    }
+
+    // Single-exchange fallback: if lay bet has no account but user has exactly one exchange, auto-assign it
+    const activeExchanges = userAccounts.filter((a) => a.kind === "exchange");
+    if (!layAccountId && activeExchanges.length === 1) {
+      const singleExchange = activeExchanges[0];
+      console.log(`[shortcut] Single-exchange fallback: auto-assigning ${singleExchange.name} (${singleExchange.id})`);
+      layAccountId = singleExchange.id;
+      layExchange = singleExchange.name;
+      if (singleExchange.currency) {
+        layCurrency = singleExchange.currency.toUpperCase();
+      }
+      // Remove any "not found" review reason for the exchange since we're auto-assigning
+      const exchangeNotFoundIdx = reviewReasons.findIndex(r => r.includes("Exchange") && r.includes("not found"));
+      if (exchangeNotFoundIdx >= 0) {
+        reviewReasons.splice(exchangeNotFoundIdx, 1);
       }
     }
 
