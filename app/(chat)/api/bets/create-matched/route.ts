@@ -98,10 +98,24 @@ async function resolveAccountId({
   exchange: string;
   kind: "bookmaker" | "exchange";
   currency?: string | null;
-}) {
+}): Promise<{ id: string | null; currencyMismatch?: string }> {
   if (accountId) {
     const existing = await getAccountById({ id: accountId, userId });
-    return existing?.id ?? null;
+    if (!existing) {
+      return { id: null };
+    }
+    // Validate currency matches if both are specified
+    if (
+      currency &&
+      existing.currency &&
+      currency.toUpperCase() !== existing.currency.toUpperCase()
+    ) {
+      return {
+        id: null,
+        currencyMismatch: `Bet currency ${currency} does not match account "${existing.name}" currency ${existing.currency}`,
+      };
+    }
+    return { id: existing.id };
   }
 
   const account = await getOrCreateAccount({
@@ -111,7 +125,7 @@ async function resolveAccountId({
     currency,
   });
 
-  return account.id;
+  return { id: account.id };
 }
 
 async function resolvePromoId({
@@ -205,7 +219,7 @@ export async function POST(request: Request) {
       (hasBack ? "NOK" : undefined);
 
     const backExchange = body.back?.exchange?.trim() || "Unknown";
-    const [backAccountId, layAccountId] = await Promise.all([
+    const [backAccountResult, layAccountResult] = await Promise.all([
       hasBack && body.back
         ? resolveAccountId({
             userId: session.user.id,
@@ -225,6 +239,23 @@ export async function POST(request: Request) {
           })
         : Promise.resolve(null),
     ]);
+
+    // Check for currency mismatches
+    if (backAccountResult?.currencyMismatch) {
+      return NextResponse.json(
+        { error: backAccountResult.currencyMismatch },
+        { status: 400 }
+      );
+    }
+    if (layAccountResult?.currencyMismatch) {
+      return NextResponse.json(
+        { error: layAccountResult.currencyMismatch },
+        { status: 400 }
+      );
+    }
+
+    const backAccountId = backAccountResult?.id ?? null;
+    const layAccountId = layAccountResult?.id ?? null;
 
     if (hasBack && body.back?.accountId && !backAccountId) {
       return NextResponse.json(

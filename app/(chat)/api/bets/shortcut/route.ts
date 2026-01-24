@@ -5,7 +5,7 @@ import { z } from "zod";
 import {
   createAuditEntry,
   createMatchedBetRecord,
-  getOrCreateAccount,
+  getAccountById,
   listAccountsByUser,
   saveBackBet,
   saveLayBet,
@@ -355,30 +355,56 @@ export async function POST(request: Request) {
       );
     }
 
-    // 9. Resolve or create accounts
+    // 9. Resolve accounts (NO auto-creation - must use existing accounts matched by parser)
     const backExchange = parsed.back.exchange?.trim() || "Unknown";
     const layExchange = parsed.lay.exchange?.trim() || "bfb247";
     const backCurrency = parsed.back.currency?.toUpperCase() ?? "NOK";
     const layCurrency = parsed.lay.currency?.toUpperCase() ?? "NOK";
 
-    const [backAccount, layAccount] = await Promise.all([
-      parsed.back.accountId
-        ? Promise.resolve({ id: parsed.back.accountId })
-        : getOrCreateAccount({
-            userId,
-            name: backExchange,
-            kind: "bookmaker",
-            currency: backCurrency,
-          }),
-      parsed.lay.accountId
-        ? Promise.resolve({ id: parsed.lay.accountId })
-        : getOrCreateAccount({
-            userId,
-            name: layExchange,
-            kind: "exchange",
-            currency: layCurrency,
-          }),
-    ]);
+    // Validate matched accounts exist and have matching currency
+    let backAccountId: string | null = null;
+    let layAccountId: string | null = null;
+
+    if (parsed.back.accountId) {
+      const backAccount = await getAccountById({ id: parsed.back.accountId, userId });
+      if (backAccount) {
+        // Validate currency matches
+        if (backAccount.currency && backAccount.currency.toUpperCase() !== backCurrency) {
+          reviewReasons.push(
+            `Bet currency ${backCurrency} does not match bookmaker "${backAccount.name}" account currency ${backAccount.currency}`
+          );
+        } else {
+          backAccountId = backAccount.id;
+        }
+      } else {
+        reviewReasons.push(
+          `Bookmaker account "${parsed.back.exchange}" not found (ID: ${parsed.back.accountId})`
+        );
+      }
+    }
+
+    if (parsed.lay.accountId) {
+      const layAccount = await getAccountById({ id: parsed.lay.accountId, userId });
+      if (layAccount) {
+        // Validate currency matches
+        if (layAccount.currency && layAccount.currency.toUpperCase() !== layCurrency) {
+          reviewReasons.push(
+            `Bet currency ${layCurrency} does not match exchange "${layAccount.name}" account currency ${layAccount.currency}`
+          );
+        } else {
+          layAccountId = layAccount.id;
+        }
+      } else {
+        reviewReasons.push(
+          `Exchange account "${parsed.lay.exchange}" not found (ID: ${parsed.lay.accountId})`
+        );
+      }
+    }
+
+    // Update needsReview if we have unresolved accounts
+    const hasAccountIssues = !backAccountId || !layAccountId;
+    const finalNeedsReview = needsReview || hasAccountIssues;
+    const finalStatus = finalNeedsReview ? "needs_review" : "matched";
 
     // 10. Save bets
     const backBet = await saveBackBet({
@@ -391,13 +417,13 @@ export async function POST(request: Request) {
       stake: parsed.back.stake,
       exchange: backExchange,
       matchId,
-      accountId: backAccount.id,
+      accountId: backAccountId,
       currency: backCurrency,
       placedAt: safeDate(parsed.back.placedAt),
       settledAt: null,
       profitLoss: null,
       confidence: parsed.back.confidence ?? null,
-      status,
+      status: finalStatus,
     });
 
     const layBet = await saveLayBet({
@@ -410,13 +436,13 @@ export async function POST(request: Request) {
       stake: parsed.lay.stake,
       exchange: layExchange,
       matchId,
-      accountId: layAccount.id,
+      accountId: layAccountId,
       currency: layCurrency,
       placedAt: safeDate(parsed.lay.placedAt),
       settledAt: null,
       profitLoss: null,
       confidence: parsed.lay.confidence ?? null,
-      status,
+      status: finalStatus,
     });
 
     // 11. Calculate net exposure
@@ -456,7 +482,7 @@ export async function POST(request: Request) {
       normalizedSelection,
       promoId: null,
       promoType: promoTypeValue,
-      status,
+      status: finalStatus,
       netExposure: Math.round(netExposure * 100) / 100,
       notes: mergedNotes || null,
     });
@@ -499,7 +525,7 @@ export async function POST(request: Request) {
         changes: {
           market: parsed.back.market,
           selection: parsed.back.selection,
-          status,
+          status: finalStatus,
           source: "shortcut",
           netExposure,
         },
@@ -511,7 +537,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       matchedBetId: matchedBet.id,
-      status,
+      status: finalStatus,
       market: parsed.back.market,
       selection: parsed.back.selection,
       back: {
@@ -529,7 +555,7 @@ export async function POST(request: Request) {
       },
       netExposure: Math.round(netExposure * 100) / 100,
       linkedMatch,
-      needsReview,
+      needsReview: finalNeedsReview,
       reviewReasons: reviewReasons.length > 0 ? reviewReasons : undefined,
       notes: notesValue,
     });

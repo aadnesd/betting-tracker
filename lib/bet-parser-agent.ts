@@ -72,10 +72,23 @@ const agentOutputSchema = z.object({
     .string()
     .nullable()
     .describe("Name of the bookmaker/exchange, or null if unknown"),
+  // Accept enum or any string and normalize it - LLM sometimes returns numeric strings
   accountConfidence: z
-    .enum(["high", "medium", "low"])
+    .union([z.enum(["high", "medium", "low"]), z.string(), z.number()])
     .nullable()
-    .describe("Confidence in account identification"),
+    .transform((val): "high" | "medium" | "low" | null => {
+      if (val === null || val === undefined) return null;
+      if (val === "high" || val === "medium" || val === "low") return val;
+      // Convert numeric confidence to enum
+      const numVal = typeof val === "number" ? val : parseFloat(String(val));
+      if (!isNaN(numVal)) {
+        if (numVal >= 0.8) return "high";
+        if (numVal >= 0.5) return "medium";
+        return "low";
+      }
+      return null;
+    })
+    .describe("Confidence in account identification: 'high', 'medium', or 'low'"),
   // Use object with specific fields instead of record to avoid schema issues
   marketConfidence: z.number().describe("Confidence 0-1 for market extraction"),
   selectionConfidence: z.number().describe("Confidence 0-1 for selection extraction"),
