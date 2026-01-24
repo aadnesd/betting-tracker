@@ -1749,7 +1749,7 @@ export async function listMatchedBetsForList({
     if (normalizedSearch) {
       const pattern = `%${normalizedSearch}%`;
       conditions.push(
-        sql`(LOWER(${matchedBet.market}) LIKE ${pattern} OR LOWER(${matchedBet.selection}) LIKE ${pattern} OR LOWER(${matchedBet.exchange}) LIKE ${pattern})`
+        sql`(LOWER(${matchedBet.market}) LIKE ${pattern} OR LOWER(${matchedBet.selection}) LIKE ${pattern})`
       );
     }
 
