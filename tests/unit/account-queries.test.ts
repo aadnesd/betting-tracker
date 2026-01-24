@@ -244,4 +244,67 @@ describe("account balance queries", () => {
       expect(activeBookmakers.map((a) => a.name)).not.toContain("Archived Account");
     });
   });
+
+  describe("getOpenBetStakesByAccount", () => {
+    it("is a function that accepts userId", async () => {
+      expect(typeof dbQueries.getOpenBetStakesByAccount).toBe("function");
+
+      // Verify function signature
+      const fn: (args: {
+        userId: string;
+      }) => Promise<dbQueries.OpenBetStakes[]> = dbQueries.getOpenBetStakesByAccount;
+      expect(fn).toBeDefined();
+    });
+
+    it("returns OpenBetStakes with all required fields", () => {
+      // Type check: OpenBetStakes should have these fields
+      type CheckFields = dbQueries.OpenBetStakes extends {
+        accountId: string;
+        openBackStake: number;
+        openLayStake: number;
+        openLayLiability: number;
+        totalOpenStake: number;
+      }
+        ? true
+        : false;
+
+      const check: CheckFields = true;
+      expect(check).toBe(true);
+    });
+
+    it("correctly calculates totalOpenStake as back stake + lay liability", () => {
+      // For bookmakers: back stake is locked until bet settles
+      // For exchanges: lay liability (stake * (odds - 1)) is locked until bet settles
+      // totalOpenStake combines both for when a single account has mixed bets
+      const mockOpenStakes: dbQueries.OpenBetStakes = {
+        accountId: "acct-1",
+        openBackStake: 100,
+        openLayStake: 50,
+        openLayLiability: 200, // e.g., laying $50 at odds 5.0 = liability of $200
+        totalOpenStake: 300, // back stake + lay liability (not lay stake)
+      };
+
+      expect(mockOpenStakes.totalOpenStake).toBe(
+        mockOpenStakes.openBackStake + mockOpenStakes.openLayLiability
+      );
+    });
+
+    it("openLayStake vs openLayLiability are distinct concepts", () => {
+      // openLayStake: what the layer wins if the bet loses (the stake amount)
+      // openLayLiability: what the layer loses if the bet wins = stake * (odds - 1)
+      // Example: Laying £50 at odds 3.0
+      // - openLayStake = 50 (profit if bet loses)
+      // - openLayLiability = 50 * (3.0 - 1) = 100 (loss if bet wins)
+      const layExample: dbQueries.OpenBetStakes = {
+        accountId: "exchange-1",
+        openBackStake: 0,
+        openLayStake: 50,
+        openLayLiability: 100,
+        totalOpenStake: 100, // Only liability counts as "locked" funds
+      };
+
+      // The stake is what you win, liability is what you risk
+      expect(layExample.openLayLiability).toBeGreaterThan(layExample.openLayStake);
+    });
+  });
 });

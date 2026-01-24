@@ -4,6 +4,7 @@ import {
   Banknote,
   Building2,
   Gift,
+  Lock,
   PiggyBank,
   RefreshCw,
   TrendingUp,
@@ -17,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   getBankrollSummary,
+  getOpenBetStakesByAccount,
   getTransactionTrends,
   getWalletTotals,
   listAccountsWithBalances,
@@ -39,9 +41,10 @@ export default async function BankrollPage() {
   const userId = session.user.id;
 
   // Fetch all data in parallel
-  const [summary, accounts, wallets, walletTotals, trends30, trends90, fxRates] = await Promise.all([
+  const [summary, accounts, openBetStakes, wallets, walletTotals, trends30, trends90, fxRates] = await Promise.all([
     getBankrollSummary({ userId }),
     listAccountsWithBalances({ userId, status: "active" }),
+    getOpenBetStakesByAccount({ userId }),
     listWalletsByUser(userId),
     getWalletTotals(userId),
     getTransactionTrends({
@@ -57,11 +60,27 @@ export default async function BankrollPage() {
     getDisplayRates(),
   ]);
 
+  // Create a map for quick lookup of open bet stakes by accountId
+  const openStakesMap = new Map(openBetStakes.map((s) => [s.accountId, s]));
+
   const bookmakers = accounts.filter((a) => a.kind === "bookmaker");
   const exchanges = accounts.filter((a) => a.kind === "exchange");
   const activeWallets = wallets.filter((w) => w.status === "active");
   const fiatWallets = activeWallets.filter((w) => w.type !== "crypto");
   const cryptoWallets = activeWallets.filter((w) => w.type === "crypto");
+
+  // Calculate total open stakes
+  // For bookmakers: open back stake is locked
+  // For exchanges: lay liability is locked
+  const totalOpenBackStake = bookmakers.reduce((sum, acc) => {
+    const stakes = openStakesMap.get(acc.id);
+    return sum + (stakes?.openBackStake || 0);
+  }, 0);
+  const totalOpenLayLiability = exchanges.reduce((sum, acc) => {
+    const stakes = openStakesMap.get(acc.id);
+    return sum + (stakes?.openLayLiability || 0);
+  }, 0);
+  const totalOpenStakes = totalOpenBackStake + totalOpenLayLiability;
 
   // Total capital now includes wallet balances
   const totalCapitalWithWallets = summary.totalCapital + walletTotals.totalBalanceNok;
@@ -138,6 +157,12 @@ export default async function BankrollPage() {
             <p className="text-muted-foreground text-xs">
               {bookmakers.length} bookmaker{bookmakers.length !== 1 ? "s" : ""}
             </p>
+            {totalOpenBackStake > 0 && (
+              <p className="mt-1 flex items-center gap-1 text-amber-600 text-xs">
+                <Lock className="h-3 w-3" />
+                {formatNOK(totalOpenBackStake)} in open bets
+              </p>
+            )}
           </CardContent>
         </Card>
 
@@ -161,6 +186,12 @@ export default async function BankrollPage() {
             <p className="text-muted-foreground text-xs">
               {exchanges.length} exchange{exchanges.length !== 1 ? "s" : ""}
             </p>
+            {totalOpenLayLiability > 0 && (
+              <p className="mt-1 flex items-center gap-1 text-amber-600 text-xs">
+                <Lock className="h-3 w-3" />
+                {formatNOK(totalOpenLayLiability)} lay liability
+              </p>
+            )}
           </CardContent>
         </Card>
 
@@ -284,30 +315,48 @@ export default async function BankrollPage() {
             ) : (
               bookmakers
                 .sort((a, b) => b.currentBalance - a.currentBalance)
-                .map((acc) => (
-                  <Link
-                    key={acc.id}
-                    href={`/bets/settings/accounts/${acc.id}`}
-                    className="flex items-center justify-between rounded-md border p-3 transition-colors hover:bg-muted/50"
-                  >
-                    <div>
-                      <p className="font-medium">{acc.name}</p>
-                      <p className="text-muted-foreground text-xs">
-                        {acc.currency} • {acc.transactionCount} transaction
-                        {acc.transactionCount !== 1 ? "s" : ""}
-                      </p>
-                    </div>
-                    <p
-                      className={`font-semibold ${
-                        acc.currentBalance >= 0
-                          ? "text-emerald-600"
-                          : "text-red-600"
-                      }`}
+                .map((acc) => {
+                  const openStakes = openStakesMap.get(acc.id);
+                  const openBackStake = openStakes?.openBackStake || 0;
+                  const availableBalance = acc.currentBalance - openBackStake;
+                  return (
+                    <Link
+                      key={acc.id}
+                      href={`/bets/settings/accounts/${acc.id}`}
+                      className="flex items-center justify-between rounded-md border p-3 transition-colors hover:bg-muted/50"
                     >
-                      {formatCurrency(acc.currentBalance, acc.currency ?? "NOK")}
-                    </p>
-                  </Link>
-                ))
+                      <div>
+                        <p className="font-medium">{acc.name}</p>
+                        <p className="text-muted-foreground text-xs">
+                          {acc.currency} • {acc.transactionCount} transaction
+                          {acc.transactionCount !== 1 ? "s" : ""}
+                        </p>
+                        {openBackStake > 0 && (
+                          <p className="mt-0.5 flex items-center gap-1 text-amber-600 text-xs">
+                            <Lock className="h-3 w-3" />
+                            {formatCurrency(openBackStake, acc.currency ?? "NOK")} in open bets
+                          </p>
+                        )}
+                      </div>
+                      <div className="text-right">
+                        <p
+                          className={`font-semibold ${
+                            availableBalance >= 0
+                              ? "text-emerald-600"
+                              : "text-red-600"
+                          }`}
+                        >
+                          {formatCurrency(availableBalance, acc.currency ?? "NOK")}
+                        </p>
+                        {openBackStake > 0 && (
+                          <p className="text-muted-foreground text-xs">
+                            of {formatCurrency(acc.currentBalance, acc.currency ?? "NOK")}
+                          </p>
+                        )}
+                      </div>
+                    </Link>
+                  );
+                })
             )}
           </CardContent>
         </Card>
@@ -334,35 +383,53 @@ export default async function BankrollPage() {
             ) : (
               exchanges
                 .sort((a, b) => b.currentBalance - a.currentBalance)
-                .map((acc) => (
-                  <Link
-                    key={acc.id}
-                    href={`/bets/settings/accounts/${acc.id}`}
-                    className="flex items-center justify-between rounded-md border p-3 transition-colors hover:bg-muted/50"
-                  >
-                    <div>
-                      <p className="font-medium">{acc.name}</p>
-                      <p className="text-muted-foreground text-xs">
-                        {acc.currency} • {acc.transactionCount} transaction
-                        {acc.transactionCount !== 1 ? "s" : ""}
-                        {acc.commission && (
-                          <span className="ml-2">
-                            {(Number(acc.commission) * 100).toFixed(1)}% comm
-                          </span>
-                        )}
-                      </p>
-                    </div>
-                    <p
-                      className={`font-semibold ${
-                        acc.currentBalance >= 0
-                          ? "text-emerald-600"
-                          : "text-red-600"
-                      }`}
+                .map((acc) => {
+                  const openStakes = openStakesMap.get(acc.id);
+                  const openLayLiability = openStakes?.openLayLiability || 0;
+                  const availableBalance = acc.currentBalance - openLayLiability;
+                  return (
+                    <Link
+                      key={acc.id}
+                      href={`/bets/settings/accounts/${acc.id}`}
+                      className="flex items-center justify-between rounded-md border p-3 transition-colors hover:bg-muted/50"
                     >
-                      {formatCurrency(acc.currentBalance, acc.currency ?? "NOK")}
-                    </p>
-                  </Link>
-                ))
+                      <div>
+                        <p className="font-medium">{acc.name}</p>
+                        <p className="text-muted-foreground text-xs">
+                          {acc.currency} • {acc.transactionCount} transaction
+                          {acc.transactionCount !== 1 ? "s" : ""}
+                          {acc.commission && (
+                            <span className="ml-2">
+                              {(Number(acc.commission) * 100).toFixed(1)}% comm
+                            </span>
+                          )}
+                        </p>
+                        {openLayLiability > 0 && (
+                          <p className="mt-0.5 flex items-center gap-1 text-amber-600 text-xs">
+                            <Lock className="h-3 w-3" />
+                            {formatCurrency(openLayLiability, acc.currency ?? "NOK")} lay liability
+                          </p>
+                        )}
+                      </div>
+                      <div className="text-right">
+                        <p
+                          className={`font-semibold ${
+                            availableBalance >= 0
+                              ? "text-emerald-600"
+                              : "text-red-600"
+                          }`}
+                        >
+                          {formatCurrency(availableBalance, acc.currency ?? "NOK")}
+                        </p>
+                        {openLayLiability > 0 && (
+                          <p className="text-muted-foreground text-xs">
+                            of {formatCurrency(acc.currentBalance, acc.currency ?? "NOK")}
+                          </p>
+                        )}
+                      </div>
+                    </Link>
+                  );
+                })
             )}
           </CardContent>
         </Card>
