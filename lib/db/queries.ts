@@ -14,6 +14,7 @@ import {
   isNull,
   lt,
   lte,
+  ne,
   or,
   sql,
   sum,
@@ -654,6 +655,120 @@ export async function getBankrollSummary({
     throw new ChatSDKError(
       "bad_request:database",
       "Failed to get bankroll summary"
+    );
+  }
+}
+
+/**
+ * Open bet stakes per account - shows funds tied up in unsettled bets.
+ */
+export interface OpenBetStakes {
+  accountId: string;
+  openBackStake: number;
+  openLayStake: number;
+  openLayLiability: number;
+  totalOpenStake: number;
+}
+
+/**
+ * Get open (unsettled) bet stakes per account.
+ * Sums stakes from back_bet and lay_bet tables where status != 'settled'.
+ * For lay bets, also calculates liability = stake * (odds - 1).
+ * Why: Shows how much capital is tied up in active positions vs available for withdrawal.
+ */
+export async function getOpenBetStakesByAccount({
+  userId,
+}: {
+  userId: string;
+}): Promise<OpenBetStakes[]> {
+  try {
+    // Query back bets that are not settled (status in draft, placed, matched, needs_review, error)
+    const backStakes = await db
+      .select({
+        accountId: backBet.accountId,
+        totalStake: sql<string>`COALESCE(SUM(${backBet.stake}::numeric), 0)`,
+      })
+      .from(backBet)
+      .where(
+        and(
+          eq(backBet.userId, userId),
+          isNotNull(backBet.accountId),
+          ne(backBet.status, "settled")
+        )
+      )
+      .groupBy(backBet.accountId);
+
+    // Query lay bets that are not settled
+    // For lay bets: stake is what you win if bet loses, liability is stake * (odds - 1)
+    const layStakes = await db
+      .select({
+        accountId: layBet.accountId,
+        totalStake: sql<string>`COALESCE(SUM(${layBet.stake}::numeric), 0)`,
+        totalLiability: sql<string>`COALESCE(SUM(${layBet.stake}::numeric * (${layBet.odds}::numeric - 1)), 0)`,
+      })
+      .from(layBet)
+      .where(
+        and(
+          eq(layBet.userId, userId),
+          isNotNull(layBet.accountId),
+          ne(layBet.status, "settled")
+        )
+      )
+      .groupBy(layBet.accountId);
+
+    // Merge results by accountId
+    const accountMap = new Map<
+      string,
+      {
+        openBackStake: number;
+        openLayStake: number;
+        openLayLiability: number;
+      }
+    >();
+
+    for (const row of backStakes) {
+      if (row.accountId) {
+        const existing = accountMap.get(row.accountId) || {
+          openBackStake: 0,
+          openLayStake: 0,
+          openLayLiability: 0,
+        };
+        existing.openBackStake = Number.parseFloat(String(row.totalStake) || "0");
+        accountMap.set(row.accountId, existing);
+      }
+    }
+
+    for (const row of layStakes) {
+      if (row.accountId) {
+        const existing = accountMap.get(row.accountId) || {
+          openBackStake: 0,
+          openLayStake: 0,
+          openLayLiability: 0,
+        };
+        existing.openLayStake = Number.parseFloat(String(row.totalStake) || "0");
+        existing.openLayLiability = Number.parseFloat(String(row.totalLiability) || "0");
+        accountMap.set(row.accountId, existing);
+      }
+    }
+
+    // Convert to array with totals
+    const results: OpenBetStakes[] = [];
+    for (const [accountId, stakes] of accountMap) {
+      results.push({
+        accountId,
+        openBackStake: stakes.openBackStake,
+        openLayStake: stakes.openLayStake,
+        openLayLiability: stakes.openLayLiability,
+        // For bookmakers: back stake is locked. For exchanges: lay liability is locked.
+        totalOpenStake: stakes.openBackStake + stakes.openLayLiability,
+      });
+    }
+
+    return results;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get open bet stakes"
     );
   }
 }
