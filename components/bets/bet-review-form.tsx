@@ -411,7 +411,7 @@ function BetFields({
           }
           placeholder="Odds"
           score={resolveConfidence(value.confidence, "odds")}
-          step="0.01"
+          step="any"
           type="number"
           value={value.odds}
         />

@@ -338,7 +338,7 @@ export function FreeBetForm({ accounts, initialData, mode }: FreeBetFormProps) {
         <Input
           id="minOdds"
           type="number"
-          step="0.01"
+          step="any"
           min="1.00"
           placeholder="e.g., 2.00"
           value={formData.minOdds}
@@ -480,7 +480,7 @@ export function FreeBetForm({ accounts, initialData, mode }: FreeBetFormProps) {
                   <Input
                     id="unlockMinOdds"
                     type="number"
-                    step="0.01"
+                    step="any"
                     min="1.00"
                     placeholder="e.g., 1.50"
                     value={formData.unlockMinOdds}

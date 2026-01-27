@@ -561,7 +561,7 @@ export function QuickAddForm({ bookmakers, exchanges, freeBets = [] }: QuickAddF
                   <Input
                     id="backOdds"
                     type="number"
-                    step="0.01"
+                    step="any"
                     min="1.01"
                     placeholder="e.g., 2.50"
                     value={formData.backOdds}
@@ -660,7 +660,7 @@ export function QuickAddForm({ bookmakers, exchanges, freeBets = [] }: QuickAddF
                   <Input
                     id="layOdds"
                     type="number"
-                    step="0.01"
+                    step="any"
                     min="1.01"
                     placeholder="e.g., 2.52"
                     value={formData.layOdds}
