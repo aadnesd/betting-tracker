@@ -177,6 +177,7 @@ export async function PATCH(request: Request) {
                 currency: fullBet.back.currency ?? "NOK",
                 occurredAt: now,
                 notes: `Settlement: ${fullBet.matched.market} - ${fullBet.matched.selection}`,
+                linkedBackBetId: fullBet.back.id,
               })
             );
           }
@@ -195,6 +196,7 @@ export async function PATCH(request: Request) {
                 currency: fullBet.lay.currency ?? "NOK",
                 occurredAt: now,
                 notes: `Settlement: ${fullBet.matched.market} - ${fullBet.matched.selection}`,
+                linkedLayBetId: fullBet.lay.id,
               })
             );
           }

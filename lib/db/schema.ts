@@ -105,6 +105,14 @@ export const accountTransaction = pgTable("AccountTransaction", {
   notes: text("notes"),
   // Link to corresponding wallet transaction (for deposit/withdrawal linked to wallet)
   linkedWalletTransactionId: uuid("linkedWalletTransactionId"),
+  // Link to originating bet (for settlement/reversal transactions)
+  // Enables cascade deletion when bet is deleted
+  linkedBackBetId: uuid("linkedBackBetId").references(() => backBet.id, {
+    onDelete: "cascade",
+  }),
+  linkedLayBetId: uuid("linkedLayBetId").references(() => layBet.id, {
+    onDelete: "cascade",
+  }),
 });
 
 export type AccountTransaction = InferSelectModel<typeof accountTransaction>;

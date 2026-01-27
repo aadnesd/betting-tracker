@@ -14,7 +14,6 @@ import {
   isNull,
   lt,
   lte,
-  ne,
   or,
   sql,
   sum,
@@ -660,120 +659,6 @@ export async function getBankrollSummary({
 }
 
 /**
- * Open bet stakes per account - shows funds tied up in unsettled bets.
- */
-export interface OpenBetStakes {
-  accountId: string;
-  openBackStake: number;
-  openLayStake: number;
-  openLayLiability: number;
-  totalOpenStake: number;
-}
-
-/**
- * Get open (unsettled) bet stakes per account.
- * Sums stakes from back_bet and lay_bet tables where status != 'settled'.
- * For lay bets, also calculates liability = stake * (odds - 1).
- * Why: Shows how much capital is tied up in active positions vs available for withdrawal.
- */
-export async function getOpenBetStakesByAccount({
-  userId,
-}: {
-  userId: string;
-}): Promise<OpenBetStakes[]> {
-  try {
-    // Query back bets that are not settled (status in draft, placed, matched, needs_review, error)
-    const backStakes = await db
-      .select({
-        accountId: backBet.accountId,
-        totalStake: sql<string>`COALESCE(SUM(${backBet.stake}::numeric), 0)`,
-      })
-      .from(backBet)
-      .where(
-        and(
-          eq(backBet.userId, userId),
-          isNotNull(backBet.accountId),
-          ne(backBet.status, "settled")
-        )
-      )
-      .groupBy(backBet.accountId);
-
-    // Query lay bets that are not settled
-    // For lay bets: stake is what you win if bet loses, liability is stake * (odds - 1)
-    const layStakes = await db
-      .select({
-        accountId: layBet.accountId,
-        totalStake: sql<string>`COALESCE(SUM(${layBet.stake}::numeric), 0)`,
-        totalLiability: sql<string>`COALESCE(SUM(${layBet.stake}::numeric * (${layBet.odds}::numeric - 1)), 0)`,
-      })
-      .from(layBet)
-      .where(
-        and(
-          eq(layBet.userId, userId),
-          isNotNull(layBet.accountId),
-          ne(layBet.status, "settled")
-        )
-      )
-      .groupBy(layBet.accountId);
-
-    // Merge results by accountId
-    const accountMap = new Map<
-      string,
-      {
-        openBackStake: number;
-        openLayStake: number;
-        openLayLiability: number;
-      }
-    >();
-
-    for (const row of backStakes) {
-      if (row.accountId) {
-        const existing = accountMap.get(row.accountId) || {
-          openBackStake: 0,
-          openLayStake: 0,
-          openLayLiability: 0,
-        };
-        existing.openBackStake = Number.parseFloat(String(row.totalStake) || "0");
-        accountMap.set(row.accountId, existing);
-      }
-    }
-
-    for (const row of layStakes) {
-      if (row.accountId) {
-        const existing = accountMap.get(row.accountId) || {
-          openBackStake: 0,
-          openLayStake: 0,
-          openLayLiability: 0,
-        };
-        existing.openLayStake = Number.parseFloat(String(row.totalStake) || "0");
-        existing.openLayLiability = Number.parseFloat(String(row.totalLiability) || "0");
-        accountMap.set(row.accountId, existing);
-      }
-    }
-
-    // Convert to array with totals
-    const results: OpenBetStakes[] = [];
-    for (const [accountId, stakes] of accountMap) {
-      results.push({
-        accountId,
-        openBackStake: stakes.openBackStake,
-        openLayStake: stakes.openLayStake,
-        openLayLiability: stakes.openLayLiability,
-        // For bookmakers: back stake is locked. For exchanges: lay liability is locked.
-        totalOpenStake: stakes.openBackStake + stakes.openLayLiability,
-      });
-    }
-
-    return results;
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to get open bet stakes"
-    );
-  }
-}
-
-/**
  * Transaction trend data point for charts.
  */
 export interface TransactionTrendPoint {
@@ -1158,6 +1043,8 @@ export async function createAccountTransaction({
   occurredAt,
   notes,
   linkedWalletTransactionId,
+  linkedBackBetId,
+  linkedLayBetId,
 }: {
   userId: string;
   accountId: string;
@@ -1167,6 +1054,8 @@ export async function createAccountTransaction({
   occurredAt?: Date | null;
   notes?: string | null;
   linkedWalletTransactionId?: string | null;
+  linkedBackBetId?: string | null;
+  linkedLayBetId?: string | null;
 }) {
   try {
     // Pre-compute NOK equivalent at write time to avoid FX API calls on read
@@ -1184,6 +1073,8 @@ export async function createAccountTransaction({
       occurredAt: occurredAt ?? new Date(),
       notes: notes ?? null,
       linkedWalletTransactionId: linkedWalletTransactionId ?? null,
+      linkedBackBetId: linkedBackBetId ?? null,
+      linkedLayBetId: linkedLayBetId ?? null,
     };
 
     const [row] = await db
@@ -1864,7 +1755,7 @@ export async function listMatchedBetsForList({
     if (normalizedSearch) {
       const pattern = `%${normalizedSearch}%`;
       conditions.push(
-        sql`(LOWER(${matchedBet.market}) LIKE ${pattern} OR LOWER(${matchedBet.selection}) LIKE ${pattern})`
+        sql`(LOWER(${matchedBet.market}) LIKE ${pattern} OR LOWER(${matchedBet.selection}) LIKE ${pattern} OR LOWER(${matchedBet.exchange}) LIKE ${pattern})`
       );
     }
 
@@ -2885,6 +2776,7 @@ export async function applyAutoSettlement(
           currency: params.backCurrency ?? "NOK",
           occurredAt: now,
           notes: `Auto-settlement: ${params.market} - ${params.selection} (${params.matchResult})`,
+          linkedBackBetId: params.backBetId,
         });
         transactionsCreated++;
       }
@@ -2913,6 +2805,7 @@ export async function applyAutoSettlement(
           currency: params.layCurrency ?? "NOK",
           occurredAt: now,
           notes: `Auto-settlement: ${params.market} - ${params.selection} (${params.matchResult})`,
+          linkedLayBetId: params.layBetId,
         });
         transactionsCreated++;
       }
@@ -6218,60 +6111,22 @@ export async function deleteBet({
       .from(screenshotUpload)
       .where(eq(screenshotUpload.id, existing.screenshotId));
 
-    // Reverse settlement if needed (create adjustment to offset prior P/L)
-    // Only create reversal if there's a corresponding settlement transaction
-    let reversalTransactionId: string | null = null;
-    if (
-      existing.status === "settled" &&
-      existing.accountId &&
-      existing.profitLoss !== null &&
-      existing.profitLoss !== undefined
-    ) {
-      const profitLossValue = Number.parseFloat(existing.profitLoss.toString());
-      if (!Number.isNaN(profitLossValue) && profitLossValue !== 0) {
-        // Check if there's a matching settlement transaction that should be reversed
-        // Look for settlement transactions with matching amount and selection in notes
-        const settlementPattern = `%${existing.selection}%`;
-        const existingSettlements = await db
-          .select({ id: accountTransaction.id, notes: accountTransaction.notes })
-          .from(accountTransaction)
-          .where(
-            and(
-              eq(accountTransaction.accountId, existing.accountId),
-              eq(accountTransaction.type, "adjustment"),
-              sql`${accountTransaction.notes} LIKE ${settlementPattern}`,
-              sql`${accountTransaction.notes} LIKE 'Settlement:%' OR ${accountTransaction.notes} LIKE 'Auto-settlement:%' OR ${accountTransaction.notes} LIKE 'Manual settlement:%'`
-            )
-          );
-
-        // Check if we already created a reversal for this bet (prevent duplicates)
-        const reversalPattern = `Reversal:%${existing.selection}%`;
-        const existingReversals = await db
-          .select({ id: accountTransaction.id })
-          .from(accountTransaction)
-          .where(
-            and(
-              eq(accountTransaction.accountId, existing.accountId),
-              eq(accountTransaction.type, "adjustment"),
-              sql`${accountTransaction.notes} LIKE ${reversalPattern}`
-            )
-          );
-
-        // Only create reversal if there's a settlement AND we haven't already reversed it
-        // (more settlements than reversals means there's one to reverse)
-        if (existingSettlements.length > existingReversals.length) {
-          const reversal = await createAccountTransaction({
-            userId,
-            accountId: existing.accountId,
-            type: "adjustment",
-            amount: -profitLossValue,
-            currency: (existing.currency ?? "NOK").toUpperCase(),
-            occurredAt: new Date(),
-            notes: `Reversal: deleted ${kind} bet ${existing.selection} @ ${existing.odds}`,
-          });
-          reversalTransactionId = reversal.id ?? null;
-        }
-      }
+    // Note: Linked account transactions (settlement) will be automatically deleted
+    // via cascade delete on the linkedBackBetId/linkedLayBetId foreign keys.
+    // For legacy transactions created before this linking was added, we explicitly
+    // delete any transactions that reference this bet by matching selection in notes.
+    if (existing.accountId && existing.status === "settled") {
+      const betIdentifier = `${existing.selection} @ ${existing.odds}`;
+      // Delete legacy settlement/reversal transactions that mention this bet
+      await db
+        .delete(accountTransaction)
+        .where(
+          and(
+            eq(accountTransaction.accountId, existing.accountId),
+            eq(accountTransaction.type, "adjustment"),
+            sql`${accountTransaction.notes} LIKE ${"%" + betIdentifier + "%"}`
+          )
+        );
     }
 
     // Handle bonus qualifying bet records - update wagering progress before deleting
@@ -6383,7 +6238,7 @@ export async function deleteBet({
         stake: existing.stake,
         status: existing.status,
         profitLoss: existing.profitLoss ?? null,
-        reversalTransactionId,
+        linkedTransactionsDeleted: existing.status === "settled",
       },
       notes: `Deleted ${kind} bet: ${existing.selection} @ ${existing.odds}`,
     });
