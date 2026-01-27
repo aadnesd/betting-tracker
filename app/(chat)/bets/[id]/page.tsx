@@ -1,5 +1,5 @@
 import { format } from "date-fns";
-import { CalendarDays, Trophy } from "lucide-react";
+import { CalendarDays, Trophy, TrendingUp, TrendingDown, Gift } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -14,6 +14,8 @@ import {
   getMatchedBetWithParts,
   listAuditEntriesByEntity,
 } from "@/lib/db/queries";
+import { computeMatchedBetOutcomes } from "@/lib/bet-calculations";
+import { convertAmountToNok } from "@/lib/fx-rates";
 import type { BackBet, FootballMatch, LayBet, ScreenshotUpload } from "@/lib/db/schema";
 
 export const metadata = {
@@ -51,6 +53,64 @@ export default async function Page({ params }: PageProps) {
 
   // Detect mismatches
   const mismatches = detectMismatches(back, lay);
+
+  // Calculate bet outcomes for display
+  const isFreeBet = matched.promoType
+    ? /free[\s_-]?bet/i.test(matched.promoType)
+    : false;
+
+  let betOutcomes: {
+    profitIfWins: number;
+    profitIfLoses: number;
+    guaranteedProfit: number;
+    isFreeBet: boolean;
+  } | null = null;
+
+  if (back && lay) {
+    const backStake = Number.parseFloat(back.stake);
+    const backOdds = Number.parseFloat(back.odds);
+    const layStake = Number.parseFloat(lay.stake);
+    const layOdds = Number.parseFloat(lay.odds);
+    const backCurrency = (back.currency ?? "NOK").toUpperCase();
+    const layCurrency = (lay.currency ?? "NOK").toUpperCase();
+
+    if (!Number.isNaN(backStake) && !Number.isNaN(backOdds) && !Number.isNaN(layStake) && !Number.isNaN(layOdds)) {
+      const outcomes = computeMatchedBetOutcomes({
+        backStake,
+        backOdds,
+        layStake,
+        layOdds,
+        isFreeBet,
+      });
+
+      // Convert to NOK for consistent display
+      const [profitIfWinsNok, profitIfLosesNok] = await Promise.all([
+        // profitIfWins = backProfit - layLiability
+        // backProfit is in back currency, layLiability is in lay currency
+        (async () => {
+          const backProfitNok = await convertAmountToNok(outcomes.backProfit, backCurrency);
+          const layLiabilityNok = await convertAmountToNok(outcomes.layLiability, layCurrency);
+          return backProfitNok - layLiabilityNok;
+        })(),
+        // profitIfLoses = layStake (for free bet) or layStake - backStake
+        (async () => {
+          const layStakeNok = await convertAmountToNok(layStake, layCurrency);
+          if (isFreeBet) {
+            return layStakeNok; // No back stake lost
+          }
+          const backStakeNok = await convertAmountToNok(backStake, backCurrency);
+          return layStakeNok - backStakeNok;
+        })(),
+      ]);
+
+      betOutcomes = {
+        profitIfWins: profitIfWinsNok,
+        profitIfLoses: profitIfLosesNok,
+        guaranteedProfit: Math.min(profitIfWinsNok, profitIfLosesNok),
+        isFreeBet,
+      };
+    }
+  }
 
   return (
     <div className="space-y-6 p-4 md:p-8">
@@ -94,7 +154,38 @@ export default async function Page({ params }: PageProps) {
 
       {/* Summary row */}
       <div className="flex flex-wrap gap-4">
-        {matched.netExposure && (
+        {/* Show both outcomes for free bets, otherwise just net exposure */}
+        {betOutcomes && betOutcomes.isFreeBet ? (
+          <>
+            <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3">
+              <p className="flex items-center gap-1 text-muted-foreground text-xs uppercase tracking-wide">
+                <Gift className="h-3 w-3 text-green-600" />
+                Guaranteed profit
+              </p>
+              <p className="font-semibold text-green-700 text-lg">
+                NOK {betOutcomes.guaranteedProfit.toFixed(2)}
+              </p>
+            </div>
+            <div className="rounded-lg border bg-muted/50 px-4 py-3">
+              <p className="flex items-center gap-1 text-muted-foreground text-xs uppercase tracking-wide">
+                <TrendingUp className="h-3 w-3" />
+                If selection wins
+              </p>
+              <p className={`font-semibold text-lg ${betOutcomes.profitIfWins >= 0 ? "text-green-600" : "text-red-600"}`}>
+                NOK {betOutcomes.profitIfWins.toFixed(2)}
+              </p>
+            </div>
+            <div className="rounded-lg border bg-muted/50 px-4 py-3">
+              <p className="flex items-center gap-1 text-muted-foreground text-xs uppercase tracking-wide">
+                <TrendingDown className="h-3 w-3" />
+                If selection loses
+              </p>
+              <p className={`font-semibold text-lg ${betOutcomes.profitIfLoses >= 0 ? "text-green-600" : "text-red-600"}`}>
+                NOK {betOutcomes.profitIfLoses.toFixed(2)}
+              </p>
+            </div>
+          </>
+        ) : matched.netExposure && (
           <div className="rounded-lg border bg-muted/50 px-4 py-3">
             <p className="text-muted-foreground text-xs uppercase tracking-wide">
               <ValueWithTooltip type="netExposure" side="right">

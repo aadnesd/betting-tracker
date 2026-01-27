@@ -187,7 +187,10 @@ function PendingBetRow({ bet }: { bet: PendingSettlementBet }) {
         </div>
         <div className="flex items-center gap-3">
           {bet.netExposure && (
-            <span className="font-medium text-amber-600 text-sm">
+            <span className={cn(
+              "font-medium text-sm",
+              Number(bet.netExposure) >= 0 ? "text-green-600" : "text-amber-600"
+            )}>
               {formatNOK(Number(bet.netExposure))}
             </span>
           )}

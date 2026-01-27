@@ -261,6 +261,7 @@ describe("account balance queries", () => {
       type CheckFields = dbQueries.OpenBetStakes extends {
         accountId: string;
         openBackStake: number;
+        openFreeBetStake: number;
         openLayStake: number;
         openLayLiability: number;
         totalOpenStake: number;
@@ -272,20 +273,26 @@ describe("account balance queries", () => {
       expect(check).toBe(true);
     });
 
-    it("correctly calculates totalOpenStake as back stake + lay liability", () => {
+    it("correctly calculates totalOpenStake as back stake + lay liability (excluding free bets)", () => {
       // For bookmakers: back stake is locked until bet settles
       // For exchanges: lay liability (stake * (odds - 1)) is locked until bet settles
-      // totalOpenStake combines both for when a single account has mixed bets
+      // Free bet stakes are NOT included since they don't lock real money
+      // totalOpenStake combines real money stakes only
       const mockOpenStakes: dbQueries.OpenBetStakes = {
         accountId: "acct-1",
         openBackStake: 100,
+        openFreeBetStake: 50, // Free bet - not locked
         openLayStake: 50,
         openLayLiability: 200, // e.g., laying $50 at odds 5.0 = liability of $200
-        totalOpenStake: 300, // back stake + lay liability (not lay stake)
+        totalOpenStake: 300, // back stake + lay liability (not lay stake, not free bet)
       };
 
       expect(mockOpenStakes.totalOpenStake).toBe(
         mockOpenStakes.openBackStake + mockOpenStakes.openLayLiability
+      );
+      // Verify free bet is excluded from total
+      expect(mockOpenStakes.totalOpenStake).not.toBe(
+        mockOpenStakes.openBackStake + mockOpenStakes.openFreeBetStake + mockOpenStakes.openLayLiability
       );
     });
 
@@ -298,6 +305,7 @@ describe("account balance queries", () => {
       const layExample: dbQueries.OpenBetStakes = {
         accountId: "exchange-1",
         openBackStake: 0,
+        openFreeBetStake: 0,
         openLayStake: 50,
         openLayLiability: 100,
         totalOpenStake: 100, // Only liability counts as "locked" funds

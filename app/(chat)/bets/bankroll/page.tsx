@@ -7,6 +7,7 @@ import {
   Lock,
   PiggyBank,
   RefreshCw,
+  Ticket,
   TrendingUp,
   Wallet,
 } from "lucide-react";
@@ -318,6 +319,7 @@ export default async function BankrollPage() {
                 .map((acc) => {
                   const openStakes = openStakesMap.get(acc.id);
                   const openBackStake = openStakes?.openBackStake || 0;
+                  const openFreeBetStake = openStakes?.openFreeBetStake || 0;
                   const availableBalance = acc.currentBalance - openBackStake;
                   return (
                     <Link
@@ -335,6 +337,12 @@ export default async function BankrollPage() {
                           <p className="mt-0.5 flex items-center gap-1 text-amber-600 text-xs">
                             <Lock className="h-3 w-3" />
                             {formatCurrency(openBackStake, acc.currency ?? "NOK")} in open bets
+                          </p>
+                        )}
+                        {openFreeBetStake > 0 && (
+                          <p className="mt-0.5 flex items-center gap-1 text-blue-600 text-xs">
+                            <Ticket className="h-3 w-3" />
+                            {formatCurrency(openFreeBetStake, acc.currency ?? "NOK")} in free bets
                           </p>
                         )}
                       </div>

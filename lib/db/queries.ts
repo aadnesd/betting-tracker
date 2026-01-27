@@ -661,12 +661,18 @@ export async function getBankrollSummary({
 
 /**
  * Open bet stakes per account - shows funds tied up in unsettled bets.
+ * Note: openBackStake excludes free bet stakes since they don't lock real money.
+ * openFreeBetStake tracks free bet stakes separately for informational purposes.
  */
 export interface OpenBetStakes {
   accountId: string;
+  /** Real money stakes locked in open back bets (excludes free bets) */
   openBackStake: number;
+  /** Free bet stakes in open bets (not locked, for display purposes) */
+  openFreeBetStake: number;
   openLayStake: number;
   openLayLiability: number;
+  /** Total locked stake = openBackStake + openLayLiability (excludes free bets) */
   totalOpenStake: number;
 }
 
@@ -675,6 +681,9 @@ export interface OpenBetStakes {
  * Sums stakes from back_bet and lay_bet tables where status != 'settled'.
  * For lay bets, also calculates liability = stake * (odds - 1).
  * Why: Shows how much capital is tied up in active positions vs available for withdrawal.
+ * 
+ * Note: Free bet stakes are EXCLUDED from openBackStake since they don't lock real money.
+ * A back bet is considered a free bet if its linked matchedBet has a free bet promo type.
  */
 export async function getOpenBetStakesByAccount({
   userId,
@@ -682,13 +691,36 @@ export async function getOpenBetStakesByAccount({
   userId: string;
 }): Promise<OpenBetStakes[]> {
   try {
-    // Query back bets that are not settled (status in draft, placed, matched, needs_review, error)
+    // Query back bets that are not settled, excluding free bet stakes.
+    // Free bets don't lock real money from the account balance.
+    // We LEFT JOIN with matchedBet to check if promoType indicates a free bet.
     const backStakes = await db
       .select({
         accountId: backBet.accountId,
-        totalStake: sql<string>`COALESCE(SUM(${backBet.stake}::numeric), 0)`,
+        // Only sum stakes where the matched bet is NOT a free bet
+        totalStake: sql<string>`COALESCE(SUM(
+          CASE WHEN (
+            ${matchedBet.promoType} IS NULL OR
+            NOT (
+              LOWER(${matchedBet.promoType}) LIKE '%free bet%' OR
+              LOWER(${matchedBet.promoType}) LIKE '%freebet%' OR
+              LOWER(${matchedBet.promoType}) LIKE '%free_bet%'
+            )
+          ) THEN ${backBet.stake}::numeric ELSE 0 END
+        ), 0)`,
+        // Sum free bet stakes separately for informational display
+        freeBetStake: sql<string>`COALESCE(SUM(
+          CASE WHEN (
+            ${matchedBet.promoType} IS NOT NULL AND (
+              LOWER(${matchedBet.promoType}) LIKE '%free bet%' OR
+              LOWER(${matchedBet.promoType}) LIKE '%freebet%' OR
+              LOWER(${matchedBet.promoType}) LIKE '%free_bet%'
+            )
+          ) THEN ${backBet.stake}::numeric ELSE 0 END
+        ), 0)`,
       })
       .from(backBet)
+      .leftJoin(matchedBet, eq(matchedBet.backBetId, backBet.id))
       .where(
         and(
           eq(backBet.userId, userId),
@@ -721,6 +753,7 @@ export async function getOpenBetStakesByAccount({
       string,
       {
         openBackStake: number;
+        openFreeBetStake: number;
         openLayStake: number;
         openLayLiability: number;
       }
@@ -730,10 +763,12 @@ export async function getOpenBetStakesByAccount({
       if (row.accountId) {
         const existing = accountMap.get(row.accountId) || {
           openBackStake: 0,
+          openFreeBetStake: 0,
           openLayStake: 0,
           openLayLiability: 0,
         };
         existing.openBackStake = Number.parseFloat(String(row.totalStake) || "0");
+        existing.openFreeBetStake = Number.parseFloat(String(row.freeBetStake) || "0");
         accountMap.set(row.accountId, existing);
       }
     }
@@ -742,6 +777,7 @@ export async function getOpenBetStakesByAccount({
       if (row.accountId) {
         const existing = accountMap.get(row.accountId) || {
           openBackStake: 0,
+          openFreeBetStake: 0,
           openLayStake: 0,
           openLayLiability: 0,
         };
@@ -757,9 +793,11 @@ export async function getOpenBetStakesByAccount({
       results.push({
         accountId,
         openBackStake: stakes.openBackStake,
+        openFreeBetStake: stakes.openFreeBetStake,
         openLayStake: stakes.openLayStake,
         openLayLiability: stakes.openLayLiability,
         // For bookmakers: back stake is locked. For exchanges: lay liability is locked.
+        // Free bet stakes are NOT included in totalOpenStake since they don't lock real money.
         totalOpenStake: stakes.openBackStake + stakes.openLayLiability,
       });
     }

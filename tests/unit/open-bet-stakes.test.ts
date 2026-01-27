@@ -4,6 +4,9 @@
  * Why: Validates that getOpenBetStakesByAccount correctly aggregates
  * stakes from unsettled back/lay bets per account, enabling the bankroll
  * page to show available balance vs funds tied up in open positions.
+ * 
+ * Free bet stakes are tracked separately in openFreeBetStake since they
+ * don't lock real money from the account balance.
  */
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
@@ -29,6 +32,7 @@ vi.mock("drizzle-orm/postgres-js", () => ({
             orderBy: vi.fn(() => ({
               limit: vi.fn().mockResolvedValue([]),
             })),
+            groupBy: vi.fn().mockResolvedValue([]),
           })),
         })),
       })),
@@ -74,6 +78,7 @@ describe("open bet stakes queries", () => {
       const stakes: dbQueries.OpenBetStakes = {
         accountId: "test-account-id",
         openBackStake: 0,
+        openFreeBetStake: 0,
         openLayStake: 0,
         openLayLiability: 0,
         totalOpenStake: 0,
@@ -85,6 +90,7 @@ describe("open bet stakes queries", () => {
       const stakes: dbQueries.OpenBetStakes = {
         accountId: "bookmaker-1",
         openBackStake: 265.0,
+        openFreeBetStake: 0,
         openLayStake: 0,
         openLayLiability: 0,
         totalOpenStake: 265.0,
@@ -93,12 +99,31 @@ describe("open bet stakes queries", () => {
       expect(stakes.totalOpenStake).toBeGreaterThan(0);
     });
 
+    it("should have openFreeBetStake field for free bet positions", () => {
+      // Free bet stakes don't lock real money
+      const stakes: dbQueries.OpenBetStakes = {
+        accountId: "bookmaker-1",
+        openBackStake: 100.0, // Real money locked
+        openFreeBetStake: 50.0, // Free bet - not locked
+        openLayStake: 0,
+        openLayLiability: 0,
+        totalOpenStake: 100.0, // Only includes real money stakes
+      };
+      expect(stakes.openFreeBetStake).toBe(50.0);
+      // totalOpenStake should NOT include free bet stakes
+      expect(stakes.totalOpenStake).toBe(100.0);
+      expect(stakes.totalOpenStake).not.toBe(
+        stakes.openBackStake + stakes.openFreeBetStake
+      );
+    });
+
     it("should have openLayStake and openLayLiability for exchange positions", () => {
       // Lay stake is what you win if the bet loses
       // Lay liability is stake * (odds - 1) - what you pay if the bet wins
       const stakes: dbQueries.OpenBetStakes = {
         accountId: "exchange-1",
         openBackStake: 0,
+        openFreeBetStake: 0,
         openLayStake: 50.0, // Stake you placed
         openLayLiability: 150.0, // 50 * (4.0 - 1) = liability at odds of 4.0
         totalOpenStake: 150.0, // For exchanges, liability is what's locked
@@ -108,19 +133,24 @@ describe("open bet stakes queries", () => {
       expect(stakes.totalOpenStake).toBe(150.0);
     });
 
-    it("should calculate totalOpenStake as backStake + layLiability", () => {
+    it("should calculate totalOpenStake as backStake + layLiability (excluding free bets)", () => {
       // For accounts with both back and lay bets (unusual but possible)
       const stakes: dbQueries.OpenBetStakes = {
         accountId: "hybrid-1",
         openBackStake: 100.0,
+        openFreeBetStake: 25.0, // Free bet stake is not included in total
         openLayStake: 50.0,
         openLayLiability: 100.0,
         // Back stake is locked at bookmaker, lay liability is locked at exchange
-        // But typically an account is either bookmaker or exchange, not both
+        // Free bet stakes are NOT included since they don't lock real money
         totalOpenStake: 200.0,
       };
       expect(stakes.totalOpenStake).toBe(
         stakes.openBackStake + stakes.openLayLiability
+      );
+      // Verify free bet is excluded
+      expect(stakes.totalOpenStake).not.toBe(
+        stakes.openBackStake + stakes.openFreeBetStake + stakes.openLayLiability
       );
     });
   });
@@ -132,6 +162,16 @@ describe("open bet stakes queries", () => {
       const openBackStake = 265.0;
       const availableBalance = accountBalance - openBackStake;
       expect(availableBalance).toBe(86.0);
+    });
+
+    it("should not subtract free bet stakes from available balance", () => {
+      // Free bets are house money, so they shouldn't reduce available balance
+      const accountBalance = 150.0;
+      const openBackStake = 50.0; // Real money locked
+      const openFreeBetStake = 100.0; // Free bet - not locked
+      const availableBalance = accountBalance - openBackStake;
+      // Should be 100, not 0 (if we incorrectly subtracted free bet)
+      expect(availableBalance).toBe(100.0);
     });
 
     it("should handle exchange lay liability", () => {
