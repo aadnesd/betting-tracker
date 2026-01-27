@@ -12,7 +12,7 @@
 
 3. When you discover a bug, gap, or mismatch between specs and code, immediately update `fix_plan.md` with your findings using a subagent. When resolved, update `fix_plan.md` and remove the item using a subagent.
 
-4. When the tests pass, update `fix_plan.md`, then add changed code and `fix_plan.md` with `git add -A`, then `git commit` with a message that describes the changes. After the commit do a `git push`.
+4. When the tests pass,run `pnpm run build` to verify build passes, update `fix_plan.md`, then add changed code and `fix_plan.md` with `git add -A`, then `git commit` with a message that describes the changes. After the commit do a `git push`.
 
 999. Important: When authoring documentation, capture the “why” and the importance of any tests and backing implementation.
 
