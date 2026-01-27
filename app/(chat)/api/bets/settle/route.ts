@@ -156,6 +156,8 @@ export async function POST(request: Request) {
         currency,
         occurredAt: now,
         notes: `Settlement: ${body.outcome} - ${bet.market} / ${bet.selection} @ ${odds}`,
+        linkedBackBetId: body.betKind === "back" ? body.betId : null,
+        linkedLayBetId: body.betKind === "lay" ? body.betId : null,
       });
     }
 
