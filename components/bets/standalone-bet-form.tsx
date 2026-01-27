@@ -404,7 +404,7 @@ export function StandaloneBetForm({
                   <Input
                     id="odds"
                     type="number"
-                    step="0.01"
+                    step="any"
                     min="1.01"
                     placeholder="e.g., 2.50"
                     value={formData.odds}
