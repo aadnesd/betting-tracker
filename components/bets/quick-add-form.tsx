@@ -66,6 +66,7 @@ interface FormData {
   market: string;
   selection: string;
   matchId: string;
+  normalizedSelection: "HOME_TEAM" | "AWAY_TEAM" | "DRAW" | "";
   promoType: string;
   freeBetId: string;
   backOdds: string;
@@ -77,6 +78,12 @@ interface FormData {
   layExchange: string;
   layCurrency: string;
   notes: string;
+}
+
+interface SelectedMatchInfo {
+  id: string;
+  homeTeam: string;
+  awayTeam: string;
 }
 
 export function QuickAddForm({ bookmakers, exchanges, freeBets = [] }: QuickAddFormProps) {
@@ -96,6 +103,7 @@ export function QuickAddForm({ bookmakers, exchanges, freeBets = [] }: QuickAddF
     market: "",
     selection: "",
     matchId: "",
+    normalizedSelection: "",
     promoType: "",
     freeBetId: "",
     backOdds: "",
@@ -112,6 +120,7 @@ export function QuickAddForm({ bookmakers, exchanges, freeBets = [] }: QuickAddF
   const [errors, setErrors] = useState<Partial<Record<keyof FormData, string>>>(
     {}
   );
+  const [selectedMatchInfo, setSelectedMatchInfo] = useState<SelectedMatchInfo | null>(null);
 
   const updateField = (field: keyof FormData, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -184,13 +193,35 @@ export function QuickAddForm({ bookmakers, exchanges, freeBets = [] }: QuickAddF
     }
   };
 
-  // When match is selected, auto-fill the market field
+  // When match is selected, auto-fill the market field and store team info
   const handleMatchChange = (match: MatchOption | null) => {
     if (match) {
       updateField("matchId", match.id);
       updateField("market", match.label);
+      setSelectedMatchInfo({
+        id: match.id,
+        homeTeam: match.homeTeam,
+        awayTeam: match.awayTeam,
+      });
     } else {
       updateField("matchId", "");
+      updateField("normalizedSelection", "");
+      updateField("selection", "");
+      setSelectedMatchInfo(null);
+    }
+  };
+
+  // When normalized selection is picked, update the selection text too
+  const handleNormalizedSelectionChange = (value: "HOME_TEAM" | "AWAY_TEAM" | "DRAW") => {
+    updateField("normalizedSelection", value);
+    if (selectedMatchInfo) {
+      if (value === "HOME_TEAM") {
+        updateField("selection", `${selectedMatchInfo.homeTeam} to Win`);
+      } else if (value === "AWAY_TEAM") {
+        updateField("selection", `${selectedMatchInfo.awayTeam} to Win`);
+      } else {
+        updateField("selection", "Draw");
+      }
     }
   };
 
@@ -266,6 +297,7 @@ export function QuickAddForm({ bookmakers, exchanges, freeBets = [] }: QuickAddF
           market: formData.market.trim(),
           selection: formData.selection.trim(),
           matchId: formData.matchId || undefined,
+          normalizedSelection: formData.normalizedSelection || undefined,
           promoType: formData.promoType || undefined,
           freeBetId: formData.freeBetId || undefined,
           back: {
@@ -372,6 +404,45 @@ export function QuickAddForm({ bookmakers, exchanges, freeBets = [] }: QuickAddF
                   Linking to a match enables automatic result lookup
                 </p>
               </div>
+
+              {/* Normalized Selection - shown when match is linked */}
+              {selectedMatchInfo && (
+                <div className="space-y-2">
+                  <Label>Match Odds Selection (for auto-settle)</Label>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant={formData.normalizedSelection === "HOME_TEAM" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => handleNormalizedSelectionChange("HOME_TEAM")}
+                      className="flex-1 min-w-[100px]"
+                    >
+                      {selectedMatchInfo.homeTeam}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={formData.normalizedSelection === "DRAW" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => handleNormalizedSelectionChange("DRAW")}
+                      className="flex-1 min-w-[80px]"
+                    >
+                      Draw
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={formData.normalizedSelection === "AWAY_TEAM" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => handleNormalizedSelectionChange("AWAY_TEAM")}
+                      className="flex-1 min-w-[100px]"
+                    >
+                      {selectedMatchInfo.awayTeam}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Select your bet pick for reliable auto-settlement
+                  </p>
+                </div>
+              )}
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
