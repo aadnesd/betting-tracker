@@ -56,6 +56,7 @@ export default async function QuickAddPage() {
     accountName: fb.accountName ?? null,
     expiresAt: fb.expiresAt ? new Date(fb.expiresAt).toISOString() : null,
     minOdds: fb.minOdds ? Number(fb.minOdds) : null,
+    stakeReturned: fb.stakeReturned ?? false,
   }));
 
   return (

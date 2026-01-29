@@ -37,6 +37,7 @@ import {
   footballMatch,
   type FootballMatchStatus,
   freeBet,
+  freeBetWageringBet,
   layBet,
   matchedBet,
   promo,
@@ -2396,11 +2397,13 @@ export async function getMatchedBetWithParts({
         back: backBet,
         lay: layBet,
         footballMatch: footballMatch,
+        freeBet: freeBet,
       })
       .from(matchedBet)
       .leftJoin(backBet, eq(matchedBet.backBetId, backBet.id))
       .leftJoin(layBet, eq(matchedBet.layBetId, layBet.id))
       .leftJoin(footballMatch, eq(matchedBet.matchId, footballMatch.id))
+      .leftJoin(freeBet, eq(freeBet.usedInMatchedBetId, matchedBet.id))
       .where(eq(matchedBet.id, id));
 
     if (!row || row.matched.userId !== userId) {
@@ -2436,6 +2439,7 @@ export async function getMatchedBetWithParts({
       backScreenshot,
       layScreenshot,
       footballMatch: row.footballMatch,
+      freeBet: row.freeBet,
     };
   } catch (_error) {
     throw new ChatSDKError(
@@ -4657,7 +4661,7 @@ export async function createManualScreenshot({
 // Free Bet / Promo Inventory
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type FreeBetStatus = "active" | "used" | "expired";
+export type FreeBetStatus = "active" | "used" | "expired" | "locked";
 
 export type CreateFreeBetParams = {
   userId: string;
@@ -4668,6 +4672,10 @@ export type CreateFreeBetParams = {
   minOdds?: number | null;
   expiresAt?: Date | null;
   notes?: string | null;
+  stakeReturned?: boolean;
+  winWageringMultiplier?: number | null;
+  winWageringMinOdds?: number | null;
+  winWageringExpiresInDays?: number | null;
 };
 
 /**
@@ -4689,6 +4697,17 @@ export async function createFreeBet(params: CreateFreeBetParams) {
         expiresAt: params.expiresAt ?? null,
         status: "active",
         notes: params.notes ?? null,
+        stakeReturned: params.stakeReturned ?? false,
+        winWageringMultiplier:
+          params.winWageringMultiplier != null
+            ? params.winWageringMultiplier.toString()
+            : null,
+        winWageringMinOdds:
+          params.winWageringMinOdds != null
+            ? params.winWageringMinOdds.toString()
+            : null,
+        winWageringExpiresInDays: params.winWageringExpiresInDays ?? null,
+        winWageringProgress: "0",
       })
       .returning();
 
@@ -4770,6 +4789,15 @@ export async function listFreeBetsByUser({
         unlockTarget: freeBet.unlockTarget,
         unlockMinOdds: freeBet.unlockMinOdds,
         unlockProgress: freeBet.unlockProgress,
+        stakeReturned: freeBet.stakeReturned,
+        winWageringMultiplier: freeBet.winWageringMultiplier,
+        winWageringMinOdds: freeBet.winWageringMinOdds,
+        winWageringExpiresInDays: freeBet.winWageringExpiresInDays,
+        winWageringRequirement: freeBet.winWageringRequirement,
+        winWageringProgress: freeBet.winWageringProgress,
+        winWageringStartedAt: freeBet.winWageringStartedAt,
+        winWageringExpiresAt: freeBet.winWageringExpiresAt,
+        winWageringCompletedAt: freeBet.winWageringCompletedAt,
       })
       .from(freeBet)
       .leftJoin(account, eq(freeBet.accountId, account.id))
@@ -4828,6 +4856,10 @@ export type UpdateFreeBetParams = {
   expiresAt?: Date | null;
   status?: FreeBetStatus;
   notes?: string | null;
+  stakeReturned?: boolean;
+  winWageringMultiplier?: number | null;
+  winWageringMinOdds?: number | null;
+  winWageringExpiresInDays?: number | null;
 };
 
 /**
@@ -4858,6 +4890,24 @@ export async function updateFreeBet(params: UpdateFreeBetParams) {
     }
     if (params.notes !== undefined) {
       updates.notes = params.notes;
+    }
+    if (params.stakeReturned !== undefined) {
+      updates.stakeReturned = params.stakeReturned;
+    }
+    if (params.winWageringMultiplier !== undefined) {
+      updates.winWageringMultiplier =
+        params.winWageringMultiplier === null
+          ? null
+          : params.winWageringMultiplier.toString();
+    }
+    if (params.winWageringMinOdds !== undefined) {
+      updates.winWageringMinOdds =
+        params.winWageringMinOdds === null
+          ? null
+          : params.winWageringMinOdds.toString();
+    }
+    if (params.winWageringExpiresInDays !== undefined) {
+      updates.winWageringExpiresInDays = params.winWageringExpiresInDays;
     }
 
     if (Object.keys(updates).length === 0) {
@@ -4918,6 +4968,266 @@ export async function markFreeBetAsUsed({
       "bad_request:database",
       "Failed to mark free bet as used"
     );
+  }
+}
+
+/**
+ * Get a free bet by the matched bet it was used in.
+ */
+export async function getFreeBetByMatchedBetId({
+  matchedBetId,
+  userId,
+}: {
+  matchedBetId: string;
+  userId: string;
+}) {
+  try {
+    const [row] = await db
+      .select()
+      .from(freeBet)
+      .where(
+        and(
+          eq(freeBet.usedInMatchedBetId, matchedBetId),
+          eq(freeBet.userId, userId)
+        )
+      )
+      .limit(1);
+    return row ?? null;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to fetch free bet by matched bet"
+    );
+  }
+}
+
+/**
+ * Activate wagering requirements when a free bet wins.
+ */
+export async function activateFreeBetWageringOnWin({
+  freeBetId,
+  userId,
+  winAmount,
+}: {
+  freeBetId: string;
+  userId: string;
+  winAmount: number;
+}) {
+  try {
+    const fb = await getFreeBetById({ id: freeBetId, userId });
+    if (!fb) {
+      return null;
+    }
+
+    const multiplier = fb.winWageringMultiplier
+      ? Number.parseFloat(fb.winWageringMultiplier)
+      : 0;
+    if (!multiplier || winAmount <= 0) {
+      return fb;
+    }
+
+    const existingRequirement = fb.winWageringRequirement
+      ? Number.parseFloat(fb.winWageringRequirement)
+      : 0;
+    if (existingRequirement > 0) {
+      return fb;
+    }
+
+    const requirement = winAmount * multiplier;
+    const now = new Date();
+
+    // Calculate expiry date based on expiresInDays
+    let expiresAt: Date | null = null;
+    if (fb.winWageringExpiresInDays) {
+      expiresAt = new Date(now);
+      expiresAt.setDate(expiresAt.getDate() + fb.winWageringExpiresInDays);
+    }
+
+    const [result] = await db
+      .update(freeBet)
+      .set({
+        winWageringRequirement: requirement.toFixed(2),
+        winWageringProgress: "0",
+        winWageringStartedAt: now,
+        winWageringExpiresAt: expiresAt,
+        winWageringCompletedAt: null,
+      })
+      .where(and(eq(freeBet.id, freeBetId), eq(freeBet.userId, userId)))
+      .returning();
+
+    await db.insert(auditLog).values({
+      createdAt: now,
+      userId,
+      entityType: "free_bet",
+      entityId: freeBetId,
+      action: "update",
+      changes: {
+        winWageringRequirement: requirement,
+        winAmount,
+        multiplier,
+        expiresAt: expiresAt?.toISOString() ?? null,
+      },
+      notes: `Free bet winnings wagering activated: ${requirement.toFixed(2)}${expiresAt ? ` (expires ${expiresAt.toLocaleDateString()})` : ""}`,
+    });
+
+    return result ?? fb;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to activate free bet wagering"
+    );
+  }
+}
+
+/**
+ * Add a wager that contributes to free bet winnings wagering.
+ */
+export async function addFreeBetWageringBet({
+  freeBetId,
+  backBetId,
+  matchedBetId,
+  stake,
+  odds,
+  userId,
+}: {
+  freeBetId: string;
+  backBetId?: string | null;
+  matchedBetId?: string | null;
+  stake: number;
+  odds: number;
+  userId: string;
+}) {
+  try {
+    const fb = await getFreeBetById({ id: freeBetId, userId });
+    if (!fb || !fb.winWageringRequirement) {
+      throw new ChatSDKError(
+        "bad_request:api",
+        "Free bet wagering requirements not active"
+      );
+    }
+
+    const minOdds = fb.winWageringMinOdds
+      ? Number.parseFloat(fb.winWageringMinOdds)
+      : 0;
+    const qualified = odds >= minOdds;
+
+    const [wager] = await db
+      .insert(freeBetWageringBet)
+      .values({
+        createdAt: new Date(),
+        freeBetId,
+        backBetId: backBetId ?? null,
+        matchedBetId: matchedBetId ?? null,
+        stake: stake.toFixed(2),
+        odds: odds.toFixed(4),
+        qualified: qualified ? "true" : "false",
+      })
+      .returning();
+
+    let newProgress = Number.parseFloat(fb.winWageringProgress ?? "0");
+    const requirement = Number.parseFloat(fb.winWageringRequirement ?? "0");
+    const updates: Partial<typeof freeBet.$inferInsert> = {};
+
+    if (qualified) {
+      newProgress = Math.min(requirement, newProgress + stake);
+      updates.winWageringProgress = newProgress.toFixed(2);
+      if (newProgress >= requirement) {
+        updates.winWageringCompletedAt = new Date();
+      }
+
+      await db
+        .update(freeBet)
+        .set(updates)
+        .where(eq(freeBet.id, freeBetId));
+    }
+
+    await db.insert(auditLog).values({
+      createdAt: new Date(),
+      userId,
+      entityType: "free_bet",
+      entityId: freeBetId,
+      action: "update",
+      changes: {
+        wagerId: wager.id,
+        stake,
+        odds,
+        qualified,
+        newProgress,
+      },
+      notes: qualified
+        ? `Winnings wagering progress: ${newProgress.toFixed(2)} / ${requirement.toFixed(2)}`
+        : "Winnings wagering bet did not qualify (min odds not met)",
+    });
+
+    return { wager, qualified, newProgress };
+  } catch (error) {
+    if (error instanceof ChatSDKError) {
+      throw error;
+    }
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to add free bet wagering bet"
+    );
+  }
+}
+
+/**
+ * Process wagering progress for free bet winnings when a back bet settles.
+ */
+export async function processFreeBetWageringProgressOnSettle({
+  accountId,
+  userId,
+  backBetId,
+  matchedBetId,
+  stake,
+  odds,
+  placedAt,
+}: {
+  accountId: string;
+  userId: string;
+  backBetId?: string | null;
+  matchedBetId?: string | null;
+  stake: number;
+  odds: number;
+  placedAt: Date;
+}) {
+  try {
+    const activeFreeBets = await db
+      .select()
+      .from(freeBet)
+      .where(
+        and(
+          eq(freeBet.userId, userId),
+          eq(freeBet.accountId, accountId),
+          isNotNull(freeBet.winWageringRequirement),
+          isNotNull(freeBet.winWageringStartedAt)
+        )
+      );
+
+    for (const fb of activeFreeBets) {
+      const requirement = Number.parseFloat(fb.winWageringRequirement ?? "0");
+      const progress = Number.parseFloat(fb.winWageringProgress ?? "0");
+      const startedAt = fb.winWageringStartedAt;
+
+      if (!startedAt || progress >= requirement) {
+        continue;
+      }
+
+      if (placedAt < startedAt) {
+        continue;
+      }
+
+      await addFreeBetWageringBet({
+        freeBetId: fb.id,
+        backBetId: backBetId ?? null,
+        matchedBetId: matchedBetId ?? null,
+        stake,
+        odds,
+        userId,
+      });
+    }
+  } catch (error) {
+    console.error("[processFreeBetWageringProgressOnSettle] Error:", error);
   }
 }
 
@@ -5379,6 +5689,10 @@ export async function createLockedPromo({
   unlockType,
   unlockTarget,
   unlockMinOdds,
+  stakeReturned,
+  winWageringMultiplier,
+  winWageringMinOdds,
+  winWageringExpiresInDays,
 }: {
   userId: string;
   accountId: string;
@@ -5391,6 +5705,10 @@ export async function createLockedPromo({
   unlockType: "stake" | "bets";
   unlockTarget: number;
   unlockMinOdds?: number;
+  stakeReturned?: boolean;
+  winWageringMultiplier?: number | null;
+  winWageringMinOdds?: number | null;
+  winWageringExpiresInDays?: number | null;
 }) {
   try {
     const [result] = await db
@@ -5410,6 +5728,15 @@ export async function createLockedPromo({
         unlockTarget: String(unlockTarget),
         unlockMinOdds: unlockMinOdds ? String(unlockMinOdds) : null,
         unlockProgress: "0",
+        stakeReturned: stakeReturned ?? false,
+        winWageringMultiplier:
+          winWageringMultiplier != null
+            ? String(winWageringMultiplier)
+            : null,
+        winWageringMinOdds:
+          winWageringMinOdds != null ? String(winWageringMinOdds) : null,
+        winWageringExpiresInDays: winWageringExpiresInDays ?? null,
+        winWageringProgress: "0",
       })
       .returning();
 
@@ -6350,6 +6677,73 @@ export async function deleteBet({
       await db
         .delete(bonusQualifyingBet)
         .where(eq(bonusQualifyingBet.backBetId, id));
+
+      // Handle free bet winnings wagering bets
+      const wageringBets = await db
+        .select({
+          id: freeBetWageringBet.id,
+          freeBetId: freeBetWageringBet.freeBetId,
+          stake: freeBetWageringBet.stake,
+          qualified: freeBetWageringBet.qualified,
+        })
+        .from(freeBetWageringBet)
+        .where(eq(freeBetWageringBet.backBetId, id));
+
+      for (const wager of wageringBets) {
+        if (wager.qualified === "true") {
+          const stakeValue = Number.parseFloat(wager.stake);
+
+          const [fb] = await db
+            .select()
+            .from(freeBet)
+            .where(eq(freeBet.id, wager.freeBetId));
+
+          if (fb) {
+            const currentProgress = Number.parseFloat(
+              fb.winWageringProgress ?? "0"
+            );
+            const requirement = Number.parseFloat(
+              fb.winWageringRequirement ?? "0"
+            );
+            const newProgress = Math.max(0, currentProgress - stakeValue);
+
+            const updates: Record<string, unknown> = {
+              winWageringProgress: newProgress.toString(),
+            };
+
+            if (
+              fb.winWageringCompletedAt &&
+              newProgress < requirement
+            ) {
+              updates.winWageringCompletedAt = null;
+            }
+
+            await db
+              .update(freeBet)
+              .set(updates)
+              .where(eq(freeBet.id, wager.freeBetId));
+
+            await db.insert(auditLog).values({
+              createdAt: new Date(),
+              userId,
+              entityType: "free_bet",
+              entityId: wager.freeBetId,
+              action: "update",
+              changes: {
+                previousProgress: currentProgress,
+                removedStake: stakeValue,
+                newProgress,
+                reason: "wagering_bet_deleted",
+              },
+              notes: `Winnings wagering progress reduced due to bet deletion: ${newProgress.toFixed(2)} / ${requirement.toFixed(2)}`,
+            });
+          }
+        }
+      }
+
+      await db
+        .delete(freeBetWageringBet)
+        .where(eq(freeBetWageringBet.backBetId, id));
     }
 
     // Delete the bet
@@ -6542,6 +6936,69 @@ export async function deleteMatchedBet({
 
       // Delete the bonus qualifying bet link
       await db.delete(bonusQualifyingBet).where(eq(bonusQualifyingBet.id, bqb.id));
+    }
+
+    // Handle free bet winnings wagering bets referencing this matched bet
+    const linkedFreeBetWageringBets = await db
+      .select({
+        id: freeBetWageringBet.id,
+        freeBetId: freeBetWageringBet.freeBetId,
+        stake: freeBetWageringBet.stake,
+        qualified: freeBetWageringBet.qualified,
+      })
+      .from(freeBetWageringBet)
+      .where(eq(freeBetWageringBet.matchedBetId, id));
+
+    for (const wager of linkedFreeBetWageringBets) {
+      if (wager.qualified === "true") {
+        const stakeValue = Number.parseFloat(wager.stake);
+        const [fb] = await db
+          .select()
+          .from(freeBet)
+          .where(eq(freeBet.id, wager.freeBetId));
+
+        if (fb) {
+          const currentProgress = Number.parseFloat(
+            fb.winWageringProgress ?? "0"
+          );
+          const requirement = Number.parseFloat(
+            fb.winWageringRequirement ?? "0"
+          );
+          const newProgress = Math.max(0, currentProgress - stakeValue);
+
+          const updates: Record<string, unknown> = {
+            winWageringProgress: newProgress.toString(),
+          };
+
+          if (fb.winWageringCompletedAt && newProgress < requirement) {
+            updates.winWageringCompletedAt = null;
+          }
+
+          await db
+            .update(freeBet)
+            .set(updates)
+            .where(eq(freeBet.id, wager.freeBetId));
+
+          await db.insert(auditLog).values({
+            createdAt: new Date(),
+            userId,
+            entityType: "free_bet",
+            entityId: wager.freeBetId,
+            action: "update",
+            changes: {
+              previousProgress: currentProgress,
+              removedStake: stakeValue,
+              newProgress,
+              reason: "matched_bet_deleted",
+            },
+            notes: `Winnings wagering progress reduced due to matched bet deletion: ${newProgress.toFixed(2)} / ${requirement.toFixed(2)}`,
+          });
+        }
+      }
+
+      await db
+        .delete(freeBetWageringBet)
+        .where(eq(freeBetWageringBet.id, wager.id));
     }
 
     if (cascade) {

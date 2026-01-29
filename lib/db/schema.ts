@@ -1,6 +1,8 @@
 import type { InferSelectModel } from "drizzle-orm";
 import {
+  boolean,
   foreignKey,
+  integer,
   jsonb,
   numeric,
   pgTable,
@@ -307,6 +309,31 @@ export const freeBet = pgTable("FreeBet", {
     precision: 14,
     scale: 2,
   }).default("0"),
+  // Whether the stake is returned on winning free bets
+  stakeReturned: boolean("stakeReturned").notNull().default(false),
+  // Wagering requirements for winnings if the free bet wins
+  winWageringMultiplier: numeric("winWageringMultiplier", {
+    precision: 6,
+    scale: 2,
+  }),
+  winWageringMinOdds: numeric("winWageringMinOdds", {
+    precision: 12,
+    scale: 4,
+  }),
+  winWageringRequirement: numeric("winWageringRequirement", {
+    precision: 14,
+    scale: 2,
+  }),
+  winWageringProgress: numeric("winWageringProgress", {
+    precision: 14,
+    scale: 2,
+  }).default("0"),
+  // Days allowed to complete wagering after the free bet wins
+  winWageringExpiresInDays: integer("winWageringExpiresInDays"),
+  winWageringStartedAt: timestamp("winWageringStartedAt"),
+  // Calculated deadline: startedAt + expiresInDays
+  winWageringExpiresAt: timestamp("winWageringExpiresAt"),
+  winWageringCompletedAt: timestamp("winWageringCompletedAt"),
 });
 
 export type FreeBet = InferSelectModel<typeof freeBet>;
@@ -329,6 +356,25 @@ export const qualifyingBet = pgTable("QualifyingBet", {
 });
 
 export type QualifyingBet = InferSelectModel<typeof qualifyingBet>;
+
+/**
+ * FreeBetWageringBet - Links bets that contribute to wagering requirements
+ * from free bet winnings (once the free bet wins).
+ */
+export const freeBetWageringBet = pgTable("FreeBetWageringBet", {
+  id: uuid("id").primaryKey().notNull().defaultRandom(),
+  createdAt: timestamp("createdAt").notNull(),
+  freeBetId: uuid("freeBetId")
+    .notNull()
+    .references(() => freeBet.id),
+  backBetId: uuid("backBetId").references(() => backBet.id),
+  matchedBetId: uuid("matchedBetId").references(() => matchedBet.id),
+  stake: numeric("stake", { precision: 14, scale: 2 }).notNull(),
+  odds: numeric("odds", { precision: 12, scale: 4 }).notNull(),
+  qualified: varchar("qualified", { enum: ["true", "false"] as const }).notNull(),
+});
+
+export type FreeBetWageringBet = InferSelectModel<typeof freeBetWageringBet>;
 
 /**
  * FootballMatch - Local cache of match data from football-data.org.

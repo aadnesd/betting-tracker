@@ -1,7 +1,13 @@
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/app/(auth)/auth";
-import { createFreeBet, createLockedPromo, listFreeBetsByUser, getAccountById } from "@/lib/db/queries";
+import {
+  createFreeBet,
+  createLockedPromo,
+  getAccountById,
+  listFreeBetsByUser,
+} from "@/lib/db/queries";
+import type { FreeBet } from "@/lib/db/schema";
 
 const createFreeBetSchema = z.object({
   accountId: z.string().uuid(),
@@ -11,6 +17,10 @@ const createFreeBetSchema = z.object({
   minOdds: z.number().positive().optional().nullable(),
   expiresAt: z.string().datetime().optional().nullable(),
   notes: z.string().max(500).optional().nullable(),
+  stakeReturned: z.boolean().optional(),
+  winWageringMultiplier: z.number().positive().optional().nullable(),
+  winWageringMinOdds: z.number().positive().optional().nullable(),
+  winWageringExpiresInDays: z.number().int().positive().optional().nullable(),
   // Unlock requirements (optional - for promos that need to be unlocked)
   unlockType: z.enum(["stake", "bets"]).optional(),
   unlockTarget: z.number().positive().optional(),
@@ -40,14 +50,11 @@ export async function POST(request: NextRequest) {
     // Verify account belongs to user
     const account = await getAccountById({ id: parsed.data.accountId, userId });
     if (!account) {
-      return NextResponse.json(
-        { error: "Account not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "Account not found" }, { status: 404 });
     }
 
     // Create either a locked promo or a regular free bet
-    let freeBet;
+    let freeBet: FreeBet;
     if (parsed.data.unlockType && parsed.data.unlockTarget) {
       // Create a locked promo with unlock requirements
       freeBet = await createLockedPromo({
@@ -57,11 +64,17 @@ export async function POST(request: NextRequest) {
         value: parsed.data.value,
         currency: parsed.data.currency,
         minOdds: parsed.data.minOdds ?? undefined,
-        expiresAt: parsed.data.expiresAt ? new Date(parsed.data.expiresAt) : undefined,
+        expiresAt: parsed.data.expiresAt
+          ? new Date(parsed.data.expiresAt)
+          : undefined,
         notes: parsed.data.notes ?? undefined,
         unlockType: parsed.data.unlockType,
         unlockTarget: parsed.data.unlockTarget,
         unlockMinOdds: parsed.data.unlockMinOdds ?? undefined,
+        stakeReturned: parsed.data.stakeReturned,
+        winWageringMultiplier: parsed.data.winWageringMultiplier ?? null,
+        winWageringMinOdds: parsed.data.winWageringMinOdds ?? null,
+        winWageringExpiresInDays: parsed.data.winWageringExpiresInDays ?? null,
       });
     } else {
       // Create a regular free bet (already unlocked)
@@ -72,8 +85,14 @@ export async function POST(request: NextRequest) {
         value: parsed.data.value,
         currency: parsed.data.currency,
         minOdds: parsed.data.minOdds,
-        expiresAt: parsed.data.expiresAt ? new Date(parsed.data.expiresAt) : null,
+        expiresAt: parsed.data.expiresAt
+          ? new Date(parsed.data.expiresAt)
+          : null,
         notes: parsed.data.notes || null,
+        stakeReturned: parsed.data.stakeReturned,
+        winWageringMultiplier: parsed.data.winWageringMultiplier ?? null,
+        winWageringMinOdds: parsed.data.winWageringMinOdds ?? null,
+        winWageringExpiresInDays: parsed.data.winWageringExpiresInDays ?? null,
       });
     }
 
@@ -98,7 +117,11 @@ export async function GET(request: NextRequest) {
 
   try {
     const { searchParams } = new URL(request.url);
-    const status = searchParams.get("status") as "active" | "used" | "expired" | null;
+    const status = searchParams.get("status") as
+      | "active"
+      | "used"
+      | "expired"
+      | null;
 
     const freeBets = await listFreeBetsByUser({
       userId,
