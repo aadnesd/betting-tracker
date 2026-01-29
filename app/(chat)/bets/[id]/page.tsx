@@ -42,7 +42,7 @@ export default async function Page({ params }: PageProps) {
     notFound();
   }
 
-  const { matched, back, lay, backScreenshot, layScreenshot, footballMatch } = data;
+  const { matched, back, lay, backScreenshot, layScreenshot, footballMatch, freeBet } = data;
 
   // Fetch audit history for this matched bet
   const auditEntries = await listAuditEntriesByEntity({
@@ -55,9 +55,12 @@ export default async function Page({ params }: PageProps) {
   const mismatches = detectMismatches(back, lay);
 
   // Calculate bet outcomes for display
-  const isFreeBet = matched.promoType
-    ? /free[\s_-]?bet/i.test(matched.promoType)
-    : false;
+  const isFreeBet = freeBet
+    ? true
+    : matched.promoType
+      ? /free[\s_-]?bet/i.test(matched.promoType)
+      : false;
+  const freeBetStakeReturned = freeBet?.stakeReturned ?? false;
 
   let betOutcomes: {
     profitIfWins: number;
@@ -81,6 +84,7 @@ export default async function Page({ params }: PageProps) {
         layStake,
         layOdds,
         isFreeBet,
+        freeBetStakeReturned,
       });
 
       // Convert to NOK for consistent display

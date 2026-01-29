@@ -556,20 +556,22 @@ export function resolveOutcome(
  * @param outcome - The bet outcome (win/loss/push)
  * @param stake - The stake amount
  * @param odds - The decimal odds
- * @param isFreeBet - Whether this is a free bet (stake not returned on win)
+ * @param isFreeBet - Whether this is a free bet
+ * @param freeBetStakeReturned - Whether the stake is returned on a free bet win
  * @returns The profit/loss amount
  */
 export function calculateProfitLoss(
   outcome: BetOutcome,
   stake: number,
   odds: number,
-  isFreeBet = false
+  isFreeBet = false,
+  freeBetStakeReturned = false
 ): number {
   switch (outcome) {
     case "win":
       if (isFreeBet) {
-        // Free bet: profit = stake * (odds - 1), no stake return
-        return stake * (odds - 1);
+        // Free bet: stake may or may not be returned
+        return freeBetStakeReturned ? stake * odds : stake * (odds - 1);
       }
       // Normal bet: profit = stake * (odds - 1)
       return stake * (odds - 1);
@@ -645,6 +647,7 @@ export function calculateLayProfitLoss(
  * @param layStake - The lay bet stake
  * @param layOdds - The lay bet decimal odds
  * @param isFreeBet - Whether the back bet is a free bet
+ * @param freeBetStakeReturned - Whether the stake is returned on a free bet win
  * @param exchangeCommission - The exchange commission rate as a decimal (e.g., 0.05 for 5%). Defaults to 0.
  * @returns The net profit/loss from both legs
  */
@@ -655,9 +658,16 @@ export function calculateMatchedBetProfitLoss(
   layStake: number,
   layOdds: number,
   isFreeBet = false,
+  freeBetStakeReturned = false,
   exchangeCommission = 0
 ): { backProfitLoss: number; layProfitLoss: number; netProfitLoss: number } {
-  const backProfitLoss = calculateProfitLoss(outcome, backStake, backOdds, isFreeBet);
+  const backProfitLoss = calculateProfitLoss(
+    outcome,
+    backStake,
+    backOdds,
+    isFreeBet,
+    freeBetStakeReturned
+  );
   const layProfitLoss = calculateLayProfitLoss(outcome, layStake, layOdds, exchangeCommission);
 
   return {

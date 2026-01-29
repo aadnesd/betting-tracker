@@ -54,6 +54,7 @@ export interface FreeBetOption {
   accountName: string | null;
   expiresAt: string | null;
   minOdds: number | null;
+  stakeReturned?: boolean;
 }
 
 interface QuickAddFormProps {
@@ -538,6 +539,11 @@ export function QuickAddForm({ bookmakers, exchanges, freeBets = [] }: QuickAddF
                             {selectedFreeBet.minOdds && (
                               <span className="ml-3">Min odds: {selectedFreeBet.minOdds.toFixed(2)}</span>
                             )}
+                            <span className="ml-3">
+                              {selectedFreeBet.stakeReturned
+                                ? "Stake returned"
+                                : "Stake not returned"}
+                            </span>
                             {selectedFreeBet.expiresAt && (
                               <span className="ml-3">
                                 Expires: {new Date(selectedFreeBet.expiresAt).toLocaleDateString()}
