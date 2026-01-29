@@ -64,7 +64,9 @@ export function isFreeBetPromoType(promoType: string | null): boolean {
  * Determine match winner from match result.
  * Returns the normalized selection that would win: HOME_TEAM, AWAY_TEAM, or DRAW.
  */
-export function getMatchWinner(result: MatchResult): "HOME_TEAM" | "AWAY_TEAM" | "DRAW" {
+export function getMatchWinner(
+  result: MatchResult
+): "HOME_TEAM" | "AWAY_TEAM" | "DRAW" {
   if (result.homeScore > result.awayScore) {
     return "HOME_TEAM";
   }
@@ -370,7 +372,11 @@ function resolveBttsOutcome(
   const normalized = normalizeSelection(selection);
   const bothScored = result.homeScore > 0 && result.awayScore > 0;
 
-  if (normalized === "yes" || normalized.includes("yes") || normalized === "gg") {
+  if (
+    normalized === "yes" ||
+    normalized.includes("yes") ||
+    normalized === "gg"
+  ) {
     return {
       outcome: bothScored ? "win" : "loss",
       confidence: "high",
@@ -668,7 +674,12 @@ export function calculateMatchedBetProfitLoss(
     isFreeBet,
     freeBetStakeReturned
   );
-  const layProfitLoss = calculateLayProfitLoss(outcome, layStake, layOdds, exchangeCommission);
+  const layProfitLoss = calculateLayProfitLoss(
+    outcome,
+    layStake,
+    layOdds,
+    exchangeCommission
+  );
 
   return {
     backProfitLoss,

@@ -100,26 +100,18 @@
         "BackBet_userId_User_id_fk": {
           "name": "BackBet_userId_User_id_fk",
           "tableFrom": "BackBet",
-          "columnsFrom": [
-            "userId"
-          ],
+          "columnsFrom": ["userId"],
           "tableTo": "User",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "no action"
         },
         "BackBet_screenshotId_ScreenshotUpload_id_fk": {
           "name": "BackBet_screenshotId_ScreenshotUpload_id_fk",
           "tableFrom": "BackBet",
-          "columnsFrom": [
-            "screenshotId"
-          ],
+          "columnsFrom": ["screenshotId"],
           "tableTo": "ScreenshotUpload",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "no action"
         }
@@ -175,13 +167,9 @@
         "Chat_userId_User_id_fk": {
           "name": "Chat_userId_User_id_fk",
           "tableFrom": "Chat",
-          "columnsFrom": [
-            "userId"
-          ],
+          "columnsFrom": ["userId"],
           "tableTo": "User",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "no action"
         }
@@ -237,13 +225,9 @@
         "Document_userId_User_id_fk": {
           "name": "Document_userId_User_id_fk",
           "tableFrom": "Document",
-          "columnsFrom": [
-            "userId"
-          ],
+          "columnsFrom": ["userId"],
           "tableTo": "User",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "no action"
         }
@@ -251,10 +235,7 @@
       "compositePrimaryKeys": {
         "Document_id_createdAt_pk": {
           "name": "Document_id_createdAt_pk",
-          "columns": [
-            "id",
-            "createdAt"
-          ]
+          "columns": ["id", "createdAt"]
         }
       },
       "uniqueConstraints": {}
@@ -355,26 +336,18 @@
         "LayBet_userId_User_id_fk": {
           "name": "LayBet_userId_User_id_fk",
           "tableFrom": "LayBet",
-          "columnsFrom": [
-            "userId"
-          ],
+          "columnsFrom": ["userId"],
           "tableTo": "User",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "no action"
         },
         "LayBet_screenshotId_ScreenshotUpload_id_fk": {
           "name": "LayBet_screenshotId_ScreenshotUpload_id_fk",
           "tableFrom": "LayBet",
-          "columnsFrom": [
-            "screenshotId"
-          ],
+          "columnsFrom": ["screenshotId"],
           "tableTo": "ScreenshotUpload",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "no action"
         }
@@ -466,39 +439,27 @@
         "MatchedBet_userId_User_id_fk": {
           "name": "MatchedBet_userId_User_id_fk",
           "tableFrom": "MatchedBet",
-          "columnsFrom": [
-            "userId"
-          ],
+          "columnsFrom": ["userId"],
           "tableTo": "User",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "no action"
         },
         "MatchedBet_backBetId_BackBet_id_fk": {
           "name": "MatchedBet_backBetId_BackBet_id_fk",
           "tableFrom": "MatchedBet",
-          "columnsFrom": [
-            "backBetId"
-          ],
+          "columnsFrom": ["backBetId"],
           "tableTo": "BackBet",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "no action"
         },
         "MatchedBet_layBetId_LayBet_id_fk": {
           "name": "MatchedBet_layBetId_LayBet_id_fk",
           "tableFrom": "MatchedBet",
-          "columnsFrom": [
-            "layBetId"
-          ],
+          "columnsFrom": ["layBetId"],
           "tableTo": "LayBet",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "no action"
         }
@@ -553,13 +514,9 @@
         "Message_v2_chatId_Chat_id_fk": {
           "name": "Message_v2_chatId_Chat_id_fk",
           "tableFrom": "Message_v2",
-          "columnsFrom": [
-            "chatId"
-          ],
+          "columnsFrom": ["chatId"],
           "tableTo": "Chat",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "no action"
         }
@@ -608,13 +565,9 @@
         "Message_chatId_Chat_id_fk": {
           "name": "Message_chatId_Chat_id_fk",
           "tableFrom": "Message",
-          "columnsFrom": [
-            "chatId"
-          ],
+          "columnsFrom": ["chatId"],
           "tableTo": "Chat",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "no action"
         }
@@ -706,13 +659,9 @@
         "ScreenshotUpload_userId_User_id_fk": {
           "name": "ScreenshotUpload_userId_User_id_fk",
           "tableFrom": "ScreenshotUpload",
-          "columnsFrom": [
-            "userId"
-          ],
+          "columnsFrom": ["userId"],
           "tableTo": "User",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "no action"
         }
@@ -749,13 +698,9 @@
         "Stream_chatId_Chat_id_fk": {
           "name": "Stream_chatId_Chat_id_fk",
           "tableFrom": "Stream",
-          "columnsFrom": [
-            "chatId"
-          ],
+          "columnsFrom": ["chatId"],
           "tableTo": "Chat",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "no action"
         }
@@ -763,9 +708,7 @@
       "compositePrimaryKeys": {
         "Stream_id_pk": {
           "name": "Stream_id_pk",
-          "columns": [
-            "id"
-          ]
+          "columns": ["id"]
         }
       },
       "uniqueConstraints": {}
@@ -836,28 +779,18 @@
         "Suggestion_userId_User_id_fk": {
           "name": "Suggestion_userId_User_id_fk",
           "tableFrom": "Suggestion",
-          "columnsFrom": [
-            "userId"
-          ],
+          "columnsFrom": ["userId"],
           "tableTo": "User",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "no action"
         },
         "Suggestion_documentId_documentCreatedAt_Document_id_createdAt_fk": {
           "name": "Suggestion_documentId_documentCreatedAt_Document_id_createdAt_fk",
           "tableFrom": "Suggestion",
-          "columnsFrom": [
-            "documentId",
-            "documentCreatedAt"
-          ],
+          "columnsFrom": ["documentId", "documentCreatedAt"],
           "tableTo": "Document",
-          "columnsTo": [
-            "id",
-            "createdAt"
-          ],
+          "columnsTo": ["id", "createdAt"],
           "onUpdate": "no action",
           "onDelete": "no action"
         }
@@ -865,9 +798,7 @@
       "compositePrimaryKeys": {
         "Suggestion_id_pk": {
           "name": "Suggestion_id_pk",
-          "columns": [
-            "id"
-          ]
+          "columns": ["id"]
         }
       },
       "uniqueConstraints": {}
@@ -929,26 +860,18 @@
         "Vote_v2_chatId_Chat_id_fk": {
           "name": "Vote_v2_chatId_Chat_id_fk",
           "tableFrom": "Vote_v2",
-          "columnsFrom": [
-            "chatId"
-          ],
+          "columnsFrom": ["chatId"],
           "tableTo": "Chat",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "no action"
         },
         "Vote_v2_messageId_Message_v2_id_fk": {
           "name": "Vote_v2_messageId_Message_v2_id_fk",
           "tableFrom": "Vote_v2",
-          "columnsFrom": [
-            "messageId"
-          ],
+          "columnsFrom": ["messageId"],
           "tableTo": "Message_v2",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "no action"
         }
@@ -956,10 +879,7 @@
       "compositePrimaryKeys": {
         "Vote_v2_chatId_messageId_pk": {
           "name": "Vote_v2_chatId_messageId_pk",
-          "columns": [
-            "chatId",
-            "messageId"
-          ]
+          "columns": ["chatId", "messageId"]
         }
       },
       "uniqueConstraints": {}
@@ -992,26 +912,18 @@
         "Vote_chatId_Chat_id_fk": {
           "name": "Vote_chatId_Chat_id_fk",
           "tableFrom": "Vote",
-          "columnsFrom": [
-            "chatId"
-          ],
+          "columnsFrom": ["chatId"],
           "tableTo": "Chat",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "no action"
         },
         "Vote_messageId_Message_id_fk": {
           "name": "Vote_messageId_Message_id_fk",
           "tableFrom": "Vote",
-          "columnsFrom": [
-            "messageId"
-          ],
+          "columnsFrom": ["messageId"],
           "tableTo": "Message",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "no action"
         }
@@ -1019,10 +931,7 @@
       "compositePrimaryKeys": {
         "Vote_chatId_messageId_pk": {
           "name": "Vote_chatId_messageId_pk",
-          "columns": [
-            "chatId",
-            "messageId"
-          ]
+          "columns": ["chatId", "messageId"]
         }
       },
       "uniqueConstraints": {}

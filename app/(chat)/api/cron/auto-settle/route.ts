@@ -1,20 +1,20 @@
 import { NextResponse } from "next/server";
 import {
-  applyAutoSettlement,
   activateFreeBetWageringOnWin,
+  applyAutoSettlement,
+  type BetReadyForSettlement,
   findBetsReadyForAutoSettlement,
   flagBetForReview,
   getFreeBetByMatchedBetId,
   processFreeBetWageringProgressOnSettle,
   processWageringProgressOnSettle,
-  type BetReadyForSettlement,
 } from "@/lib/db/queries";
 import {
+  type BetOutcome,
   calculateMatchedBetProfitLoss,
   isFreeBetPromoType,
   resolveOutcome,
   resolveOutcomeWithNormalizedSelection,
-  type BetOutcome,
 } from "@/lib/settlement";
 
 /**
@@ -31,7 +31,7 @@ import {
  * Schedule: Runs after sync-matches (6:30 UTC daily via vercel.json)
  */
 
-interface AutoSettleResult {
+type AutoSettleResult = {
   processed: number;
   settled: number;
   flaggedForReview: number;
@@ -42,7 +42,7 @@ interface AutoSettleResult {
     outcome?: BetOutcome;
     reason?: string;
   }>;
-}
+};
 
 /**
  * Process a single bet for auto-settlement.
@@ -96,9 +96,7 @@ async function processBet(
     matchedBetId: bet.id,
     userId: bet.userId,
   });
-  const freeBet = matchedFreeBet
-    ? true
-    : isFreeBetPromoType(bet.promoType);
+  const freeBet = matchedFreeBet ? true : isFreeBetPromoType(bet.promoType);
   const freeBetStakeReturned = matchedFreeBet?.stakeReturned ?? false;
   const { backProfitLoss, layProfitLoss } = calculateMatchedBetProfitLoss(
     outcomeResult.outcome,
@@ -261,6 +259,6 @@ export async function POST(request: Request) {
 }
 
 // Also support GET for manual testing (still requires auth)
-export async function GET(request: Request) {
+export function GET(request: Request) {
   return POST(request);
 }

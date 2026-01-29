@@ -77,12 +77,8 @@
           "name": "Account_userId_User_id_fk",
           "tableFrom": "Account",
           "tableTo": "User",
-          "columnsFrom": [
-            "userId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["userId"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -180,12 +176,8 @@
           "name": "AccountTransaction_userId_User_id_fk",
           "tableFrom": "AccountTransaction",
           "tableTo": "User",
-          "columnsFrom": [
-            "userId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["userId"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -193,12 +185,8 @@
           "name": "AccountTransaction_accountId_Account_id_fk",
           "tableFrom": "AccountTransaction",
           "tableTo": "Account",
-          "columnsFrom": [
-            "accountId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["accountId"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -206,12 +194,8 @@
           "name": "AccountTransaction_linkedBackBetId_BackBet_id_fk",
           "tableFrom": "AccountTransaction",
           "tableTo": "BackBet",
-          "columnsFrom": [
-            "linkedBackBetId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["linkedBackBetId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -219,12 +203,8 @@
           "name": "AccountTransaction_linkedLayBetId_LayBet_id_fk",
           "tableFrom": "AccountTransaction",
           "tableTo": "LayBet",
-          "columnsFrom": [
-            "linkedLayBetId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["linkedLayBetId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -292,12 +272,8 @@
           "name": "AuditLog_userId_User_id_fk",
           "tableFrom": "AuditLog",
           "tableTo": "User",
-          "columnsFrom": [
-            "userId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["userId"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -444,12 +420,8 @@
           "name": "BackBet_userId_User_id_fk",
           "tableFrom": "BackBet",
           "tableTo": "User",
-          "columnsFrom": [
-            "userId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["userId"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -457,12 +429,8 @@
           "name": "BackBet_accountId_Account_id_fk",
           "tableFrom": "BackBet",
           "tableTo": "Account",
-          "columnsFrom": [
-            "accountId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["accountId"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -470,12 +438,8 @@
           "name": "BackBet_screenshotId_ScreenshotUpload_id_fk",
           "tableFrom": "BackBet",
           "tableTo": "ScreenshotUpload",
-          "columnsFrom": [
-            "screenshotId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["screenshotId"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -531,12 +495,8 @@
           "name": "BalanceSnapshot_userId_User_id_fk",
           "tableFrom": "BalanceSnapshot",
           "tableTo": "User",
-          "columnsFrom": [
-            "userId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["userId"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -604,12 +564,8 @@
           "name": "BonusQualifyingBet_depositBonusId_DepositBonus_id_fk",
           "tableFrom": "BonusQualifyingBet",
           "tableTo": "DepositBonus",
-          "columnsFrom": [
-            "depositBonusId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["depositBonusId"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -617,12 +573,8 @@
           "name": "BonusQualifyingBet_backBetId_BackBet_id_fk",
           "tableFrom": "BonusQualifyingBet",
           "tableTo": "BackBet",
-          "columnsFrom": [
-            "backBetId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["backBetId"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -630,12 +582,8 @@
           "name": "BonusQualifyingBet_matchedBetId_MatchedBet_id_fk",
           "tableFrom": "BonusQualifyingBet",
           "tableTo": "MatchedBet",
-          "columnsFrom": [
-            "matchedBetId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["matchedBetId"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -771,12 +719,8 @@
           "name": "DepositBonus_userId_User_id_fk",
           "tableFrom": "DepositBonus",
           "tableTo": "User",
-          "columnsFrom": [
-            "userId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["userId"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -784,12 +728,8 @@
           "name": "DepositBonus_accountId_Account_id_fk",
           "tableFrom": "DepositBonus",
           "tableTo": "Account",
-          "columnsFrom": [
-            "accountId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["accountId"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -797,12 +737,8 @@
           "name": "DepositBonus_linkedTransactionId_AccountTransaction_id_fk",
           "tableFrom": "DepositBonus",
           "tableTo": "AccountTransaction",
-          "columnsFrom": [
-            "linkedTransactionId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["linkedTransactionId"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -896,9 +832,7 @@
         "FootballMatch_externalId_unique": {
           "name": "FootballMatch_externalId_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "externalId"
-          ]
+          "columns": ["externalId"]
         }
       }
     },
@@ -1056,12 +990,8 @@
           "name": "FreeBet_userId_User_id_fk",
           "tableFrom": "FreeBet",
           "tableTo": "User",
-          "columnsFrom": [
-            "userId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["userId"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1069,12 +999,8 @@
           "name": "FreeBet_accountId_Account_id_fk",
           "tableFrom": "FreeBet",
           "tableTo": "Account",
-          "columnsFrom": [
-            "accountId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["accountId"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1082,12 +1008,8 @@
           "name": "FreeBet_usedInMatchedBetId_MatchedBet_id_fk",
           "tableFrom": "FreeBet",
           "tableTo": "MatchedBet",
-          "columnsFrom": [
-            "usedInMatchedBetId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["usedInMatchedBetId"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1155,12 +1077,8 @@
           "name": "FreeBetWageringBet_freeBetId_FreeBet_id_fk",
           "tableFrom": "FreeBetWageringBet",
           "tableTo": "FreeBet",
-          "columnsFrom": [
-            "freeBetId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["freeBetId"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1168,12 +1086,8 @@
           "name": "FreeBetWageringBet_backBetId_BackBet_id_fk",
           "tableFrom": "FreeBetWageringBet",
           "tableTo": "BackBet",
-          "columnsFrom": [
-            "backBetId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["backBetId"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1181,12 +1095,8 @@
           "name": "FreeBetWageringBet_matchedBetId_MatchedBet_id_fk",
           "tableFrom": "FreeBetWageringBet",
           "tableTo": "MatchedBet",
-          "columnsFrom": [
-            "matchedBetId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["matchedBetId"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1333,12 +1243,8 @@
           "name": "LayBet_userId_User_id_fk",
           "tableFrom": "LayBet",
           "tableTo": "User",
-          "columnsFrom": [
-            "userId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["userId"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1346,12 +1252,8 @@
           "name": "LayBet_accountId_Account_id_fk",
           "tableFrom": "LayBet",
           "tableTo": "Account",
-          "columnsFrom": [
-            "accountId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["accountId"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1359,12 +1261,8 @@
           "name": "LayBet_screenshotId_ScreenshotUpload_id_fk",
           "tableFrom": "LayBet",
           "tableTo": "ScreenshotUpload",
-          "columnsFrom": [
-            "screenshotId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["screenshotId"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1481,12 +1379,8 @@
           "name": "MatchedBet_userId_User_id_fk",
           "tableFrom": "MatchedBet",
           "tableTo": "User",
-          "columnsFrom": [
-            "userId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["userId"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1494,12 +1388,8 @@
           "name": "MatchedBet_backBetId_BackBet_id_fk",
           "tableFrom": "MatchedBet",
           "tableTo": "BackBet",
-          "columnsFrom": [
-            "backBetId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["backBetId"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1507,12 +1397,8 @@
           "name": "MatchedBet_layBetId_LayBet_id_fk",
           "tableFrom": "MatchedBet",
           "tableTo": "LayBet",
-          "columnsFrom": [
-            "layBetId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["layBetId"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1520,12 +1406,8 @@
           "name": "MatchedBet_promoId_Promo_id_fk",
           "tableFrom": "MatchedBet",
           "tableTo": "Promo",
-          "columnsFrom": [
-            "promoId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["promoId"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1599,12 +1481,8 @@
           "name": "Promo_userId_User_id_fk",
           "tableFrom": "Promo",
           "tableTo": "User",
-          "columnsFrom": [
-            "userId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["userId"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1654,12 +1532,8 @@
           "name": "QualifyingBet_freeBetId_FreeBet_id_fk",
           "tableFrom": "QualifyingBet",
           "tableTo": "FreeBet",
-          "columnsFrom": [
-            "freeBetId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["freeBetId"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1667,12 +1541,8 @@
           "name": "QualifyingBet_matchedBetId_MatchedBet_id_fk",
           "tableFrom": "QualifyingBet",
           "tableTo": "MatchedBet",
-          "columnsFrom": [
-            "matchedBetId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["matchedBetId"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1765,12 +1635,8 @@
           "name": "ScreenshotUpload_userId_User_id_fk",
           "tableFrom": "ScreenshotUpload",
           "tableTo": "User",
-          "columnsFrom": [
-            "userId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["userId"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1873,12 +1739,8 @@
           "name": "UserSettings_userId_User_id_fk",
           "tableFrom": "UserSettings",
           "tableTo": "User",
-          "columnsFrom": [
-            "userId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["userId"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1888,9 +1750,7 @@
         "UserSettings_userId_unique": {
           "name": "UserSettings_userId_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "userId"
-          ]
+          "columns": ["userId"]
         }
       }
     },
@@ -1955,12 +1815,8 @@
           "name": "Wallet_userId_User_id_fk",
           "tableFrom": "Wallet",
           "tableTo": "User",
-          "columnsFrom": [
-            "userId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["userId"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -2052,12 +1908,8 @@
           "name": "WalletTransaction_walletId_Wallet_id_fk",
           "tableFrom": "WalletTransaction",
           "tableTo": "Wallet",
-          "columnsFrom": [
-            "walletId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["walletId"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -2065,12 +1917,8 @@
           "name": "WalletTransaction_relatedAccountId_Account_id_fk",
           "tableFrom": "WalletTransaction",
           "tableTo": "Account",
-          "columnsFrom": [
-            "relatedAccountId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["relatedAccountId"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -2078,12 +1926,8 @@
           "name": "WalletTransaction_relatedWalletId_Wallet_id_fk",
           "tableFrom": "WalletTransaction",
           "tableTo": "Wallet",
-          "columnsFrom": [
-            "relatedWalletId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["relatedWalletId"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
