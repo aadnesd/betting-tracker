@@ -4675,6 +4675,7 @@ export type CreateFreeBetParams = {
   stakeReturned?: boolean;
   winWageringMultiplier?: number | null;
   winWageringMinOdds?: number | null;
+  winWageringExpiresInDays?: number | null;
 };
 
 /**
@@ -4705,6 +4706,7 @@ export async function createFreeBet(params: CreateFreeBetParams) {
           params.winWageringMinOdds != null
             ? params.winWageringMinOdds.toString()
             : null,
+        winWageringExpiresInDays: params.winWageringExpiresInDays ?? null,
         winWageringProgress: "0",
       })
       .returning();
@@ -4790,9 +4792,11 @@ export async function listFreeBetsByUser({
         stakeReturned: freeBet.stakeReturned,
         winWageringMultiplier: freeBet.winWageringMultiplier,
         winWageringMinOdds: freeBet.winWageringMinOdds,
+        winWageringExpiresInDays: freeBet.winWageringExpiresInDays,
         winWageringRequirement: freeBet.winWageringRequirement,
         winWageringProgress: freeBet.winWageringProgress,
         winWageringStartedAt: freeBet.winWageringStartedAt,
+        winWageringExpiresAt: freeBet.winWageringExpiresAt,
         winWageringCompletedAt: freeBet.winWageringCompletedAt,
       })
       .from(freeBet)
@@ -4855,6 +4859,7 @@ export type UpdateFreeBetParams = {
   stakeReturned?: boolean;
   winWageringMultiplier?: number | null;
   winWageringMinOdds?: number | null;
+  winWageringExpiresInDays?: number | null;
 };
 
 /**
@@ -4900,6 +4905,9 @@ export async function updateFreeBet(params: UpdateFreeBetParams) {
         params.winWageringMinOdds === null
           ? null
           : params.winWageringMinOdds.toString();
+    }
+    if (params.winWageringExpiresInDays !== undefined) {
+      updates.winWageringExpiresInDays = params.winWageringExpiresInDays;
     }
 
     if (Object.keys(updates).length === 0) {
@@ -5028,12 +5036,20 @@ export async function activateFreeBetWageringOnWin({
     const requirement = winAmount * multiplier;
     const now = new Date();
 
+    // Calculate expiry date based on expiresInDays
+    let expiresAt: Date | null = null;
+    if (fb.winWageringExpiresInDays) {
+      expiresAt = new Date(now);
+      expiresAt.setDate(expiresAt.getDate() + fb.winWageringExpiresInDays);
+    }
+
     const [result] = await db
       .update(freeBet)
       .set({
         winWageringRequirement: requirement.toFixed(2),
         winWageringProgress: "0",
         winWageringStartedAt: now,
+        winWageringExpiresAt: expiresAt,
         winWageringCompletedAt: null,
       })
       .where(and(eq(freeBet.id, freeBetId), eq(freeBet.userId, userId)))
@@ -5049,8 +5065,9 @@ export async function activateFreeBetWageringOnWin({
         winWageringRequirement: requirement,
         winAmount,
         multiplier,
+        expiresAt: expiresAt?.toISOString() ?? null,
       },
-      notes: `Free bet winnings wagering activated: ${requirement.toFixed(2)}`,
+      notes: `Free bet winnings wagering activated: ${requirement.toFixed(2)}${expiresAt ? ` (expires ${expiresAt.toLocaleDateString()})` : ""}`,
     });
 
     return result ?? fb;
@@ -5675,6 +5692,7 @@ export async function createLockedPromo({
   stakeReturned,
   winWageringMultiplier,
   winWageringMinOdds,
+  winWageringExpiresInDays,
 }: {
   userId: string;
   accountId: string;
@@ -5690,6 +5708,7 @@ export async function createLockedPromo({
   stakeReturned?: boolean;
   winWageringMultiplier?: number | null;
   winWageringMinOdds?: number | null;
+  winWageringExpiresInDays?: number | null;
 }) {
   try {
     const [result] = await db
@@ -5716,6 +5735,7 @@ export async function createLockedPromo({
             : null,
         winWageringMinOdds:
           winWageringMinOdds != null ? String(winWageringMinOdds) : null,
+        winWageringExpiresInDays: winWageringExpiresInDays ?? null,
         winWageringProgress: "0",
       })
       .returning();

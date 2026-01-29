@@ -218,6 +218,13 @@
       "when": 1769638754913,
       "tag": "0030_many_morlocks",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1769677009891,
+      "tag": "0031_legal_purifiers",
+      "breakpoints": true
     }
   ]
 }

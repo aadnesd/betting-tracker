@@ -2,6 +2,7 @@ import type { InferSelectModel } from "drizzle-orm";
 import {
   boolean,
   foreignKey,
+  integer,
   jsonb,
   numeric,
   pgTable,
@@ -327,7 +328,11 @@ export const freeBet = pgTable("FreeBet", {
     precision: 14,
     scale: 2,
   }).default("0"),
+  // Days allowed to complete wagering after the free bet wins
+  winWageringExpiresInDays: integer("winWageringExpiresInDays"),
   winWageringStartedAt: timestamp("winWageringStartedAt"),
+  // Calculated deadline: startedAt + expiresInDays
+  winWageringExpiresAt: timestamp("winWageringExpiresAt"),
   winWageringCompletedAt: timestamp("winWageringCompletedAt"),
 });
 

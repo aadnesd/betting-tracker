@@ -46,6 +46,7 @@ interface FreeBetFormProps {
     stakeReturned?: boolean;
     winWageringMultiplier?: string | null;
     winWageringMinOdds?: string | null;
+    winWageringExpiresInDays?: number | null;
   };
   mode: "create" | "edit";
 }
@@ -66,6 +67,7 @@ interface FormData {
   hasWinWageringRequirements: boolean;
   winWageringMultiplier: string;
   winWageringMinOdds: string;
+  winWageringExpiresInDays: string;
 }
 
 const CURRENCIES = ["NOK", "EUR", "GBP", "USD", "SEK", "DKK"] as const;
@@ -90,6 +92,7 @@ export function FreeBetForm({ accounts, initialData, mode }: FreeBetFormProps) {
     hasWinWageringRequirements: hasExistingWinWagering,
     winWageringMultiplier: initialData?.winWageringMultiplier ?? "",
     winWageringMinOdds: initialData?.winWageringMinOdds ?? "",
+    winWageringExpiresInDays: initialData?.winWageringExpiresInDays?.toString() ?? "",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showUnlockSection, setShowUnlockSection] = useState(hasExistingUnlock);
@@ -179,6 +182,13 @@ export function FreeBetForm({ accounts, initialData, mode }: FreeBetFormProps) {
           newErrors.winWageringMinOdds = "Min odds must be at least 1.0";
         }
       }
+
+      if (formData.winWageringExpiresInDays) {
+        const days = Number.parseInt(formData.winWageringExpiresInDays, 10);
+        if (Number.isNaN(days) || days < 1) {
+          newErrors.winWageringExpiresInDays = "Days must be at least 1";
+        }
+      }
     }
 
     setErrors(newErrors);
@@ -215,10 +225,14 @@ export function FreeBetForm({ accounts, initialData, mode }: FreeBetFormProps) {
               winWageringMinOdds: formData.winWageringMinOdds
                 ? Number.parseFloat(formData.winWageringMinOdds)
                 : null,
+              winWageringExpiresInDays: formData.winWageringExpiresInDays
+                ? Number.parseInt(formData.winWageringExpiresInDays, 10)
+                : null,
             }
           : {
               winWageringMultiplier: null,
               winWageringMinOdds: null,
+              winWageringExpiresInDays: null,
             }),
         // Unlock requirements (only if enabled)
         ...(formData.hasUnlockRequirements && {
@@ -679,6 +693,35 @@ export function FreeBetForm({ accounts, initialData, mode }: FreeBetFormProps) {
                 <p className="text-muted-foreground text-xs">
                   Minimum odds required for bets to count toward wagering the
                   winnings.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="winWageringExpiresInDays">
+                  Days to Complete Wagering (optional)
+                </Label>
+                <Input
+                  id="winWageringExpiresInDays"
+                  type="number"
+                  step="1"
+                  min="1"
+                  placeholder="e.g., 30"
+                  value={formData.winWageringExpiresInDays}
+                  onChange={(e) =>
+                    updateField("winWageringExpiresInDays", e.target.value)
+                  }
+                  className={
+                    errors.winWageringExpiresInDays ? "border-destructive" : ""
+                  }
+                />
+                {errors.winWageringExpiresInDays && (
+                  <p className="text-xs text-destructive">
+                    {errors.winWageringExpiresInDays}
+                  </p>
+                )}
+                <p className="text-muted-foreground text-xs">
+                  After the free bet wins, how many days do you have to complete
+                  the wagering? Leave blank if no time limit.
                 </p>
               </div>
             </>
