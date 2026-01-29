@@ -1,11 +1,11 @@
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/app/(auth)/auth";
 import {
-  getFreeBetById,
-  updateFreeBet,
-  markFreeBetAsUsed,
   deleteFreeBet,
+  getFreeBetById,
+  markFreeBetAsUsed,
+  updateFreeBet,
 } from "@/lib/db/queries";
 
 const updateFreeBetSchema = z.object({
@@ -22,11 +22,11 @@ const updateFreeBetSchema = z.object({
   winWageringMinOdds: z.number().positive().optional().nullable(),
 });
 
-interface RouteParams {
+type RouteParams = {
   params: Promise<{ id: string }>;
-}
+};
 
-export async function GET(request: NextRequest, { params }: RouteParams) {
+export async function GET(_request: NextRequest, { params }: RouteParams) {
   const session = await auth();
 
   if (!session) {
@@ -40,7 +40,10 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const freeBet = await getFreeBetById({ id, userId });
 
     if (!freeBet) {
-      return NextResponse.json({ error: "Free bet not found" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Free bet not found" },
+        { status: 404 }
+      );
     }
 
     return NextResponse.json(freeBet);
@@ -67,7 +70,10 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     const freeBet = await getFreeBetById({ id, userId });
 
     if (!freeBet) {
-      return NextResponse.json({ error: "Free bet not found" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Free bet not found" },
+        { status: 404 }
+      );
     }
 
     const body = await request.json();
@@ -98,11 +104,12 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       value: parsed.data.value,
       currency: parsed.data.currency,
       minOdds: parsed.data.minOdds,
-      expiresAt: parsed.data.expiresAt !== undefined
-        ? parsed.data.expiresAt === null
-          ? null
-          : new Date(parsed.data.expiresAt)
-        : undefined,
+      expiresAt:
+        parsed.data.expiresAt !== undefined
+          ? parsed.data.expiresAt === null
+            ? null
+            : new Date(parsed.data.expiresAt)
+          : undefined,
       status: parsed.data.status,
       notes: parsed.data.notes,
       stakeReturned: parsed.data.stakeReturned,
@@ -120,7 +127,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   }
 }
 
-export async function DELETE(request: NextRequest, { params }: RouteParams) {
+export async function DELETE(_request: NextRequest, { params }: RouteParams) {
   const session = await auth();
 
   if (!session) {
@@ -134,14 +141,20 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     const result = await deleteFreeBet({ id, userId });
 
     if (!result) {
-      return NextResponse.json({ error: "Free bet not found" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Free bet not found" },
+        { status: 404 }
+      );
     }
 
     return NextResponse.json({ success: true });
   } catch (error: unknown) {
     console.error("Error deleting free bet:", error);
 
-    if (error instanceof Error && error.message.includes("Cannot delete a used")) {
+    if (
+      error instanceof Error &&
+      error.message.includes("Cannot delete a used")
+    ) {
       return NextResponse.json(
         { error: "Cannot delete a used free bet" },
         { status: 400 }

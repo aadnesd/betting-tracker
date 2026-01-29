@@ -2,26 +2,26 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/app/(auth)/auth";
 import {
+  activateFreeBetWageringOnWin,
   createAccountTransaction,
   createAuditEntry,
-  activateFreeBetWageringOnWin,
   getAccountById,
   getBackBetById,
   getFreeBetByMatchedBetId,
   getLayBetById,
   getMatchedBetByLegId,
   processFreeBetWageringProgressOnSettle,
-  updateMatchedBetRecord,
+  processWageringProgressOnSettle,
   updateBackBet,
   updateLayBet,
-  processWageringProgressOnSettle,
+  updateMatchedBetRecord,
 } from "@/lib/db/queries";
+import { convertAmountToNok } from "@/lib/fx-rates";
 import {
-  calculateProfitLoss,
   calculateLayProfitLoss,
+  calculateProfitLoss,
   isFreeBetPromoType,
 } from "@/lib/settlement";
-import { convertAmountToNok } from "@/lib/fx-rates";
 
 const settleSchema = z.object({
   betId: z.string().uuid(),
@@ -32,7 +32,7 @@ const settleSchema = z.object({
 
 /**
  * Calculate P&L for a bet based on outcome
- * 
+ *
  * @param commissionRate - For lay bets, the exchange commission rate as a decimal (e.g., 0.05 for 5%)
  */
 function calculateBetProfitLoss(
@@ -45,7 +45,8 @@ function calculateBetProfitLoss(
   commissionRate = 0
 ): number {
   // Convert outcome to settlement outcome type
-  const betOutcome = outcome === "won" ? "win" : outcome === "lost" ? "loss" : "push";
+  const betOutcome =
+    outcome === "won" ? "win" : outcome === "lost" ? "loss" : "push";
 
   if (kind === "back") {
     return calculateProfitLoss(
@@ -62,7 +63,12 @@ function calculateBetProfitLoss(
   // So we need to flip: layer won → back lost, layer lost → back won
   const layOutcomeFromBackPerspective =
     betOutcome === "win" ? "loss" : betOutcome === "loss" ? "win" : "push";
-  return calculateLayProfitLoss(layOutcomeFromBackPerspective, stake, odds, commissionRate);
+  return calculateLayProfitLoss(
+    layOutcomeFromBackPerspective,
+    stake,
+    odds,
+    commissionRate
+  );
 }
 
 export async function POST(request: Request) {
@@ -124,7 +130,9 @@ export async function POST(request: Request) {
         : null;
       matchedFreeBetId = freeBet?.id ?? null;
       freeBetStakeReturned = freeBet?.stakeReturned ?? false;
-      isFreeBet = freeBet ? true : isFreeBetPromoType(matchedBet?.promoType ?? null);
+      isFreeBet = freeBet
+        ? true
+        : isFreeBetPromoType(matchedBet?.promoType ?? null);
     }
 
     // For lay bets, get the exchange account's commission rate
@@ -223,11 +231,7 @@ export async function POST(request: Request) {
       });
     }
 
-    if (
-      body.betKind === "back" &&
-      matchedFreeBetId &&
-      body.outcome === "won"
-    ) {
+    if (body.betKind === "back" && matchedFreeBetId && body.outcome === "won") {
       const winAmount = freeBetStakeReturned
         ? stake * odds
         : stake * (odds - 1);
@@ -263,7 +267,8 @@ export async function POST(request: Request) {
             changes: {
               status: { from: matchedBet.status, to: "settled" },
             },
-            notes: "Marked matched bet settled after both legs were manually settled.",
+            notes:
+              "Marked matched bet settled after both legs were manually settled.",
           });
         }
       }

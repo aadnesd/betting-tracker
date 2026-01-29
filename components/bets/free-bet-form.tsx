@@ -160,7 +160,8 @@ export function FreeBetForm({ accounts, initialData, mode }: FreeBetFormProps) {
       if (formData.unlockMinOdds) {
         const unlockOdds = Number.parseFloat(formData.unlockMinOdds);
         if (Number.isNaN(unlockOdds) || unlockOdds < 1) {
-        newErrors.unlockMinOdds = "Min odds must be at least 1.0";
+          newErrors.unlockMinOdds = "Min odds must be at least 1.0";
+        }
       }
     }
 
@@ -178,7 +179,6 @@ export function FreeBetForm({ accounts, initialData, mode }: FreeBetFormProps) {
           newErrors.winWageringMinOdds = "Min odds must be at least 1.0";
         }
       }
-    }
     }
 
     setErrors(newErrors);
@@ -201,10 +201,10 @@ export function FreeBetForm({ accounts, initialData, mode }: FreeBetFormProps) {
         name: formData.name.trim(),
         value: Number.parseFloat(formData.value),
         currency: formData.currency,
-        minOdds: formData.minOdds
-          ? Number.parseFloat(formData.minOdds)
+        minOdds: formData.minOdds ? Number.parseFloat(formData.minOdds) : null,
+        expiresAt: formData.expiresAt
+          ? new Date(formData.expiresAt).toISOString()
           : null,
-        expiresAt: formData.expiresAt ? new Date(formData.expiresAt).toISOString() : null,
         notes: formData.notes.trim() || null,
         stakeReturned: formData.stakeReturned,
         ...(formData.hasWinWageringRequirements
@@ -298,7 +298,10 @@ export function FreeBetForm({ accounts, initialData, mode }: FreeBetFormProps) {
             {bookmakers.length === 0 ? (
               <div className="p-2 text-center text-sm text-muted-foreground">
                 No bookmaker accounts found.{" "}
-                <a href="/bets/settings/accounts/new" className="text-primary underline">
+                <a
+                  href="/bets/settings/accounts/new"
+                  className="text-primary underline"
+                >
                   Add one first
                 </a>
               </div>
@@ -448,7 +451,10 @@ export function FreeBetForm({ accounts, initialData, mode }: FreeBetFormProps) {
 
       {/* Unlock Requirements (Collapsible) */}
       {mode === "create" && (
-        <Collapsible open={showUnlockSection} onOpenChange={setShowUnlockSection}>
+        <Collapsible
+          open={showUnlockSection}
+          onOpenChange={setShowUnlockSection}
+        >
           <CollapsibleTrigger asChild>
             <Button
               type="button"
@@ -465,8 +471,9 @@ export function FreeBetForm({ accounts, initialData, mode }: FreeBetFormProps) {
           </CollapsibleTrigger>
           <CollapsibleContent className="mt-4 space-y-4 rounded-lg border bg-muted/30 p-4">
             <p className="text-muted-foreground text-sm">
-              If this free bet requires placing qualifying bets first (e.g., "Bet £50 to unlock £10 free bet"),
-              enter the requirements below to track your progress.
+              If this free bet requires placing qualifying bets first (e.g.,
+              "Bet £50 to unlock £10 free bet"), enter the requirements below to
+              track your progress.
             </p>
 
             {/* Enable unlock tracking */}
@@ -522,9 +529,13 @@ export function FreeBetForm({ accounts, initialData, mode }: FreeBetFormProps) {
                     type="number"
                     step={formData.unlockType === "stake" ? "0.01" : "1"}
                     min={formData.unlockType === "stake" ? "0.01" : "1"}
-                    placeholder={formData.unlockType === "stake" ? "50.00" : "3"}
+                    placeholder={
+                      formData.unlockType === "stake" ? "50.00" : "3"
+                    }
                     value={formData.unlockTarget}
-                    onChange={(e) => updateField("unlockTarget", e.target.value)}
+                    onChange={(e) =>
+                      updateField("unlockTarget", e.target.value)
+                    }
                     className={errors.unlockTarget ? "border-destructive" : ""}
                   />
                   {errors.unlockTarget && (
@@ -551,7 +562,9 @@ export function FreeBetForm({ accounts, initialData, mode }: FreeBetFormProps) {
                     min="1.00"
                     placeholder="e.g., 1.50"
                     value={formData.unlockMinOdds}
-                    onChange={(e) => updateField("unlockMinOdds", e.target.value)}
+                    onChange={(e) =>
+                      updateField("unlockMinOdds", e.target.value)
+                    }
                     className={errors.unlockMinOdds ? "border-destructive" : ""}
                   />
                   {errors.unlockMinOdds && (
@@ -590,8 +603,9 @@ export function FreeBetForm({ accounts, initialData, mode }: FreeBetFormProps) {
         </CollapsibleTrigger>
         <CollapsibleContent className="mt-4 space-y-4 rounded-lg border bg-muted/30 p-4">
           <p className="text-muted-foreground text-sm">
-            If the free bet wins and the bookmaker requires wagering on the winnings,
-            enter the multiplier below to track progress after the win.
+            If the free bet wins and the bookmaker requires wagering on the
+            winnings, enter the multiplier below to track progress after the
+            win.
           </p>
 
           <div className="flex items-center gap-2">
@@ -612,7 +626,9 @@ export function FreeBetForm({ accounts, initialData, mode }: FreeBetFormProps) {
           {formData.hasWinWageringRequirements && (
             <>
               <div className="space-y-2">
-                <Label htmlFor="winWageringMultiplier">Wagering Multiplier</Label>
+                <Label htmlFor="winWageringMultiplier">
+                  Wagering Multiplier
+                </Label>
                 <Input
                   id="winWageringMultiplier"
                   type="number"
@@ -661,7 +677,8 @@ export function FreeBetForm({ accounts, initialData, mode }: FreeBetFormProps) {
                   </p>
                 )}
                 <p className="text-muted-foreground text-xs">
-                  Minimum odds required for bets to count toward wagering the winnings.
+                  Minimum odds required for bets to count toward wagering the
+                  winnings.
                 </p>
               </div>
             </>
@@ -681,7 +698,8 @@ export function FreeBetForm({ accounts, initialData, mode }: FreeBetFormProps) {
               ` (min odds: ${initialData.unlockMinOdds})`}
           </p>
           <p className="mt-1 text-muted-foreground text-xs">
-            Note: Unlock requirements cannot be edited after creation. Track progress on the promo detail page.
+            Note: Unlock requirements cannot be edited after creation. Track
+            progress on the promo detail page.
           </p>
         </div>
       )}
@@ -716,7 +734,9 @@ export function FreeBetForm({ accounts, initialData, mode }: FreeBetFormProps) {
         <div className="border-t pt-6 mt-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-destructive">Danger Zone</p>
+              <p className="text-sm font-medium text-destructive">
+                Danger Zone
+              </p>
               <p className="text-xs text-muted-foreground mt-1">
                 Delete this free bet permanently. This cannot be undone.
               </p>
