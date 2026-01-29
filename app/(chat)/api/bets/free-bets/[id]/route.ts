@@ -20,6 +20,7 @@ const updateFreeBetSchema = z.object({
   stakeReturned: z.boolean().optional(),
   winWageringMultiplier: z.number().positive().optional().nullable(),
   winWageringMinOdds: z.number().positive().optional().nullable(),
+  winWageringExpiresInDays: z.number().int().positive().optional().nullable(),
 });
 
 type RouteParams = {
