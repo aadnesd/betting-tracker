@@ -17,6 +17,9 @@ const updateFreeBetSchema = z.object({
   notes: z.string().max(500).optional().nullable(),
   status: z.enum(["active", "used", "expired"]).optional(),
   usedInMatchedBetId: z.string().uuid().optional().nullable(),
+  stakeReturned: z.boolean().optional(),
+  winWageringMultiplier: z.number().positive().optional().nullable(),
+  winWageringMinOdds: z.number().positive().optional().nullable(),
 });
 
 interface RouteParams {
@@ -102,6 +105,9 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         : undefined,
       status: parsed.data.status,
       notes: parsed.data.notes,
+      stakeReturned: parsed.data.stakeReturned,
+      winWageringMultiplier: parsed.data.winWageringMultiplier,
+      winWageringMinOdds: parsed.data.winWageringMinOdds,
     });
 
     return NextResponse.json(updated);

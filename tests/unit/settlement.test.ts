@@ -433,7 +433,7 @@ describe("settlement outcome logic", () => {
     it("applies exchange commission when back loses (lay wins)", () => {
       // Back £100 @ 2.00, Lay £100 @ 2.00, 5% exchange commission
       // Back loses: -£100, Lay wins: +£100 gross, -£5 commission = +£95 net
-      const result = calculateMatchedBetProfitLoss("loss", 100, 2.0, 100, 2.0, false, 0.05);
+      const result = calculateMatchedBetProfitLoss("loss", 100, 2.0, 100, 2.0, false, false, 0.05);
 
       expect(result.backProfitLoss).toBe(-100);
       expect(result.layProfitLoss).toBe(95); // 100 * (1 - 0.05)
@@ -443,7 +443,7 @@ describe("settlement outcome logic", () => {
     it("does not apply commission when back wins (lay loses)", () => {
       // Back £100 @ 2.00, Lay £100 @ 2.00, 5% exchange commission
       // Back wins: +£100, Lay loses: -£100 (no commission on losses)
-      const result = calculateMatchedBetProfitLoss("win", 100, 2.0, 100, 2.0, false, 0.05);
+      const result = calculateMatchedBetProfitLoss("win", 100, 2.0, 100, 2.0, false, false, 0.05);
 
       expect(result.backProfitLoss).toBe(100);
       expect(result.layProfitLoss).toBe(-100); // Full liability, no commission
@@ -453,7 +453,7 @@ describe("settlement outcome logic", () => {
     it("calculates free bet with commission correctly", () => {
       // Free bet £100 @ 5.00, Lay £80 @ 5.10, 2% exchange commission
       // Free bet loses: £0, Lay wins: +£80 gross, -£1.60 commission = +£78.40 net
-      const result = calculateMatchedBetProfitLoss("loss", 100, 5.0, 80, 5.1, true, 0.02);
+      const result = calculateMatchedBetProfitLoss("loss", 100, 5.0, 80, 5.1, true, false, 0.02);
 
       expect(result.backProfitLoss).toBe(0); // Free bet loss = 0
       expect(result.layProfitLoss).toBeCloseTo(78.4); // 80 * (1 - 0.02)

@@ -88,6 +88,21 @@ export default async function FreeBetDetailPage({
   const progressPercent =
     unlockTarget > 0 ? Math.min((unlockProgress / unlockTarget) * 100, 100) : 100;
 
+  const hasWinWageringConfig = freeBet.winWageringMultiplier != null;
+  const winWageringMultiplier = freeBet.winWageringMultiplier
+    ? Number.parseFloat(freeBet.winWageringMultiplier)
+    : 0;
+  const winWageringRequirement = freeBet.winWageringRequirement
+    ? Number.parseFloat(freeBet.winWageringRequirement)
+    : 0;
+  const winWageringProgress = freeBet.winWageringProgress
+    ? Number.parseFloat(freeBet.winWageringProgress)
+    : 0;
+  const winWageringPercent =
+    winWageringRequirement > 0
+      ? Math.min((winWageringProgress / winWageringRequirement) * 100, 100)
+      : 0;
+
   return (
     <div className="space-y-6 p-4 md:p-8">
       <div className="flex flex-col items-start justify-between gap-3 md:flex-row md:items-center">
@@ -160,6 +175,12 @@ export default async function FreeBetDetailPage({
             <div>
               <dt className="text-muted-foreground">Status</dt>
               <dd>{getStatusBadge(freeBet.status)}</dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground">Stake Returned</dt>
+              <dd className="font-medium">
+                {freeBet.stakeReturned ? "Yes" : "No"}
+              </dd>
             </div>
             {freeBet.notes && (
               <div className="col-span-2">
@@ -273,6 +294,64 @@ export default async function FreeBetDetailPage({
         </Card>
       )}
 
+      {hasWinWageringConfig && (
+        <Card className="max-w-2xl">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Target className="h-5 w-5 text-blue-600" />
+              Winnings Wagering
+            </CardTitle>
+            <CardDescription>
+              Track wagering requirements for free bet winnings.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {winWageringRequirement > 0 ? (
+              <>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">
+                      {freeBet.currency} {winWageringProgress.toFixed(2)} of{" "}
+                      {winWageringRequirement.toFixed(2)}
+                    </span>
+                    <span className="font-medium">{winWageringPercent.toFixed(0)}%</span>
+                  </div>
+                  <Progress value={winWageringPercent} className="bg-blue-100" />
+                </div>
+                <dl className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <dt className="text-muted-foreground">Multiplier</dt>
+                    <dd className="font-medium">{winWageringMultiplier.toFixed(2)}×</dd>
+                  </div>
+                  {freeBet.winWageringMinOdds && (
+                    <div>
+                      <dt className="text-muted-foreground">Min Odds</dt>
+                      <dd className="font-medium">
+                        {Number.parseFloat(freeBet.winWageringMinOdds).toFixed(2)}
+                      </dd>
+                    </div>
+                  )}
+                </dl>
+              </>
+            ) : (
+              <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
+                Wagering will start after this free bet wins. Multiplier:{" "}
+                <span className="font-medium text-foreground">
+                  {winWageringMultiplier.toFixed(2)}×
+                </span>
+                {freeBet.winWageringMinOdds && (
+                  <span>
+                    {" "}
+                    • Min odds:{" "}
+                    {Number.parseFloat(freeBet.winWageringMinOdds).toFixed(2)}
+                  </span>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Edit Form (only for active free bets) */}
       {isEditable && (
         <Card className="max-w-2xl">
@@ -301,6 +380,9 @@ export default async function FreeBetDetailPage({
                 unlockType: freeBet.unlockType as "stake" | "bets" | null,
                 unlockTarget: freeBet.unlockTarget ?? undefined,
                 unlockMinOdds: freeBet.unlockMinOdds ?? undefined,
+                stakeReturned: freeBet.stakeReturned ?? false,
+                winWageringMultiplier: freeBet.winWageringMultiplier ?? undefined,
+                winWageringMinOdds: freeBet.winWageringMinOdds ?? undefined,
               }}
             />
           </CardContent>

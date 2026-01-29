@@ -11,6 +11,9 @@ const createFreeBetSchema = z.object({
   minOdds: z.number().positive().optional().nullable(),
   expiresAt: z.string().datetime().optional().nullable(),
   notes: z.string().max(500).optional().nullable(),
+  stakeReturned: z.boolean().optional(),
+  winWageringMultiplier: z.number().positive().optional().nullable(),
+  winWageringMinOdds: z.number().positive().optional().nullable(),
   // Unlock requirements (optional - for promos that need to be unlocked)
   unlockType: z.enum(["stake", "bets"]).optional(),
   unlockTarget: z.number().positive().optional(),
@@ -62,6 +65,9 @@ export async function POST(request: NextRequest) {
         unlockType: parsed.data.unlockType,
         unlockTarget: parsed.data.unlockTarget,
         unlockMinOdds: parsed.data.unlockMinOdds ?? undefined,
+        stakeReturned: parsed.data.stakeReturned,
+        winWageringMultiplier: parsed.data.winWageringMultiplier ?? null,
+        winWageringMinOdds: parsed.data.winWageringMinOdds ?? null,
       });
     } else {
       // Create a regular free bet (already unlocked)
@@ -74,6 +80,9 @@ export async function POST(request: NextRequest) {
         minOdds: parsed.data.minOdds,
         expiresAt: parsed.data.expiresAt ? new Date(parsed.data.expiresAt) : null,
         notes: parsed.data.notes || null,
+        stakeReturned: parsed.data.stakeReturned,
+        winWageringMultiplier: parsed.data.winWageringMultiplier ?? null,
+        winWageringMinOdds: parsed.data.winWageringMinOdds ?? null,
       });
     }
 
