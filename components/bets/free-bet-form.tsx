@@ -43,6 +43,10 @@ interface FreeBetFormProps {
     unlockType?: "stake" | "bets" | null;
     unlockTarget?: string;
     unlockMinOdds?: string;
+    stakeReturned?: boolean;
+    winWageringMultiplier?: string | null;
+    winWageringMinOdds?: string | null;
+    winWageringExpiresInDays?: number | null;
   };
   mode: "create" | "edit";
 }
@@ -59,6 +63,11 @@ interface FormData {
   unlockType: "stake" | "bets";
   unlockTarget: string;
   unlockMinOdds: string;
+  stakeReturned: boolean;
+  hasWinWageringRequirements: boolean;
+  winWageringMultiplier: string;
+  winWageringMinOdds: string;
+  winWageringExpiresInDays: string;
 }
 
 const CURRENCIES = ["NOK", "EUR", "GBP", "USD", "SEK", "DKK"] as const;
@@ -66,6 +75,7 @@ const CURRENCIES = ["NOK", "EUR", "GBP", "USD", "SEK", "DKK"] as const;
 export function FreeBetForm({ accounts, initialData, mode }: FreeBetFormProps) {
   const router = useRouter();
   const hasExistingUnlock = initialData?.unlockType != null;
+  const hasExistingWinWagering = initialData?.winWageringMultiplier != null;
   const [formData, setFormData] = useState<FormData>({
     accountId: initialData?.accountId ?? "",
     name: initialData?.name ?? "",
@@ -78,9 +88,17 @@ export function FreeBetForm({ accounts, initialData, mode }: FreeBetFormProps) {
     unlockType: initialData?.unlockType ?? "stake",
     unlockTarget: initialData?.unlockTarget ?? "",
     unlockMinOdds: initialData?.unlockMinOdds ?? "",
+    stakeReturned: initialData?.stakeReturned ?? false,
+    hasWinWageringRequirements: hasExistingWinWagering,
+    winWageringMultiplier: initialData?.winWageringMultiplier ?? "",
+    winWageringMinOdds: initialData?.winWageringMinOdds ?? "",
+    winWageringExpiresInDays: initialData?.winWageringExpiresInDays?.toString() ?? "",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showUnlockSection, setShowUnlockSection] = useState(hasExistingUnlock);
+  const [showWinWageringSection, setShowWinWageringSection] = useState(
+    hasExistingWinWagering
+  );
   const [errors, setErrors] = useState<Partial<Record<keyof FormData, string>>>(
     {}
   );
@@ -150,6 +168,29 @@ export function FreeBetForm({ accounts, initialData, mode }: FreeBetFormProps) {
       }
     }
 
+    if (formData.hasWinWageringRequirements) {
+      const multiplier = Number.parseFloat(formData.winWageringMultiplier);
+      if (!formData.winWageringMultiplier || Number.isNaN(multiplier)) {
+        newErrors.winWageringMultiplier = "Wagering multiplier is required";
+      } else if (multiplier <= 0) {
+        newErrors.winWageringMultiplier = "Multiplier must be positive";
+      }
+
+      if (formData.winWageringMinOdds) {
+        const winMinOdds = Number.parseFloat(formData.winWageringMinOdds);
+        if (Number.isNaN(winMinOdds) || winMinOdds < 1) {
+          newErrors.winWageringMinOdds = "Min odds must be at least 1.0";
+        }
+      }
+
+      if (formData.winWageringExpiresInDays) {
+        const days = Number.parseInt(formData.winWageringExpiresInDays, 10);
+        if (Number.isNaN(days) || days < 1) {
+          newErrors.winWageringExpiresInDays = "Days must be at least 1";
+        }
+      }
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -170,11 +211,29 @@ export function FreeBetForm({ accounts, initialData, mode }: FreeBetFormProps) {
         name: formData.name.trim(),
         value: Number.parseFloat(formData.value),
         currency: formData.currency,
-        minOdds: formData.minOdds
-          ? Number.parseFloat(formData.minOdds)
+        minOdds: formData.minOdds ? Number.parseFloat(formData.minOdds) : null,
+        expiresAt: formData.expiresAt
+          ? new Date(formData.expiresAt).toISOString()
           : null,
-        expiresAt: formData.expiresAt ? new Date(formData.expiresAt).toISOString() : null,
         notes: formData.notes.trim() || null,
+        stakeReturned: formData.stakeReturned,
+        ...(formData.hasWinWageringRequirements
+          ? {
+              winWageringMultiplier: Number.parseFloat(
+                formData.winWageringMultiplier
+              ),
+              winWageringMinOdds: formData.winWageringMinOdds
+                ? Number.parseFloat(formData.winWageringMinOdds)
+                : null,
+              winWageringExpiresInDays: formData.winWageringExpiresInDays
+                ? Number.parseInt(formData.winWageringExpiresInDays, 10)
+                : null,
+            }
+          : {
+              winWageringMultiplier: null,
+              winWageringMinOdds: null,
+              winWageringExpiresInDays: null,
+            }),
         // Unlock requirements (only if enabled)
         ...(formData.hasUnlockRequirements && {
           unlockType: formData.unlockType,
@@ -253,7 +312,10 @@ export function FreeBetForm({ accounts, initialData, mode }: FreeBetFormProps) {
             {bookmakers.length === 0 ? (
               <div className="p-2 text-center text-sm text-muted-foreground">
                 No bookmaker accounts found.{" "}
-                <a href="/bets/settings/accounts/new" className="text-primary underline">
+                <a
+                  href="/bets/settings/accounts/new"
+                  className="text-primary underline"
+                >
                   Add one first
                 </a>
               </div>
@@ -353,6 +415,28 @@ export function FreeBetForm({ accounts, initialData, mode }: FreeBetFormProps) {
         </p>
       </div>
 
+      {/* Stake returned */}
+      <div className="space-y-2">
+        <Label htmlFor="stakeReturned">Stake Return</Label>
+        <Select
+          value={formData.stakeReturned ? "returned" : "not_returned"}
+          onValueChange={(value) =>
+            updateField("stakeReturned", value === "returned")
+          }
+        >
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="not_returned">Stake not returned</SelectItem>
+            <SelectItem value="returned">Stake returned</SelectItem>
+          </SelectContent>
+        </Select>
+        <p className="text-xs text-muted-foreground">
+          Choose whether the free bet stake is returned on a win.
+        </p>
+      </div>
+
       {/* Expiry Date */}
       <div className="space-y-2">
         <Label htmlFor="expiresAt">Expiry Date (optional)</Label>
@@ -381,7 +465,10 @@ export function FreeBetForm({ accounts, initialData, mode }: FreeBetFormProps) {
 
       {/* Unlock Requirements (Collapsible) */}
       {mode === "create" && (
-        <Collapsible open={showUnlockSection} onOpenChange={setShowUnlockSection}>
+        <Collapsible
+          open={showUnlockSection}
+          onOpenChange={setShowUnlockSection}
+        >
           <CollapsibleTrigger asChild>
             <Button
               type="button"
@@ -398,8 +485,9 @@ export function FreeBetForm({ accounts, initialData, mode }: FreeBetFormProps) {
           </CollapsibleTrigger>
           <CollapsibleContent className="mt-4 space-y-4 rounded-lg border bg-muted/30 p-4">
             <p className="text-muted-foreground text-sm">
-              If this free bet requires placing qualifying bets first (e.g., "Bet £50 to unlock £10 free bet"),
-              enter the requirements below to track your progress.
+              If this free bet requires placing qualifying bets first (e.g.,
+              "Bet £50 to unlock £10 free bet"), enter the requirements below to
+              track your progress.
             </p>
 
             {/* Enable unlock tracking */}
@@ -455,9 +543,13 @@ export function FreeBetForm({ accounts, initialData, mode }: FreeBetFormProps) {
                     type="number"
                     step={formData.unlockType === "stake" ? "0.01" : "1"}
                     min={formData.unlockType === "stake" ? "0.01" : "1"}
-                    placeholder={formData.unlockType === "stake" ? "50.00" : "3"}
+                    placeholder={
+                      formData.unlockType === "stake" ? "50.00" : "3"
+                    }
                     value={formData.unlockTarget}
-                    onChange={(e) => updateField("unlockTarget", e.target.value)}
+                    onChange={(e) =>
+                      updateField("unlockTarget", e.target.value)
+                    }
                     className={errors.unlockTarget ? "border-destructive" : ""}
                   />
                   {errors.unlockTarget && (
@@ -484,7 +576,9 @@ export function FreeBetForm({ accounts, initialData, mode }: FreeBetFormProps) {
                     min="1.00"
                     placeholder="e.g., 1.50"
                     value={formData.unlockMinOdds}
-                    onChange={(e) => updateField("unlockMinOdds", e.target.value)}
+                    onChange={(e) =>
+                      updateField("unlockMinOdds", e.target.value)
+                    }
                     className={errors.unlockMinOdds ? "border-destructive" : ""}
                   />
                   {errors.unlockMinOdds && (
@@ -502,6 +596,139 @@ export function FreeBetForm({ accounts, initialData, mode }: FreeBetFormProps) {
         </Collapsible>
       )}
 
+      {/* Wagering requirements for winnings */}
+      <Collapsible
+        open={showWinWageringSection}
+        onOpenChange={setShowWinWageringSection}
+      >
+        <CollapsibleTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            className="flex w-full items-center justify-between p-0 hover:bg-transparent"
+          >
+            <span className="font-medium text-sm">
+              Winnings Wagering Requirements (optional)
+            </span>
+            <ChevronDown
+              className={`h-4 w-4 transition-transform ${showWinWageringSection ? "rotate-180" : ""}`}
+            />
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="mt-4 space-y-4 rounded-lg border bg-muted/30 p-4">
+          <p className="text-muted-foreground text-sm">
+            If the free bet wins and the bookmaker requires wagering on the
+            winnings, enter the multiplier below to track progress after the
+            win.
+          </p>
+
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="hasWinWageringRequirements"
+              checked={formData.hasWinWageringRequirements}
+              onChange={(e) =>
+                updateField("hasWinWageringRequirements", e.target.checked)
+              }
+              className="h-4 w-4 rounded border-gray-300"
+            />
+            <Label htmlFor="hasWinWageringRequirements" className="text-sm">
+              Winnings have wagering requirements
+            </Label>
+          </div>
+
+          {formData.hasWinWageringRequirements && (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="winWageringMultiplier">
+                  Wagering Multiplier
+                </Label>
+                <Input
+                  id="winWageringMultiplier"
+                  type="number"
+                  step="0.1"
+                  min="0.1"
+                  placeholder="e.g., 3"
+                  value={formData.winWageringMultiplier}
+                  onChange={(e) =>
+                    updateField("winWageringMultiplier", e.target.value)
+                  }
+                  className={
+                    errors.winWageringMultiplier ? "border-destructive" : ""
+                  }
+                />
+                {errors.winWageringMultiplier && (
+                  <p className="text-xs text-destructive">
+                    {errors.winWageringMultiplier}
+                  </p>
+                )}
+                <p className="text-muted-foreground text-xs">
+                  The winnings will require this multiple in wagering to clear.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="winWageringMinOdds">
+                  Minimum Odds for Wagering (optional)
+                </Label>
+                <Input
+                  id="winWageringMinOdds"
+                  type="number"
+                  step="any"
+                  min="1.00"
+                  placeholder="e.g., 1.50"
+                  value={formData.winWageringMinOdds}
+                  onChange={(e) =>
+                    updateField("winWageringMinOdds", e.target.value)
+                  }
+                  className={
+                    errors.winWageringMinOdds ? "border-destructive" : ""
+                  }
+                />
+                {errors.winWageringMinOdds && (
+                  <p className="text-xs text-destructive">
+                    {errors.winWageringMinOdds}
+                  </p>
+                )}
+                <p className="text-muted-foreground text-xs">
+                  Minimum odds required for bets to count toward wagering the
+                  winnings.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="winWageringExpiresInDays">
+                  Days to Complete Wagering (optional)
+                </Label>
+                <Input
+                  id="winWageringExpiresInDays"
+                  type="number"
+                  step="1"
+                  min="1"
+                  placeholder="e.g., 30"
+                  value={formData.winWageringExpiresInDays}
+                  onChange={(e) =>
+                    updateField("winWageringExpiresInDays", e.target.value)
+                  }
+                  className={
+                    errors.winWageringExpiresInDays ? "border-destructive" : ""
+                  }
+                />
+                {errors.winWageringExpiresInDays && (
+                  <p className="text-xs text-destructive">
+                    {errors.winWageringExpiresInDays}
+                  </p>
+                )}
+                <p className="text-muted-foreground text-xs">
+                  After the free bet wins, how many days do you have to complete
+                  the wagering? Leave blank if no time limit.
+                </p>
+              </div>
+            </>
+          )}
+        </CollapsibleContent>
+      </Collapsible>
+
       {/* Show unlock info in edit mode if applicable */}
       {mode === "edit" && initialData?.unlockType && (
         <div className="rounded-lg border bg-muted/30 p-4">
@@ -514,7 +741,8 @@ export function FreeBetForm({ accounts, initialData, mode }: FreeBetFormProps) {
               ` (min odds: ${initialData.unlockMinOdds})`}
           </p>
           <p className="mt-1 text-muted-foreground text-xs">
-            Note: Unlock requirements cannot be edited after creation. Track progress on the promo detail page.
+            Note: Unlock requirements cannot be edited after creation. Track
+            progress on the promo detail page.
           </p>
         </div>
       )}
@@ -549,7 +777,9 @@ export function FreeBetForm({ accounts, initialData, mode }: FreeBetFormProps) {
         <div className="border-t pt-6 mt-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-destructive">Danger Zone</p>
+              <p className="text-sm font-medium text-destructive">
+                Danger Zone
+              </p>
               <p className="text-xs text-muted-foreground mt-1">
                 Delete this free bet permanently. This cannot be undone.
               </p>

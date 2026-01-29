@@ -1,17 +1,20 @@
 import { NextResponse } from "next/server";
 import {
+  activateFreeBetWageringOnWin,
   applyAutoSettlement,
+  type BetReadyForSettlement,
   findBetsReadyForAutoSettlement,
   flagBetForReview,
+  getFreeBetByMatchedBetId,
+  processFreeBetWageringProgressOnSettle,
   processWageringProgressOnSettle,
-  type BetReadyForSettlement,
 } from "@/lib/db/queries";
 import {
+  type BetOutcome,
   calculateMatchedBetProfitLoss,
   isFreeBetPromoType,
   resolveOutcome,
   resolveOutcomeWithNormalizedSelection,
-  type BetOutcome,
 } from "@/lib/settlement";
 
 /**
@@ -28,7 +31,7 @@ import {
  * Schedule: Runs after sync-matches (6:30 UTC daily via vercel.json)
  */
 
-interface AutoSettleResult {
+type AutoSettleResult = {
   processed: number;
   settled: number;
   flaggedForReview: number;
@@ -39,7 +42,7 @@ interface AutoSettleResult {
     outcome?: BetOutcome;
     reason?: string;
   }>;
-}
+};
 
 /**
  * Process a single bet for auto-settlement.
@@ -89,7 +92,12 @@ async function processBet(
   // Exchange commission (e.g., 0.05 for 5%) - defaults to 0 if not set
   const exchangeCommission = bet.layAccountCommission ?? 0;
 
-  const freeBet = isFreeBetPromoType(bet.promoType);
+  const matchedFreeBet = await getFreeBetByMatchedBetId({
+    matchedBetId: bet.id,
+    userId: bet.userId,
+  });
+  const freeBet = matchedFreeBet ? true : isFreeBetPromoType(bet.promoType);
+  const freeBetStakeReturned = matchedFreeBet?.stakeReturned ?? false;
   const { backProfitLoss, layProfitLoss } = calculateMatchedBetProfitLoss(
     outcomeResult.outcome,
     backStake,
@@ -97,6 +105,7 @@ async function processBet(
     layStake,
     layOdds,
     freeBet,
+    freeBetStakeReturned,
     exchangeCommission
   );
 
@@ -129,6 +138,27 @@ async function processBet(
       stake: backStake,
       odds: backOdds,
       placedAt: bet.backBetPlacedAt,
+    });
+
+    await processFreeBetWageringProgressOnSettle({
+      accountId: bet.backAccountId,
+      userId: bet.userId,
+      backBetId: bet.backBetId,
+      matchedBetId: bet.id,
+      stake: backStake,
+      odds: backOdds,
+      placedAt: bet.backBetPlacedAt,
+    });
+  }
+
+  if (matchedFreeBet && outcomeResult.outcome === "win") {
+    const winAmount = freeBetStakeReturned
+      ? backStake * backOdds
+      : backStake * (backOdds - 1);
+    await activateFreeBetWageringOnWin({
+      freeBetId: matchedFreeBet.id,
+      userId: bet.userId,
+      winAmount,
     });
   }
 
@@ -229,6 +259,6 @@ export async function POST(request: Request) {
 }
 
 // Also support GET for manual testing (still requires auth)
-export async function GET(request: Request) {
+export function GET(request: Request) {
   return POST(request);
 }
