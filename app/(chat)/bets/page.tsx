@@ -1,4 +1,5 @@
 import { format } from "date-fns";
+import { unstable_cache } from "next/cache";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/app/(auth)/auth";
@@ -24,6 +25,27 @@ import {
   listMatchedBetsByUser,
 } from "@/lib/db/queries";
 
+const getExposureTimelineCached = unstable_cache(
+  async (userId: string) => getExposureTimeline({ userId, daysBack: 90 }),
+  ["bets-exposure-timeline"],
+  { revalidate: 60 }
+);
+
+const getDashboardSummaryCached = unstable_cache(
+  async (userId: string) => getDashboardSummary({ userId }),
+  ["bets-dashboard-summary"],
+  { revalidate: 60 }
+);
+
+const listAccountsWithBalancesCached = unstable_cache(
+  async (userId: string) => listAccountsWithBalances({ userId }),
+  ["bets-accounts-with-balances"],
+  { revalidate: 60 }
+);
+
+const deriveExposureRange = (data: { date: string }[], days: number) =>
+  data.slice(-days);
+
 export const metadata = {
   title: "Matched bets",
 };
@@ -37,23 +59,34 @@ export default async function Page() {
 
   const userId = session.user.id;
 
-  const [bets, summary, expiringFreeBetsCount, exposureData7, exposureData14, exposureData30, exposureData90, exposureByEvent, pendingSettlementBets, pendingSettlementCount, accountsWithBalances, activeWallets] = await Promise.all([
+  const [
+    bets,
+    summary,
+    expiringFreeBetsCount,
+    exposureData90,
+    exposureByEvent,
+    pendingSettlementBets,
+    pendingSettlementCount,
+    accountsWithBalances,
+    activeWallets,
+  ] = await Promise.all([
     listMatchedBetsByUser({
       userId,
       limit: 50,
     }),
-    getDashboardSummary({ userId }),
+    getDashboardSummaryCached(userId),
     countExpiringFreeBets({ userId, daysUntilExpiry: 7 }),
-    getExposureTimeline({ userId, daysBack: 7 }),
-    getExposureTimeline({ userId, daysBack: 14 }),
-    getExposureTimeline({ userId, daysBack: 30 }),
-    getExposureTimeline({ userId, daysBack: 90 }),
+    getExposureTimelineCached(userId),
     getExposureByEvent({ userId }),
     getPendingSettlementBets({ userId, filter: "all", limit: 10 }),
     countPendingSettlementBets({ userId }),
-    listAccountsWithBalances({ userId }),
+    listAccountsWithBalancesCached(userId),
     listActiveWalletsByUser(userId),
   ]);
+
+  const exposureData7 = deriveExposureRange(exposureData90, 7);
+  const exposureData14 = deriveExposureRange(exposureData90, 14);
+  const exposureData30 = deriveExposureRange(exposureData90, 30);
 
   // Helper to check if an account is active (treats null/undefined as active for backwards compatibility)
   const isActive = (status: string | null | undefined) => !status || status === "active";
