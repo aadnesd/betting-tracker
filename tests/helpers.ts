@@ -21,7 +21,13 @@ export async function createAuthenticatedContext({
   browser: Browser;
   name: string;
 }): Promise<UserContext> {
-  const host = process.env.HOST || "127.0.0.1";
+  const overrideHost = process.env.PLAYWRIGHT_HOST;
+  const envHost = overrideHost ?? process.env.HOST;
+  const host =
+    overrideHost ||
+    (["localhost", "127.0.0.1", "0.0.0.0", "::1"].includes(envHost ?? "")
+      ? (envHost as string)
+      : "127.0.0.1");
   const port = process.env.PORT || "3000";
   const baseUrl = `http://${host}:${port}`;
   const directory = path.join(__dirname, "../playwright/.sessions");
@@ -55,12 +61,14 @@ export async function createAuthenticatedContext({
   const responseHeaders = response.headers();
   const userIdHeader = responseHeaders["x-test-user-id"] ?? null;
 
+  const cookieDomain = new URL(baseUrl).hostname;
+
   // Set the auth cookie in the browser context
   await context.addCookies([
     {
       name: cookieName,
       value: token,
-      url: baseUrl,
+      domain: cookieDomain,
       path: "/",
       httpOnly: true,
       sameSite: "Lax",
