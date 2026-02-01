@@ -16,6 +16,7 @@ import { Separator } from "@/components/ui/separator";
 import {
   countExpiringFreeBets,
   countPendingSettlementBets,
+  type ExposureDataPoint,
   getDashboardSummary,
   getExposureByEvent,
   getExposureTimeline,
@@ -43,7 +44,7 @@ const listAccountsWithBalancesCached = unstable_cache(
   { revalidate: 60 }
 );
 
-const deriveExposureRange = (data: { date: string }[], days: number) =>
+const deriveExposureRange = (data: ExposureDataPoint[], days: number) =>
   data.slice(-days);
 
 export const metadata = {
