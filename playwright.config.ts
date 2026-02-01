@@ -12,7 +12,13 @@ config({
 
 /* Respect explicit PORT/HOST, defaulting to a local-only dev server */
 const PORT = process.env.PORT || 3000;
-const HOST = process.env.HOST || "127.0.0.1";
+const overrideHost = process.env.PLAYWRIGHT_HOST;
+const envHost = overrideHost ?? process.env.HOST;
+const HOST =
+  overrideHost ||
+  (["localhost", "127.0.0.1", "0.0.0.0", "::1"].includes(envHost ?? "")
+    ? (envHost as string)
+    : "127.0.0.1");
 
 /**
  * Set webServer.url and use.baseURL with the location
