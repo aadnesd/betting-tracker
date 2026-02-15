@@ -45,6 +45,7 @@ export function computeMatchedBetOutcomes({
   isFreeBet = false,
   freeBetStakeReturned = false,
   layLiabilityProvided,
+  commissionRate = 0,
 }: {
   backStake: number;
   backOdds: number;
@@ -53,6 +54,8 @@ export function computeMatchedBetOutcomes({
   isFreeBet?: boolean;
   freeBetStakeReturned?: boolean;
   layLiabilityProvided?: number | null;
+  /** Exchange commission rate as a decimal (e.g. 0.025 for 2.5%). Defaults to 0. */
+  commissionRate?: number;
 }) {
   const backProfit = backStake * (backOdds - 1);
   const layLiability =
@@ -67,10 +70,12 @@ export function computeMatchedBetOutcomes({
       : backProfit - layLiability;
 
   // Profit if selection loses: back bet loses, lay bet wins
+  // Exchange takes commission on lay winnings
+  const layWinNet = layStake * (1 - commissionRate);
   // For free bets, we don't lose the stake
   const profitIfLoses = isFreeBet
-    ? layStake // Only the lay win (no stake lost)
-    : layStake - backStake; // Lay win minus back stake lost
+    ? layWinNet // Only the lay win (no stake lost)
+    : layWinNet - backStake; // Lay win minus back stake lost
 
   // Guaranteed profit is the minimum of the two outcomes
   const guaranteedProfit = Math.min(profitIfWins, profitIfLoses);
