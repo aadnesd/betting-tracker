@@ -8,15 +8,15 @@
 
 import { describe, expect, test } from "vitest";
 import {
+  type ExportableMatchedBet,
+  generateMatchedBetsCsv,
   isValidCurrency,
   isValidOdds,
-  parseOdds,
+  parseBalancesCsv,
+  parseBetsCsv,
   parseCsvText,
   parseDate,
-  parseBetsCsv,
-  parseBalancesCsv,
-  generateMatchedBetsCsv,
-  type ExportableMatchedBet,
+  parseOdds,
 } from "@/lib/csv";
 
 describe("Currency validation", () => {
@@ -194,7 +194,11 @@ Football,"Draw, Over 2.5"`;
     const csv = `Market Name,Placed At,Selection ID
 test,2024-01-15,123`;
     const result = parseCsvText(csv);
-    expect(result?.headers).toEqual(["market_name", "placed_at", "selection_id"]);
+    expect(result?.headers).toEqual([
+      "market_name",
+      "placed_at",
+      "selection_id",
+    ]);
   });
 
   test("returns null for empty CSV", () => {

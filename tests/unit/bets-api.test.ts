@@ -1,19 +1,19 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
 import { NextResponse } from "next/server";
-import { POST as screenshotsRoute } from "@/app/(chat)/api/bets/screenshots/route";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import * as authModule from "@/app/(auth)/auth";
 import { POST as autoparseRoute } from "@/app/(chat)/api/bets/autoparse/route";
 import { POST as createMatchedRoute } from "@/app/(chat)/api/bets/create-matched/route";
-import { PATCH as updateMatchedRoute } from "@/app/(chat)/api/bets/update-matched/route";
-import { POST as quickAddRoute } from "@/app/(chat)/api/bets/quick-add/route";
-import { POST as standaloneRoute } from "@/app/(chat)/api/bets/standalone/route";
-import { POST as settleRoute } from "@/app/(chat)/api/bets/settle/route";
 import { POST as deleteIndividualRoute } from "@/app/(chat)/api/bets/individual/delete/route";
 import { POST as updateIndividualRoute } from "@/app/(chat)/api/bets/individual/update/route";
-import * as authModule from "@/app/(auth)/auth";
-import * as dbQueries from "@/lib/db/queries";
-import * as matchLinking from "@/lib/match-linking";
+import { POST as quickAddRoute } from "@/app/(chat)/api/bets/quick-add/route";
+import { POST as screenshotsRoute } from "@/app/(chat)/api/bets/screenshots/route";
+import { POST as settleRoute } from "@/app/(chat)/api/bets/settle/route";
+import { POST as standaloneRoute } from "@/app/(chat)/api/bets/standalone/route";
+import { PATCH as updateMatchedRoute } from "@/app/(chat)/api/bets/update-matched/route";
 import { parseMatchedBetFromScreenshots } from "@/lib/bet-parser";
+import * as dbQueries from "@/lib/db/queries";
 import { convertAmountToNok } from "@/lib/fx-rates";
+import * as matchLinking from "@/lib/match-linking";
 
 vi.mock("@/lib/ai/providers", () => ({
   myProvider: {
@@ -635,18 +635,18 @@ describe("bets API routes (unit)", () => {
         selection: "Arsenal",
         odds: 2.4,
         stake: 20,
-      exchange: "Bet365",
-      currency: "EUR",
-    },
-    lay: {
-      market: "Premier League",
-      selection: "Arsenal",
-      odds: 2.32,
-      stake: 21,
-      exchange: "bfb247",
-      currency: "SEK",
-    },
-};
+        exchange: "Bet365",
+        currency: "EUR",
+      },
+      lay: {
+        market: "Premier League",
+        selection: "Arsenal",
+        odds: 2.32,
+        stake: 21,
+        exchange: "bfb247",
+        currency: "SEK",
+      },
+    };
 
     const res = await createMatchedRoute(
       new Request("http://localhost/api/bets/create-matched", {
@@ -825,7 +825,9 @@ describe("bets API routes (unit)", () => {
       id: "mb1",
       status: "matched",
     });
-    (dbQueries.createAuditEntry as vi.Mock).mockResolvedValue({ id: "audit-1" });
+    (dbQueries.createAuditEntry as vi.Mock).mockResolvedValue({
+      id: "audit-1",
+    });
 
     const payload = {
       backScreenshotId: "11111111-1111-1111-1111-111111111111",
@@ -929,7 +931,9 @@ describe("bets API routes (unit)", () => {
 
     (dbQueries.getMatchedBetById as vi.Mock).mockResolvedValue(existingBet);
     (dbQueries.updateMatchedBetRecord as vi.Mock).mockResolvedValue(updatedBet);
-    (dbQueries.createAuditEntry as vi.Mock).mockResolvedValue({ id: "audit-1" });
+    (dbQueries.createAuditEntry as vi.Mock).mockResolvedValue({
+      id: "audit-1",
+    });
 
     const res = await updateMatchedRoute(
       new Request("http://localhost/api/bets/update-matched", {
@@ -984,7 +988,9 @@ describe("bets API routes (unit)", () => {
 
     (dbQueries.getMatchedBetById as vi.Mock).mockResolvedValue(existingBet);
     (dbQueries.updateMatchedBetRecord as vi.Mock).mockResolvedValue(updatedBet);
-    (dbQueries.createAuditEntry as vi.Mock).mockResolvedValue({ id: "audit-1" });
+    (dbQueries.createAuditEntry as vi.Mock).mockResolvedValue({
+      id: "audit-1",
+    });
 
     const res = await updateMatchedRoute(
       new Request("http://localhost/api/bets/update-matched", {
@@ -1028,7 +1034,9 @@ describe("bets API routes (unit)", () => {
     };
 
     (dbQueries.getMatchedBetById as vi.Mock).mockResolvedValue(existingBet);
-    (dbQueries.updateMatchedBetRecord as vi.Mock).mockResolvedValue(existingBet);
+    (dbQueries.updateMatchedBetRecord as vi.Mock).mockResolvedValue(
+      existingBet
+    );
 
     const res = await updateMatchedRoute(
       new Request("http://localhost/api/bets/update-matched", {
@@ -1101,10 +1109,18 @@ describe("bets API routes (unit)", () => {
       };
 
       (dbQueries.getMatchedBetById as vi.Mock).mockResolvedValue(existingBet);
-      (dbQueries.updateMatchedBetRecord as vi.Mock).mockResolvedValue(updatedBet);
-      (dbQueries.getMatchedBetWithParts as vi.Mock).mockResolvedValue(fullBetWithParts);
-      (dbQueries.createAccountTransaction as vi.Mock).mockResolvedValue({ id: "txn-1" });
-      (dbQueries.createAuditEntry as vi.Mock).mockResolvedValue({ id: "audit-1" });
+      (dbQueries.updateMatchedBetRecord as vi.Mock).mockResolvedValue(
+        updatedBet
+      );
+      (dbQueries.getMatchedBetWithParts as vi.Mock).mockResolvedValue(
+        fullBetWithParts
+      );
+      (dbQueries.createAccountTransaction as vi.Mock).mockResolvedValue({
+        id: "txn-1",
+      });
+      (dbQueries.createAuditEntry as vi.Mock).mockResolvedValue({
+        id: "audit-1",
+      });
 
       const res = await updateMatchedRoute(
         new Request("http://localhost/api/bets/update-matched", {
@@ -1162,7 +1178,9 @@ describe("bets API routes (unit)", () => {
       };
 
       (dbQueries.getMatchedBetById as vi.Mock).mockResolvedValue(existingBet);
-      (dbQueries.updateMatchedBetRecord as vi.Mock).mockResolvedValue(existingBet);
+      (dbQueries.updateMatchedBetRecord as vi.Mock).mockResolvedValue(
+        existingBet
+      );
 
       const res = await updateMatchedRoute(
         new Request("http://localhost/api/bets/update-matched", {
@@ -1216,9 +1234,15 @@ describe("bets API routes (unit)", () => {
       };
 
       (dbQueries.getMatchedBetById as vi.Mock).mockResolvedValue(existingBet);
-      (dbQueries.updateMatchedBetRecord as vi.Mock).mockResolvedValue(updatedBet);
-      (dbQueries.getMatchedBetWithParts as vi.Mock).mockResolvedValue(fullBetWithParts);
-      (dbQueries.createAuditEntry as vi.Mock).mockResolvedValue({ id: "audit-1" });
+      (dbQueries.updateMatchedBetRecord as vi.Mock).mockResolvedValue(
+        updatedBet
+      );
+      (dbQueries.getMatchedBetWithParts as vi.Mock).mockResolvedValue(
+        fullBetWithParts
+      );
+      (dbQueries.createAuditEntry as vi.Mock).mockResolvedValue({
+        id: "audit-1",
+      });
 
       const res = await updateMatchedRoute(
         new Request("http://localhost/api/bets/update-matched", {
@@ -1272,9 +1296,15 @@ describe("bets API routes (unit)", () => {
       };
 
       (dbQueries.getMatchedBetById as vi.Mock).mockResolvedValue(existingBet);
-      (dbQueries.updateMatchedBetRecord as vi.Mock).mockResolvedValue(updatedBet);
-      (dbQueries.getMatchedBetWithParts as vi.Mock).mockResolvedValue(fullBetWithParts);
-      (dbQueries.createAuditEntry as vi.Mock).mockResolvedValue({ id: "audit-1" });
+      (dbQueries.updateMatchedBetRecord as vi.Mock).mockResolvedValue(
+        updatedBet
+      );
+      (dbQueries.getMatchedBetWithParts as vi.Mock).mockResolvedValue(
+        fullBetWithParts
+      );
+      (dbQueries.createAuditEntry as vi.Mock).mockResolvedValue({
+        id: "audit-1",
+      });
 
       const res = await updateMatchedRoute(
         new Request("http://localhost/api/bets/update-matched", {
@@ -1328,10 +1358,18 @@ describe("bets API routes (unit)", () => {
       };
 
       (dbQueries.getMatchedBetById as vi.Mock).mockResolvedValue(existingBet);
-      (dbQueries.updateMatchedBetRecord as vi.Mock).mockResolvedValue(updatedBet);
-      (dbQueries.getMatchedBetWithParts as vi.Mock).mockResolvedValue(fullBetWithParts);
-      (dbQueries.createAccountTransaction as vi.Mock).mockResolvedValue({ id: "txn-1" });
-      (dbQueries.createAuditEntry as vi.Mock).mockResolvedValue({ id: "audit-1" });
+      (dbQueries.updateMatchedBetRecord as vi.Mock).mockResolvedValue(
+        updatedBet
+      );
+      (dbQueries.getMatchedBetWithParts as vi.Mock).mockResolvedValue(
+        fullBetWithParts
+      );
+      (dbQueries.createAccountTransaction as vi.Mock).mockResolvedValue({
+        id: "txn-1",
+      });
+      (dbQueries.createAuditEntry as vi.Mock).mockResolvedValue({
+        id: "audit-1",
+      });
 
       const res = await updateMatchedRoute(
         new Request("http://localhost/api/bets/update-matched", {
@@ -1377,7 +1415,9 @@ describe("bets API routes (unit)", () => {
         id: "mb1",
         status: "matched",
       });
-      (dbQueries.createAuditEntry as vi.Mock).mockResolvedValue({ id: "audit-1" });
+      (dbQueries.createAuditEntry as vi.Mock).mockResolvedValue({
+        id: "audit-1",
+      });
 
       const payload = {
         market: "Premier League",
@@ -1527,8 +1567,12 @@ describe("bets API routes (unit)", () => {
         id: "mb1",
         status: "matched",
       });
-      (dbQueries.createAuditEntry as vi.Mock).mockResolvedValue({ id: "audit-1" });
-      (dbQueries.markFreeBetAsUsed as vi.Mock).mockResolvedValue({ success: true });
+      (dbQueries.createAuditEntry as vi.Mock).mockResolvedValue({
+        id: "audit-1",
+      });
+      (dbQueries.markFreeBetAsUsed as vi.Mock).mockResolvedValue({
+        success: true,
+      });
 
       const freeBetId = "123e4567-e89b-12d3-a456-426614174000";
       const payload = {
@@ -1600,7 +1644,9 @@ describe("bets API routes (unit)", () => {
         id: "mb1",
         status: "matched",
       });
-      (dbQueries.createAuditEntry as vi.Mock).mockResolvedValue({ id: "audit-1" });
+      (dbQueries.createAuditEntry as vi.Mock).mockResolvedValue({
+        id: "audit-1",
+      });
 
       const payload = {
         market: "Premier League",
@@ -1755,7 +1801,9 @@ describe("bets API routes (unit)", () => {
       expect(res.status).toBe(200);
       const json = await res.json();
       expect(json.bet.matchId).toBe(matchId);
-      expect(dbQueries.getFootballMatchById).toHaveBeenCalledWith({ id: matchId });
+      expect(dbQueries.getFootballMatchById).toHaveBeenCalledWith({
+        id: matchId,
+      });
       expect(dbQueries.saveBackBet).toHaveBeenCalledWith(
         expect.objectContaining({ matchId })
       );
@@ -2020,7 +2068,7 @@ describe("bets API routes (unit)", () => {
       const betId = "11111111-1111-1111-1111-111111111111";
       const odds = 2.5;
       const stake = 100;
-      
+
       (dbQueries.getBackBetById as vi.Mock).mockResolvedValue({
         id: betId,
         status: "placed",
@@ -2216,7 +2264,7 @@ describe("bets API routes (unit)", () => {
     it("settles a back bet with lost outcome (loses stake)", async () => {
       const betId = "22222222-2222-2222-2222-222222222222";
       const stake = 50;
-      
+
       (dbQueries.getBackBetById as vi.Mock).mockResolvedValue({
         id: betId,
         status: "placed",
@@ -2260,7 +2308,7 @@ describe("bets API routes (unit)", () => {
       const betId = "33333333-3333-3333-3333-333333333333";
       const layStake = 100;
       const layOdds = 2.0;
-      
+
       (dbQueries.getLayBetById as vi.Mock).mockResolvedValue({
         id: betId,
         status: "placed",
@@ -2301,7 +2349,7 @@ describe("bets API routes (unit)", () => {
 
     it("settles with push outcome (no P&L)", async () => {
       const betId = "44444444-4444-4444-4444-444444444444";
-      
+
       (dbQueries.getBackBetById as vi.Mock).mockResolvedValue({
         id: betId,
         status: "placed",

@@ -1,8 +1,8 @@
 "use client";
 
-import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import { cn } from "@/lib/utils";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 const periods = [
   { value: "week", label: "Last 7 days" },
@@ -35,13 +35,13 @@ export function ReportingDateFilter() {
     <div className="flex flex-wrap gap-2">
       {periods.map((period) => (
         <Button
-          key={period.value}
-          variant={currentPeriod === period.value ? "default" : "outline"}
-          size="sm"
-          onClick={() => handlePeriodChange(period.value)}
           className={cn(
             currentPeriod === period.value && "pointer-events-none"
           )}
+          key={period.value}
+          onClick={() => handlePeriodChange(period.value)}
+          size="sm"
+          variant={currentPeriod === period.value ? "default" : "outline"}
         >
           {period.label}
         </Button>

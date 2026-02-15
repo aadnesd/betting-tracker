@@ -1,11 +1,14 @@
 import { NextResponse } from "next/server";
 import {
   batchUpsertFootballMatches,
-  getAllEnabledCompetitions,
-  countBetsReadyForAutoSettlement,
   type CreateFootballMatchParams,
+  countBetsReadyForAutoSettlement,
+  getAllEnabledCompetitions,
 } from "@/lib/db/queries";
-import { DEFAULT_COMPETITION_CODES, type FootballMatchStatus } from "@/lib/db/schema";
+import {
+  DEFAULT_COMPETITION_CODES,
+  type FootballMatchStatus,
+} from "@/lib/db/schema";
 
 /**
  * Football-data.org API v4 response types.
@@ -156,22 +159,29 @@ async function fetchMatchesFromApi({
  */
 export async function GET(request: Request) {
   console.log("[Match Sync] Request received");
-  
+
   // Verify cron secret for security
   const authHeader = request.headers.get("authorization");
   const cronSecret = process.env.CRON_SECRET;
-  
-  console.log("[Match Sync] Auth check - cronSecret set:", !!cronSecret, "authHeader received:", !!authHeader);
+
+  console.log(
+    "[Match Sync] Auth check - cronSecret set:",
+    !!cronSecret,
+    "authHeader received:",
+    !!authHeader
+  );
 
   // In production, require CRON_SECRET if it's configured
   // Vercel cron jobs automatically send: Authorization: Bearer <CRON_SECRET>
-  if (process.env.NODE_ENV === "production" && cronSecret) {
-    if (authHeader !== `Bearer ${cronSecret}`) {
-      console.log("[Match Sync] Auth FAILED - header mismatch");
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+  if (
+    process.env.NODE_ENV === "production" &&
+    cronSecret &&
+    authHeader !== `Bearer ${cronSecret}`
+  ) {
+    console.log("[Match Sync] Auth FAILED - header mismatch");
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  
+
   console.log("[Match Sync] Auth passed, starting sync");
 
   // Get competitions to sync from user settings (union of all users' enabled competitions)
@@ -180,7 +190,10 @@ export async function GET(request: Request) {
   try {
     competitionsToSync = await getAllEnabledCompetitions();
   } catch (error) {
-    console.warn("[Match Sync] Failed to get user competitions, using defaults:", error);
+    console.warn(
+      "[Match Sync] Failed to get user competitions, using defaults:",
+      error
+    );
     competitionsToSync = [...DEFAULT_COMPETITION_CODES];
   }
 
@@ -211,15 +224,21 @@ export async function GET(request: Request) {
       status: ["SCHEDULED", "TIMED"],
     });
 
-    console.log(`[Match Sync] Found ${upcomingMatches.length} upcoming matches`);
+    console.log(
+      `[Match Sync] Found ${upcomingMatches.length} upcoming matches`
+    );
 
     // Parse all matches and batch upsert
     const upcomingParams = upcomingMatches.map(parseFootballDataMatch);
-    console.log(`[Match Sync] Batch upserting ${upcomingParams.length} upcoming matches...`);
+    console.log(
+      `[Match Sync] Batch upserting ${upcomingParams.length} upcoming matches...`
+    );
     const upcomingResult = await batchUpsertFootballMatches(upcomingParams);
     syncResults.upcoming.synced = upcomingResult.synced;
     syncResults.upcoming.errors = upcomingResult.errors;
-    console.log(`[Match Sync] Upcoming matches: ${upcomingResult.synced} synced, ${upcomingResult.errors} errors`);
+    console.log(
+      `[Match Sync] Upcoming matches: ${upcomingResult.synced} synced, ${upcomingResult.errors} errors`
+    );
 
     // Sync recently finished matches (last 3 days)
     const threeDaysAgo = new Date();
@@ -236,27 +255,37 @@ export async function GET(request: Request) {
       status: ["FINISHED"],
     });
 
-    console.log(`[Match Sync] Found ${finishedMatches.length} finished matches`);
+    console.log(
+      `[Match Sync] Found ${finishedMatches.length} finished matches`
+    );
 
     // Parse all matches and batch upsert
     const finishedParams = finishedMatches.map(parseFootballDataMatch);
-    console.log(`[Match Sync] Batch upserting ${finishedParams.length} finished matches...`);
+    console.log(
+      `[Match Sync] Batch upserting ${finishedParams.length} finished matches...`
+    );
     const finishedResult = await batchUpsertFootballMatches(finishedParams);
     syncResults.finished.synced = finishedResult.synced;
     syncResults.finished.errors = finishedResult.errors;
-    console.log(`[Match Sync] Finished matches: ${finishedResult.synced} synced, ${finishedResult.errors} errors`);
+    console.log(
+      `[Match Sync] Finished matches: ${finishedResult.synced} synced, ${finishedResult.errors} errors`
+    );
 
     // After syncing finished matches, check for bets ready for auto-settlement
     // These are matched bets linked to FINISHED matches with scores available
     try {
-      syncResults.betsReadyForSettlement = await countBetsReadyForAutoSettlement();
+      syncResults.betsReadyForSettlement =
+        await countBetsReadyForAutoSettlement();
       if (syncResults.betsReadyForSettlement > 0) {
         console.log(
           `[Match Sync] Found ${syncResults.betsReadyForSettlement} bets ready for settlement`
         );
       }
     } catch (error) {
-      console.warn("[Match Sync] Failed to count bets ready for settlement:", error);
+      console.warn(
+        "[Match Sync] Failed to count bets ready for settlement:",
+        error
+      );
     }
 
     syncResults.completedAt = new Date().toISOString();

@@ -46,8 +46,8 @@ export default async function NewTransactionPage({
     <div className="container mx-auto max-w-xl px-4 py-8">
       <div className="mb-6">
         <Link
+          className="inline-flex items-center gap-2 text-muted-foreground text-sm transition-colors hover:text-foreground"
           href={`/bets/settings/accounts/${id}`}
-          className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
           <ArrowLeft className="h-4 w-4" />
           Back to Account

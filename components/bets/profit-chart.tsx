@@ -40,24 +40,38 @@ function CustomTooltip({
       <p className="font-medium text-sm">{dataPoint.label}</p>
       <div className="mt-2 space-y-1 text-sm">
         <p className="text-muted-foreground">
-          Period: <span className={dataPoint.profit >= 0 ? "text-green-600" : "text-red-600"}>
+          Period:{" "}
+          <span
+            className={
+              dataPoint.profit >= 0 ? "text-green-600" : "text-red-600"
+            }
+          >
             {formatNOK(dataPoint.profit)}
           </span>
         </p>
         <p className="text-muted-foreground">
-          Cumulative: <span className={dataPoint.cumulative >= 0 ? "text-green-600" : "text-red-600"}>
+          Cumulative:{" "}
+          <span
+            className={
+              dataPoint.cumulative >= 0 ? "text-green-600" : "text-red-600"
+            }
+          >
             {formatNOK(dataPoint.cumulative)}
           </span>
         </p>
         <p className="text-muted-foreground">
-          Bets settled: <span className="text-foreground">{dataPoint.count}</span>
+          Bets settled:{" "}
+          <span className="text-foreground">{dataPoint.count}</span>
         </p>
       </div>
     </div>
   );
 }
 
-export function ProfitChart({ data, title = "Profit Over Time" }: ProfitChartProps) {
+export function ProfitChart({
+  data,
+  title = "Profit Over Time",
+}: ProfitChartProps) {
   if (data.length === 0) {
     return (
       <Card>
@@ -93,40 +107,53 @@ export function ProfitChart({ data, title = "Profit Over Time" }: ProfitChartPro
       </CardHeader>
       <CardContent>
         <div className="h-64 w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+          <ResponsiveContainer height="100%" width="100%">
+            <AreaChart
+              data={data}
+              margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
+            >
               <defs>
-                <linearGradient id="profitGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={gradientColor} stopOpacity={0.3} />
-                  <stop offset="95%" stopColor={gradientColor} stopOpacity={0} />
+                <linearGradient id="profitGradient" x1="0" x2="0" y1="0" y2="1">
+                  <stop
+                    offset="5%"
+                    stopColor={gradientColor}
+                    stopOpacity={0.3}
+                  />
+                  <stop
+                    offset="95%"
+                    stopColor={gradientColor}
+                    stopOpacity={0}
+                  />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+              <CartesianGrid className="stroke-muted" strokeDasharray="3 3" />
               <XAxis
-                dataKey="label"
-                tick={{ fontSize: 12 }}
-                tickLine={false}
                 axisLine={false}
                 className="text-muted-foreground"
+                dataKey="label"
                 interval="preserveStartEnd"
-              />
-              <YAxis
                 tick={{ fontSize: 12 }}
                 tickLine={false}
+              />
+              <YAxis
                 axisLine={false}
                 className="text-muted-foreground"
                 domain={[yMin, yMax]}
-                tickFormatter={(value) => `${value >= 0 ? "" : "-"}${Math.abs(value)}`}
+                tick={{ fontSize: 12 }}
+                tickFormatter={(value) =>
+                  `${value >= 0 ? "" : "-"}${Math.abs(value)}`
+                }
+                tickLine={false}
               />
               <Tooltip content={<CustomTooltip />} />
               <Area
-                type="monotone"
+                activeDot={{ r: 4, strokeWidth: 2 }}
                 dataKey="cumulative"
+                dot={false}
+                fill="url(#profitGradient)"
                 stroke={strokeColor}
                 strokeWidth={2}
-                fill="url(#profitGradient)"
-                dot={false}
-                activeDot={{ r: 4, strokeWidth: 2 }}
+                type="monotone"
               />
             </AreaChart>
           </ResponsiveContainer>
@@ -151,7 +178,8 @@ export function ProfitChartWithControls({
 }: ProfitChartWithControlsProps) {
   const [grouping, setGrouping] = useState<GroupingOption>("day");
 
-  const data = grouping === "day" ? dayData : grouping === "week" ? weekData : monthData;
+  const data =
+    grouping === "day" ? dayData : grouping === "week" ? weekData : monthData;
 
   if (dayData.length === 0 && weekData.length === 0 && monthData.length === 0) {
     return (
@@ -188,14 +216,14 @@ export function ProfitChartWithControls({
         <div className="flex gap-1">
           {(["day", "week", "month"] as const).map((option) => (
             <button
-              key={option}
-              type="button"
-              onClick={() => setGrouping(option)}
-              className={`rounded-md px-3 py-1 text-sm font-medium transition-colors ${
+              className={`rounded-md px-3 py-1 font-medium text-sm transition-colors ${
                 grouping === option
                   ? "bg-primary text-primary-foreground"
                   : "bg-muted text-muted-foreground hover:bg-muted/80"
               }`}
+              key={option}
+              onClick={() => setGrouping(option)}
+              type="button"
             >
               {option.charAt(0).toUpperCase() + option.slice(1)}
             </button>
@@ -204,40 +232,59 @@ export function ProfitChartWithControls({
       </CardHeader>
       <CardContent>
         <div className="h-64 w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+          <ResponsiveContainer height="100%" width="100%">
+            <AreaChart
+              data={data}
+              margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
+            >
               <defs>
-                <linearGradient id="profitGradientCtrl" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={gradientColor} stopOpacity={0.3} />
-                  <stop offset="95%" stopColor={gradientColor} stopOpacity={0} />
+                <linearGradient
+                  id="profitGradientCtrl"
+                  x1="0"
+                  x2="0"
+                  y1="0"
+                  y2="1"
+                >
+                  <stop
+                    offset="5%"
+                    stopColor={gradientColor}
+                    stopOpacity={0.3}
+                  />
+                  <stop
+                    offset="95%"
+                    stopColor={gradientColor}
+                    stopOpacity={0}
+                  />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+              <CartesianGrid className="stroke-muted" strokeDasharray="3 3" />
               <XAxis
-                dataKey="label"
-                tick={{ fontSize: 12 }}
-                tickLine={false}
                 axisLine={false}
                 className="text-muted-foreground"
+                dataKey="label"
                 interval="preserveStartEnd"
-              />
-              <YAxis
                 tick={{ fontSize: 12 }}
                 tickLine={false}
+              />
+              <YAxis
                 axisLine={false}
                 className="text-muted-foreground"
                 domain={[yMin, yMax]}
-                tickFormatter={(value) => `${value >= 0 ? "" : "-"}${Math.abs(value)}`}
+                tick={{ fontSize: 12 }}
+                tickFormatter={(value) =>
+                  `${value >= 0 ? "" : "-"}${Math.abs(value)}`
+                }
+                tickLine={false}
               />
               <Tooltip content={<CustomTooltip />} />
               <Area
-                type="monotone"
+                activeDot={{ r: 4, strokeWidth: 2 }}
                 dataKey="cumulative"
+                dot={false}
+                fill="url(#profitGradientCtrl)"
                 stroke={strokeColor}
                 strokeWidth={2}
-                fill="url(#profitGradientCtrl)"
-                dot={false}
-                activeDot={{ r: 4, strokeWidth: 2 }}
+                type="monotone"
               />
             </AreaChart>
           </ResponsiveContainer>

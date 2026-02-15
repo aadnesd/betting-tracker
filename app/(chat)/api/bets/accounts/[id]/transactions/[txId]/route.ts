@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/app/(auth)/auth";
-import { getAccountById, deleteAccountTransaction } from "@/lib/db/queries";
+import { deleteAccountTransaction, getAccountById } from "@/lib/db/queries";
 
 interface RouteParams {
   params: Promise<{ id: string; txId: string }>;
@@ -32,7 +32,10 @@ export async function DELETE(request: Request, { params }: RouteParams) {
     });
 
     if (!result) {
-      return NextResponse.json({ error: "Transaction not found" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Transaction not found" },
+        { status: 404 }
+      );
     }
 
     return NextResponse.json({ success: true });

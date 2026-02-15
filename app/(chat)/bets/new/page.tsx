@@ -1,5 +1,5 @@
-import { connection } from "next/server";
 import { redirect } from "next/navigation";
+import { connection } from "next/server";
 import { auth } from "@/app/(auth)/auth";
 import { BetIntakeWrapper } from "@/components/bets/bet-intake-wrapper";
 import { listAccountsByUser } from "@/lib/db/queries";
@@ -21,7 +21,9 @@ export default async function Page() {
     status === "active" || !status;
 
   const bookmakers = accounts
-    .filter((account) => account.kind === "bookmaker" && isActive(account.status))
+    .filter(
+      (account) => account.kind === "bookmaker" && isActive(account.status)
+    )
     .map((account) => ({
       id: account.id,
       name: account.name,
@@ -30,7 +32,9 @@ export default async function Page() {
     }));
 
   const exchanges = accounts
-    .filter((account) => account.kind === "exchange" && isActive(account.status))
+    .filter(
+      (account) => account.kind === "exchange" && isActive(account.status)
+    )
     .map((account) => ({
       id: account.id,
       name: account.name,
@@ -48,8 +52,9 @@ export default async function Page() {
           Upload back & lay screenshots
         </h1>
         <p className="text-muted-foreground text-sm">
-          Paste screenshots from your clipboard (⌘V), drag & drop, or browse files.
-          AI parsing starts automatically when both screenshots are ready.
+          Paste screenshots from your clipboard (⌘V), drag & drop, or browse
+          files. AI parsing starts automatically when both screenshots are
+          ready.
         </p>
       </div>
       <BetIntakeWrapper bookmakers={bookmakers} exchanges={exchanges} />

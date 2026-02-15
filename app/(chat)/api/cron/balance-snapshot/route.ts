@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import {
+  createBalanceSnapshot,
   getAllUserIds,
   getBankrollSummary,
   getWalletTotals,
-  createBalanceSnapshot,
 } from "@/lib/db/queries";
 
 /**
@@ -93,10 +93,7 @@ export async function POST(request: Request) {
           status: "error",
           error: error instanceof Error ? error.message : "Unknown error",
         });
-        console.error(
-          `[Balance-Snapshot] Error for user ${userId}:`,
-          error
-        );
+        console.error(`[Balance-Snapshot] Error for user ${userId}:`, error);
       }
     }
 

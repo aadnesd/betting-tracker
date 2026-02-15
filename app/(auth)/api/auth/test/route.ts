@@ -36,7 +36,7 @@ export async function POST(request: Request) {
   const token = await encode({
     token: {
       sub: userId,
-      email: email,
+      email,
       name: email.split("@")[0],
       id: userId,
     },

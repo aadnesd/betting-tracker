@@ -275,7 +275,7 @@ export function parseDate(value: string): Date | null {
   }
 
   // European format: DD/MM/YYYY or DD-MM-YYYY
-  const europeanMatch = trimmed.match(/^(\d{1,2})[/\-](\d{1,2})[/\-](\d{4})$/);
+  const europeanMatch = trimmed.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
   if (europeanMatch) {
     const [, day, month, year] = europeanMatch;
     const date = new Date(Number(year), Number(month) - 1, Number(day));

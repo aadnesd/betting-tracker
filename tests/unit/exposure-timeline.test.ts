@@ -65,9 +65,27 @@ describe("ExposureDataPoint interface", () => {
 describe("Exposure timeline data structure", () => {
   test("data points are sortable by date", () => {
     const dataPoints: ExposureDataPoint[] = [
-      { date: "2025-01-03", label: "3 Jan", exposure: 3000, openPositions: 3, change: 1000 },
-      { date: "2025-01-01", label: "1 Jan", exposure: 1000, openPositions: 1, change: 1000 },
-      { date: "2025-01-02", label: "2 Jan", exposure: 2000, openPositions: 2, change: 1000 },
+      {
+        date: "2025-01-03",
+        label: "3 Jan",
+        exposure: 3000,
+        openPositions: 3,
+        change: 1000,
+      },
+      {
+        date: "2025-01-01",
+        label: "1 Jan",
+        exposure: 1000,
+        openPositions: 1,
+        change: 1000,
+      },
+      {
+        date: "2025-01-02",
+        label: "2 Jan",
+        exposure: 2000,
+        openPositions: 2,
+        change: 1000,
+      },
     ];
 
     const sorted = [...dataPoints].sort((a, b) => a.date.localeCompare(b.date));
@@ -80,9 +98,27 @@ describe("Exposure timeline data structure", () => {
   test("running exposure increases with new bets", () => {
     // Simulating exposure building up over time
     const dataPoints: ExposureDataPoint[] = [
-      { date: "2025-01-01", label: "1 Jan", exposure: 1000, openPositions: 1, change: 1000 },
-      { date: "2025-01-02", label: "2 Jan", exposure: 2500, openPositions: 2, change: 1500 },
-      { date: "2025-01-03", label: "3 Jan", exposure: 4000, openPositions: 3, change: 1500 },
+      {
+        date: "2025-01-01",
+        label: "1 Jan",
+        exposure: 1000,
+        openPositions: 1,
+        change: 1000,
+      },
+      {
+        date: "2025-01-02",
+        label: "2 Jan",
+        exposure: 2500,
+        openPositions: 2,
+        change: 1500,
+      },
+      {
+        date: "2025-01-03",
+        label: "3 Jan",
+        exposure: 4000,
+        openPositions: 3,
+        change: 1500,
+      },
     ];
 
     // Verify cumulative growth
@@ -98,9 +134,27 @@ describe("Exposure timeline data structure", () => {
   test("running exposure decreases with settlements", () => {
     // Simulating exposure reducing as bets settle
     const dataPoints: ExposureDataPoint[] = [
-      { date: "2025-01-01", label: "1 Jan", exposure: 5000, openPositions: 5, change: 0 },
-      { date: "2025-01-02", label: "2 Jan", exposure: 4000, openPositions: 4, change: -1000 },
-      { date: "2025-01-03", label: "3 Jan", exposure: 2500, openPositions: 3, change: -1500 },
+      {
+        date: "2025-01-01",
+        label: "1 Jan",
+        exposure: 5000,
+        openPositions: 5,
+        change: 0,
+      },
+      {
+        date: "2025-01-02",
+        label: "2 Jan",
+        exposure: 4000,
+        openPositions: 4,
+        change: -1000,
+      },
+      {
+        date: "2025-01-03",
+        label: "3 Jan",
+        exposure: 2500,
+        openPositions: 3,
+        change: -1500,
+      },
     ];
 
     // Verify decreasing exposure
@@ -108,17 +162,45 @@ describe("Exposure timeline data structure", () => {
     expect(dataPoints[1].exposure).toBeGreaterThan(dataPoints[2].exposure);
 
     // Verify decreasing open positions
-    expect(dataPoints[0].openPositions).toBeGreaterThan(dataPoints[1].openPositions);
-    expect(dataPoints[1].openPositions).toBeGreaterThan(dataPoints[2].openPositions);
+    expect(dataPoints[0].openPositions).toBeGreaterThan(
+      dataPoints[1].openPositions
+    );
+    expect(dataPoints[1].openPositions).toBeGreaterThan(
+      dataPoints[2].openPositions
+    );
   });
 
   test("handles days with no activity (carry forward)", () => {
     // Days without activity should carry forward previous exposure
     const dataPoints: ExposureDataPoint[] = [
-      { date: "2025-01-01", label: "1 Jan", exposure: 2000, openPositions: 2, change: 2000 },
-      { date: "2025-01-02", label: "2 Jan", exposure: 2000, openPositions: 2, change: 0 },
-      { date: "2025-01-03", label: "3 Jan", exposure: 2000, openPositions: 2, change: 0 },
-      { date: "2025-01-04", label: "4 Jan", exposure: 3500, openPositions: 3, change: 1500 },
+      {
+        date: "2025-01-01",
+        label: "1 Jan",
+        exposure: 2000,
+        openPositions: 2,
+        change: 2000,
+      },
+      {
+        date: "2025-01-02",
+        label: "2 Jan",
+        exposure: 2000,
+        openPositions: 2,
+        change: 0,
+      },
+      {
+        date: "2025-01-03",
+        label: "3 Jan",
+        exposure: 2000,
+        openPositions: 2,
+        change: 0,
+      },
+      {
+        date: "2025-01-04",
+        label: "4 Jan",
+        exposure: 3500,
+        openPositions: 3,
+        change: 1500,
+      },
     ];
 
     // Days 2 and 3 have no change but maintain exposure
@@ -130,14 +212,38 @@ describe("Exposure timeline data structure", () => {
 
   test("calculates maximum exposure correctly", () => {
     const dataPoints: ExposureDataPoint[] = [
-      { date: "2025-01-01", label: "1 Jan", exposure: 1000, openPositions: 1, change: 1000 },
-      { date: "2025-01-02", label: "2 Jan", exposure: 3500, openPositions: 3, change: 2500 },
-      { date: "2025-01-03", label: "3 Jan", exposure: 2000, openPositions: 2, change: -1500 },
-      { date: "2025-01-04", label: "4 Jan", exposure: 500, openPositions: 1, change: -1500 },
+      {
+        date: "2025-01-01",
+        label: "1 Jan",
+        exposure: 1000,
+        openPositions: 1,
+        change: 1000,
+      },
+      {
+        date: "2025-01-02",
+        label: "2 Jan",
+        exposure: 3500,
+        openPositions: 3,
+        change: 2500,
+      },
+      {
+        date: "2025-01-03",
+        label: "3 Jan",
+        exposure: 2000,
+        openPositions: 2,
+        change: -1500,
+      },
+      {
+        date: "2025-01-04",
+        label: "4 Jan",
+        exposure: 500,
+        openPositions: 1,
+        change: -1500,
+      },
     ];
 
-    const maxExposure = Math.max(...dataPoints.map(dp => dp.exposure));
-    const maxPositions = Math.max(...dataPoints.map(dp => dp.openPositions));
+    const maxExposure = Math.max(...dataPoints.map((dp) => dp.exposure));
+    const maxPositions = Math.max(...dataPoints.map((dp) => dp.openPositions));
 
     expect(maxExposure).toBe(3500);
     expect(maxPositions).toBe(3);
@@ -145,9 +251,27 @@ describe("Exposure timeline data structure", () => {
 
   test("supports current exposure (last data point)", () => {
     const dataPoints: ExposureDataPoint[] = [
-      { date: "2025-01-01", label: "1 Jan", exposure: 1000, openPositions: 1, change: 1000 },
-      { date: "2025-01-02", label: "2 Jan", exposure: 2500, openPositions: 2, change: 1500 },
-      { date: "2025-01-03", label: "3 Jan", exposure: 1800, openPositions: 2, change: -700 },
+      {
+        date: "2025-01-01",
+        label: "1 Jan",
+        exposure: 1000,
+        openPositions: 1,
+        change: 1000,
+      },
+      {
+        date: "2025-01-02",
+        label: "2 Jan",
+        exposure: 2500,
+        openPositions: 2,
+        change: 1500,
+      },
+      {
+        date: "2025-01-03",
+        label: "3 Jan",
+        exposure: 1800,
+        openPositions: 2,
+        change: -700,
+      },
     ];
 
     const currentExposure = dataPoints[dataPoints.length - 1].exposure;
@@ -166,7 +290,13 @@ describe("Exposure timeline edge cases", () => {
 
   test("single day with single bet", () => {
     const dataPoints: ExposureDataPoint[] = [
-      { date: "2025-01-01", label: "1 Jan", exposure: 500, openPositions: 1, change: 500 },
+      {
+        date: "2025-01-01",
+        label: "1 Jan",
+        exposure: 500,
+        openPositions: 1,
+        change: 500,
+      },
     ];
 
     expect(dataPoints.length).toBe(1);

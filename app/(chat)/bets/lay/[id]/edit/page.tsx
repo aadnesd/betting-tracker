@@ -61,7 +61,6 @@ export default async function Page({ params }: PageProps) {
     <StandaloneBetForm
       bookmakers={bookmakers}
       exchanges={exchanges}
-      mode="edit"
       initialData={{
         id: bet.id,
         kind: "lay",
@@ -75,6 +74,7 @@ export default async function Page({ params }: PageProps) {
         placedAt: bet.placedAt ?? bet.createdAt,
         notes: null,
       }}
+      mode="edit"
     />
   );
 }

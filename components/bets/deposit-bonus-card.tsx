@@ -1,11 +1,11 @@
 "use client";
 
+import { AlertTriangle, Clock, ExternalLink, TrendingUp } from "lucide-react";
 import Link from "next/link";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
-import { Clock, ExternalLink, TrendingUp, AlertTriangle } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 
 interface DepositBonusCardProps {
   bonus: {
@@ -28,12 +28,15 @@ interface DepositBonusCardProps {
 export function DepositBonusCard({ bonus }: DepositBonusCardProps) {
   const wageringRequirement = Number.parseFloat(bonus.wageringRequirement);
   const wageringProgress = Number.parseFloat(bonus.wageringProgress);
-  const progressPercent = wageringRequirement > 0
-    ? Math.min((wageringProgress / wageringRequirement) * 100, 100)
-    : 0;
+  const progressPercent =
+    wageringRequirement > 0
+      ? Math.min((wageringProgress / wageringRequirement) * 100, 100)
+      : 0;
   const remaining = Math.max(0, wageringRequirement - wageringProgress);
 
-  const isExpiringSoon = bonus.expiresAt && bonus.status === "active" && 
+  const isExpiringSoon =
+    bonus.expiresAt &&
+    bonus.status === "active" &&
     new Date(bonus.expiresAt).getTime() - Date.now() < 7 * 24 * 60 * 60 * 1000;
 
   const getStatusBadge = () => {
@@ -41,7 +44,11 @@ export function DepositBonusCard({ bonus }: DepositBonusCardProps) {
       case "active":
         return <Badge variant="default">Active</Badge>;
       case "cleared":
-        return <Badge variant="outline" className="border-green-500 text-green-600">Cleared</Badge>;
+        return (
+          <Badge className="border-green-500 text-green-600" variant="outline">
+            Cleared
+          </Badge>
+        );
       case "forfeited":
         return <Badge variant="secondary">Forfeited</Badge>;
       case "expired":
@@ -53,13 +60,16 @@ export function DepositBonusCard({ bonus }: DepositBonusCardProps) {
     <Card className="transition-colors hover:border-primary/50">
       <CardHeader className="pb-2">
         <div className="flex items-start justify-between gap-2">
-          <div className="flex-1 min-w-0">
-            <CardTitle className="text-base font-medium truncate">
-              <Link href={`/bets/settings/promos/deposit-bonus/${bonus.id}`} className="hover:underline">
+          <div className="min-w-0 flex-1">
+            <CardTitle className="truncate font-medium text-base">
+              <Link
+                className="hover:underline"
+                href={`/bets/settings/promos/deposit-bonus/${bonus.id}`}
+              >
                 {bonus.name}
               </Link>
             </CardTitle>
-            <p className="text-sm text-muted-foreground truncate">
+            <p className="truncate text-muted-foreground text-sm">
               {bonus.accountName || "Unknown Account"}
             </p>
           </div>
@@ -72,7 +82,8 @@ export function DepositBonusCard({ bonus }: DepositBonusCardProps) {
           <div>
             <span className="text-muted-foreground">Deposit:</span>{" "}
             <span className="font-medium">
-              {bonus.currency} {Number.parseFloat(bonus.depositAmount).toFixed(0)}
+              {bonus.currency}{" "}
+              {Number.parseFloat(bonus.depositAmount).toFixed(0)}
             </span>
           </div>
           <div>
@@ -87,15 +98,16 @@ export function DepositBonusCard({ bonus }: DepositBonusCardProps) {
         {bonus.status === "active" && (
           <div className="space-y-1">
             <div className="flex items-center justify-between text-xs">
-              <span className="text-muted-foreground flex items-center gap-1">
+              <span className="flex items-center gap-1 text-muted-foreground">
                 <TrendingUp className="h-3 w-3" />
                 Wagering Progress
               </span>
               <span className="font-medium">{progressPercent.toFixed(0)}%</span>
             </div>
-            <Progress value={progressPercent} className="h-2" />
-            <p className="text-xs text-muted-foreground">
-              {bonus.currency} {wageringProgress.toFixed(0)} / {wageringRequirement.toFixed(0)}
+            <Progress className="h-2" value={progressPercent} />
+            <p className="text-muted-foreground text-xs">
+              {bonus.currency} {wageringProgress.toFixed(0)} /{" "}
+              {wageringRequirement.toFixed(0)}
               {remaining > 0 && (
                 <span className="ml-1">
                   ({bonus.currency} {remaining.toFixed(0)} remaining)
@@ -107,26 +119,26 @@ export function DepositBonusCard({ bonus }: DepositBonusCardProps) {
 
         {/* Cleared info */}
         {bonus.status === "cleared" && bonus.clearedAt && (
-          <p className="text-xs text-green-600">
+          <p className="text-green-600 text-xs">
             Cleared on {new Date(bonus.clearedAt).toLocaleDateString()}
           </p>
         )}
 
         {/* Min Odds */}
-        <p className="text-xs text-muted-foreground">
+        <p className="text-muted-foreground text-xs">
           Min odds: {Number.parseFloat(bonus.minOdds).toFixed(2)}
         </p>
 
         {/* Expiry Warning */}
         {isExpiringSoon && (
-          <div className="flex items-center gap-1 text-xs text-amber-600">
+          <div className="flex items-center gap-1 text-amber-600 text-xs">
             <AlertTriangle className="h-3 w-3" />
             Expires {new Date(bonus.expiresAt!).toLocaleDateString()}
           </div>
         )}
 
         {/* View Details Link */}
-        <Button variant="ghost" size="sm" className="w-full" asChild>
+        <Button asChild className="w-full" size="sm" variant="ghost">
           <Link href={`/bets/settings/promos/deposit-bonus/${bonus.id}`}>
             View Details
             <ExternalLink className="ml-1 h-3 w-3" />

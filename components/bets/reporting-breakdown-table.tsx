@@ -1,5 +1,3 @@
-import { cn } from "@/lib/utils";
-import { formatNOK, formatPercentage } from "@/lib/reporting";
 import {
   Table,
   TableBody,
@@ -8,6 +6,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { formatNOK, formatPercentage } from "@/lib/reporting";
+import { cn } from "@/lib/utils";
 
 type BreakdownRow = {
   name: string;
@@ -31,7 +31,9 @@ export function ReportingBreakdownTable({
   className,
 }: Props) {
   // Sort by profit descending
-  const sorted = [...data].sort((a, b) => b.totalProfitLoss - a.totalProfitLoss);
+  const sorted = [...data].sort(
+    (a, b) => b.totalProfitLoss - a.totalProfitLoss
+  );
 
   return (
     <div className={cn("rounded-lg border bg-card", className)}>
@@ -64,7 +66,9 @@ export function ReportingBreakdownTable({
                 <TableCell
                   className={cn(
                     "text-right font-medium",
-                    row.totalProfitLoss >= 0 ? "text-emerald-600" : "text-rose-600"
+                    row.totalProfitLoss >= 0
+                      ? "text-emerald-600"
+                      : "text-rose-600"
                   )}
                 >
                   {formatNOK(row.totalProfitLoss)}

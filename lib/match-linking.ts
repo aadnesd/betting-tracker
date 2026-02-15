@@ -128,8 +128,8 @@ export async function findCandidateMatches({
   }
 
   // Allow matches that started up to 3 hours before the bet (for in-play bets)
-  const searchFromDate = betDate 
-    ? new Date(betDate.getTime() - 3 * 60 * 60 * 1000) 
+  const searchFromDate = betDate
+    ? new Date(betDate.getTime() - 3 * 60 * 60 * 1000)
     : new Date();
 
   try {
@@ -171,14 +171,13 @@ export async function findCandidateMatches({
       }
     }
 
-    let candidates = Array.from(candidateMap.values())
-      .sort((a, b) => {
-        const simDiff = (b.similarity ?? 0) - (a.similarity ?? 0);
-        if (simDiff !== 0) {
-          return simDiff;
-        }
-        return a.matchDate.getTime() - b.matchDate.getTime();
-      });
+    let candidates = Array.from(candidateMap.values()).sort((a, b) => {
+      const simDiff = (b.similarity ?? 0) - (a.similarity ?? 0);
+      if (simDiff !== 0) {
+        return simDiff;
+      }
+      return a.matchDate.getTime() - b.matchDate.getTime();
+    });
 
     // If we have a high-quality match (>70%), filter out low-quality noise (<50%)
     const hasHighQuality = candidates.some((c) => (c.similarity ?? 0) > 0.7);
@@ -217,7 +216,9 @@ export async function selectMatchWithLLM({
     .map((c, i) => {
       const dateStr = c.matchDate.toISOString().split("T")[0];
       const timeStr = c.matchDate.toISOString().split("T")[1].slice(0, 5);
-      const simScore = c.similarity ? ` (sim: ${(c.similarity * 100).toFixed(0)}%)` : "";
+      const simScore = c.similarity
+        ? ` (sim: ${(c.similarity * 100).toFixed(0)}%)`
+        : "";
       return `${i + 1}. ${c.homeTeam} vs ${c.awayTeam} | ${c.competition || "Unknown"} | ${dateStr} ${timeStr} UTC${simScore}`;
     })
     .join("\n");
@@ -256,7 +257,10 @@ Respond with JSON only: {"matchIndex": N, "normalizedSelection": "HOME_TEAM" | "
     });
 
     // Parse JSON response
-    let parsed: { matchIndex: number; normalizedSelection: NormalizedSelection | null };
+    let parsed: {
+      matchIndex: number;
+      normalizedSelection: NormalizedSelection | null;
+    };
     try {
       // Try to extract JSON from the response
       const jsonMatch = text.match(/\{[\s\S]*\}/);
@@ -265,24 +269,41 @@ Respond with JSON only: {"matchIndex": N, "normalizedSelection": "HOME_TEAM" | "
       } else {
         // Fallback: try parsing as a simple number (backwards compatibility)
         const matchIndex = Number.parseInt(text.trim(), 10);
-        parsed = { matchIndex: Number.isNaN(matchIndex) ? 0 : matchIndex, normalizedSelection: null };
+        parsed = {
+          matchIndex: Number.isNaN(matchIndex) ? 0 : matchIndex,
+          normalizedSelection: null,
+        };
       }
     } catch {
-      console.warn(`[match-linking] Failed to parse LLM JSON response: "${text}"`);
+      console.warn(
+        `[match-linking] Failed to parse LLM JSON response: "${text}"`
+      );
       const matchIndex = Number.parseInt(text.trim(), 10);
-      parsed = { matchIndex: Number.isNaN(matchIndex) ? 0 : matchIndex, normalizedSelection: null };
+      parsed = {
+        matchIndex: Number.isNaN(matchIndex) ? 0 : matchIndex,
+        normalizedSelection: null,
+      };
     }
 
     const { matchIndex, normalizedSelection } = parsed;
 
     if (matchIndex < 0 || matchIndex > candidates.length) {
-      console.warn(`[match-linking] LLM returned invalid match index: ${matchIndex}`);
+      console.warn(
+        `[match-linking] LLM returned invalid match index: ${matchIndex}`
+      );
       return { matchIndex: 0, confidence: "low", normalizedSelection: null };
     }
 
     // Validate normalizedSelection
-    const validSelections: (NormalizedSelection | null)[] = ["HOME_TEAM", "AWAY_TEAM", "DRAW", null];
-    const validatedSelection = validSelections.includes(normalizedSelection) ? normalizedSelection : null;
+    const validSelections: (NormalizedSelection | null)[] = [
+      "HOME_TEAM",
+      "AWAY_TEAM",
+      "DRAW",
+      null,
+    ];
+    const validatedSelection = validSelections.includes(normalizedSelection)
+      ? normalizedSelection
+      : null;
 
     // Confidence based on similarity score if available
     let confidence: "high" | "medium" | "low";
@@ -351,7 +372,7 @@ function determineNormalizedSelection(
 
 /**
  * Main entry point: link a parsed bet to a football match.
- * 
+ *
  * 1. Fuzzy search FootballMatch table for candidates
  * 2. Auto-link if a single candidate is found
  * 3. LLM picks the best match when multiple candidates remain
@@ -411,15 +432,16 @@ export async function linkBetToMatch({
     }
 
     // Always use LLM to select the match
-    const { matchIndex, confidence, normalizedSelection } = await selectMatchWithLLM({
-      market,
-      selection,
-      betDate,
-      candidates,
-    });
+    const { matchIndex, confidence, normalizedSelection } =
+      await selectMatchWithLLM({
+        market,
+        selection,
+        betDate,
+        candidates,
+      });
 
     if (matchIndex === 0) {
-      console.log(`[match-linking] LLM found no confident match`);
+      console.log("[match-linking] LLM found no confident match");
       return {
         matchId: null,
         matchConfidence: "low",
@@ -432,7 +454,7 @@ export async function linkBetToMatch({
     console.log(
       `[match-linking] LLM selected: ${selectedMatch.homeTeam} vs ${selectedMatch.awayTeam} (confidence: ${confidence}, normalizedSelection: ${normalizedSelection})`
     );
-    
+
     return {
       matchId: selectedMatch.id,
       matchConfidence: confidence,

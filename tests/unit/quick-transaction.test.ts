@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 /**
  * Tests for QuickTransactionSheet component
- * 
+ *
  * These tests verify:
  * 1. Component structure and props interface
  * 2. AccountOption interface fields

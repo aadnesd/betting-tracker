@@ -76,7 +76,7 @@ export function ExportButton({ startDate, endDate }: ExportButtonProps) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" disabled={isLoading}>
+        <Button disabled={isLoading} size="sm" variant="outline">
           <Download className="mr-2 h-4 w-4" />
           {isLoading ? "Exporting..." : "Export"}
         </Button>

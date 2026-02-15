@@ -16,7 +16,15 @@
  * - Date range handling
  */
 
-import { describe, expect, it, beforeAll, afterAll, beforeEach, vi } from "vitest";
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 
 // Mock server-only to allow testing server modules
 vi.mock("server-only", () => ({}));
@@ -29,7 +37,7 @@ const canRunIntegrationTests = hasApiToken && hasPostgresUrl;
 /**
  * Helper to wait for rate limit reset.
  */
-async function waitForRateLimit(ms: number = 6000): Promise<void> {
+async function waitForRateLimit(ms = 6000): Promise<void> {
   console.log(`[Rate Limit] Waiting ${ms}ms for rate limit reset...`);
   await new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -140,10 +148,20 @@ async function fetchMatchesFromApi({
     // Rate limited - wait and retry up to 2 times
     if (retryCount < 2) {
       const retryAfter = response.headers.get("X-RequestCounter-Reset");
-      const waitMs = retryAfter ? (parseInt(retryAfter, 10) + 1) * 1000 : 12000;
-      console.log(`[Rate Limit] Hit rate limit, waiting ${waitMs}ms before retry ${retryCount + 1}/2`);
+      const waitMs = retryAfter
+        ? (Number.parseInt(retryAfter, 10) + 1) * 1000
+        : 12_000;
+      console.log(
+        `[Rate Limit] Hit rate limit, waiting ${waitMs}ms before retry ${retryCount + 1}/2`
+      );
       await new Promise((resolve) => setTimeout(resolve, waitMs));
-      return fetchMatchesFromApi({ dateFrom, dateTo, competitions, status, retryCount: retryCount + 1 });
+      return fetchMatchesFromApi({
+        dateFrom,
+        dateTo,
+        competitions,
+        status,
+        retryCount: retryCount + 1,
+      });
     }
     throw new Error("Rate limited by football-data.org API after retries");
   }
@@ -167,9 +185,7 @@ describe("Football-data.org API Integration", () => {
       );
     }
     if (!hasPostgresUrl) {
-      console.warn(
-        "⚠️ POSTGRES_URL not set. Database tests will be skipped."
-      );
+      console.warn("⚠️ POSTGRES_URL not set. Database tests will be skipped.");
     }
   });
 
@@ -180,10 +196,10 @@ describe("Football-data.org API Integration", () => {
         await waitForRateLimit(API_DELAY_MS);
       }
     });
-    
+
     it.skipIf(!hasApiToken)(
       "connects to football-data.org API successfully",
-      { timeout: 45000 },
+      { timeout: 45_000 },
       async () => {
         const today = new Date();
         const tomorrow = new Date();
@@ -206,7 +222,7 @@ describe("Football-data.org API Integration", () => {
 
     it.skipIf(!hasApiToken)(
       "fetches upcoming Premier League matches",
-      { timeout: 45000 },
+      { timeout: 45_000 },
       async () => {
         const today = new Date();
         // Free tier API has 10-day limit
@@ -245,7 +261,7 @@ describe("Football-data.org API Integration", () => {
 
     it.skipIf(!hasApiToken)(
       "fetches recently finished matches",
-      { timeout: 45000 },
+      { timeout: 45_000 },
       async () => {
         const threeDaysAgo = new Date();
         threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
@@ -282,7 +298,7 @@ describe("Football-data.org API Integration", () => {
 
     it.skipIf(!hasApiToken)(
       "handles multiple competitions in one request",
-      { timeout: 45000 },
+      { timeout: 45_000 },
       async () => {
         const today = new Date();
         // Free tier API has 10-day limit
@@ -301,8 +317,12 @@ describe("Football-data.org API Integration", () => {
         );
 
         // Check that we got matches from different competitions
-        const competitionCodes = [...new Set(matches.map((m) => m.competition.code))];
-        console.log(`[API Test] Competitions represented: ${competitionCodes.join(", ")}`);
+        const competitionCodes = [
+          ...new Set(matches.map((m) => m.competition.code)),
+        ];
+        console.log(
+          `[API Test] Competitions represented: ${competitionCodes.join(", ")}`
+        );
 
         // We should have at least some matches unless it's a complete break
         // Just validate structure
@@ -322,10 +342,10 @@ describe("Football-data.org API Integration", () => {
         await waitForRateLimit(API_DELAY_MS);
       }
     });
-    
+
     it.skipIf(!hasApiToken)(
       "parseFootballDataMatch transforms API response correctly",
-      { timeout: 45000 },
+      { timeout: 45_000 },
       async () => {
         // Import the parser function
         const { parseFootballDataMatch } = await import(
@@ -352,8 +372,14 @@ describe("Football-data.org API Integration", () => {
         const apiMatch = matches[0];
         const parsed = parseFootballDataMatch(apiMatch);
 
-        console.log("[Parse Test] Original API match:", JSON.stringify(apiMatch, null, 2));
-        console.log("[Parse Test] Parsed match:", JSON.stringify(parsed, null, 2));
+        console.log(
+          "[Parse Test] Original API match:",
+          JSON.stringify(apiMatch, null, 2)
+        );
+        console.log(
+          "[Parse Test] Parsed match:",
+          JSON.stringify(parsed, null, 2)
+        );
 
         // Validate parsed fields
         expect(parsed.externalId).toBe(apiMatch.id);
@@ -364,13 +390,15 @@ describe("Football-data.org API Integration", () => {
         expect(parsed.status).toBe(apiMatch.status);
         expect(parsed.matchDate).toBeInstanceOf(Date);
         // Compare timestamps (API may not include milliseconds, but parsed Date will)
-        expect(parsed.matchDate.getTime()).toBe(new Date(apiMatch.utcDate).getTime());
+        expect(parsed.matchDate.getTime()).toBe(
+          new Date(apiMatch.utcDate).getTime()
+        );
       }
     );
 
     it.skipIf(!hasApiToken)(
       "parses finished match with scores correctly",
-      { timeout: 30000 },
+      { timeout: 30_000 },
       async () => {
         const { parseFootballDataMatch } = await import(
           "@/app/(chat)/api/cron/sync-matches/route"
@@ -390,7 +418,8 @@ describe("Football-data.org API Integration", () => {
 
         // Find a match with actual scores
         const matchWithScores = matches.find(
-          (m) => m.score.fullTime.home !== null && m.score.fullTime.away !== null
+          (m) =>
+            m.score.fullTime.home !== null && m.score.fullTime.away !== null
         );
 
         if (!matchWithScores) {
@@ -413,17 +442,16 @@ describe("Football-data.org API Integration", () => {
 
   describe.sequential("Database Operations", () => {
     // Database operations don't need delays but mark sequential for consistency
-    
+
     it.skipIf(!canRunIntegrationTests)(
       "upserts match to database successfully",
-      { timeout: 45000 },
+      { timeout: 45_000 },
       async () => {
-        const { upsertFootballMatch, getFootballMatchByExternalId } = await import(
-          "@/lib/db/queries"
-        );
+        const { upsertFootballMatch, getFootballMatchByExternalId } =
+          await import("@/lib/db/queries");
 
         // Create a test match with a unique external ID
-        const testExternalId = 999999999 + Math.floor(Math.random() * 1000);
+        const testExternalId = 999_999_999 + Math.floor(Math.random() * 1000);
         const testMatch = {
           externalId: testExternalId,
           homeTeam: "Test Home FC",
@@ -436,7 +464,9 @@ describe("Football-data.org API Integration", () => {
           awayScore: null,
         };
 
-        console.log(`[DB Test] Upserting test match with externalId: ${testExternalId}`);
+        console.log(
+          `[DB Test] Upserting test match with externalId: ${testExternalId}`
+        );
 
         // Upsert the match
         const result = await upsertFootballMatch(testMatch);
@@ -449,7 +479,9 @@ describe("Football-data.org API Integration", () => {
         console.log(`[DB Test] Match upserted with ID: ${result.id}`);
 
         // Verify it exists in the database
-        const fetched = await getFootballMatchByExternalId({ externalId: testExternalId });
+        const fetched = await getFootballMatchByExternalId({
+          externalId: testExternalId,
+        });
         expect(fetched).not.toBeNull();
         expect(fetched?.homeTeam).toBe(testMatch.homeTeam);
 
@@ -466,23 +498,24 @@ describe("Football-data.org API Integration", () => {
         expect(updateResult.homeScore).toBe("2");
         expect(updateResult.awayScore).toBe("1");
 
-        console.log(`[DB Test] Match updated with score: ${updateResult.homeScore}-${updateResult.awayScore}`);
+        console.log(
+          `[DB Test] Match updated with score: ${updateResult.homeScore}-${updateResult.awayScore}`
+        );
       }
     );
 
     it.skipIf(!canRunIntegrationTests)(
       "syncs real matches from API to database",
-      { timeout: 90000 },
+      { timeout: 90_000 },
       async () => {
         // Wait for rate limit before API call
         await waitForRateLimit(API_DELAY_MS);
-        
+
         const { parseFootballDataMatch } = await import(
           "@/app/(chat)/api/cron/sync-matches/route"
         );
-        const { upsertFootballMatch, getFootballMatchByExternalId } = await import(
-          "@/lib/db/queries"
-        );
+        const { upsertFootballMatch, getFootballMatchByExternalId } =
+          await import("@/lib/db/queries");
 
         // Fetch a few real matches (7-day range for free tier)
         const today = new Date();
@@ -497,11 +530,13 @@ describe("Football-data.org API Integration", () => {
         });
 
         if (matches.length === 0) {
-          console.log("[DB Test] No PL matches in next 7 days, trying finished matches");
-          
+          console.log(
+            "[DB Test] No PL matches in next 7 days, trying finished matches"
+          );
+
           const sevenDaysAgo = new Date();
           sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-          
+
           matches = await fetchMatchesFromApi({
             dateFrom: sevenDaysAgo,
             dateTo: today,
@@ -515,7 +550,9 @@ describe("Football-data.org API Integration", () => {
           }
         }
 
-        console.log(`[DB Test] Syncing ${Math.min(matches.length, 3)} matches to database`);
+        console.log(
+          `[DB Test] Syncing ${Math.min(matches.length, 3)} matches to database`
+        );
 
         // Sync first 3 matches
         const syncedIds: number[] = [];
@@ -534,7 +571,9 @@ describe("Football-data.org API Integration", () => {
           expect(match).not.toBeNull();
         }
 
-        console.log(`[DB Test] Verified ${syncedIds.length} matches in database`);
+        console.log(
+          `[DB Test] Verified ${syncedIds.length} matches in database`
+        );
       }
     );
   });
@@ -542,17 +581,18 @@ describe("Football-data.org API Integration", () => {
   describe.sequential("Competition Settings Integration", () => {
     it.skipIf(!canRunIntegrationTests)(
       "respects user-configured competitions",
-      { timeout: 45000 },
+      { timeout: 45_000 },
       async () => {
-        const {
-          getAllEnabledCompetitions,
-          upsertUserSettings,
-        } = await import("@/lib/db/queries");
+        const { getAllEnabledCompetitions, upsertUserSettings } = await import(
+          "@/lib/db/queries"
+        );
         const { DEFAULT_COMPETITION_CODES } = await import("@/lib/db/schema");
 
         // First check what defaults are
         const defaults = await getAllEnabledCompetitions();
-        console.log(`[Settings Test] Default competitions: ${defaults.join(", ")}`);
+        console.log(
+          `[Settings Test] Default competitions: ${defaults.join(", ")}`
+        );
 
         // Defaults should match the exported constant if no users have settings
         expect(defaults.length).toBeGreaterThan(0);
@@ -571,10 +611,10 @@ describe("Football-data.org API Integration", () => {
         await waitForRateLimit(API_DELAY_MS);
       }
     });
-    
+
     it.skipIf(!hasApiToken)(
       "handles API response headers correctly",
-      { timeout: 45000 },
+      { timeout: 45_000 },
       async () => {
         const apiToken = process.env.FOOTBALL_DATA_API_TOKEN;
 
@@ -591,21 +631,27 @@ describe("Football-data.org API Integration", () => {
         });
 
         // Check rate limit headers
-        const requestsAvailable = response.headers.get("X-Requests-Available-Minute");
+        const requestsAvailable = response.headers.get(
+          "X-Requests-Available-Minute"
+        );
         const requestCounter = response.headers.get("X-RequestCounter-Reset");
 
         console.log(`[Rate Limit Test] Status: ${response.status}`);
-        console.log(`[Rate Limit Test] Requests available: ${requestsAvailable}`);
+        console.log(
+          `[Rate Limit Test] Requests available: ${requestsAvailable}`
+        );
         console.log(`[Rate Limit Test] Counter reset: ${requestCounter}`);
 
         // Either we get a successful response, or 429 (rate limited)
         // Both are valid - we just want to verify headers are present
         expect([200, 429]).toContain(response.status);
-        
+
         // If rate limited, the counter reset header should tell us when
         if (response.status === 429) {
           expect(requestCounter).not.toBeNull();
-          console.log(`[Rate Limit Test] Rate limited - reset in ${requestCounter}s`);
+          console.log(
+            `[Rate Limit Test] Rate limited - reset in ${requestCounter}s`
+          );
         } else {
           expect(response.ok).toBe(true);
         }
@@ -617,7 +663,7 @@ describe("Football-data.org API Integration", () => {
 describe.sequential("Match Search API Integration", () => {
   it.skipIf(!canRunIntegrationTests)(
     "searchFootballMatches finds synced matches",
-    { timeout: 45000 },
+    { timeout: 45_000 },
     async () => {
       const { searchFootballMatches, listUpcomingMatches } = await import(
         "@/lib/db/queries"
@@ -629,7 +675,9 @@ describe.sequential("Match Search API Integration", () => {
         limit: 10,
       });
 
-      console.log(`[Search Test] Found ${upcomingMatches.length} upcoming matches in DB`);
+      console.log(
+        `[Search Test] Found ${upcomingMatches.length} upcoming matches in DB`
+      );
 
       if (upcomingMatches.length === 0) {
         console.log("[Search Test] No matches in DB, skipping search test");
@@ -648,7 +696,9 @@ describe.sequential("Match Search API Integration", () => {
         limit: 20,
       });
 
-      console.log(`[Search Test] Found ${searchResults.length} matches for "${searchTerm}"`);
+      console.log(
+        `[Search Test] Found ${searchResults.length} matches for "${searchTerm}"`
+      );
 
       // Should find at least the match we searched for
       expect(searchResults.length).toBeGreaterThan(0);

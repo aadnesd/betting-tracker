@@ -138,10 +138,10 @@ export default async function Page(props: PageProps) {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button asChild variant="outline" size="sm">
+          <Button asChild size="sm" variant="outline">
             <Link href="/bets">← Dashboard</Link>
           </Button>
-          <Button asChild variant="outline" size="sm">
+          <Button asChild size="sm" variant="outline">
             <Link href="/bets/review">Review queue</Link>
           </Button>
           <Button asChild size="sm">
@@ -221,7 +221,7 @@ export default async function Page(props: PageProps) {
               </div>
             </div>
             <div className="md:col-span-4">
-              <Button type="submit" variant="outline" size="sm">
+              <Button size="sm" type="submit" variant="outline">
                 Apply filters
               </Button>
             </div>
@@ -246,10 +246,7 @@ export default async function Page(props: PageProps) {
                 : "Missing back leg"
               : null;
             return (
-              <details
-                className="group rounded-md border bg-card"
-                key={bet.id}
-              >
+              <details className="group rounded-md border bg-card" key={bet.id}>
                 <summary className="flex cursor-pointer list-none flex-col gap-3 p-3 md:flex-row md:items-center md:justify-between">
                   <div className="space-y-1">
                     <div className="flex flex-wrap items-center gap-2">
@@ -396,10 +393,7 @@ export default async function Page(props: PageProps) {
                                 Stake
                               </span>
                               <span>
-                                {formatAmount(
-                                  bet.lay.stake,
-                                  bet.lay.currency
-                                )}
+                                {formatAmount(bet.lay.stake, bet.lay.currency)}
                               </span>
                             </div>
                             <div className="flex items-center justify-between">

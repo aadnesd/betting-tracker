@@ -74,12 +74,13 @@ export default async function AccountSettingsPage() {
     <div className="space-y-6 p-4 md:p-8">
       <div className="flex flex-col items-start justify-between gap-3 md:flex-row md:items-center">
         <div>
-          <p className="font-medium text-muted-foreground text-sm">
-            Settings
-          </p>
-          <h1 className="font-semibold text-2xl">Bookmaker & Exchange Accounts</h1>
+          <p className="font-medium text-muted-foreground text-sm">Settings</p>
+          <h1 className="font-semibold text-2xl">
+            Bookmaker & Exchange Accounts
+          </h1>
           <p className="text-muted-foreground text-sm">
-            Manage your betting accounts, track balances, and record transactions.
+            Manage your betting accounts, track balances, and record
+            transactions.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -99,48 +100,48 @@ export default async function AccountSettingsPage() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardTitle className="font-medium text-muted-foreground text-sm">
               Total Accounts
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold">{accounts.length}</p>
+            <p className="font-bold text-2xl">{accounts.length}</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardTitle className="font-medium text-muted-foreground text-sm">
               Bookmakers
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold">{bookmakers.length}</p>
-            <p className="text-sm text-muted-foreground">
+            <p className="font-bold text-2xl">{bookmakers.length}</p>
+            <p className="text-muted-foreground text-sm">
               Total: NOK {totalBookmakerBalance.toFixed(2)}
             </p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardTitle className="font-medium text-muted-foreground text-sm">
               Exchanges
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold">{exchanges.length}</p>
-            <p className="text-sm text-muted-foreground">
+            <p className="font-bold text-2xl">{exchanges.length}</p>
+            <p className="text-muted-foreground text-sm">
               Total: NOK {totalExchangeBalance.toFixed(2)}
             </p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardTitle className="font-medium text-muted-foreground text-sm">
               Combined Balance
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold">
+            <p className="font-bold text-2xl">
               NOK {(totalBookmakerBalance + totalExchangeBalance).toFixed(2)}
             </p>
           </CardContent>
@@ -174,9 +175,9 @@ export default async function AccountSettingsPage() {
 
           {accounts.map((acct) => (
             <Link
-              key={acct.id}
-              href={`/bets/settings/accounts/${acct.id}`}
               className="block rounded-md border p-4 transition-colors hover:bg-muted/50"
+              href={`/bets/settings/accounts/${acct.id}`}
+              key={acct.id}
             >
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="space-y-1">
@@ -185,17 +186,17 @@ export default async function AccountSettingsPage() {
                     <AccountKindBadge kind={acct.kind} />
                     <AccountStatusBadge status={acct.status} />
                   </div>
-                  <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-                    {acct.currency && (
-                      <span>Currency: {acct.currency}</span>
-                    )}
+                  <div className="flex flex-wrap items-center gap-3 text-muted-foreground text-sm">
+                    {acct.currency && <span>Currency: {acct.currency}</span>}
                     {acct.kind === "exchange" && acct.commission && (
                       <span>
-                        Commission: {(Number(acct.commission) * 100).toFixed(1)}%
+                        Commission: {(Number(acct.commission) * 100).toFixed(1)}
+                        %
                       </span>
                     )}
                     <span>
-                      {acct.transactionCount} transaction{acct.transactionCount !== 1 ? "s" : ""}
+                      {acct.transactionCount} transaction
+                      {acct.transactionCount !== 1 ? "s" : ""}
                     </span>
                   </div>
                 </div>
@@ -215,16 +216,21 @@ export default async function AccountSettingsPage() {
 
       {/* Quick Info */}
       <div className="rounded-lg border border-blue-200 bg-blue-50/50 p-4">
-        <h3 className="mb-2 font-medium text-blue-900">About Account Tracking</h3>
+        <h3 className="mb-2 font-medium text-blue-900">
+          About Account Tracking
+        </h3>
         <ul className="space-y-1 text-blue-800 text-sm">
           <li>
-            • <strong>Bookmaker accounts</strong> are where you place back bets with promotional offers
+            • <strong>Bookmaker accounts</strong> are where you place back bets
+            with promotional offers
           </li>
           <li>
-            • <strong>Exchange accounts</strong> are where you lay bets to lock in profit/minimize loss
+            • <strong>Exchange accounts</strong> are where you lay bets to lock
+            in profit/minimize loss
           </li>
           <li>
-            • Record deposits, withdrawals, and bonuses to keep accurate balance tracking
+            • Record deposits, withdrawals, and bonuses to keep accurate balance
+            tracking
           </li>
           <li>
             • Balances update automatically based on your recorded transactions

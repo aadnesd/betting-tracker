@@ -1,12 +1,12 @@
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/app/(auth)/auth";
 import {
-  getDepositBonusById,
-  updateDepositBonus,
   deleteDepositBonus,
   forfeitDepositBonus,
+  getDepositBonusById,
   listBonusQualifyingBets,
+  updateDepositBonus,
 } from "@/lib/db/queries";
 
 const updateDepositBonusSchema = z.object({
@@ -94,9 +94,18 @@ export async function PATCH(
       id,
       userId,
       name: parsed.data.name,
-      expiresAt: parsed.data.expiresAt ? new Date(parsed.data.expiresAt) : parsed.data.expiresAt === null ? null : undefined,
+      expiresAt: parsed.data.expiresAt
+        ? new Date(parsed.data.expiresAt)
+        : parsed.data.expiresAt === null
+          ? null
+          : undefined,
       notes: parsed.data.notes,
-      status: parsed.data.status as "active" | "cleared" | "forfeited" | "expired" | undefined,
+      status: parsed.data.status as
+        | "active"
+        | "cleared"
+        | "forfeited"
+        | "expired"
+        | undefined,
     });
 
     return NextResponse.json(updated);
@@ -165,7 +174,7 @@ export async function POST(
     if (action === "forfeit") {
       const reason = body.reason || "User forfeited bonus";
       const result = await forfeitDepositBonus({ id, userId, reason });
-      
+
       if (!result) {
         return NextResponse.json(
           { error: "Deposit bonus not found" },
@@ -176,10 +185,7 @@ export async function POST(
       return NextResponse.json(result);
     }
 
-    return NextResponse.json(
-      { error: "Unknown action" },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "Unknown action" }, { status: 400 });
   } catch (error) {
     console.error("Error processing deposit bonus action:", error);
     return NextResponse.json(

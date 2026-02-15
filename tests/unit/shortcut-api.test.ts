@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 /**
  * Unit tests for iOS Shortcut API key management and endpoint.
- * 
+ *
  * Why: The iOS Shortcut API enables users to submit matched bets directly from their phone
  * using Apple Shortcuts. These tests validate:
  * - API key generation creates valid 64-character hex keys
@@ -63,7 +63,11 @@ describe("iOS Shortcut API Key Functions", () => {
     });
 
     it("should return valid=false with error=rate_limited and retryAfter", () => {
-      type RateLimitResult = { valid: false; error: "rate_limited"; retryAfter: number };
+      type RateLimitResult = {
+        valid: false;
+        error: "rate_limited";
+        retryAfter: number;
+      };
       const mockRateLimited: RateLimitResult = {
         valid: false,
         error: "rate_limited",
@@ -84,8 +88,12 @@ describe("iOS Shortcut API Key Functions", () => {
 
   describe("getShortcutApiKeyInfo", () => {
     it("should return hasKey, hint, and createdAt", () => {
-      type KeyInfo = { hasKey: boolean; hint: string | null; createdAt: Date | null };
-      
+      type KeyInfo = {
+        hasKey: boolean;
+        hint: string | null;
+        createdAt: Date | null;
+      };
+
       const hasKeyInfo: KeyInfo = {
         hasKey: true,
         hint: "abcd1234",
@@ -132,7 +140,9 @@ describe("iOS Shortcut API Endpoint", () => {
   describe("Request Validation", () => {
     it("should require Bearer authorization header", () => {
       const authHeader = "Bearer abc123";
-      const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+      const token = authHeader.startsWith("Bearer ")
+        ? authHeader.slice(7)
+        : null;
       expect(token).toBe("abc123");
 
       const noBearer = "abc123";
@@ -142,7 +152,7 @@ describe("iOS Shortcut API Endpoint", () => {
 
     it("should validate image files are PNG or JPEG", () => {
       const ALLOWED_TYPES = ["image/jpeg", "image/png"];
-      
+
       expect(ALLOWED_TYPES.includes("image/png")).toBe(true);
       expect(ALLOWED_TYPES.includes("image/jpeg")).toBe(true);
       expect(ALLOWED_TYPES.includes("image/gif")).toBe(false);
@@ -151,8 +161,8 @@ describe("iOS Shortcut API Endpoint", () => {
 
     it("should enforce 10MB file size limit", () => {
       const MAX_FILE_SIZE = 10 * 1024 * 1024;
-      
-      expect(MAX_FILE_SIZE).toBe(10485760);
+
+      expect(MAX_FILE_SIZE).toBe(10_485_760);
       expect(5 * 1024 * 1024 <= MAX_FILE_SIZE).toBe(true);
       expect(15 * 1024 * 1024 <= MAX_FILE_SIZE).toBe(false);
     });
@@ -175,7 +185,7 @@ describe("iOS Shortcut API Endpoint", () => {
         lay: {
           exchange: "BFB",
           odds: 1.52,
-          stake: 10000,
+          stake: 10_000,
           liability: 5200,
           currency: "NOK",
         },
@@ -239,8 +249,8 @@ describe("iOS Shortcut API Endpoint", () => {
 
 describe("Rate Limiting", () => {
   it("should enforce 10 second minimum between requests", () => {
-    const MIN_INTERVAL_MS = 10000;
-    
+    const MIN_INTERVAL_MS = 10_000;
+
     // Simulate request timestamps
     const lastRequest = new Date("2026-01-22T10:00:00Z");
     const tooSoon = new Date("2026-01-22T10:00:05Z");
@@ -254,10 +264,10 @@ describe("Rate Limiting", () => {
   });
 
   it("should calculate correct Retry-After value", () => {
-    const MIN_INTERVAL_MS = 10000;
+    const MIN_INTERVAL_MS = 10_000;
     const elapsed = 3000; // 3 seconds since last request
     const retryAfter = Math.ceil((MIN_INTERVAL_MS - elapsed) / 1000);
-    
+
     expect(retryAfter).toBe(7);
   });
 });
@@ -267,7 +277,10 @@ describe("SHA-256 Hashing", () => {
     // Simulate the hashing process
     const key = "test-api-key-12345";
     const encoder = new TextEncoder();
-    const hashBuffer = await crypto.subtle.digest("SHA-256", encoder.encode(key));
+    const hashBuffer = await crypto.subtle.digest(
+      "SHA-256",
+      encoder.encode(key)
+    );
     const hashArray = Array.from(new Uint8Array(hashBuffer));
     const hash = hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
 
@@ -277,13 +290,19 @@ describe("SHA-256 Hashing", () => {
 
   it("should produce different hashes for different keys", async () => {
     const encoder = new TextEncoder();
-    
-    const hash1Buffer = await crypto.subtle.digest("SHA-256", encoder.encode("key1"));
+
+    const hash1Buffer = await crypto.subtle.digest(
+      "SHA-256",
+      encoder.encode("key1")
+    );
     const hash1 = Array.from(new Uint8Array(hash1Buffer))
       .map((b) => b.toString(16).padStart(2, "0"))
       .join("");
 
-    const hash2Buffer = await crypto.subtle.digest("SHA-256", encoder.encode("key2"));
+    const hash2Buffer = await crypto.subtle.digest(
+      "SHA-256",
+      encoder.encode("key2")
+    );
     const hash2 = Array.from(new Uint8Array(hash2Buffer))
       .map((b) => b.toString(16).padStart(2, "0"))
       .join("");
@@ -320,7 +339,7 @@ describe("API Key Settings Page", () => {
     const generateResponse = {
       success: true,
       key: fullKey,
-      hint: hint,
+      hint,
       createdAt: "2026-01-22T10:00:00Z",
     };
 

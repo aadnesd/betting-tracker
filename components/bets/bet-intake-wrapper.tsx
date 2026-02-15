@@ -1,8 +1,8 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { ScreenshotIntakeForm } from "@/components/bets/screenshot-intake-form";
 import { BetReviewForm } from "@/components/bets/bet-review-form";
+import { ScreenshotIntakeForm } from "@/components/bets/screenshot-intake-form";
 import type { AccountOption } from "@/lib/bet-accounts";
 import type { ParsedPair } from "@/lib/bet-parser";
 
@@ -103,12 +103,12 @@ export function BetIntakeWrapper({
     return (
       <BetReviewForm
         backScreenshotId={intakeData.backScreenshotId}
-        layScreenshotId={intakeData.layScreenshotId}
-        parsedData={intakeData.parsedData}
         bookmakers={bookmakers}
         exchanges={exchanges}
+        layScreenshotId={intakeData.layScreenshotId}
         onBack={handleBack}
         onSaveComplete={handleSaveComplete}
+        parsedData={intakeData.parsedData}
       />
     );
   }

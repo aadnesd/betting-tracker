@@ -173,14 +173,11 @@ export function IndividualBetActions({
         throw new Error(data.error || "Failed to delete bet");
       }
 
-      toast.success(
-        cascade ? "Matched set deleted" : "Bet deleted",
-        {
-          description: cascade
-            ? "Removed matched set and both legs."
-            : "The bet has been removed and any links updated.",
-        }
-      );
+      toast.success(cascade ? "Matched set deleted" : "Bet deleted", {
+        description: cascade
+          ? "Removed matched set and both legs."
+          : "The bet has been removed and any links updated.",
+      });
 
       router.push("/bets/all");
       router.refresh();
@@ -233,8 +230,8 @@ export function IndividualBetActions({
               <div className="space-y-2">
                 <Label htmlFor="outcome">Outcome</Label>
                 <Select
-                  value={outcome}
                   onValueChange={(v) => setOutcome(v as Outcome)}
+                  value={outcome}
                 >
                   <SelectTrigger id="outcome">
                     <SelectValue placeholder="Select outcome" />
@@ -253,9 +250,9 @@ export function IndividualBetActions({
                 <Label htmlFor="notes">Notes</Label>
                 <Textarea
                   id="notes"
+                  onChange={(event) => setNotes(event.target.value)}
                   placeholder="Optional settlement notes"
                   value={notes}
-                  onChange={(event) => setNotes(event.target.value)}
                 />
               </div>
 
@@ -277,17 +274,17 @@ export function IndividualBetActions({
                   </span>
                 </div>
                 {accountBalance !== null && accountBalance !== undefined && (
-                  <p className="mt-1 text-xs text-muted-foreground">
+                  <p className="mt-1 text-muted-foreground text-xs">
                     Current balance: {formatCurrency(accountBalance, currency)}
                   </p>
                 )}
               </div>
 
               <Button
-                type="button"
-                onClick={settleBet}
-                disabled={isSettling || !outcome}
                 className="w-full"
+                disabled={isSettling || !outcome}
+                onClick={settleBet}
+                type="button"
               >
                 {isSettling ? (
                   <span className="flex items-center justify-center gap-2">
@@ -313,7 +310,11 @@ export function IndividualBetActions({
           </p>
           <AlertDialog>
             <AlertDialogTrigger asChild>
-              <Button variant="destructive" className="w-full" disabled={isDeleting}>
+              <Button
+                className="w-full"
+                disabled={isDeleting}
+                variant="destructive"
+              >
                 {isDeleting ? (
                   <span className="flex items-center justify-center gap-2">
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -342,8 +343,8 @@ export function IndividualBetActions({
                 </AlertDialogAction>
                 {matchedBetId && (
                   <AlertDialogAction
-                    onClick={() => deleteBet(true)}
                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    onClick={() => deleteBet(true)}
                   >
                     Delete matched set
                   </AlertDialogAction>

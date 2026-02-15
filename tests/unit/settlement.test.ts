@@ -8,15 +8,15 @@
  */
 import { describe, expect, it } from "vitest";
 import {
-  detectMarketType,
-  resolveOutcome,
-  calculateProfitLoss,
+  type BetOutcome,
   calculateLayProfitLoss,
   calculateMatchedBetProfitLoss,
+  calculateProfitLoss,
+  detectMarketType,
   getMatchWinner,
-  resolveOutcomeWithNormalizedSelection,
-  type BetOutcome,
   type MatchResult,
+  resolveOutcome,
+  resolveOutcomeWithNormalizedSelection,
 } from "@/lib/settlement";
 
 describe("settlement outcome logic", () => {
@@ -193,7 +193,11 @@ describe("settlement outcome logic", () => {
     const result00: MatchResult = { homeScore: 0, awayScore: 0 };
 
     it("resolves BTTS Yes correctly", () => {
-      let outcome = resolveOutcome("Both Teams To Score", "Yes", resultBothScore);
+      let outcome = resolveOutcome(
+        "Both Teams To Score",
+        "Yes",
+        resultBothScore
+      );
       expect(outcome.outcome).toBe("win");
       expect(outcome.confidence).toBe("high");
 
@@ -210,7 +214,11 @@ describe("settlement outcome logic", () => {
     });
 
     it("resolves BTTS No correctly", () => {
-      let outcome = resolveOutcome("Both Teams To Score", "No", resultCleanSheet);
+      let outcome = resolveOutcome(
+        "Both Teams To Score",
+        "No",
+        resultCleanSheet
+      );
       expect(outcome.outcome).toBe("win");
       expect(outcome.confidence).toBe("high");
 
@@ -296,18 +304,27 @@ describe("settlement outcome logic", () => {
 
   describe("resolveOutcome - Unknown market", () => {
     it("returns unknown for unrecognized market", () => {
-      const outcome = resolveOutcome("Random Market", "Something", { homeScore: 1, awayScore: 0 });
+      const outcome = resolveOutcome("Random Market", "Something", {
+        homeScore: 1,
+        awayScore: 0,
+      });
       expect(outcome.outcome).toBe("unknown");
       expect(outcome.confidence).toBe("low");
     });
 
     it("infers Over/Under from selection pattern", () => {
-      const outcome = resolveOutcome("Goals", "Over 2.5", { homeScore: 3, awayScore: 1 });
+      const outcome = resolveOutcome("Goals", "Over 2.5", {
+        homeScore: 3,
+        awayScore: 1,
+      });
       expect(outcome.outcome).toBe("win");
     });
 
     it("infers Correct Score from selection pattern", () => {
-      const outcome = resolveOutcome("Score", "2-1", { homeScore: 2, awayScore: 1 });
+      const outcome = resolveOutcome("Score", "2-1", {
+        homeScore: 2,
+        awayScore: 1,
+      });
       expect(outcome.outcome).toBe("win");
     });
   });
@@ -371,7 +388,7 @@ describe("settlement outcome logic", () => {
       // Lay £100, selection loses, 5% commission
       // Gross profit = £100, commission = £5, net = £95
       expect(calculateLayProfitLoss("loss", 100, 2.5, 0.05)).toBe(95);
-      
+
       // Lay £200, selection loses, 2% commission
       // Gross profit = £200, commission = £4, net = £196
       expect(calculateLayProfitLoss("loss", 200, 3.0, 0.02)).toBe(196);
@@ -413,7 +430,14 @@ describe("settlement outcome logic", () => {
     it("calculates free bet matched correctly when back wins", () => {
       // Free bet £100 @ 5.00, Lay £80 @ 5.10
       // Free bet wins: +£400 (no stake return), Lay loses: -£328 liability
-      const result = calculateMatchedBetProfitLoss("win", 100, 5.0, 80, 5.1, true);
+      const result = calculateMatchedBetProfitLoss(
+        "win",
+        100,
+        5.0,
+        80,
+        5.1,
+        true
+      );
 
       expect(result.backProfitLoss).toBe(400); // 100 * (5.0 - 1)
       expect(result.layProfitLoss).toBeCloseTo(-328); // -80 * (5.1 - 1)
@@ -423,7 +447,14 @@ describe("settlement outcome logic", () => {
     it("calculates free bet matched correctly when back loses", () => {
       // Free bet £100 @ 5.00, Lay £80 @ 5.10
       // Free bet loses: £0 (free bet), Lay wins: +£80
-      const result = calculateMatchedBetProfitLoss("loss", 100, 5.0, 80, 5.1, true);
+      const result = calculateMatchedBetProfitLoss(
+        "loss",
+        100,
+        5.0,
+        80,
+        5.1,
+        true
+      );
 
       expect(result.backProfitLoss).toBe(0); // Free bet loss = 0
       expect(result.layProfitLoss).toBe(80);
@@ -433,7 +464,16 @@ describe("settlement outcome logic", () => {
     it("applies exchange commission when back loses (lay wins)", () => {
       // Back £100 @ 2.00, Lay £100 @ 2.00, 5% exchange commission
       // Back loses: -£100, Lay wins: +£100 gross, -£5 commission = +£95 net
-      const result = calculateMatchedBetProfitLoss("loss", 100, 2.0, 100, 2.0, false, false, 0.05);
+      const result = calculateMatchedBetProfitLoss(
+        "loss",
+        100,
+        2.0,
+        100,
+        2.0,
+        false,
+        false,
+        0.05
+      );
 
       expect(result.backProfitLoss).toBe(-100);
       expect(result.layProfitLoss).toBe(95); // 100 * (1 - 0.05)
@@ -443,7 +483,16 @@ describe("settlement outcome logic", () => {
     it("does not apply commission when back wins (lay loses)", () => {
       // Back £100 @ 2.00, Lay £100 @ 2.00, 5% exchange commission
       // Back wins: +£100, Lay loses: -£100 (no commission on losses)
-      const result = calculateMatchedBetProfitLoss("win", 100, 2.0, 100, 2.0, false, false, 0.05);
+      const result = calculateMatchedBetProfitLoss(
+        "win",
+        100,
+        2.0,
+        100,
+        2.0,
+        false,
+        false,
+        0.05
+      );
 
       expect(result.backProfitLoss).toBe(100);
       expect(result.layProfitLoss).toBe(-100); // Full liability, no commission
@@ -453,7 +502,16 @@ describe("settlement outcome logic", () => {
     it("calculates free bet with commission correctly", () => {
       // Free bet £100 @ 5.00, Lay £80 @ 5.10, 2% exchange commission
       // Free bet loses: £0, Lay wins: +£80 gross, -£1.60 commission = +£78.40 net
-      const result = calculateMatchedBetProfitLoss("loss", 100, 5.0, 80, 5.1, true, false, 0.02);
+      const result = calculateMatchedBetProfitLoss(
+        "loss",
+        100,
+        5.0,
+        80,
+        5.1,
+        true,
+        false,
+        0.02
+      );
 
       expect(result.backProfitLoss).toBe(0); // Free bet loss = 0
       expect(result.layProfitLoss).toBeCloseTo(78.4); // 80 * (1 - 0.02)
@@ -485,76 +543,76 @@ describe("settlement outcome logic", () => {
 
   describe("resolveOutcomeWithNormalizedSelection", () => {
     it("returns win when HOME_TEAM selection and home wins", () => {
-      const result = resolveOutcomeWithNormalizedSelection(
-        "HOME_TEAM",
-        { homeScore: 2, awayScore: 1 }
-      );
+      const result = resolveOutcomeWithNormalizedSelection("HOME_TEAM", {
+        homeScore: 2,
+        awayScore: 1,
+      });
       expect(result.outcome).toBe("win");
       expect(result.confidence).toBe("high");
       expect(result.detectedMarket).toBe("match_odds");
     });
 
     it("returns loss when HOME_TEAM selection and away wins", () => {
-      const result = resolveOutcomeWithNormalizedSelection(
-        "HOME_TEAM",
-        { homeScore: 1, awayScore: 2 }
-      );
+      const result = resolveOutcomeWithNormalizedSelection("HOME_TEAM", {
+        homeScore: 1,
+        awayScore: 2,
+      });
       expect(result.outcome).toBe("loss");
     });
 
     it("returns loss when HOME_TEAM selection and draw", () => {
-      const result = resolveOutcomeWithNormalizedSelection(
-        "HOME_TEAM",
-        { homeScore: 1, awayScore: 1 }
-      );
+      const result = resolveOutcomeWithNormalizedSelection("HOME_TEAM", {
+        homeScore: 1,
+        awayScore: 1,
+      });
       expect(result.outcome).toBe("loss");
     });
 
     it("returns win when AWAY_TEAM selection and away wins", () => {
-      const result = resolveOutcomeWithNormalizedSelection(
-        "AWAY_TEAM",
-        { homeScore: 0, awayScore: 2 }
-      );
+      const result = resolveOutcomeWithNormalizedSelection("AWAY_TEAM", {
+        homeScore: 0,
+        awayScore: 2,
+      });
       expect(result.outcome).toBe("win");
     });
 
     it("returns loss when AWAY_TEAM selection and home wins", () => {
-      const result = resolveOutcomeWithNormalizedSelection(
-        "AWAY_TEAM",
-        { homeScore: 3, awayScore: 0 }
-      );
+      const result = resolveOutcomeWithNormalizedSelection("AWAY_TEAM", {
+        homeScore: 3,
+        awayScore: 0,
+      });
       expect(result.outcome).toBe("loss");
     });
 
     it("returns loss when AWAY_TEAM selection and draw", () => {
-      const result = resolveOutcomeWithNormalizedSelection(
-        "AWAY_TEAM",
-        { homeScore: 2, awayScore: 2 }
-      );
+      const result = resolveOutcomeWithNormalizedSelection("AWAY_TEAM", {
+        homeScore: 2,
+        awayScore: 2,
+      });
       expect(result.outcome).toBe("loss");
     });
 
     it("returns win when DRAW selection and draw", () => {
-      const result = resolveOutcomeWithNormalizedSelection(
-        "DRAW",
-        { homeScore: 0, awayScore: 0 }
-      );
+      const result = resolveOutcomeWithNormalizedSelection("DRAW", {
+        homeScore: 0,
+        awayScore: 0,
+      });
       expect(result.outcome).toBe("win");
     });
 
     it("returns loss when DRAW selection and home wins", () => {
-      const result = resolveOutcomeWithNormalizedSelection(
-        "DRAW",
-        { homeScore: 1, awayScore: 0 }
-      );
+      const result = resolveOutcomeWithNormalizedSelection("DRAW", {
+        homeScore: 1,
+        awayScore: 0,
+      });
       expect(result.outcome).toBe("loss");
     });
 
     it("returns loss when DRAW selection and away wins", () => {
-      const result = resolveOutcomeWithNormalizedSelection(
-        "DRAW",
-        { homeScore: 0, awayScore: 1 }
-      );
+      const result = resolveOutcomeWithNormalizedSelection("DRAW", {
+        homeScore: 0,
+        awayScore: 1,
+      });
       expect(result.outcome).toBe("loss");
     });
   });

@@ -1,10 +1,4 @@
-import {
-  ArrowLeft,
-  Building2,
-  CreditCard,
-  Pencil,
-  Plus,
-} from "lucide-react";
+import { ArrowLeft, Building2, CreditCard, Pencil, Plus } from "lucide-react";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/app/(auth)/auth";
@@ -63,8 +57,8 @@ export default async function AccountDetailPage({
     <div className="container mx-auto max-w-2xl px-4 py-8">
       <div className="mb-6">
         <Link
+          className="inline-flex items-center gap-2 text-muted-foreground text-sm transition-colors hover:text-foreground"
           href="/bets/settings/accounts"
-          className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
           <ArrowLeft className="h-4 w-4" />
           Back to Accounts
@@ -92,18 +86,19 @@ export default async function AccountDetailPage({
                     <Badge variant="secondary">Archived</Badge>
                   )}
                 </CardTitle>
-                <p className="text-sm text-muted-foreground capitalize">
+                <p className="text-muted-foreground text-sm capitalize">
                   {account.kind}
                   {account.currency && ` • ${account.currency}`}
-                  {commission !== null && ` • ${commission.toFixed(1)}% commission`}
+                  {commission !== null &&
+                    ` • ${commission.toFixed(1)}% commission`}
                 </p>
               </div>
             </div>
             <div className="text-right">
-              <p className="text-2xl font-bold">
+              <p className="font-bold text-2xl">
                 {account.currency ?? "NOK"} {balance.toFixed(2)}
               </p>
-              <p className="text-xs text-muted-foreground">Current balance</p>
+              <p className="text-muted-foreground text-xs">Current balance</p>
             </div>
           </div>
         </CardHeader>
@@ -156,16 +151,20 @@ export default async function AccountDetailPage({
             <div className="space-y-2">
               {transactions.map((tx) => (
                 <TransactionRow
+                  accountId={id}
                   key={tx.id}
                   transaction={{
                     id: tx.id,
-                    type: tx.type as "deposit" | "withdrawal" | "bonus" | "adjustment",
+                    type: tx.type as
+                      | "deposit"
+                      | "withdrawal"
+                      | "bonus"
+                      | "adjustment",
                     amount: tx.amount,
                     currency: tx.currency,
                     occurredAt: tx.occurredAt.toISOString(),
                     notes: tx.notes,
                   }}
-                  accountId={id}
                 />
               ))}
             </div>

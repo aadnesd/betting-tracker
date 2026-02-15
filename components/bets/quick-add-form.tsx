@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { ValueWithTooltip } from "@/components/bets/calculation-tooltip";
-import { MatchPicker, type MatchOption } from "@/components/bets/match-picker";
+import { type MatchOption, MatchPicker } from "@/components/bets/match-picker";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -87,18 +87,20 @@ interface SelectedMatchInfo {
   awayTeam: string;
 }
 
-export function QuickAddForm({ bookmakers, exchanges, freeBets = [] }: QuickAddFormProps) {
+export function QuickAddForm({
+  bookmakers,
+  exchanges,
+  freeBets = [],
+}: QuickAddFormProps) {
   const router = useRouter();
 
   // Pick default selections based on available accounts
   const defaultBookmaker = bookmakers.length > 0 ? bookmakers[0].name : "";
   const defaultExchange = exchanges.length > 0 ? exchanges[0].name : "";
-  const defaultBackCurrency = bookmakers.length > 0 
-    ? (bookmakers[0].currency ?? "NOK") 
-    : "NOK";
-  const defaultLayCurrency = exchanges.length > 0 
-    ? (exchanges[0].currency ?? "NOK") 
-    : "NOK";
+  const defaultBackCurrency =
+    bookmakers.length > 0 ? (bookmakers[0].currency ?? "NOK") : "NOK";
+  const defaultLayCurrency =
+    exchanges.length > 0 ? (exchanges[0].currency ?? "NOK") : "NOK";
 
   const [formData, setFormData] = useState<FormData>({
     market: "",
@@ -121,7 +123,8 @@ export function QuickAddForm({ bookmakers, exchanges, freeBets = [] }: QuickAddF
   const [errors, setErrors] = useState<Partial<Record<keyof FormData, string>>>(
     {}
   );
-  const [selectedMatchInfo, setSelectedMatchInfo] = useState<SelectedMatchInfo | null>(null);
+  const [selectedMatchInfo, setSelectedMatchInfo] =
+    useState<SelectedMatchInfo | null>(null);
 
   const updateField = (field: keyof FormData, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -162,7 +165,9 @@ export function QuickAddForm({ bookmakers, exchanges, freeBets = [] }: QuickAddF
     }
     // Clear free bet selection when bookmaker changes
     if (formData.freeBetId) {
-      const currentFreeBet = freeBets.find((fb) => fb.id === formData.freeBetId);
+      const currentFreeBet = freeBets.find(
+        (fb) => fb.id === formData.freeBetId
+      );
       if (currentFreeBet && currentFreeBet.accountId !== selected?.id) {
         updateField("freeBetId", "");
       }
@@ -213,7 +218,9 @@ export function QuickAddForm({ bookmakers, exchanges, freeBets = [] }: QuickAddF
   };
 
   // When normalized selection is picked, update the selection text too
-  const handleNormalizedSelectionChange = (value: "HOME_TEAM" | "AWAY_TEAM" | "DRAW") => {
+  const handleNormalizedSelectionChange = (
+    value: "HOME_TEAM" | "AWAY_TEAM" | "DRAW"
+  ) => {
     updateField("normalizedSelection", value);
     if (selectedMatchInfo) {
       if (value === "HOME_TEAM") {
@@ -324,8 +331,8 @@ export function QuickAddForm({ bookmakers, exchanges, freeBets = [] }: QuickAddF
       }
 
       toast.success(
-        formData.freeBetId 
-          ? "Matched bet created and free bet marked as used!" 
+        formData.freeBetId
+          ? "Matched bet created and free bet marked as used!"
           : "Matched bet created successfully!"
       );
       router.push("/bets");
@@ -348,8 +355,8 @@ export function QuickAddForm({ bookmakers, exchanges, freeBets = [] }: QuickAddF
     <div className="container mx-auto max-w-2xl px-4 py-8">
       <div className="mb-6">
         <Link
+          className="inline-flex items-center gap-2 text-muted-foreground text-sm transition-colors hover:text-foreground"
           href="/bets"
-          className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
           <ArrowLeft className="h-4 w-4" />
           Back to Dashboard
@@ -366,15 +373,17 @@ export function QuickAddForm({ bookmakers, exchanges, freeBets = [] }: QuickAddF
         <CardContent>
           {(hasNoBookmakers || hasNoExchanges) && (
             <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 p-4">
-              <h3 className="font-medium text-amber-900">Set up your accounts first</h3>
-              <p className="text-sm text-amber-800 mt-1">
+              <h3 className="font-medium text-amber-900">
+                Set up your accounts first
+              </h3>
+              <p className="mt-1 text-amber-800 text-sm">
                 {hasNoBookmakers && hasNoExchanges
                   ? "Add at least one bookmaker and one exchange account before creating matched bets."
                   : hasNoBookmakers
                     ? "Add at least one bookmaker account before creating matched bets."
                     : "Add at least one exchange account before creating matched bets."}
               </p>
-              <Button asChild size="sm" className="mt-3">
+              <Button asChild className="mt-3" size="sm">
                 <Link href="/bets/settings/accounts/new">
                   <Plus className="mr-1 h-4 w-4" />
                   Add Account
@@ -383,25 +392,28 @@ export function QuickAddForm({ bookmakers, exchanges, freeBets = [] }: QuickAddF
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form className="space-y-6" onSubmit={handleSubmit}>
             {/* Market Details */}
             <div className="space-y-4">
-              <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+              <h3 className="flex items-center gap-2 font-medium text-muted-foreground text-sm">
                 Market Details
                 <Trophy className="h-4 w-4 text-amber-500" />
               </h3>
-              
+
               {/* Match Picker - optional link to synced football match */}
               <div className="space-y-2">
-                <Label htmlFor="matchPicker" className="flex items-center gap-2">
+                <Label
+                  className="flex items-center gap-2"
+                  htmlFor="matchPicker"
+                >
                   Link to Match (optional)
                 </Label>
                 <MatchPicker
-                  value={formData.matchId || null}
                   onChange={handleMatchChange}
                   placeholder="Search for a match..."
+                  value={formData.matchId || null}
                 />
-                <p className="text-xs text-muted-foreground">
+                <p className="text-muted-foreground text-xs">
                   Linking to a match enables automatic result lookup
                 </p>
               </div>
@@ -412,34 +424,50 @@ export function QuickAddForm({ bookmakers, exchanges, freeBets = [] }: QuickAddF
                   <Label>Match Odds Selection (for auto-settle)</Label>
                   <div className="flex flex-wrap gap-2">
                     <Button
-                      type="button"
-                      variant={formData.normalizedSelection === "HOME_TEAM" ? "default" : "outline"}
+                      className="min-w-[100px] flex-1"
+                      onClick={() =>
+                        handleNormalizedSelectionChange("HOME_TEAM")
+                      }
                       size="sm"
-                      onClick={() => handleNormalizedSelectionChange("HOME_TEAM")}
-                      className="flex-1 min-w-[100px]"
+                      type="button"
+                      variant={
+                        formData.normalizedSelection === "HOME_TEAM"
+                          ? "default"
+                          : "outline"
+                      }
                     >
                       {selectedMatchInfo.homeTeam}
                     </Button>
                     <Button
-                      type="button"
-                      variant={formData.normalizedSelection === "DRAW" ? "default" : "outline"}
-                      size="sm"
+                      className="min-w-[80px] flex-1"
                       onClick={() => handleNormalizedSelectionChange("DRAW")}
-                      className="flex-1 min-w-[80px]"
+                      size="sm"
+                      type="button"
+                      variant={
+                        formData.normalizedSelection === "DRAW"
+                          ? "default"
+                          : "outline"
+                      }
                     >
                       Draw
                     </Button>
                     <Button
-                      type="button"
-                      variant={formData.normalizedSelection === "AWAY_TEAM" ? "default" : "outline"}
+                      className="min-w-[100px] flex-1"
+                      onClick={() =>
+                        handleNormalizedSelectionChange("AWAY_TEAM")
+                      }
                       size="sm"
-                      onClick={() => handleNormalizedSelectionChange("AWAY_TEAM")}
-                      className="flex-1 min-w-[100px]"
+                      type="button"
+                      variant={
+                        formData.normalizedSelection === "AWAY_TEAM"
+                          ? "default"
+                          : "outline"
+                      }
                     >
                       {selectedMatchInfo.awayTeam}
                     </Button>
                   </div>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-muted-foreground text-xs">
                     Select your bet pick for reliable auto-settlement
                   </p>
                 </div>
@@ -449,27 +477,27 @@ export function QuickAddForm({ bookmakers, exchanges, freeBets = [] }: QuickAddF
                 <div className="space-y-2">
                   <Label htmlFor="market">Market</Label>
                   <Input
+                    className={errors.market ? "border-destructive" : ""}
                     id="market"
+                    onChange={(e) => updateField("market", e.target.value)}
                     placeholder="e.g., Man Utd vs Liverpool"
                     value={formData.market}
-                    onChange={(e) => updateField("market", e.target.value)}
-                    className={errors.market ? "border-destructive" : ""}
                   />
                   {errors.market && (
-                    <p className="text-xs text-destructive">{errors.market}</p>
+                    <p className="text-destructive text-xs">{errors.market}</p>
                   )}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="selection">Selection</Label>
                   <Input
+                    className={errors.selection ? "border-destructive" : ""}
                     id="selection"
+                    onChange={(e) => updateField("selection", e.target.value)}
                     placeholder="e.g., Man Utd to Win"
                     value={formData.selection}
-                    onChange={(e) => updateField("selection", e.target.value)}
-                    className={errors.selection ? "border-destructive" : ""}
                   />
                   {errors.selection && (
-                    <p className="text-xs text-destructive">
+                    <p className="text-destructive text-xs">
                       {errors.selection}
                     </p>
                   )}
@@ -478,8 +506,8 @@ export function QuickAddForm({ bookmakers, exchanges, freeBets = [] }: QuickAddF
               <div className="space-y-2">
                 <Label htmlFor="promoType">Promo Type (optional)</Label>
                 <Select
-                  value={formData.promoType}
                   onValueChange={handlePromoTypeChange}
+                  value={formData.promoType}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select promo type..." />
@@ -495,17 +523,18 @@ export function QuickAddForm({ bookmakers, exchanges, freeBets = [] }: QuickAddF
               </div>
 
               {/* Free Bet Selector - shown when promo type is Free Bet or Risk-Free Bet */}
-              {(formData.promoType === "Free Bet" || formData.promoType === "Risk-Free Bet") && (
+              {(formData.promoType === "Free Bet" ||
+                formData.promoType === "Risk-Free Bet") && (
                 <div className="space-y-2">
-                  <Label htmlFor="freeBet" className="flex items-center gap-2">
+                  <Label className="flex items-center gap-2" htmlFor="freeBet">
                     <Gift className="h-4 w-4 text-emerald-600" />
                     Use a Free Bet (optional)
                   </Label>
                   {availableFreeBets.length > 0 ? (
                     <>
                       <Select
-                        value={formData.freeBetId}
                         onValueChange={handleFreeBetChange}
+                        value={formData.freeBetId}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Select a free bet to use..." />
@@ -515,7 +544,7 @@ export function QuickAddForm({ bookmakers, exchanges, freeBets = [] }: QuickAddF
                             <SelectItem key={fb.id} value={fb.id}>
                               <span className="flex items-center gap-2">
                                 {fb.name}
-                                <span className="text-emerald-600 font-medium">
+                                <span className="font-medium text-emerald-600">
                                   {fb.currency} {fb.value.toFixed(2)}
                                 </span>
                                 {fb.accountName && (
@@ -535,9 +564,12 @@ export function QuickAddForm({ bookmakers, exchanges, freeBets = [] }: QuickAddF
                             Using: {selectedFreeBet.name}
                           </div>
                           <div className="mt-1 text-emerald-700">
-                            Value: {selectedFreeBet.currency} {selectedFreeBet.value.toFixed(2)}
+                            Value: {selectedFreeBet.currency}{" "}
+                            {selectedFreeBet.value.toFixed(2)}
                             {selectedFreeBet.minOdds && (
-                              <span className="ml-3">Min odds: {selectedFreeBet.minOdds.toFixed(2)}</span>
+                              <span className="ml-3">
+                                Min odds: {selectedFreeBet.minOdds.toFixed(2)}
+                              </span>
                             )}
                             <span className="ml-3">
                               {selectedFreeBet.stakeReturned
@@ -546,7 +578,10 @@ export function QuickAddForm({ bookmakers, exchanges, freeBets = [] }: QuickAddF
                             </span>
                             {selectedFreeBet.expiresAt && (
                               <span className="ml-3">
-                                Expires: {new Date(selectedFreeBet.expiresAt).toLocaleDateString()}
+                                Expires:{" "}
+                                {new Date(
+                                  selectedFreeBet.expiresAt
+                                ).toLocaleDateString()}
                               </span>
                             )}
                           </div>
@@ -554,13 +589,16 @@ export function QuickAddForm({ bookmakers, exchanges, freeBets = [] }: QuickAddF
                       )}
                     </>
                   ) : (
-                    <div className="rounded-md border border-muted bg-muted/50 p-3 text-sm text-muted-foreground">
+                    <div className="rounded-md border border-muted bg-muted/50 p-3 text-muted-foreground text-sm">
                       No active free bets available
                       {formData.backBookmaker && (
                         <span> for {formData.backBookmaker}</span>
                       )}
                       .{" "}
-                      <Link href="/bets/settings/promos/new" className="text-primary hover:underline">
+                      <Link
+                        className="text-primary hover:underline"
+                        href="/bets/settings/promos/new"
+                      >
                         Add one
                       </Link>
                     </div>
@@ -571,16 +609,18 @@ export function QuickAddForm({ bookmakers, exchanges, freeBets = [] }: QuickAddF
 
             {/* Back Bet */}
             <div className="space-y-4 rounded-lg border p-4">
-              <h3 className="text-sm font-medium">Back Bet (Bookmaker)</h3>
+              <h3 className="font-medium text-sm">Back Bet (Bookmaker)</h3>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="backBookmaker">Bookmaker</Label>
                   <Select
-                    value={formData.backBookmaker}
                     onValueChange={handleBookmakerChange}
+                    value={formData.backBookmaker}
                   >
                     <SelectTrigger
-                      className={errors.backBookmaker ? "border-destructive" : ""}
+                      className={
+                        errors.backBookmaker ? "border-destructive" : ""
+                      }
                     >
                       <SelectValue placeholder="Select bookmaker..." />
                     </SelectTrigger>
@@ -605,7 +645,7 @@ export function QuickAddForm({ bookmakers, exchanges, freeBets = [] }: QuickAddF
                     </SelectContent>
                   </Select>
                   {errors.backBookmaker && (
-                    <p className="text-xs text-destructive">
+                    <p className="text-destructive text-xs">
                       {errors.backBookmaker}
                     </p>
                   )}
@@ -613,10 +653,10 @@ export function QuickAddForm({ bookmakers, exchanges, freeBets = [] }: QuickAddF
                 <div className="space-y-2">
                   <Label htmlFor="backCurrency">Currency</Label>
                   <Select
-                    value={formData.backCurrency}
                     onValueChange={(value) =>
                       updateField("backCurrency", value)
                     }
+                    value={formData.backCurrency}
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -636,33 +676,35 @@ export function QuickAddForm({ bookmakers, exchanges, freeBets = [] }: QuickAddF
                 <div className="space-y-2">
                   <Label htmlFor="backOdds">Odds</Label>
                   <Input
-                    id="backOdds"
-                    type="number"
-                    step="any"
-                    min="1.01"
-                    placeholder="e.g., 2.50"
-                    value={formData.backOdds}
-                    onChange={(e) => updateField("backOdds", e.target.value)}
                     className={errors.backOdds ? "border-destructive" : ""}
+                    id="backOdds"
+                    min="1.01"
+                    onChange={(e) => updateField("backOdds", e.target.value)}
+                    placeholder="e.g., 2.50"
+                    step="any"
+                    type="number"
+                    value={formData.backOdds}
                   />
                   {errors.backOdds && (
-                    <p className="text-xs text-destructive">{errors.backOdds}</p>
+                    <p className="text-destructive text-xs">
+                      {errors.backOdds}
+                    </p>
                   )}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="backStake">Stake</Label>
                   <Input
-                    id="backStake"
-                    type="number"
-                    step="0.01"
-                    min="0.01"
-                    placeholder="e.g., 100"
-                    value={formData.backStake}
-                    onChange={(e) => updateField("backStake", e.target.value)}
                     className={errors.backStake ? "border-destructive" : ""}
+                    id="backStake"
+                    min="0.01"
+                    onChange={(e) => updateField("backStake", e.target.value)}
+                    placeholder="e.g., 100"
+                    step="0.01"
+                    type="number"
+                    value={formData.backStake}
                   />
                   {errors.backStake && (
-                    <p className="text-xs text-destructive">
+                    <p className="text-destructive text-xs">
                       {errors.backStake}
                     </p>
                   )}
@@ -672,13 +714,13 @@ export function QuickAddForm({ bookmakers, exchanges, freeBets = [] }: QuickAddF
 
             {/* Lay Bet */}
             <div className="space-y-4 rounded-lg border p-4">
-              <h3 className="text-sm font-medium">Lay Bet (Exchange)</h3>
+              <h3 className="font-medium text-sm">Lay Bet (Exchange)</h3>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="layExchange">Exchange</Label>
                   <Select
-                    value={formData.layExchange}
                     onValueChange={handleExchangeChange}
+                    value={formData.layExchange}
                   >
                     <SelectTrigger
                       className={errors.layExchange ? "border-destructive" : ""}
@@ -706,7 +748,7 @@ export function QuickAddForm({ bookmakers, exchanges, freeBets = [] }: QuickAddF
                     </SelectContent>
                   </Select>
                   {errors.layExchange && (
-                    <p className="text-xs text-destructive">
+                    <p className="text-destructive text-xs">
                       {errors.layExchange}
                     </p>
                   )}
@@ -714,8 +756,8 @@ export function QuickAddForm({ bookmakers, exchanges, freeBets = [] }: QuickAddF
                 <div className="space-y-2">
                   <Label htmlFor="layCurrency">Currency</Label>
                   <Select
-                    value={formData.layCurrency}
                     onValueChange={(value) => updateField("layCurrency", value)}
+                    value={formData.layCurrency}
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -735,40 +777,40 @@ export function QuickAddForm({ bookmakers, exchanges, freeBets = [] }: QuickAddF
                 <div className="space-y-2">
                   <Label htmlFor="layOdds">Odds</Label>
                   <Input
-                    id="layOdds"
-                    type="number"
-                    step="any"
-                    min="1.01"
-                    placeholder="e.g., 2.52"
-                    value={formData.layOdds}
-                    onChange={(e) => updateField("layOdds", e.target.value)}
                     className={errors.layOdds ? "border-destructive" : ""}
+                    id="layOdds"
+                    min="1.01"
+                    onChange={(e) => updateField("layOdds", e.target.value)}
+                    placeholder="e.g., 2.52"
+                    step="any"
+                    type="number"
+                    value={formData.layOdds}
                   />
                   {errors.layOdds && (
-                    <p className="text-xs text-destructive">{errors.layOdds}</p>
+                    <p className="text-destructive text-xs">{errors.layOdds}</p>
                   )}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="layStake">Stake</Label>
                   <Input
-                    id="layStake"
-                    type="number"
-                    step="0.01"
-                    min="0.01"
-                    placeholder="e.g., 99.20"
-                    value={formData.layStake}
-                    onChange={(e) => updateField("layStake", e.target.value)}
                     className={errors.layStake ? "border-destructive" : ""}
+                    id="layStake"
+                    min="0.01"
+                    onChange={(e) => updateField("layStake", e.target.value)}
+                    placeholder="e.g., 99.20"
+                    step="0.01"
+                    type="number"
+                    value={formData.layStake}
                   />
                   {errors.layStake && (
-                    <p className="text-xs text-destructive">
+                    <p className="text-destructive text-xs">
                       {errors.layStake}
                     </p>
                   )}
                 </div>
               </div>
               {layLiability !== null && (
-                <p className="text-sm text-muted-foreground">
+                <p className="text-muted-foreground text-sm">
                   <ValueWithTooltip type="layLiability">
                     Lay Liability:{" "}
                     <span className="font-medium">
@@ -784,28 +826,28 @@ export function QuickAddForm({ bookmakers, exchanges, freeBets = [] }: QuickAddF
               <Label htmlFor="notes">Notes (optional)</Label>
               <Textarea
                 id="notes"
-                placeholder="Any additional notes..."
-                value={formData.notes}
                 onChange={(e) => updateField("notes", e.target.value)}
+                placeholder="Any additional notes..."
                 rows={2}
+                value={formData.notes}
               />
             </div>
 
             {/* Actions */}
             <div className="flex gap-4">
               <Button
+                className="flex-1"
+                disabled={isSubmitting}
+                onClick={() => router.push("/bets")}
                 type="button"
                 variant="outline"
-                className="flex-1"
-                onClick={() => router.push("/bets")}
-                disabled={isSubmitting}
               >
                 Cancel
               </Button>
-              <Button 
-                type="submit" 
-                className="flex-1" 
+              <Button
+                className="flex-1"
                 disabled={isSubmitting || hasNoBookmakers || hasNoExchanges}
+                type="submit"
               >
                 {isSubmitting ? (
                   <>

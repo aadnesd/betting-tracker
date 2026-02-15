@@ -29,8 +29,8 @@ export function applyAccountSelection({
     accountId: account.id,
     exchange: account.name,
     currency: enforceCurrency
-      ? account.currency ?? bet.currency ?? null
-      : bet.currency ?? null,
+      ? (account.currency ?? bet.currency ?? null)
+      : (bet.currency ?? null),
     unmatchedAccount: false,
   };
 }

@@ -1,11 +1,11 @@
-import { notFound, redirect } from "next/navigation";
-import Link from "next/link";
-import { auth } from "@/app/(auth)/auth";
-import { getDepositBonusById, listAccountsByUser } from "@/lib/db/queries";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
+import Link from "next/link";
+import { notFound, redirect } from "next/navigation";
+import { auth } from "@/app/(auth)/auth";
 import { DepositBonusForm } from "@/components/bets/deposit-bonus-form";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { getDepositBonusById, listAccountsByUser } from "@/lib/db/queries";
 
 export default async function EditDepositBonusPage({
   params,
@@ -41,16 +41,16 @@ export default async function EditDepositBonusPage({
   }));
 
   return (
-    <div className="container mx-auto max-w-2xl p-4 space-y-6">
+    <div className="container mx-auto max-w-2xl space-y-6 p-4">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" asChild>
+        <Button asChild size="icon" variant="ghost">
           <Link href={`/bets/settings/promos/deposit-bonus/${id}`}>
             <ArrowLeft className="h-4 w-4" />
           </Link>
         </Button>
         <div>
-          <h1 className="text-2xl font-bold">Edit Deposit Bonus</h1>
+          <h1 className="font-bold text-2xl">Edit Deposit Bonus</h1>
           <p className="text-muted-foreground">{bonus.name}</p>
         </div>
       </div>
@@ -63,7 +63,6 @@ export default async function EditDepositBonusPage({
         <CardContent>
           <DepositBonusForm
             accounts={accountOptions}
-            mode="edit"
             initialData={{
               id: bonus.id,
               accountId: bonus.accountId,
@@ -72,13 +71,17 @@ export default async function EditDepositBonusPage({
               bonusAmount: bonus.bonusAmount,
               currency: bonus.currency,
               wageringMultiplier: bonus.wageringMultiplier,
-              wageringBase: bonus.wageringBase as "deposit" | "bonus" | "deposit_plus_bonus",
+              wageringBase: bonus.wageringBase as
+                | "deposit"
+                | "bonus"
+                | "deposit_plus_bonus",
               minOdds: bonus.minOdds,
               maxBetPercent: bonus.maxBetPercent,
               expiresAt: bonus.expiresAt,
               linkedTransactionId: bonus.linkedTransactionId,
               notes: bonus.notes,
             }}
+            mode="edit"
           />
         </CardContent>
       </Card>

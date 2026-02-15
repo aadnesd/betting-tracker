@@ -38,10 +38,7 @@ export function FreeBetExpiryBanner({
   const isUrgent = expiringCount >= 3;
 
   return (
-    <Alert
-      variant={isUrgent ? "destructive" : "default"}
-      className={className}
-    >
+    <Alert className={className} variant={isUrgent ? "destructive" : "default"}>
       {isUrgent ? (
         <AlertTriangle className="h-4 w-4" />
       ) : (

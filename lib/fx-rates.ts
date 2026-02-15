@@ -1,19 +1,29 @@
 const FX_BASE_URL =
-  process.env.FXRATES_API_BASE_URL?.trim() || "https://api.fxratesapi.com/latest";
+  process.env.FXRATES_API_BASE_URL?.trim() ||
+  "https://api.fxratesapi.com/latest";
 const TARGET_CURRENCY = "NOK";
 
 const cache = new Map<string, { rate: number; expiresAt: number }>();
 const CACHE_TTL_MS = 5 * 60 * 1000;
 
 // Stablecoins pegged to USD - use USD rate as fallback
-const USD_STABLECOINS = new Set(["USDT", "USDC", "DAI", "BUSD", "TUSD", "USDP", "GUSD", "FRAX"]);
+const USD_STABLECOINS = new Set([
+  "USDT",
+  "USDC",
+  "DAI",
+  "BUSD",
+  "TUSD",
+  "USDP",
+  "GUSD",
+  "FRAX",
+]);
 
 async function fetchRate(fromCurrency: string): Promise<number> {
   const base = fromCurrency.toUpperCase();
-  
+
   // For USD stablecoins, use USD rate directly
   const effectiveBase = USD_STABLECOINS.has(base) ? "USD" : base;
-  
+
   const cached = cache.get(effectiveBase);
   if (cached && cached.expiresAt > Date.now()) {
     // Also cache the original currency if it's a stablecoin
@@ -51,7 +61,10 @@ async function fetchRate(fromCurrency: string): Promise<number> {
 
   const rate = data.rates?.[TARGET_CURRENCY] ?? data.data?.[TARGET_CURRENCY];
   if (typeof rate !== "number" || Number.isNaN(rate)) {
-    console.error(`[FX] API response missing NOK rate for ${effectiveBase}:`, JSON.stringify(data));
+    console.error(
+      `[FX] API response missing NOK rate for ${effectiveBase}:`,
+      JSON.stringify(data)
+    );
     throw new Error(`FX API response missing NOK rate for ${effectiveBase}`);
   }
 
@@ -74,10 +87,15 @@ export async function convertAmountToNok(
   try {
     const rate = await fetchRate(currency);
     const converted = amount * rate;
-    console.log(`[FX] Converted ${amount} ${currency} → ${converted.toFixed(2)} NOK (rate: ${rate})`);
+    console.log(
+      `[FX] Converted ${amount} ${currency} → ${converted.toFixed(2)} NOK (rate: ${rate})`
+    );
     return converted;
   } catch (error) {
-    console.error(`[FX] Failed to convert ${amount} ${currency} to NOK:`, error);
+    console.error(
+      `[FX] Failed to convert ${amount} ${currency} to NOK:`,
+      error
+    );
     // Fallback: return amount unchanged (will be wrong but won't crash)
     return amount;
   }

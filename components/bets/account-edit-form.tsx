@@ -51,7 +51,10 @@ export function AccountEditForm({ account }: AccountEditFormProps) {
     {}
   );
 
-  const updateField = <K extends keyof FormData>(field: K, value: FormData[K]) => {
+  const updateField = <K extends keyof FormData>(
+    field: K,
+    value: FormData[K]
+  ) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
     if (errors[field]) {
       setErrors((prev) => ({ ...prev, [field]: undefined }));
@@ -101,8 +104,7 @@ export function AccountEditForm({ account }: AccountEditFormProps) {
           name: formData.name.trim(),
           kind: formData.kind,
           currency: formData.currency || null,
-          commission:
-            formData.kind === "exchange" ? commissionDecimal : null,
+          commission: formData.kind === "exchange" ? commissionDecimal : null,
           status: formData.status,
         }),
       });
@@ -148,15 +150,15 @@ export function AccountEditForm({ account }: AccountEditFormProps) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form className="space-y-6" onSubmit={handleSubmit}>
       {/* Account Type */}
       <div className="space-y-2">
         <Label htmlFor="kind">Account Type</Label>
         <Select
-          value={formData.kind}
           onValueChange={(value: "bookmaker" | "exchange") =>
             updateField("kind", value)
           }
+          value={formData.kind}
         >
           <SelectTrigger>
             <SelectValue />
@@ -182,18 +184,18 @@ export function AccountEditForm({ account }: AccountEditFormProps) {
       <div className="space-y-2">
         <Label htmlFor="name">Account Name</Label>
         <Input
+          className={errors.name ? "border-destructive" : ""}
           id="name"
+          onChange={(e) => updateField("name", e.target.value)}
           placeholder={
             formData.kind === "bookmaker"
               ? "e.g., bet365, Unibet, William Hill"
               : "e.g., Betfair Exchange, Smarkets"
           }
           value={formData.name}
-          onChange={(e) => updateField("name", e.target.value)}
-          className={errors.name ? "border-destructive" : ""}
         />
         {errors.name && (
-          <p className="text-xs text-destructive">{errors.name}</p>
+          <p className="text-destructive text-xs">{errors.name}</p>
         )}
       </div>
 
@@ -201,8 +203,8 @@ export function AccountEditForm({ account }: AccountEditFormProps) {
       <div className="space-y-2">
         <Label htmlFor="currency">Default Currency</Label>
         <Select
-          value={formData.currency}
           onValueChange={(value) => updateField("currency", value)}
+          value={formData.currency}
         >
           <SelectTrigger>
             <SelectValue />
@@ -222,20 +224,20 @@ export function AccountEditForm({ account }: AccountEditFormProps) {
         <div className="space-y-2">
           <Label htmlFor="commission">Commission Rate (%)</Label>
           <Input
-            id="commission"
-            type="number"
-            step="0.1"
-            min="0"
-            max="100"
-            placeholder="e.g., 2 (for 2%)"
-            value={formData.commission}
-            onChange={(e) => updateField("commission", e.target.value)}
             className={errors.commission ? "border-destructive" : ""}
+            id="commission"
+            max="100"
+            min="0"
+            onChange={(e) => updateField("commission", e.target.value)}
+            placeholder="e.g., 2 (for 2%)"
+            step="0.1"
+            type="number"
+            value={formData.commission}
           />
           {errors.commission && (
-            <p className="text-xs text-destructive">{errors.commission}</p>
+            <p className="text-destructive text-xs">{errors.commission}</p>
           )}
-          <p className="text-xs text-muted-foreground">
+          <p className="text-muted-foreground text-xs">
             The commission rate charged by the exchange on winning bets
           </p>
         </div>
@@ -245,10 +247,10 @@ export function AccountEditForm({ account }: AccountEditFormProps) {
       <div className="space-y-2">
         <Label htmlFor="status">Status</Label>
         <Select
-          value={formData.status}
           onValueChange={(value: "active" | "archived") =>
             updateField("status", value)
           }
+          value={formData.status}
         >
           <SelectTrigger>
             <SelectValue />
@@ -258,7 +260,7 @@ export function AccountEditForm({ account }: AccountEditFormProps) {
             <SelectItem value="archived">Archived</SelectItem>
           </SelectContent>
         </Select>
-        <p className="text-xs text-muted-foreground">
+        <p className="text-muted-foreground text-xs">
           Archived accounts won't appear in bet entry dropdowns
         </p>
       </div>
@@ -266,18 +268,18 @@ export function AccountEditForm({ account }: AccountEditFormProps) {
       {/* Actions */}
       <div className="flex gap-4 pt-4">
         <Button
+          className="flex-1"
+          disabled={isSubmitting}
+          onClick={() => router.push("/bets/settings/accounts")}
           type="button"
           variant="outline"
-          className="flex-1"
-          onClick={() => router.push("/bets/settings/accounts")}
-          disabled={isSubmitting}
         >
           Cancel
         </Button>
         <Button
-          type="submit"
           className="flex-1"
           disabled={isSubmitting || !hasChanges}
+          type="submit"
         >
           {isSubmitting ? (
             <>
@@ -291,20 +293,20 @@ export function AccountEditForm({ account }: AccountEditFormProps) {
       </div>
 
       {/* Delete section - separated from main actions */}
-      <div className="border-t pt-6 mt-6">
+      <div className="mt-6 border-t pt-6">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm font-medium text-destructive">Danger Zone</p>
-            <p className="text-xs text-muted-foreground mt-1">
+            <p className="font-medium text-destructive text-sm">Danger Zone</p>
+            <p className="mt-1 text-muted-foreground text-xs">
               Delete this account permanently. This cannot be undone.
             </p>
           </div>
           <DeleteConfirmDialog
-            title="Delete account?"
             description="This action cannot be undone. The account will be permanently deleted. Note: You cannot delete accounts that have linked bets, transactions, or free bets. Archive instead."
-            onConfirm={handleDelete}
             destructiveLabel="Delete Account"
             disabled={isSubmitting}
+            onConfirm={handleDelete}
+            title="Delete account?"
           />
         </div>
       </div>

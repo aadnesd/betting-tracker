@@ -108,10 +108,7 @@ export async function POST(request: Request) {
     if (payload.matchId !== undefined && payload.matchId !== null) {
       const match = await getFootballMatchById({ id: payload.matchId });
       if (!match) {
-        return NextResponse.json(
-          { error: "Match not found" },
-          { status: 404 }
-        );
+        return NextResponse.json({ error: "Match not found" }, { status: 404 });
       }
     }
 

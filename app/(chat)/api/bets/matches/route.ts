@@ -24,13 +24,23 @@ export async function GET(request: Request) {
   const limit = Math.min(Number(searchParams.get("limit")) || 20, 100);
 
   try {
-    let matches;
+    type SearchMatchRow = Awaited<
+      ReturnType<typeof searchFootballMatches>
+    >[number];
+    type UpcomingMatchRow = Awaited<
+      ReturnType<typeof listUpcomingMatches>
+    >[number];
+    type MatchRow = SearchMatchRow | UpcomingMatchRow;
+    let matches: MatchRow[] = [];
 
     if (search && search.trim().length > 0) {
+      const fromDate = new Date();
+      fromDate.setDate(fromDate.getDate() - 14);
+
       // Search for matches by team name
       matches = await searchFootballMatches({
         searchTerm: search.trim(),
-        fromDate: new Date(), // Only future matches
+        fromDate,
         limit,
       });
     } else {

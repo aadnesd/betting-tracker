@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
-import { MatchPicker, type MatchOption } from "@/components/bets/match-picker";
+import { type MatchOption, MatchPicker } from "@/components/bets/match-picker";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -165,7 +165,9 @@ export function StandaloneBetForm({
 
     try {
       const endpoint =
-        mode === "edit" ? "/api/bets/individual/update" : "/api/bets/standalone";
+        mode === "edit"
+          ? "/api/bets/individual/update"
+          : "/api/bets/standalone";
       const response = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -212,9 +214,12 @@ export function StandaloneBetForm({
       }
       router.refresh();
     } catch (error) {
-      toast.error(mode === "edit" ? "Failed to update bet" : "Failed to create bet", {
-        description: error instanceof Error ? error.message : "Unknown error",
-      });
+      toast.error(
+        mode === "edit" ? "Failed to update bet" : "Failed to create bet",
+        {
+          description: error instanceof Error ? error.message : "Unknown error",
+        }
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -242,8 +247,12 @@ export function StandaloneBetForm({
     <div className="container mx-auto max-w-xl p-4">
       <div className="mb-4">
         <Link
-          href={isEdit && initialData ? `/bets/${initialData.kind}/${initialData.id}` : "/bets/all"}
-          className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground"
+          className="inline-flex items-center text-muted-foreground text-sm hover:text-foreground"
+          href={
+            isEdit && initialData
+              ? `/bets/${initialData.kind}/${initialData.id}`
+              : "/bets/all"
+          }
         >
           <ArrowLeft className="mr-2 h-4 w-4" />
           {isEdit ? "Back to Bet Detail" : "Back to All Bets"}
@@ -252,9 +261,7 @@ export function StandaloneBetForm({
 
       <Card>
         <CardHeader>
-          <CardTitle>
-            {isEdit ? "Edit Bet" : "Create Standalone Bet"}
-          </CardTitle>
+          <CardTitle>{isEdit ? "Edit Bet" : "Create Standalone Bet"}</CardTitle>
           <CardDescription>
             {isEdit
               ? "Update the details of this individual bet"
@@ -268,8 +275,8 @@ export function StandaloneBetForm({
               <p className="mt-1 text-muted-foreground">
                 Please{" "}
                 <Link
-                  href="/bets/settings/accounts/new"
                   className="underline hover:text-foreground"
+                  href="/bets/settings/accounts/new"
                 >
                   add an account
                 </Link>{" "}
@@ -277,31 +284,31 @@ export function StandaloneBetForm({
               </p>
             </div>
           ) : (
-            <form onSubmit={handleSubmit} className="space-y-6">
+            <form className="space-y-6" onSubmit={handleSubmit}>
               {/* Bet Type Selection */}
               <div className="space-y-2">
                 <Label>Bet Type</Label>
                 <div className="flex gap-2">
                   <Button
-                    type="button"
-                    variant={formData.kind === "back" ? "default" : "outline"}
                     className="flex-1"
                     disabled={isEdit}
                     onClick={() => handleKindChange("back")}
+                    type="button"
+                    variant={formData.kind === "back" ? "default" : "outline"}
                   >
                     Back
                   </Button>
                   <Button
-                    type="button"
-                    variant={formData.kind === "lay" ? "default" : "outline"}
                     className="flex-1"
                     disabled={isEdit}
                     onClick={() => handleKindChange("lay")}
+                    type="button"
+                    variant={formData.kind === "lay" ? "default" : "outline"}
                   >
                     Lay
                   </Button>
                 </div>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-muted-foreground text-xs">
                   {formData.kind === "back"
                     ? "Betting FOR the selection to win"
                     : "Betting AGAINST the selection to win"}
@@ -319,8 +326,8 @@ export function StandaloneBetForm({
                       No {formData.kind === "back" ? "bookmaker" : "exchange"}{" "}
                       accounts configured.{" "}
                       <Link
-                        href="/bets/settings/accounts/new"
                         className="underline hover:text-foreground"
+                        href="/bets/settings/accounts/new"
                       >
                         Add one
                       </Link>
@@ -328,8 +335,8 @@ export function StandaloneBetForm({
                   </div>
                 ) : (
                   <Select
-                    value={formData.accountId}
                     onValueChange={handleAccountChange}
+                    value={formData.accountId}
                   >
                     <SelectTrigger id="account">
                       <SelectValue placeholder="Select account" />
@@ -349,21 +356,24 @@ export function StandaloneBetForm({
                   </Select>
                 )}
                 {errors.accountId && (
-                  <p className="text-xs text-destructive">{errors.accountId}</p>
+                  <p className="text-destructive text-xs">{errors.accountId}</p>
                 )}
               </div>
 
               {/* Market & Selection */}
               <div className="space-y-2">
-                <Label htmlFor="matchPicker" className="flex items-center gap-2">
+                <Label
+                  className="flex items-center gap-2"
+                  htmlFor="matchPicker"
+                >
                   Link to Match (optional)
                 </Label>
                 <MatchPicker
-                  value={formData.matchId || null}
                   onChange={handleMatchChange}
                   placeholder="Search for a match..."
+                  value={formData.matchId || null}
                 />
-                <p className="text-xs text-muted-foreground">
+                <p className="text-muted-foreground text-xs">
                   Linking to a match enables automatic result lookup
                 </p>
               </div>
@@ -373,24 +383,24 @@ export function StandaloneBetForm({
                   <Label htmlFor="market">Market</Label>
                   <Input
                     id="market"
+                    onChange={(e) => updateField("market", e.target.value)}
                     placeholder="e.g., Man Utd v Liverpool"
                     value={formData.market}
-                    onChange={(e) => updateField("market", e.target.value)}
                   />
                   {errors.market && (
-                    <p className="text-xs text-destructive">{errors.market}</p>
+                    <p className="text-destructive text-xs">{errors.market}</p>
                   )}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="selection">Selection</Label>
                   <Input
                     id="selection"
+                    onChange={(e) => updateField("selection", e.target.value)}
                     placeholder="e.g., Man Utd to win"
                     value={formData.selection}
-                    onChange={(e) => updateField("selection", e.target.value)}
                   />
                   {errors.selection && (
-                    <p className="text-xs text-destructive">
+                    <p className="text-destructive text-xs">
                       {errors.selection}
                     </p>
                   )}
@@ -403,30 +413,30 @@ export function StandaloneBetForm({
                   <Label htmlFor="odds">Odds</Label>
                   <Input
                     id="odds"
-                    type="number"
-                    step="any"
                     min="1.01"
-                    placeholder="e.g., 2.50"
-                    value={formData.odds}
                     onChange={(e) => updateField("odds", e.target.value)}
+                    placeholder="e.g., 2.50"
+                    step="any"
+                    type="number"
+                    value={formData.odds}
                   />
                   {errors.odds && (
-                    <p className="text-xs text-destructive">{errors.odds}</p>
+                    <p className="text-destructive text-xs">{errors.odds}</p>
                   )}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="stake">Stake ({formData.currency})</Label>
                   <Input
                     id="stake"
-                    type="number"
-                    step="0.01"
                     min="0.01"
-                    placeholder="e.g., 100"
-                    value={formData.stake}
                     onChange={(e) => updateField("stake", e.target.value)}
+                    placeholder="e.g., 100"
+                    step="0.01"
+                    type="number"
+                    value={formData.stake}
                   />
                   {errors.stake && (
-                    <p className="text-xs text-destructive">{errors.stake}</p>
+                    <p className="text-destructive text-xs">{errors.stake}</p>
                   )}
                 </div>
               </div>
@@ -464,9 +474,9 @@ export function StandaloneBetForm({
                 <Label htmlFor="placedAt">Date Placed</Label>
                 <Input
                   id="placedAt"
+                  onChange={(e) => updateField("placedAt", e.target.value)}
                   type="datetime-local"
                   value={formData.placedAt}
-                  onChange={(e) => updateField("placedAt", e.target.value)}
                 />
               </div>
 
@@ -475,28 +485,28 @@ export function StandaloneBetForm({
                 <Label htmlFor="notes">Notes (optional)</Label>
                 <Textarea
                   id="notes"
-                  placeholder="Any additional notes..."
-                  value={formData.notes}
                   onChange={(e) => updateField("notes", e.target.value)}
+                  placeholder="Any additional notes..."
                   rows={2}
+                  value={formData.notes}
                 />
               </div>
 
               {/* Submit */}
               <Button
-                type="submit"
                 className="w-full"
                 disabled={isSubmitting || noAccountsForType}
+                type="submit"
               >
                 {isSubmitting ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     {isEdit ? "Updating..." : "Creating..."}
                   </>
+                ) : isEdit ? (
+                  "Update Bet"
                 ) : (
-                  isEdit
-                    ? "Update Bet"
-                    : `Create ${formData.kind === "back" ? "Back" : "Lay"} Bet`
+                  `Create ${formData.kind === "back" ? "Back" : "Lay"} Bet`
                 )}
               </Button>
             </form>

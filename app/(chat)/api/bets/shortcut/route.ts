@@ -2,6 +2,18 @@ import { Buffer } from "node:buffer";
 import { put } from "@vercel/blob";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { computeNetExposureInputs } from "@/lib/bet-calculations";
+import {
+  isOcrConfigured,
+  parseMatchedBetFromScreenshots,
+  parseMatchedBetWithOcr,
+} from "@/lib/bet-parser";
+import {
+  type AgentAccount,
+  parseMatchedBetWithAgent,
+} from "@/lib/bet-parser-agent";
+import { evaluateNeedsReview, formatNeedsReviewNote } from "@/lib/bet-review";
+import { isTestEnvironment } from "@/lib/constants";
 import {
   createAuditEntry,
   createMatchedBetRecord,
@@ -12,20 +24,8 @@ import {
   saveScreenshotUpload,
   validateShortcutApiKey,
 } from "@/lib/db/queries";
-import { computeNetExposureInputs } from "@/lib/bet-calculations";
 import { convertAmountToNok } from "@/lib/fx-rates";
-import { isTestEnvironment } from "@/lib/constants";
-import {
-  parseMatchedBetWithAgent,
-  type AgentAccount,
-} from "@/lib/bet-parser-agent";
-import {
-  isOcrConfigured,
-  parseMatchedBetWithOcr,
-  parseMatchedBetFromScreenshots,
-} from "@/lib/bet-parser";
 import { linkBetToMatch } from "@/lib/match-linking";
-import { evaluateNeedsReview, formatNeedsReviewNote } from "@/lib/bet-review";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB per spec
 const ALLOWED_TYPES = ["image/jpeg", "image/png"];
@@ -74,14 +74,16 @@ function extractBearerToken(request: Request): string | null {
 /**
  * Validate a file from FormData.
  */
-function validateFile(file: unknown): {
-  valid: true;
-  file: File;
-} | {
-  valid: false;
-  error: keyof typeof ErrorCodes;
-  message: string;
-} {
+function validateFile(file: unknown):
+  | {
+      valid: true;
+      file: File;
+    }
+  | {
+      valid: false;
+      error: keyof typeof ErrorCodes;
+      message: string;
+    } {
   if (!(file instanceof File)) {
     return {
       valid: false,
@@ -139,13 +141,13 @@ function safeDate(value?: string | null) {
 
 /**
  * POST /api/bets/shortcut
- * 
+ *
  * Single-request endpoint for iOS Shortcuts to submit matched bets.
  * Chains: upload → parse → link → save in one atomic operation.
- * 
+ *
  * Auth: Bearer token (per-user API key)
  * Body: FormData with `back` and `lay` image files, optional `promoType` and `notes`
- * 
+ *
  * See specs/ios-shortcut-api.md for full documentation.
  */
 export async function POST(request: Request) {
@@ -198,8 +200,16 @@ export async function POST(request: Request) {
 
   // Debug: log what we received
   console.log("[shortcut] FormData received:", {
-    backType: backFile ? (backFile instanceof File ? `File(${backFile.name}, ${backFile.type}, ${backFile.size}b)` : typeof backFile) : "null",
-    layType: layFile ? (layFile instanceof File ? `File(${layFile.name}, ${layFile.type}, ${layFile.size}b)` : typeof layFile) : "null",
+    backType: backFile
+      ? backFile instanceof File
+        ? `File(${backFile.name}, ${backFile.type}, ${backFile.size}b)`
+        : typeof backFile
+      : "null",
+    layType: layFile
+      ? layFile instanceof File
+        ? `File(${layFile.name}, ${layFile.type}, ${layFile.size}b)`
+        : typeof layFile
+      : "null",
     promoType: promoType ?? "null",
     notes: notes ? "present" : "null",
     allKeys: Array.from(formData.keys()),
@@ -289,8 +299,10 @@ export async function POST(request: Request) {
     } | null = null;
 
     try {
-      console.log(`[shortcut] Calling linkBetToMatch with market="${parsed.back.market}", selection="${parsed.back.selection}", betDate="${parsed.back.placedAt}"`);
-      
+      console.log(
+        `[shortcut] Calling linkBetToMatch with market="${parsed.back.market}", selection="${parsed.back.selection}", betDate="${parsed.back.placedAt}"`
+      );
+
       const matchResult = await linkBetToMatch({
         market: parsed.back.market,
         selection: parsed.back.selection,
@@ -319,8 +331,7 @@ export async function POST(request: Request) {
     const hasUnmatchedAccounts =
       !parsed.back.accountId || !parsed.lay.accountId;
     const matchNeedsReview =
-      matchConfidence === "low" ||
-      (matchCandidates > 0 && !matchId);
+      matchConfidence === "low" || (matchCandidates > 0 && !matchId);
 
     const reviewInfo = evaluateNeedsReview({
       explicitFlag:
@@ -336,7 +347,9 @@ export async function POST(request: Request) {
     const reviewReasons: string[] = [];
     if (reviewInfo.lowConfidence && reviewInfo.lowConfidence.length > 0) {
       for (const item of reviewInfo.lowConfidence) {
-        reviewReasons.push(`Low confidence in ${item.leg}.${item.field} extraction (${item.score.toFixed(2)})`);
+        reviewReasons.push(
+          `Low confidence in ${item.leg}.${item.field} extraction (${item.score.toFixed(2)})`
+        );
       }
     }
     if (!parsed.back.accountId) {
@@ -358,7 +371,7 @@ export async function POST(request: Request) {
     // 9. Resolve accounts (NO auto-creation - must use existing accounts matched by parser)
     const backExchange = parsed.back.exchange?.trim() || "Unknown";
     let layExchange = parsed.lay.exchange?.trim() || "bfb247";
-    
+
     // Start with parsed currencies, but will override with account currency if matched
     let backCurrency = parsed.back.currency?.toUpperCase() ?? "NOK";
     let layCurrency = parsed.lay.currency?.toUpperCase() ?? "NOK";
@@ -368,13 +381,18 @@ export async function POST(request: Request) {
     let layAccountId: string | null = null;
 
     if (parsed.back.accountId) {
-      const backAccount = await getAccountById({ id: parsed.back.accountId, userId });
+      const backAccount = await getAccountById({
+        id: parsed.back.accountId,
+        userId,
+      });
       if (backAccount) {
         backAccountId = backAccount.id;
         // Use account's currency - trust the account config over OCR
         if (backAccount.currency) {
           if (backAccount.currency.toUpperCase() !== backCurrency) {
-            console.log(`[shortcut] Back bet currency override: ${backCurrency} -> ${backAccount.currency} (from account)`);
+            console.log(
+              `[shortcut] Back bet currency override: ${backCurrency} -> ${backAccount.currency} (from account)`
+            );
           }
           backCurrency = backAccount.currency.toUpperCase();
         }
@@ -386,13 +404,18 @@ export async function POST(request: Request) {
     }
 
     if (parsed.lay.accountId) {
-      const layAccount = await getAccountById({ id: parsed.lay.accountId, userId });
+      const layAccount = await getAccountById({
+        id: parsed.lay.accountId,
+        userId,
+      });
       if (layAccount) {
         layAccountId = layAccount.id;
         // Use account's currency - trust the account config over OCR
         if (layAccount.currency) {
           if (layAccount.currency.toUpperCase() !== layCurrency) {
-            console.log(`[shortcut] Lay bet currency override: ${layCurrency} -> ${layAccount.currency} (from account)`);
+            console.log(
+              `[shortcut] Lay bet currency override: ${layCurrency} -> ${layAccount.currency} (from account)`
+            );
           }
           layCurrency = layAccount.currency.toUpperCase();
         }
@@ -407,14 +430,18 @@ export async function POST(request: Request) {
     const activeExchanges = userAccounts.filter((a) => a.kind === "exchange");
     if (!layAccountId && activeExchanges.length === 1) {
       const singleExchange = activeExchanges[0];
-      console.log(`[shortcut] Single-exchange fallback: auto-assigning ${singleExchange.name} (${singleExchange.id})`);
+      console.log(
+        `[shortcut] Single-exchange fallback: auto-assigning ${singleExchange.name} (${singleExchange.id})`
+      );
       layAccountId = singleExchange.id;
       layExchange = singleExchange.name;
       if (singleExchange.currency) {
         layCurrency = singleExchange.currency.toUpperCase();
       }
       // Remove any "not found" review reason for the exchange since we're auto-assigning
-      const exchangeNotFoundIdx = reviewReasons.findIndex(r => r.includes("Exchange") && r.includes("not found"));
+      const exchangeNotFoundIdx = reviewReasons.findIndex(
+        (r) => r.includes("Exchange") && r.includes("not found")
+      );
       if (exchangeNotFoundIdx >= 0) {
         reviewReasons.splice(exchangeNotFoundIdx, 1);
       }

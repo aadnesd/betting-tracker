@@ -17,12 +17,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import {
-  countExpiringFreeBets,
-  getActiveFreeBetsSummary,
-  listFreeBetsByUser,
-  listDepositBonusesByUser,
-  getActiveDepositBonusesSummary,
   countExpiringDepositBonuses,
+  countExpiringFreeBets,
+  getActiveDepositBonusesSummary,
+  getActiveFreeBetsSummary,
+  listDepositBonusesByUser,
+  listFreeBetsByUser,
 } from "@/lib/db/queries";
 
 export const metadata = {
@@ -103,7 +103,14 @@ export default async function PromosSettingsPage({
   const filterExpiring = params.filter === "expiring";
 
   // Fetch all data in parallel
-  const [freeBets, summary, expiringCount, depositBonuses, depositSummary, expiringDepositCount] = await Promise.all([
+  const [
+    freeBets,
+    summary,
+    expiringCount,
+    depositBonuses,
+    depositSummary,
+    expiringDepositCount,
+  ] = await Promise.all([
     listFreeBetsByUser({ userId }),
     getActiveFreeBetsSummary({ userId }),
     countExpiringFreeBets({ userId, daysUntilExpiry: 7 }),
@@ -114,19 +121,27 @@ export default async function PromosSettingsPage({
 
   let activeFreeBets = freeBets.filter((fb) => fb.status === "active");
   const lockedFreeBets = freeBets.filter((fb) => fb.status === "locked");
-  
+
   // Apply filter if requested - uses isExpiringSoon helper defined above
   if (filterExpiring) {
-    activeFreeBets = activeFreeBets.filter((fb) => isExpiringSoon(fb.expiresAt));
+    activeFreeBets = activeFreeBets.filter((fb) =>
+      isExpiringSoon(fb.expiresAt)
+    );
   }
-  
+
   const usedFreeBets = freeBets.filter((fb) => fb.status === "used");
   const expiredFreeBets = freeBets.filter((fb) => fb.status === "expired");
 
   // Deposit bonus categories
-  const activeDepositBonuses = depositBonuses.filter((db) => db.status === "active");
-  const clearedDepositBonuses = depositBonuses.filter((db) => db.status === "cleared");
-  const inactiveDepositBonuses = depositBonuses.filter((db) => db.status === "forfeited" || db.status === "expired");
+  const activeDepositBonuses = depositBonuses.filter(
+    (db) => db.status === "active"
+  );
+  const clearedDepositBonuses = depositBonuses.filter(
+    (db) => db.status === "cleared"
+  );
+  const inactiveDepositBonuses = depositBonuses.filter(
+    (db) => db.status === "forfeited" || db.status === "expired"
+  );
 
   return (
     <div className="space-y-6 p-4 md:p-8">
@@ -145,7 +160,10 @@ export default async function PromosSettingsPage({
           </Button>
           {expiringCount > 0 && !filterExpiring && (
             <Button asChild variant="outline">
-              <Link href="/bets/settings/promos?filter=expiring" className="flex items-center gap-1">
+              <Link
+                className="flex items-center gap-1"
+                href="/bets/settings/promos?filter=expiring"
+              >
                 <AlertTriangle className="h-4 w-4" />
                 Expiring ({expiringCount})
               </Link>
@@ -189,15 +207,19 @@ export default async function PromosSettingsPage({
             <Filter className="h-5 w-5 text-blue-600" />
             <div>
               <p className="font-medium text-blue-900">
-                Showing {activeFreeBets.length} free bet{activeFreeBets.length !== 1 ? "s" : ""} expiring within 7 days
+                Showing {activeFreeBets.length} free bet
+                {activeFreeBets.length !== 1 ? "s" : ""} expiring within 7 days
               </p>
               <p className="text-blue-700 text-sm">
                 Use these before they expire to maximize your value.
               </p>
             </div>
           </div>
-          <Button asChild variant="outline" size="sm">
-            <Link href="/bets/settings/promos" className="flex items-center gap-1">
+          <Button asChild size="sm" variant="outline">
+            <Link
+              className="flex items-center gap-1"
+              href="/bets/settings/promos"
+            >
               <X className="h-4 w-4" />
               Clear filter
             </Link>
@@ -209,22 +231,22 @@ export default async function PromosSettingsPage({
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardTitle className="font-medium text-muted-foreground text-sm">
               Active Free Bets
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold">{summary.count}</p>
+            <p className="font-bold text-2xl">{summary.count}</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardTitle className="font-medium text-muted-foreground text-sm">
               Free Bet Value
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-emerald-600">
+            <p className="font-bold text-2xl text-emerald-600">
               {summary.totalValue.toFixed(2)}
             </p>
             <p className="text-muted-foreground text-sm">Available to use</p>
@@ -232,12 +254,14 @@ export default async function PromosSettingsPage({
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardTitle className="font-medium text-muted-foreground text-sm">
               Deposit Bonuses
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-blue-600">{depositSummary.count}</p>
+            <p className="font-bold text-2xl text-blue-600">
+              {depositSummary.count}
+            </p>
             <p className="text-muted-foreground text-sm">
               {depositSummary.totalBonusValue.toFixed(0)} in bonuses
             </p>
@@ -245,14 +269,16 @@ export default async function PromosSettingsPage({
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardTitle className="font-medium text-muted-foreground text-sm">
               Expiring Soon
             </CardTitle>
           </CardHeader>
           <CardContent>
             <p
-              className={`text-2xl font-bold ${
-                expiringCount + expiringDepositCount > 0 ? "text-amber-600" : "text-muted-foreground"
+              className={`font-bold text-2xl ${
+                expiringCount + expiringDepositCount > 0
+                  ? "text-amber-600"
+                  : "text-muted-foreground"
               }`}
             >
               {expiringCount + expiringDepositCount}
@@ -262,12 +288,12 @@ export default async function PromosSettingsPage({
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardTitle className="font-medium text-muted-foreground text-sm">
               Wagering Left
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold">
+            <p className="font-bold text-2xl">
               {depositSummary.totalWageringRemaining.toFixed(0)}
             </p>
             <p className="text-muted-foreground text-sm">To clear bonuses</p>
@@ -302,9 +328,9 @@ export default async function PromosSettingsPage({
 
           {activeFreeBets.map((fb) => (
             <Link
-              key={fb.id}
-              href={`/bets/settings/promos/${fb.id}`}
               className="block rounded-md border p-4 transition-colors hover:bg-muted/50"
+              href={`/bets/settings/promos/${fb.id}`}
+              key={fb.id}
             >
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="space-y-1">
@@ -318,7 +344,7 @@ export default async function PromosSettingsPage({
                       </span>
                     )}
                   </div>
-                  <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+                  <div className="flex flex-wrap items-center gap-3 text-muted-foreground text-sm">
                     {fb.accountName && (
                       <span className="flex items-center gap-1">
                         <Tag className="h-3 w-3" />
@@ -335,10 +361,12 @@ export default async function PromosSettingsPage({
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="font-semibold text-lg text-emerald-600">
+                  <p className="font-semibold text-emerald-600 text-lg">
                     {formatCurrency(fb.value, fb.currency)}
                   </p>
-                  <p className="text-muted-foreground text-xs">Free bet value</p>
+                  <p className="text-muted-foreground text-xs">
+                    Free bet value
+                  </p>
                 </div>
               </div>
             </Link>
@@ -370,9 +398,9 @@ export default async function PromosSettingsPage({
 
               return (
                 <Link
-                  key={fb.id}
-                  href={`/bets/settings/promos/${fb.id}`}
                   className="block rounded-md border border-amber-200 bg-amber-50/30 p-4 transition-colors hover:bg-amber-50/50"
+                  href={`/bets/settings/promos/${fb.id}`}
+                  key={fb.id}
                 >
                   <div className="space-y-3">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -381,7 +409,7 @@ export default async function PromosSettingsPage({
                           <span className="font-semibold">{fb.name}</span>
                           <FreeBetStatusBadge status={fb.status} />
                         </div>
-                        <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+                        <div className="flex flex-wrap items-center gap-3 text-muted-foreground text-sm">
                           {fb.accountName && (
                             <span className="flex items-center gap-1">
                               <Tag className="h-3 w-3" />
@@ -398,15 +426,17 @@ export default async function PromosSettingsPage({
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="font-semibold text-lg text-amber-600">
+                        <p className="font-semibold text-amber-600 text-lg">
                           {formatCurrency(fb.value, fb.currency)}
                         </p>
-                        <p className="text-muted-foreground text-xs">When unlocked</p>
+                        <p className="text-muted-foreground text-xs">
+                          When unlocked
+                        </p>
                       </div>
                     </div>
                     {/* Progress bar */}
                     <div className="space-y-1">
-                      <div className="flex justify-between text-xs text-muted-foreground">
+                      <div className="flex justify-between text-muted-foreground text-xs">
                         <span>
                           {fb.unlockType === "stake"
                             ? `${fb.currency} ${unlockProgress.toFixed(2)}`
@@ -414,7 +444,10 @@ export default async function PromosSettingsPage({
                         </span>
                         <span>{progressPercent.toFixed(0)}%</span>
                       </div>
-                      <Progress value={progressPercent} className="h-2 bg-amber-100" />
+                      <Progress
+                        className="h-2 bg-amber-100"
+                        value={progressPercent}
+                      />
                     </div>
                   </div>
                 </Link>
@@ -432,7 +465,7 @@ export default async function PromosSettingsPage({
               <Wallet className="h-5 w-5 text-blue-600" />
               Deposit Bonuses ({activeDepositBonuses.length})
             </CardTitle>
-            <Button asChild variant="outline" size="sm">
+            <Button asChild size="sm" variant="outline">
               <Link href="/bets/settings/promos/deposit-bonus/new">
                 <Plus className="mr-1 h-3 w-3" />
                 Add
@@ -458,18 +491,24 @@ export default async function PromosSettingsPage({
           )}
 
           {activeDepositBonuses.map((db) => {
-            const wageringRequirement = Number.parseFloat(db.wageringRequirement);
+            const wageringRequirement = Number.parseFloat(
+              db.wageringRequirement
+            );
             const wageringProgress = Number.parseFloat(db.wageringProgress);
-            const progressPercent = wageringRequirement > 0
-              ? Math.min((wageringProgress / wageringRequirement) * 100, 100)
-              : 0;
-            const remaining = Math.max(0, wageringRequirement - wageringProgress);
+            const progressPercent =
+              wageringRequirement > 0
+                ? Math.min((wageringProgress / wageringRequirement) * 100, 100)
+                : 0;
+            const remaining = Math.max(
+              0,
+              wageringRequirement - wageringProgress
+            );
 
             return (
               <Link
-                key={db.id}
-                href={`/bets/settings/promos/deposit-bonus/${db.id}`}
                 className="block rounded-md border border-blue-200 bg-blue-50/30 p-4 transition-colors hover:bg-blue-50/50"
+                href={`/bets/settings/promos/deposit-bonus/${db.id}`}
+                key={db.id}
               >
                 <div className="space-y-3">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -487,7 +526,7 @@ export default async function PromosSettingsPage({
                           </span>
                         )}
                       </div>
-                      <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+                      <div className="flex flex-wrap items-center gap-3 text-muted-foreground text-sm">
                         {db.accountName && (
                           <span className="flex items-center gap-1">
                             <Tag className="h-3 w-3" />
@@ -503,21 +542,28 @@ export default async function PromosSettingsPage({
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="font-semibold text-lg text-blue-600">
-                        {db.currency} {Number.parseFloat(db.bonusAmount).toFixed(0)}
+                      <p className="font-semibold text-blue-600 text-lg">
+                        {db.currency}{" "}
+                        {Number.parseFloat(db.bonusAmount).toFixed(0)}
                       </p>
-                      <p className="text-muted-foreground text-xs">Bonus value</p>
+                      <p className="text-muted-foreground text-xs">
+                        Bonus value
+                      </p>
                     </div>
                   </div>
                   {/* Wagering Progress bar */}
                   <div className="space-y-1">
-                    <div className="flex justify-between text-xs text-muted-foreground">
+                    <div className="flex justify-between text-muted-foreground text-xs">
                       <span>
-                        {db.currency} {wageringProgress.toFixed(0)} / {wageringRequirement.toFixed(0)}
+                        {db.currency} {wageringProgress.toFixed(0)} /{" "}
+                        {wageringRequirement.toFixed(0)}
                       </span>
                       <span>{progressPercent.toFixed(0)}%</span>
                     </div>
-                    <Progress value={progressPercent} className="h-2 bg-blue-100" />
+                    <Progress
+                      className="h-2 bg-blue-100"
+                      value={progressPercent}
+                    />
                   </div>
                 </div>
               </Link>
@@ -527,20 +573,22 @@ export default async function PromosSettingsPage({
       </Card>
 
       {/* Cleared/Forfeited Deposit Bonuses */}
-      {(clearedDepositBonuses.length > 0 || inactiveDepositBonuses.length > 0) && (
+      {(clearedDepositBonuses.length > 0 ||
+        inactiveDepositBonuses.length > 0) && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-muted-foreground">
               <Wallet className="h-5 w-5" />
-              Deposit Bonus History ({clearedDepositBonuses.length + inactiveDepositBonuses.length})
+              Deposit Bonus History (
+              {clearedDepositBonuses.length + inactiveDepositBonuses.length})
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             {[...clearedDepositBonuses, ...inactiveDepositBonuses].map((db) => (
               <Link
-                key={db.id}
-                href={`/bets/settings/promos/deposit-bonus/${db.id}`}
                 className="block rounded-md border border-muted bg-muted/30 p-4 transition-colors hover:bg-muted/50"
+                href={`/bets/settings/promos/deposit-bonus/${db.id}`}
+                key={db.id}
               >
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="space-y-1">
@@ -562,7 +610,7 @@ export default async function PromosSettingsPage({
                         </span>
                       )}
                     </div>
-                    <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+                    <div className="flex flex-wrap items-center gap-3 text-muted-foreground text-sm">
                       {db.accountName && <span>{db.accountName}</span>}
                       {db.clearedAt && (
                         <span>Cleared: {formatDate(db.clearedAt)}</span>
@@ -571,7 +619,8 @@ export default async function PromosSettingsPage({
                   </div>
                   <div className="text-right">
                     <p className="font-medium text-muted-foreground">
-                      {db.currency} {Number.parseFloat(db.bonusAmount).toFixed(0)}
+                      {db.currency}{" "}
+                      {Number.parseFloat(db.bonusAmount).toFixed(0)}
                     </p>
                   </div>
                 </div>
@@ -593,9 +642,9 @@ export default async function PromosSettingsPage({
           <CardContent className="space-y-3">
             {[...usedFreeBets, ...expiredFreeBets].map((fb) => (
               <Link
-                key={fb.id}
-                href={`/bets/settings/promos/${fb.id}`}
                 className="block rounded-md border border-muted bg-muted/30 p-4 transition-colors hover:bg-muted/50"
+                href={`/bets/settings/promos/${fb.id}`}
+                key={fb.id}
               >
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="space-y-1">
@@ -605,7 +654,7 @@ export default async function PromosSettingsPage({
                       </span>
                       <FreeBetStatusBadge status={fb.status} />
                     </div>
-                    <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+                    <div className="flex flex-wrap items-center gap-3 text-muted-foreground text-sm">
                       {fb.accountName && <span>{fb.accountName}</span>}
                       {fb.expiresAt && (
                         <span>

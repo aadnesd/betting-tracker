@@ -137,15 +137,15 @@ export default function ImportPage() {
   const csvPreviewLines = csvContent.split("\n").slice(0, 6);
 
   return (
-    <div className="container mx-auto px-4 py-6 max-w-4xl">
-      <div className="flex items-center justify-between mb-6">
+    <div className="container mx-auto max-w-4xl px-4 py-6">
+      <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Import Data</h1>
+          <h1 className="font-bold text-2xl">Import Data</h1>
           <p className="text-muted-foreground">
             Import bets or balance transactions from CSV
           </p>
         </div>
-        <Button variant="outline" asChild>
+        <Button asChild variant="outline">
           <Link href="/bets">← Back to Dashboard</Link>
         </Button>
       </div>
@@ -157,8 +157,8 @@ export default function ImportPage() {
         </CardHeader>
         <CardContent>
           <Select
-            value={importType}
             onValueChange={(v) => setImportType(v as ImportType)}
+            value={importType}
           >
             <SelectTrigger className="w-64">
               <SelectValue placeholder="Select import type" />
@@ -171,11 +171,11 @@ export default function ImportPage() {
             </SelectContent>
           </Select>
 
-          <div className="mt-4 text-sm text-muted-foreground">
+          <div className="mt-4 text-muted-foreground text-sm">
             {importType === "bets" ? (
               <div>
-                <p className="font-medium mb-2">Required columns for bets:</p>
-                <code className="bg-muted px-2 py-1 rounded text-xs">
+                <p className="mb-2 font-medium">Required columns for bets:</p>
+                <code className="rounded bg-muted px-2 py-1 text-xs">
                   kind, market, selection, odds, stake, exchange, currency
                 </code>
                 <p className="mt-2">
@@ -185,10 +185,10 @@ export default function ImportPage() {
               </div>
             ) : (
               <div>
-                <p className="font-medium mb-2">
+                <p className="mb-2 font-medium">
                   Required columns for balances:
                 </p>
-                <code className="bg-muted px-2 py-1 rounded text-xs">
+                <code className="rounded bg-muted px-2 py-1 text-xs">
                   account, type, amount, currency, date
                 </code>
                 <p className="mt-2">
@@ -206,42 +206,19 @@ export default function ImportPage() {
           <CardTitle className="text-lg">Upload CSV File</CardTitle>
         </CardHeader>
         <CardContent>
-          {!file ? (
-            <div
-              onDrop={handleDrop}
-              onDragOver={handleDragOver}
-              className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-8 text-center hover:border-muted-foreground/50 transition-colors cursor-pointer"
-            >
-              <input
-                type="file"
-                accept=".csv,text/csv"
-                onChange={handleFileSelect}
-                className="hidden"
-                id="csv-upload"
-              />
-              <label htmlFor="csv-upload" className="cursor-pointer">
-                <FileUp className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-                <p className="text-lg font-medium mb-1">
-                  Drop your CSV file here or click to upload
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  Supports .csv files
-                </p>
-              </label>
-            </div>
-          ) : (
+          {file ? (
             <div className="space-y-4">
-              <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
+              <div className="flex items-center justify-between rounded-lg bg-muted p-4">
                 <div className="flex items-center gap-3">
                   <FileUp className="h-8 w-8 text-primary" />
                   <div>
                     <p className="font-medium">{file.name}</p>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-muted-foreground text-sm">
                       {(file.size / 1024).toFixed(1)} KB
                     </p>
                   </div>
                 </div>
-                <Button variant="ghost" size="icon" onClick={clearFile}>
+                <Button onClick={clearFile} size="icon" variant="ghost">
                   <X className="h-4 w-4" />
                 </Button>
               </div>
@@ -249,19 +226,19 @@ export default function ImportPage() {
               {/* CSV Preview */}
               {csvPreviewLines.length > 0 && (
                 <div>
-                  <p className="text-sm font-medium mb-2">Preview:</p>
-                  <div className="bg-muted rounded-lg p-4 overflow-x-auto">
-                    <pre className="text-xs font-mono">
+                  <p className="mb-2 font-medium text-sm">Preview:</p>
+                  <div className="overflow-x-auto rounded-lg bg-muted p-4">
+                    <pre className="font-mono text-xs">
                       {csvPreviewLines.map((line, i) => (
                         <div
-                          key={i}
                           className={i === 0 ? "font-bold text-primary" : ""}
+                          key={i}
                         >
                           {line}
                         </div>
                       ))}
                       {csvContent.split("\n").length > 6 && (
-                        <div className="text-muted-foreground mt-2">
+                        <div className="mt-2 text-muted-foreground">
                           ... and {csvContent.split("\n").length - 6} more rows
                         </div>
                       )}
@@ -270,18 +247,41 @@ export default function ImportPage() {
                 </div>
               )}
             </div>
+          ) : (
+            <div
+              className="cursor-pointer rounded-lg border-2 border-muted-foreground/25 border-dashed p-8 text-center transition-colors hover:border-muted-foreground/50"
+              onDragOver={handleDragOver}
+              onDrop={handleDrop}
+            >
+              <input
+                accept=".csv,text/csv"
+                className="hidden"
+                id="csv-upload"
+                onChange={handleFileSelect}
+                type="file"
+              />
+              <label className="cursor-pointer" htmlFor="csv-upload">
+                <FileUp className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
+                <p className="mb-1 font-medium text-lg">
+                  Drop your CSV file here or click to upload
+                </p>
+                <p className="text-muted-foreground text-sm">
+                  Supports .csv files
+                </p>
+              </label>
+            </div>
           )}
         </CardContent>
       </Card>
 
       {/* Import Button */}
       {file && !result && (
-        <div className="flex justify-center mb-6">
+        <div className="mb-6 flex justify-center">
           <Button
-            size="lg"
-            onClick={handleImport}
-            disabled={isLoading}
             className="gap-2"
+            disabled={isLoading}
+            onClick={handleImport}
+            size="lg"
           >
             <Upload className="h-4 w-4" />
             {isLoading ? "Importing..." : "Import Data"}
@@ -293,7 +293,7 @@ export default function ImportPage() {
       {result && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2 text-lg">
               {result.success ? (
                 <>
                   <CheckCircle2 className="h-5 w-5 text-green-500" />
@@ -314,21 +314,21 @@ export default function ImportPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-3 gap-4 text-center">
-              <div className="p-4 bg-muted rounded-lg">
-                <p className="text-2xl font-bold">{result.totalRows}</p>
-                <p className="text-sm text-muted-foreground">Total Rows</p>
+              <div className="rounded-lg bg-muted p-4">
+                <p className="font-bold text-2xl">{result.totalRows}</p>
+                <p className="text-muted-foreground text-sm">Total Rows</p>
               </div>
-              <div className="p-4 bg-green-500/10 rounded-lg">
-                <p className="text-2xl font-bold text-green-600">
+              <div className="rounded-lg bg-green-500/10 p-4">
+                <p className="font-bold text-2xl text-green-600">
                   {result.imported}
                 </p>
-                <p className="text-sm text-muted-foreground">Imported</p>
+                <p className="text-muted-foreground text-sm">Imported</p>
               </div>
-              <div className="p-4 bg-red-500/10 rounded-lg">
-                <p className="text-2xl font-bold text-red-600">
+              <div className="rounded-lg bg-red-500/10 p-4">
+                <p className="font-bold text-2xl text-red-600">
                   {result.errors.length}
                 </p>
-                <p className="text-sm text-muted-foreground">Errors</p>
+                <p className="text-muted-foreground text-sm">Errors</p>
               </div>
             </div>
 
@@ -341,14 +341,14 @@ export default function ImportPage() {
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="border-b">
-                          <th className="text-left py-1">Row</th>
-                          <th className="text-left py-1">Field</th>
-                          <th className="text-left py-1">Error</th>
+                          <th className="py-1 text-left">Row</th>
+                          <th className="py-1 text-left">Field</th>
+                          <th className="py-1 text-left">Error</th>
                         </tr>
                       </thead>
                       <tbody>
                         {result.errors.map((error, i) => (
-                          <tr key={i} className="border-b border-red-200/20">
+                          <tr className="border-red-200/20 border-b" key={i}>
                             <td className="py-1">{error.row}</td>
                             <td className="py-1">{error.field}</td>
                             <td className="py-1">{error.message}</td>
@@ -361,8 +361,8 @@ export default function ImportPage() {
               </Alert>
             )}
 
-            <div className="flex gap-4 justify-center pt-4">
-              <Button variant="outline" onClick={clearFile}>
+            <div className="flex justify-center gap-4 pt-4">
+              <Button onClick={clearFile} variant="outline">
                 Import Another File
               </Button>
               <Button asChild>

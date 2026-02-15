@@ -6,7 +6,7 @@
  * bets to specific matches and enabling auto-settlement. This is critical
  * for the P7 Match Data & Auto-Settlement feature.
  */
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock server-only to allow testing server modules
 vi.mock("server-only", () => ({}));
@@ -75,7 +75,7 @@ beforeEach(() => {
       awayTeam: "Chelsea",
       competition: "Premier League",
       competitionCode: "PL",
-      matchDate: matchDate,
+      matchDate,
       status: "SCHEDULED",
       homeScore: null,
       awayScore: null,
@@ -92,7 +92,7 @@ beforeEach(() => {
       awayTeam: "Chelsea",
       competition: "Premier League",
       competitionCode: "PL",
-      matchDate: matchDate,
+      matchDate,
       status: "SCHEDULED",
       homeScore: null,
       awayScore: null,
@@ -109,7 +109,7 @@ beforeEach(() => {
       awayTeam: "Chelsea",
       competition: "Premier League",
       competitionCode: "PL",
-      matchDate: matchDate,
+      matchDate,
       status: "FINISHED",
       homeScore: "2",
       awayScore: "1",
@@ -183,12 +183,12 @@ describe("FootballMatch Queries", () => {
       const queries = await import("@/lib/db/queries");
 
       const params: queries.CreateFootballMatchParams = {
-        externalId: 12345,
+        externalId: 12_345,
         homeTeam: "Arsenal",
         awayTeam: "Chelsea",
         competition: "Premier League",
         competitionCode: "PL",
-        matchDate: matchDate,
+        matchDate,
         status: "SCHEDULED",
       };
 
@@ -204,11 +204,11 @@ describe("FootballMatch Queries", () => {
 
       // Minimal params without optional fields
       const params: queries.CreateFootballMatchParams = {
-        externalId: 12345,
+        externalId: 12_345,
         homeTeam: "Arsenal",
         awayTeam: "Chelsea",
         competition: "Premier League",
-        matchDate: matchDate,
+        matchDate,
       };
 
       const result = await queries.createFootballMatch(params);
@@ -254,7 +254,7 @@ describe("FootballMatch Queries", () => {
       const queries = await import("@/lib/db/queries");
 
       const result = await queries.getFootballMatchByExternalId({
-        externalId: 12345,
+        externalId: 12_345,
       });
 
       expect(result).toBeDefined();
@@ -272,11 +272,11 @@ describe("FootballMatch Queries", () => {
       const queries = await import("@/lib/db/queries");
 
       const params: queries.CreateFootballMatchParams = {
-        externalId: 12345,
+        externalId: 12_345,
         homeTeam: "Arsenal",
         awayTeam: "Chelsea",
         competition: "Premier League",
-        matchDate: matchDate,
+        matchDate,
         status: "SCHEDULED",
       };
 
@@ -454,7 +454,7 @@ describe("CreateFootballMatchParams interface", () => {
 
     // Type check that the interface has correct fields
     const params: queries.CreateFootballMatchParams = {
-      externalId: 12345,
+      externalId: 12_345,
       homeTeam: "Team A",
       awayTeam: "Team B",
       competition: "Competition",
@@ -465,7 +465,7 @@ describe("CreateFootballMatchParams interface", () => {
       awayScore: 0,
     };
 
-    expect(params.externalId).toBe(12345);
+    expect(params.externalId).toBe(12_345);
     expect(params.homeTeam).toBe("Team A");
     expect(params.awayTeam).toBe("Team B");
     expect(params.competition).toBe("Competition");
@@ -481,7 +481,7 @@ describe("CreateFootballMatchParams interface", () => {
 
     // Minimal required fields
     const params: queries.CreateFootballMatchParams = {
-      externalId: 12345,
+      externalId: 12_345,
       homeTeam: "Team A",
       awayTeam: "Team B",
       competition: "Competition",

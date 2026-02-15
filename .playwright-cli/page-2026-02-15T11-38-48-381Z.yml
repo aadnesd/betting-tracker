@@ -1,0 +1,12 @@
+- generic [active] [ref=e1]:
+  - region "Notifications alt+T"
+  - generic [ref=e3]:
+    - generic [ref=e4]:
+      - heading "Sign In" [level=3] [ref=e5]
+      - paragraph [ref=e6]: Sign in with your account to access your matched betting data.
+    - button "Continue with Google" [ref=e8]:
+      - img
+      - text: Continue with Google
+  - button "Open Next.js Dev Tools" [ref=e14] [cursor=pointer]:
+    - img [ref=e15]
+  - alert [ref=e18]

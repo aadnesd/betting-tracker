@@ -1,10 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Select,
   SelectContent,
@@ -13,9 +16,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
 
 interface AccountOption {
   id: string;
@@ -59,7 +59,9 @@ export function DepositBonusForm({
 }: DepositBonusFormProps) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [recentDeposits, setRecentDeposits] = useState<DepositTransaction[]>([]);
+  const [recentDeposits, setRecentDeposits] = useState<DepositTransaction[]>(
+    []
+  );
   const [loadingDeposits, setLoadingDeposits] = useState(false);
 
   // Form state
@@ -68,7 +70,9 @@ export function DepositBonusForm({
   const [depositAmount, setDepositAmount] = useState(
     initialData?.depositAmount || ""
   );
-  const [bonusAmount, setBonusAmount] = useState(initialData?.bonusAmount || "");
+  const [bonusAmount, setBonusAmount] = useState(
+    initialData?.bonusAmount || ""
+  );
   const [currency, setCurrency] = useState(initialData?.currency || "NOK");
   const [wageringMultiplier, setWageringMultiplier] = useState(
     initialData?.wageringMultiplier || "6"
@@ -159,11 +163,12 @@ export function DepositBonusForm({
         wageringMultiplier: Number.parseFloat(wageringMultiplier),
         wageringBase,
         minOdds: Number.parseFloat(minOdds),
-        maxBetPercent: maxBetPercent
-          ? Number.parseFloat(maxBetPercent)
-          : null,
+        maxBetPercent: maxBetPercent ? Number.parseFloat(maxBetPercent) : null,
         expiresAt: expiresAt ? new Date(expiresAt).toISOString() : null,
-        linkedTransactionId: linkedTransactionId && linkedTransactionId !== "none" ? linkedTransactionId : null,
+        linkedTransactionId:
+          linkedTransactionId && linkedTransactionId !== "none"
+            ? linkedTransactionId
+            : null,
         notes: notes || null,
       };
 
@@ -186,9 +191,7 @@ export function DepositBonusForm({
       }
 
       toast.success(
-        mode === "edit"
-          ? "Deposit bonus updated"
-          : "Deposit bonus created"
+        mode === "edit" ? "Deposit bonus updated" : "Deposit bonus created"
       );
       router.push("/bets/settings/promos");
       router.refresh();
@@ -202,14 +205,14 @@ export function DepositBonusForm({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form className="space-y-6" onSubmit={handleSubmit}>
       {/* Account Selection */}
       <div className="space-y-2">
         <Label htmlFor="account">Bookmaker Account *</Label>
         <Select
-          value={accountId}
-          onValueChange={setAccountId}
           disabled={mode === "edit"}
+          onValueChange={setAccountId}
+          value={accountId}
         >
           <SelectTrigger id="account">
             <SelectValue placeholder="Select bookmaker" />
@@ -230,10 +233,10 @@ export function DepositBonusForm({
         <Label htmlFor="name">Bonus Name *</Label>
         <Input
           id="name"
-          value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="e.g., Welcome Bonus 100%"
           required
+          value={name}
         />
       </div>
 
@@ -243,31 +246,31 @@ export function DepositBonusForm({
           <Label htmlFor="depositAmount">Deposit Amount *</Label>
           <Input
             id="depositAmount"
-            type="number"
-            step="0.01"
             min="0"
-            value={depositAmount}
             onChange={(e) => setDepositAmount(e.target.value)}
             placeholder="1000"
             required
+            step="0.01"
+            type="number"
+            value={depositAmount}
           />
         </div>
         <div className="space-y-2">
           <Label htmlFor="bonusAmount">Bonus Amount *</Label>
           <Input
             id="bonusAmount"
-            type="number"
-            step="0.01"
             min="0"
-            value={bonusAmount}
             onChange={(e) => setBonusAmount(e.target.value)}
             placeholder="1000"
             required
+            step="0.01"
+            type="number"
+            value={bonusAmount}
           />
         </div>
         <div className="space-y-2">
           <Label htmlFor="currency">Currency</Label>
-          <Select value={currency} onValueChange={setCurrency}>
+          <Select onValueChange={setCurrency} value={currency}>
             <SelectTrigger id="currency">
               <SelectValue />
             </SelectTrigger>
@@ -292,15 +295,15 @@ export function DepositBonusForm({
             <Label htmlFor="wageringMultiplier">Wagering Multiplier *</Label>
             <div className="flex items-center gap-2">
               <Input
+                className="w-24"
                 id="wageringMultiplier"
-                type="number"
-                step="0.1"
                 min="1"
-                value={wageringMultiplier}
                 onChange={(e) => setWageringMultiplier(e.target.value)}
                 placeholder="6"
                 required
-                className="w-24"
+                step="0.1"
+                type="number"
+                value={wageringMultiplier}
               />
               <span className="text-muted-foreground">× turnover</span>
             </div>
@@ -310,13 +313,13 @@ export function DepositBonusForm({
             <Label htmlFor="minOdds">Minimum Odds *</Label>
             <Input
               id="minOdds"
-              type="number"
-              step="0.01"
               min="1.01"
-              value={minOdds}
               onChange={(e) => setMinOdds(e.target.value)}
               placeholder="1.80"
               required
+              step="0.01"
+              type="number"
+              value={minOdds}
             />
           </div>
         </div>
@@ -324,27 +327,27 @@ export function DepositBonusForm({
         <div className="space-y-2">
           <Label>Wagering Base *</Label>
           <RadioGroup
-            value={wageringBase}
+            className="flex flex-wrap gap-4"
             onValueChange={(v) =>
               setWageringBase(v as "deposit" | "bonus" | "deposit_plus_bonus")
             }
-            className="flex flex-wrap gap-4"
+            value={wageringBase}
           >
             <div className="flex items-center space-x-2">
-              <RadioGroupItem value="deposit" id="base-deposit" />
-              <Label htmlFor="base-deposit" className="font-normal">
+              <RadioGroupItem id="base-deposit" value="deposit" />
+              <Label className="font-normal" htmlFor="base-deposit">
                 Deposit only
               </Label>
             </div>
             <div className="flex items-center space-x-2">
-              <RadioGroupItem value="bonus" id="base-bonus" />
-              <Label htmlFor="base-bonus" className="font-normal">
+              <RadioGroupItem id="base-bonus" value="bonus" />
+              <Label className="font-normal" htmlFor="base-bonus">
                 Bonus only
               </Label>
             </div>
             <div className="flex items-center space-x-2">
-              <RadioGroupItem value="deposit_plus_bonus" id="base-both" />
-              <Label htmlFor="base-both" className="font-normal">
+              <RadioGroupItem id="base-both" value="deposit_plus_bonus" />
+              <Label className="font-normal" htmlFor="base-both">
                 Deposit + Bonus
               </Label>
             </div>
@@ -353,10 +356,10 @@ export function DepositBonusForm({
 
         {/* Calculated Requirement */}
         <div className="rounded-md bg-muted p-3">
-          <p className="text-sm text-muted-foreground">
+          <p className="text-muted-foreground text-sm">
             Total wagering requirement:
           </p>
-          <p className="text-lg font-semibold">
+          <p className="font-semibold text-lg">
             {currency} {wageringRequirement.toFixed(2)}
           </p>
         </div>
@@ -368,15 +371,15 @@ export function DepositBonusForm({
           <Label htmlFor="maxBetPercent">Max Bet % (optional)</Label>
           <Input
             id="maxBetPercent"
-            type="number"
-            step="1"
-            min="1"
             max="100"
-            value={maxBetPercent}
+            min="1"
             onChange={(e) => setMaxBetPercent(e.target.value)}
             placeholder="e.g., 25"
+            step="1"
+            type="number"
+            value={maxBetPercent}
           />
-          <p className="text-xs text-muted-foreground">
+          <p className="text-muted-foreground text-xs">
             Max bet as % of bonus (e.g., 25% = max {currency}{" "}
             {((Number.parseFloat(bonusAmount) || 0) * 0.25).toFixed(0)})
           </p>
@@ -386,9 +389,9 @@ export function DepositBonusForm({
           <Label htmlFor="expiresAt">Expires At (optional)</Label>
           <Input
             id="expiresAt"
+            onChange={(e) => setExpiresAt(e.target.value)}
             type="date"
             value={expiresAt}
-            onChange={(e) => setExpiresAt(e.target.value)}
           />
         </div>
       </div>
@@ -396,17 +399,17 @@ export function DepositBonusForm({
       {/* Link to Deposit Transaction */}
       {accountId && mode === "create" && (
         <div className="space-y-2">
-          <Label htmlFor="linkedTransaction">
-            Link to Deposit (optional)
-          </Label>
+          <Label htmlFor="linkedTransaction">Link to Deposit (optional)</Label>
           <Select
-            value={linkedTransactionId}
             onValueChange={setLinkedTransactionId}
+            value={linkedTransactionId}
           >
             <SelectTrigger id="linkedTransaction">
               <SelectValue
                 placeholder={
-                  loadingDeposits ? "Loading..." : "Select a deposit transaction"
+                  loadingDeposits
+                    ? "Loading..."
+                    : "Select a deposit transaction"
                 }
               />
             </SelectTrigger>
@@ -421,7 +424,7 @@ export function DepositBonusForm({
               ))}
             </SelectContent>
           </Select>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-muted-foreground text-xs">
             Link this bonus to the deposit that triggered it
           </p>
         </div>
@@ -432,23 +435,23 @@ export function DepositBonusForm({
         <Label htmlFor="notes">Notes (optional)</Label>
         <Textarea
           id="notes"
-          value={notes}
           onChange={(e) => setNotes(e.target.value)}
           placeholder="Any additional terms or conditions..."
           rows={3}
+          value={notes}
         />
       </div>
 
       {/* Submit Button */}
       <div className="flex gap-3">
-        <Button type="submit" disabled={isSubmitting}>
+        <Button disabled={isSubmitting} type="submit">
           {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           {mode === "edit" ? "Update Bonus" : "Create Deposit Bonus"}
         </Button>
         <Button
+          onClick={() => router.push("/bets/settings/promos")}
           type="button"
           variant="outline"
-          onClick={() => router.push("/bets/settings/promos")}
         >
           Cancel
         </Button>

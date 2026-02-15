@@ -1,9 +1,9 @@
 /**
  * Backfill balance snapshots with simulated historical data.
- * 
+ *
  * Creates snapshots from 01.01.2026 to now with a gradual increase
  * from 113,000 NOK to the current total capital.
- * 
+ *
  * Run with: npx tsx scripts/backfill-balance-snapshots.ts
  */
 
@@ -14,7 +14,8 @@ async function main() {
   const client = postgres(process.env.POSTGRES_URL!);
 
   // Get the user by email (use actual user, not test user)
-  const [user] = await client`SELECT id, email FROM "User" WHERE email = 'aadne.s.djuve@gmail.com' LIMIT 1`;
+  const [user] =
+    await client`SELECT id, email FROM "User" WHERE email = 'aadne.s.djuve@gmail.com' LIMIT 1`;
   if (!user) {
     console.error("User not found!");
     await client.end();
@@ -26,8 +27,8 @@ async function main() {
   // Configuration
   const startDate = new Date("2026-01-01T08:00:00Z");
   const endDate = new Date("2026-01-23T22:00:00Z"); // Today at 22:00
-  const startValue = 113000;
-  const endValue = 119449; // Current total capital
+  const startValue = 113_000;
+  const endValue = 119_449; // Current total capital
 
   // Calculate number of snapshots (twice daily)
   const msPerDay = 24 * 60 * 60 * 1000;
@@ -35,7 +36,9 @@ async function main() {
   const snapshotsPerDay = 2; // 08:00 and 20:00
   const totalSnapshots = Math.ceil(totalDays * snapshotsPerDay);
 
-  console.log(`Creating ${totalSnapshots} snapshots from ${startDate.toISOString()} to ${endDate.toISOString()}`);
+  console.log(
+    `Creating ${totalSnapshots} snapshots from ${startDate.toISOString()} to ${endDate.toISOString()}`
+  );
   console.log(`Value range: ${startValue} NOK → ${endValue} NOK`);
 
   // Clear existing snapshots for this user (for idempotent reruns)
@@ -52,7 +55,7 @@ async function main() {
     walletsNok: string | null;
   }> = [];
 
-  let currentDate = new Date(startDate);
+  const currentDate = new Date(startDate);
   let i = 0;
 
   while (currentDate <= endDate) {
@@ -61,9 +64,10 @@ async function main() {
     // Add some random daily fluctuation (±500 NOK)
     const noise = (Math.random() - 0.5) * 1000;
     // Ensure general upward trend with occasional dips
-    const trendMultiplier = 0.8 + (Math.random() * 0.4); // 0.8 to 1.2
-    
-    const rawValue = startValue + (valueRange * baseProgress * trendMultiplier) + noise;
+    const trendMultiplier = 0.8 + Math.random() * 0.4; // 0.8 to 1.2
+
+    const rawValue =
+      startValue + valueRange * baseProgress * trendMultiplier + noise;
     // Clamp to reasonable bounds, ensuring end value matches
     const totalCapitalNok = Math.max(
       startValue - 2000,
@@ -103,7 +107,7 @@ async function main() {
 
   // Insert all snapshots
   console.log(`Inserting ${snapshots.length} snapshots...`);
-  
+
   for (const snapshot of snapshots) {
     await client`
       INSERT INTO "BalanceSnapshot" (id, "createdAt", "userId", "totalCapitalNok", "accountsNok", "walletsNok")

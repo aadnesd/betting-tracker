@@ -1,10 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getTestAwareSession } from "@/lib/auth";
-import {
-  evaluateNeedsReview,
-  formatNeedsReviewNote,
-} from "@/lib/bet-review";
+import { computeNetExposureInputs } from "@/lib/bet-calculations";
+import { evaluateNeedsReview, formatNeedsReviewNote } from "@/lib/bet-review";
 import {
   createAuditEntry,
   createMatchedBetRecord,
@@ -16,9 +14,8 @@ import {
   saveBackBet,
   saveLayBet,
 } from "@/lib/db/queries";
-import { computeNetExposureInputs } from "@/lib/bet-calculations";
-import { convertAmountToNok } from "@/lib/fx-rates";
 import type { NormalizedSelection } from "@/lib/db/schema";
+import { convertAmountToNok } from "@/lib/fx-rates";
 
 const betPartSchema = z.object({
   market: z.string().min(1),
@@ -47,7 +44,10 @@ const payloadSchema = z
     selection: z.string().min(1),
     matchId: z.string().uuid().optional().nullable(),
     /** Normalized selection for Match Odds (1X2): HOME_TEAM, AWAY_TEAM, DRAW */
-    normalizedSelection: z.enum(["HOME_TEAM", "AWAY_TEAM", "DRAW"]).optional().nullable(),
+    normalizedSelection: z
+      .enum(["HOME_TEAM", "AWAY_TEAM", "DRAW"])
+      .optional()
+      .nullable(),
     promoId: z.string().uuid().optional(),
     promoType: z.string().optional(),
     needsReview: z.boolean().optional(),
@@ -215,8 +215,7 @@ export async function POST(request: Request) {
         : "matched";
 
     const backCurrency =
-      body.back?.currency?.toUpperCase() ??
-      (hasBack ? "NOK" : undefined);
+      body.back?.currency?.toUpperCase() ?? (hasBack ? "NOK" : undefined);
 
     const backExchange = body.back?.exchange?.trim() || "Unknown";
     const [backAccountResult, layAccountResult] = await Promise.all([
@@ -278,59 +277,60 @@ export async function POST(request: Request) {
     });
 
     if (body.promoId && !promoId) {
-      return NextResponse.json(
-        { error: "Promo not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "Promo not found" }, { status: 404 });
     }
 
-    const backBetRow = hasBack && body.back
-      ? await saveBackBet({
-          userId: session.user.id,
-          screenshotId: backShot!.id,
-          market: body.back.market,
-          selection: body.back.selection,
-          normalizedSelection: body.normalizedSelection ?? null,
-          odds: body.back.odds,
-          stake: body.back.stake,
-          exchange: backExchange,
-          matchId: body.matchId ?? null,
-          accountId: backAccountId,
-          currency: backCurrency ?? null,
-          placedAt: safeDate(body.back.placedAt),
-          settledAt: safeDate(body.back.settledAt),
-          profitLoss: body.back.profitLoss ?? null,
-          confidence: body.back.confidence ?? null,
-          status: body.back.status ?? betStatusFallback,
-        })
-      : null;
+    const backBetRow =
+      hasBack && body.back
+        ? await saveBackBet({
+            userId: session.user.id,
+            screenshotId: backShot!.id,
+            market: body.back.market,
+            selection: body.back.selection,
+            normalizedSelection: body.normalizedSelection ?? null,
+            odds: body.back.odds,
+            stake: body.back.stake,
+            exchange: backExchange,
+            matchId: body.matchId ?? null,
+            accountId: backAccountId,
+            currency: backCurrency ?? null,
+            placedAt: safeDate(body.back.placedAt),
+            settledAt: safeDate(body.back.settledAt),
+            profitLoss: body.back.profitLoss ?? null,
+            confidence: body.back.confidence ?? null,
+            status: body.back.status ?? betStatusFallback,
+          })
+        : null;
 
-    const layBetRow = hasLay && body.lay
-      ? await saveLayBet({
-          userId: session.user.id,
-          screenshotId: layShot!.id,
-          market: body.lay.market,
-          selection: body.lay.selection,
-          normalizedSelection: body.normalizedSelection ?? null,
-          odds: body.lay.odds,
-          stake: body.lay.stake,
-          exchange: layExchange,
-          matchId: body.matchId ?? null,
-          accountId: layAccountId,
-          currency: layCurrency ?? "NOK",
-          placedAt: safeDate(body.lay.placedAt),
-          settledAt: safeDate(body.lay.settledAt),
-          profitLoss: body.lay.profitLoss ?? null,
-          confidence: body.lay.confidence ?? null,
-          status: body.lay.status ?? betStatusFallback,
-        })
-      : null;
+    const layBetRow =
+      hasLay && body.lay
+        ? await saveLayBet({
+            userId: session.user.id,
+            screenshotId: layShot!.id,
+            market: body.lay.market,
+            selection: body.lay.selection,
+            normalizedSelection: body.normalizedSelection ?? null,
+            odds: body.lay.odds,
+            stake: body.lay.stake,
+            exchange: layExchange,
+            matchId: body.matchId ?? null,
+            accountId: layAccountId,
+            currency: layCurrency ?? "NOK",
+            placedAt: safeDate(body.lay.placedAt),
+            settledAt: safeDate(body.lay.settledAt),
+            profitLoss: body.lay.profitLoss ?? null,
+            confidence: body.lay.confidence ?? null,
+            status: body.lay.status ?? betStatusFallback,
+          })
+        : null;
 
     let netExposure: number | null = null;
 
     if (hasBack && hasLay && body.back && body.lay) {
-      console.log(`[NET EXPOSURE] Input values: backStake=${body.back.stake}, backOdds=${body.back.odds}, layStake=${body.lay.stake}, layOdds=${body.lay.odds}, layLiability=${body.lay.liability}`);
-      
+      console.log(
+        `[NET EXPOSURE] Input values: backStake=${body.back.stake}, backOdds=${body.back.odds}, layStake=${body.lay.stake}, layOdds=${body.lay.odds}, layLiability=${body.lay.liability}`
+      );
+
       const { backProfit, layLiability } = computeNetExposureInputs({
         backStake: body.back.stake,
         backOdds: body.back.odds,
@@ -339,15 +339,21 @@ export async function POST(request: Request) {
         layLiabilityProvided: body.lay.liability,
       });
 
-      console.log(`[NET EXPOSURE] Computing with backCurrency=${backCurrency}, layCurrency=${layCurrency}`);
-      console.log(`[NET EXPOSURE] backProfit=${backProfit}, layLiability=${layLiability}`);
+      console.log(
+        `[NET EXPOSURE] Computing with backCurrency=${backCurrency}, layCurrency=${layCurrency}`
+      );
+      console.log(
+        `[NET EXPOSURE] backProfit=${backProfit}, layLiability=${layLiability}`
+      );
 
       const [backProfitNok, layLiabilityNok] = await Promise.all([
         convertAmountToNok(backProfit, backCurrency ?? "NOK"),
         convertAmountToNok(layLiability, layCurrency ?? "NOK"),
       ]);
 
-      console.log(`[NET EXPOSURE] backProfitNok=${backProfitNok}, layLiabilityNok=${layLiabilityNok}`);
+      console.log(
+        `[NET EXPOSURE] backProfitNok=${backProfitNok}, layLiabilityNok=${layLiabilityNok}`
+      );
       netExposure = backProfitNok - layLiabilityNok;
       console.log(`[NET EXPOSURE] Final netExposure=${netExposure}`);
     }

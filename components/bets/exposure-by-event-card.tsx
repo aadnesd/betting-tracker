@@ -17,7 +17,7 @@ interface ExposureByEventCardProps {
 
 /**
  * Dashboard card showing open exposure grouped by football match/event.
- * 
+ *
  * Why: Users may have multiple bets on the same match (e.g., Match Odds + Over 2.5)
  * and need to see their total exposure to that single event for risk management.
  * The reporting spec requires "Net exposure per event and per day."
@@ -27,8 +27,13 @@ export function ExposureByEventCard({
   warningThreshold = 5000,
 }: ExposureByEventCardProps) {
   const hasExposure = exposureData.length > 0;
-  const totalExposure = exposureData.reduce((sum, e) => sum + e.totalExposure, 0);
-  const highExposureEvents = exposureData.filter((e) => e.totalExposure >= warningThreshold);
+  const totalExposure = exposureData.reduce(
+    (sum, e) => sum + e.totalExposure,
+    0
+  );
+  const highExposureEvents = exposureData.filter(
+    (e) => e.totalExposure >= warningThreshold
+  );
 
   // Separate linked and unlinked bets
   const linkedEvents = exposureData.filter((e) => e.match !== null);
@@ -39,19 +44,33 @@ export function ExposureByEventCard({
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className={cn(
-              "rounded-full p-2",
-              highExposureEvents.length > 0 ? "bg-amber-100" : hasExposure ? "bg-blue-100" : "bg-gray-100"
-            )}>
-              <Target className={cn(
-                "h-4 w-4",
-                highExposureEvents.length > 0 ? "text-amber-600" : hasExposure ? "text-blue-600" : "text-gray-400"
-              )} />
+            <div
+              className={cn(
+                "rounded-full p-2",
+                highExposureEvents.length > 0
+                  ? "bg-amber-100"
+                  : hasExposure
+                    ? "bg-blue-100"
+                    : "bg-gray-100"
+              )}
+            >
+              <Target
+                className={cn(
+                  "h-4 w-4",
+                  highExposureEvents.length > 0
+                    ? "text-amber-600"
+                    : hasExposure
+                      ? "text-blue-600"
+                      : "text-gray-400"
+                )}
+              />
             </div>
             <div>
               <CardTitle className="text-base">Exposure by Event</CardTitle>
               <p className="text-muted-foreground text-xs">
-                {linkedEvents.length} event{linkedEvents.length !== 1 ? "s" : ""} • Total: {formatNOK(totalExposure)}
+                {linkedEvents.length} event
+                {linkedEvents.length !== 1 ? "s" : ""} • Total:{" "}
+                {formatNOK(totalExposure)}
               </p>
             </div>
           </div>
@@ -64,26 +83,16 @@ export function ExposureByEventCard({
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
-        {!hasExposure ? (
-          <div className="py-6 text-center">
-            <Target className="mx-auto h-8 w-8 text-muted-foreground" />
-            <p className="mt-2 font-medium text-muted-foreground text-sm">
-              No open exposure
-            </p>
-            <p className="text-muted-foreground text-xs">
-              All positions are settled
-            </p>
-          </div>
-        ) : (
+        {hasExposure ? (
           <>
             {/* Linked events (with match info) */}
             {linkedEvents.length > 0 && (
               <div className="space-y-2">
                 {linkedEvents.map((event) => (
                   <EventRow
-                    key={event.matchId}
                     event={event}
                     isHighExposure={event.totalExposure >= warningThreshold}
+                    key={event.matchId}
                   />
                 ))}
               </div>
@@ -101,17 +110,22 @@ export function ExposureByEventCard({
                           Unlinked Bets
                         </span>
                         <span className="text-muted-foreground text-xs">
-                          ({unlinkedBets.betCount} bet{unlinkedBets.betCount !== 1 ? "s" : ""})
+                          ({unlinkedBets.betCount} bet
+                          {unlinkedBets.betCount !== 1 ? "s" : ""})
                         </span>
                       </div>
                       <p className="text-muted-foreground text-xs">
                         Bets not linked to a football match
                       </p>
                     </div>
-                    <span className={cn(
-                      "font-semibold text-sm",
-                      unlinkedBets.totalExposure >= warningThreshold ? "text-amber-600" : "text-gray-600"
-                    )}>
+                    <span
+                      className={cn(
+                        "font-semibold text-sm",
+                        unlinkedBets.totalExposure >= warningThreshold
+                          ? "text-amber-600"
+                          : "text-gray-600"
+                      )}
+                    >
                       {formatNOK(unlinkedBets.totalExposure)}
                     </span>
                   </div>
@@ -119,6 +133,16 @@ export function ExposureByEventCard({
               </>
             )}
           </>
+        ) : (
+          <div className="py-6 text-center">
+            <Target className="mx-auto h-8 w-8 text-muted-foreground" />
+            <p className="mt-2 font-medium text-muted-foreground text-sm">
+              No open exposure
+            </p>
+            <p className="text-muted-foreground text-xs">
+              All positions are settled
+            </p>
+          </div>
         )}
       </CardContent>
     </Card>
@@ -135,18 +159,21 @@ function EventRow({
   if (!event.match) return null;
 
   const matchDate = new Date(event.match.matchDate);
-  const isLive = event.match.status === "IN_PLAY" || event.match.status === "PAUSED";
+  const isLive =
+    event.match.status === "IN_PLAY" || event.match.status === "PAUSED";
   const isFinished = event.match.status === "FINISHED";
 
   // Link to the first bet if only one, otherwise could link to filtered bet list
   const betLink = event.betCount === 1 ? `/bets/${event.betIds[0]}` : undefined;
 
   const content = (
-    <div className={cn(
-      "rounded-md border p-3 transition-colors",
-      isHighExposure && "border-amber-200 bg-amber-50/30",
-      betLink && "hover:bg-muted/50"
-    )}>
+    <div
+      className={cn(
+        "rounded-md border p-3 transition-colors",
+        isHighExposure && "border-amber-200 bg-amber-50/30",
+        betLink && "hover:bg-muted/50"
+      )}
+    >
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
@@ -155,7 +182,7 @@ function EventRow({
               {event.match.homeTeam} vs {event.match.awayTeam}
             </span>
           </div>
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <div className="flex items-center gap-2 text-muted-foreground text-xs">
             <span>{event.match.competition}</span>
             <Separator className="h-3" orientation="vertical" />
             <Calendar className="h-3 w-3" />
@@ -165,10 +192,12 @@ function EventRow({
         </div>
         <div className="flex items-center gap-3">
           <div className="text-right">
-            <div className={cn(
-              "font-semibold text-sm",
-              isHighExposure ? "text-amber-600" : "text-gray-900"
-            )}>
+            <div
+              className={cn(
+                "font-semibold text-sm",
+                isHighExposure ? "text-amber-600" : "text-gray-900"
+              )}
+            >
               {formatNOK(event.totalExposure)}
             </div>
             <div className="text-muted-foreground text-xs">
@@ -179,8 +208,8 @@ function EventRow({
             <div className="flex flex-wrap gap-1">
               {event.promoTypes.slice(0, 2).map((promo) => (
                 <span
-                  key={promo}
                   className="rounded-full bg-purple-100 px-2 py-0.5 text-purple-700 text-xs"
+                  key={promo}
                 >
                   {promo}
                 </span>
@@ -208,7 +237,10 @@ function MatchStatusBadge({ status }: { status: string }) {
   const statusConfig: Record<string, { label: string; className: string }> = {
     SCHEDULED: { label: "Scheduled", className: "bg-gray-100 text-gray-700" },
     TIMED: { label: "Scheduled", className: "bg-gray-100 text-gray-700" },
-    IN_PLAY: { label: "Live", className: "bg-red-100 text-red-700 animate-pulse" },
+    IN_PLAY: {
+      label: "Live",
+      className: "bg-red-100 text-red-700 animate-pulse",
+    },
     PAUSED: { label: "Paused", className: "bg-amber-100 text-amber-700" },
     FINISHED: { label: "Finished", className: "bg-green-100 text-green-700" },
     POSTPONED: { label: "Postponed", className: "bg-amber-100 text-amber-700" },
@@ -216,7 +248,10 @@ function MatchStatusBadge({ status }: { status: string }) {
     CANCELLED: { label: "Cancelled", className: "bg-red-100 text-red-700" },
   };
 
-  const config = statusConfig[status] ?? { label: status, className: "bg-gray-100 text-gray-700" };
+  const config = statusConfig[status] ?? {
+    label: status,
+    className: "bg-gray-100 text-gray-700",
+  };
 
   return (
     <span className={cn("rounded-full px-2 py-0.5 text-xs", config.className)}>

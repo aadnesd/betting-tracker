@@ -1,7 +1,7 @@
 /**
  * Test Azure Document Intelligence OCR
- * 
- * Usage: 
+ *
+ * Usage:
  *   source .env.local && npx tsx scripts/test-azure-ocr.ts
  */
 

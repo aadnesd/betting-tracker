@@ -7,7 +7,7 @@
  * - Filter parameters (today, thisWeek, all)
  * - Integration with football match data
  */
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock server-only to allow testing server modules
 vi.mock("server-only", () => ({}));
@@ -34,8 +34,8 @@ vi.mock("postgres", () => ({
   default: vi.fn(() => ({})),
 }));
 
-import * as dbQueries from "@/lib/db/queries";
 import type { PendingSettlementBet } from "@/lib/db/queries";
+import * as dbQueries from "@/lib/db/queries";
 
 describe("getPendingSettlementBets", () => {
   beforeEach(() => {
@@ -51,24 +51,31 @@ describe("getPendingSettlementBets", () => {
         userId: string;
         filter?: "today" | "thisWeek" | "all";
         limit?: number;
-      }) => Promise<PendingSettlementBet[]> = dbQueries.getPendingSettlementBets;
+      }) => Promise<PendingSettlementBet[]> =
+        dbQueries.getPendingSettlementBets;
       expect(fn).toBeDefined();
     });
 
     it("accepts all filter values", () => {
-      const todayParams: Parameters<typeof dbQueries.getPendingSettlementBets>[0] = {
+      const todayParams: Parameters<
+        typeof dbQueries.getPendingSettlementBets
+      >[0] = {
         userId: "user-1",
         filter: "today",
       };
       expect(todayParams.filter).toBe("today");
 
-      const weekParams: Parameters<typeof dbQueries.getPendingSettlementBets>[0] = {
+      const weekParams: Parameters<
+        typeof dbQueries.getPendingSettlementBets
+      >[0] = {
         userId: "user-1",
         filter: "thisWeek",
       };
       expect(weekParams.filter).toBe("thisWeek");
 
-      const allParams: Parameters<typeof dbQueries.getPendingSettlementBets>[0] = {
+      const allParams: Parameters<
+        typeof dbQueries.getPendingSettlementBets
+      >[0] = {
         userId: "user-1",
         filter: "all",
       };
@@ -186,16 +193,19 @@ describe("countPendingSettlementBets", () => {
     });
 
     it("only requires userId parameter", () => {
-      const params: Parameters<typeof dbQueries.countPendingSettlementBets>[0] = {
-        userId: "user-1",
-      };
+      const params: Parameters<typeof dbQueries.countPendingSettlementBets>[0] =
+        {
+          userId: "user-1",
+        };
       expect(params.userId).toBe("user-1");
     });
   });
 
   describe("return value", () => {
     it("returns a number representing count of pending bets", () => {
-      const count: Awaited<ReturnType<typeof dbQueries.countPendingSettlementBets>> = 5;
+      const count: Awaited<
+        ReturnType<typeof dbQueries.countPendingSettlementBets>
+      > = 5;
       expect(typeof count).toBe("number");
     });
 
@@ -293,7 +303,9 @@ describe("pending settlement workflow", () => {
     // Grouping by match date
     const groups = new Map<string, PendingSettlementBet[]>();
     for (const bet of bets) {
-      const dateKey = bet.footballMatch?.matchDate.toDateString() ?? bet.createdAt.toDateString();
+      const dateKey =
+        bet.footballMatch?.matchDate.toDateString() ??
+        bet.createdAt.toDateString();
       if (!groups.has(dateKey)) {
         groups.set(dateKey, []);
       }

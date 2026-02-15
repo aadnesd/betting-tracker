@@ -60,9 +60,9 @@ describe("XLSX buffer generation", () => {
     expect(buffer).toBeInstanceOf(Buffer);
     // Check that the buffer contains the worksheet XML with numeric values
     const content = buffer.toString("utf8");
-    expect(content).toContain('<v>100</v>');
-    expect(content).toContain('<v>2.5</v>');
-    expect(content).toContain('<v>50.75</v>');
+    expect(content).toContain("<v>100</v>");
+    expect(content).toContain("<v>2.5</v>");
+    expect(content).toContain("<v>50.75</v>");
   });
 
   test("handles null and undefined values", () => {
@@ -252,10 +252,7 @@ describe("XLSX export structure for matched bets", () => {
   test("string values use inline strings", () => {
     const buffer = createXlsxBuffer({
       name: "Test",
-      rows: [
-        ["name"],
-        ["Test Value"],
-      ],
+      rows: [["name"], ["Test Value"]],
     });
 
     const content = buffer.toString("utf8");

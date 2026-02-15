@@ -74,7 +74,10 @@ export async function POST(request: Request) {
       });
 
       if (!account) {
-        return NextResponse.json({ error: "Account not found" }, { status: 404 });
+        return NextResponse.json(
+          { error: "Account not found" },
+          { status: 404 }
+        );
       }
 
       if (account.kind !== expectedKind) {

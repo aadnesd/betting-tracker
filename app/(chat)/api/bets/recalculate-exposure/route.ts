@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/app/(auth)/auth";
+import { computeNetExposureInputs } from "@/lib/bet-calculations";
 import {
   createAuditEntry,
   getMatchedBetWithParts,
   updateMatchedBetRecord,
 } from "@/lib/db/queries";
-import { computeNetExposureInputs } from "@/lib/bet-calculations";
 import { convertAmountToNok } from "@/lib/fx-rates";
 
 const payloadSchema = z.object({

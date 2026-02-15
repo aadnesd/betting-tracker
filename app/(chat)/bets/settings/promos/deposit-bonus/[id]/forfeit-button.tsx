@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { Ban, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
+import { useState } from "react";
+import { toast } from "sonner";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -14,8 +15,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { toast } from "sonner";
-import { Loader2, Ban } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface DepositBonusForfeitButtonProps {
   bonusId: string;
@@ -58,9 +58,9 @@ export function DepositBonusForfeitButton({
   };
 
   return (
-    <AlertDialog open={open} onOpenChange={setOpen}>
+    <AlertDialog onOpenChange={setOpen} open={open}>
       <AlertDialogTrigger asChild>
-        <Button variant="destructive" size="sm">
+        <Button size="sm" variant="destructive">
           <Ban className="mr-1 h-3 w-3" />
           Forfeit
         </Button>
@@ -69,17 +69,17 @@ export function DepositBonusForfeitButton({
         <AlertDialogHeader>
           <AlertDialogTitle>Forfeit Deposit Bonus?</AlertDialogTitle>
           <AlertDialogDescription>
-            Are you sure you want to forfeit &quot;{bonusName}&quot;? This action cannot
-            be undone. You will lose the bonus amount and any remaining wagering
-            progress.
+            Are you sure you want to forfeit &quot;{bonusName}&quot;? This
+            action cannot be undone. You will lose the bonus amount and any
+            remaining wagering progress.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel disabled={isForfeiting}>Cancel</AlertDialogCancel>
           <AlertDialogAction
-            onClick={handleForfeit}
-            disabled={isForfeiting}
             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            disabled={isForfeiting}
+            onClick={handleForfeit}
           >
             {isForfeiting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Forfeit Bonus

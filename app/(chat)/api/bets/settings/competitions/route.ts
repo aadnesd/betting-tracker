@@ -6,7 +6,10 @@ import {
   getUserSettings,
   upsertUserSettings,
 } from "@/lib/db/queries";
-import { AVAILABLE_COMPETITIONS, DEFAULT_COMPETITION_CODES } from "@/lib/db/schema";
+import {
+  AVAILABLE_COMPETITIONS,
+  DEFAULT_COMPETITION_CODES,
+} from "@/lib/db/schema";
 
 /**
  * GET /api/bets/settings/competitions
@@ -31,7 +34,9 @@ export async function GET() {
 }
 
 const updateCompetitionsSchema = z.object({
-  competitions: z.array(z.string()).min(1, "At least one competition must be selected"),
+  competitions: z
+    .array(z.string())
+    .min(1, "At least one competition must be selected"),
 });
 
 /**
@@ -64,7 +69,9 @@ export async function PATCH(request: Request) {
 
   // Validate that all codes are valid
   const validCodes: string[] = AVAILABLE_COMPETITIONS.map((c) => c.code);
-  const invalidCodes = parsed.data.competitions.filter((c) => !validCodes.includes(c));
+  const invalidCodes = parsed.data.competitions.filter(
+    (c) => !validCodes.includes(c)
+  );
   if (invalidCodes.length > 0) {
     return NextResponse.json(
       { error: "Invalid competition codes", invalidCodes },

@@ -14,12 +14,12 @@
  * - Use vision tool when needed (logo-only identification)
  */
 
-import { ToolLoopAgent, Output, tool, stepCountIs } from "ai";
 import { gateway } from "@ai-sdk/gateway";
+import { Output, stepCountIs, ToolLoopAgent, tool } from "ai";
 import { z } from "zod";
 import { extractTextFromImage, type OcrResult } from "@/lib/azure-ocr";
-import { isTestEnvironment } from "@/lib/constants";
 import type { ParsedBet } from "@/lib/bet-parser";
+import { isTestEnvironment } from "@/lib/constants";
 
 /** Account info passed to the agent for matching */
 export interface AgentAccount {
@@ -46,7 +46,9 @@ export interface AgentParsedPair {
 
 /** Schema for agent output */
 const agentOutputSchema = z.object({
-  market: z.string().describe("The match/event name (e.g., 'Man Utd v Arsenal')"),
+  market: z
+    .string()
+    .describe("The match/event name (e.g., 'Man Utd v Arsenal')"),
   selection: z
     .string()
     .describe("What was bet on (e.g., 'Arsenal', 'Draw', 'Over 2.5')"),
@@ -55,7 +57,9 @@ const agentOutputSchema = z.object({
   liability: z
     .number()
     .nullable()
-    .describe("For lay bets: liability = stake × (odds - 1). Null for back bets."),
+    .describe(
+      "For lay bets: liability = stake × (odds - 1). Null for back bets."
+    ),
   currency: z
     .string()
     .nullable()
@@ -67,7 +71,9 @@ const agentOutputSchema = z.object({
   accountId: z
     .string()
     .nullable()
-    .describe("UUID of matched account from user's accounts, or null if not matched"),
+    .describe(
+      "UUID of matched account from user's accounts, or null if not matched"
+    ),
   accountName: z
     .string()
     .nullable()
@@ -80,7 +86,8 @@ const agentOutputSchema = z.object({
       if (val === null || val === undefined) return null;
       if (val === "high" || val === "medium" || val === "low") return val;
       // Convert numeric confidence to enum
-      const numVal = typeof val === "number" ? val : parseFloat(String(val));
+      const numVal =
+        typeof val === "number" ? val : Number.parseFloat(String(val));
       if (!isNaN(numVal)) {
         if (numVal >= 0.8) return "high";
         if (numVal >= 0.5) return "medium";
@@ -88,10 +95,14 @@ const agentOutputSchema = z.object({
       }
       return null;
     })
-    .describe("Confidence in account identification: 'high', 'medium', or 'low'"),
+    .describe(
+      "Confidence in account identification: 'high', 'medium', or 'low'"
+    ),
   // Use object with specific fields instead of record to avoid schema issues
   marketConfidence: z.number().describe("Confidence 0-1 for market extraction"),
-  selectionConfidence: z.number().describe("Confidence 0-1 for selection extraction"),
+  selectionConfidence: z
+    .number()
+    .describe("Confidence 0-1 for selection extraction"),
   oddsConfidence: z.number().describe("Confidence 0-1 for odds extraction"),
   stakeConfidence: z.number().describe("Confidence 0-1 for stake extraction"),
 });
@@ -121,7 +132,10 @@ function buildInstructions(
   const accountsList =
     relevantAccounts.length > 0
       ? relevantAccounts
-          .map((a) => `- ${a.name} (id: ${a.id}, currency: ${a.currency ?? "unset"})`)
+          .map(
+            (a) =>
+              `- ${a.name} (id: ${a.id}, currency: ${a.currency ?? "unset"})`
+          )
           .join("\n")
       : `No ${accountType} accounts configured`;
 
@@ -214,7 +228,9 @@ function createBetParserAgent(
             ),
         }),
         execute: async (input: { aspect: string }) => {
-          console.log(`[bet-parser-agent] Vision tool invoked for: ${input.aspect}`);
+          console.log(
+            `[bet-parser-agent] Vision tool invoked for: ${input.aspect}`
+          );
 
           // Return hints about which accounts are available
           const accountNames = relevantAccounts.map((a) => a.name).join(", ");

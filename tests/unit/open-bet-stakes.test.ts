@@ -4,11 +4,11 @@
  * Why: Validates that getOpenBetStakesByAccount correctly aggregates
  * stakes from unsettled back/lay bets per account, enabling the bankroll
  * page to show available balance vs funds tied up in open positions.
- * 
+ *
  * Free bet stakes are tracked separately in openFreeBetStake since they
  * don't lock real money from the account balance.
  */
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock server-only to allow testing server modules
 vi.mock("server-only", () => ({}));
@@ -58,7 +58,9 @@ describe("open bet stakes queries", () => {
 
     it("should accept userId parameter", async () => {
       // Type check: the function should accept an object with userId
-      const fn: (params: { userId: string }) => Promise<dbQueries.OpenBetStakes[]> =
+      const fn: (params: {
+        userId: string;
+      }) => Promise<dbQueries.OpenBetStakes[]> =
         dbQueries.getOpenBetStakesByAccount;
       expect(fn).toBeDefined();
     });
@@ -66,9 +68,9 @@ describe("open bet stakes queries", () => {
     it("should return array of OpenBetStakes", async () => {
       // Verify the return type structure
       type ExpectedReturnType = dbQueries.OpenBetStakes[];
-      const typeCheck: (
-        params: { userId: string }
-      ) => Promise<ExpectedReturnType> = dbQueries.getOpenBetStakesByAccount;
+      const typeCheck: (params: {
+        userId: string;
+      }) => Promise<ExpectedReturnType> = dbQueries.getOpenBetStakesByAccount;
       expect(typeCheck).toBeDefined();
     });
   });

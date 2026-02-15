@@ -36,8 +36,8 @@ export function ExposureAlertBanner({
 
   return (
     <Alert
-      variant={isHighExposure ? "destructive" : "default"}
       className={className}
+      variant={isHighExposure ? "destructive" : "default"}
     >
       {isHighExposure ? (
         <AlertTriangle className="h-4 w-4" />

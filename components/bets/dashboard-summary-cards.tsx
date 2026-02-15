@@ -69,20 +69,20 @@ export function DashboardSummaryCards({
             {roi !== 0 && (
               <span
                 className={cn(
-                  "flex items-center text-xs font-medium",
+                  "flex items-center font-medium text-xs",
                   isProfitable ? "text-green-600" : "text-red-600"
                 )}
               >
                 <TrendingUp className="mr-0.5 h-3 w-3" />
                 {formatPercentage(roi)}
-                <CalculationTooltip type="roi" className="ml-1" />
+                <CalculationTooltip className="ml-1" type="roi" />
               </span>
             )}
           </div>
           <div className="mt-3">
             <p
               className={cn(
-                "text-2xl font-bold",
+                "font-bold text-2xl",
                 isProfitable ? "text-green-600" : "text-red-600"
               )}
             >
@@ -122,7 +122,7 @@ export function DashboardSummaryCards({
           <div className="mt-3">
             <p
               className={cn(
-                "text-2xl font-bold",
+                "font-bold text-2xl",
                 hasExposure ? "text-amber-600" : "text-muted-foreground"
               )}
             >
@@ -168,16 +168,14 @@ export function DashboardSummaryCards({
             <div className="mt-3">
               <p
                 className={cn(
-                  "text-2xl font-bold",
+                  "font-bold text-2xl",
                   hasPending ? "text-amber-600" : "text-muted-foreground"
                 )}
               >
                 {pendingReviewCount}
               </p>
               <p className="mt-1 text-muted-foreground text-xs">
-                {hasPending
-                  ? "Items need your attention"
-                  : "All caught up!"}
+                {hasPending ? "Items need your attention" : "All caught up!"}
               </p>
             </div>
           </CardContent>
@@ -198,7 +196,7 @@ export function DashboardSummaryCards({
             </div>
           </div>
           <div className="mt-3">
-            <p className="text-2xl font-bold text-blue-600">
+            <p className="font-bold text-2xl text-blue-600">
               {recentActivityCount}
             </p>
             <p className="mt-1 text-muted-foreground text-xs">

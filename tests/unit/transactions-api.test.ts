@@ -1,10 +1,10 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
 import { NextResponse } from "next/server";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import * as authModule from "@/app/(auth)/auth";
 import {
   POST as createTransactionRoute,
   GET as listTransactionsRoute,
 } from "@/app/(chat)/api/bets/accounts/[id]/transactions/route";
-import * as authModule from "@/app/(auth)/auth";
 import * as dbQueries from "@/lib/db/queries";
 
 const user = { id: "user-1" };
@@ -362,7 +362,9 @@ describe("transactions API routes (unit)", () => {
       };
 
       (dbQueries.getAccountById as vi.Mock).mockResolvedValueOnce(mockAccount);
-      (dbQueries.listTransactionsByAccount as vi.Mock).mockResolvedValueOnce([]);
+      (dbQueries.listTransactionsByAccount as vi.Mock).mockResolvedValueOnce(
+        []
+      );
 
       const res = await listTransactionsRoute(
         new Request(

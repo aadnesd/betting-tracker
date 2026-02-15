@@ -22,7 +22,7 @@ function LoginContent() {
     <div className="flex h-dvh w-screen items-start justify-center bg-background pt-12 md:items-center md:pt-0">
       <div className="flex w-full max-w-md flex-col gap-10 overflow-hidden rounded-2xl border border-border bg-card p-6 shadow-sm">
         <div className="flex flex-col items-center justify-center gap-2 text-center">
-          <h3 className="font-semibold text-xl text-foreground">Sign In</h3>
+          <h3 className="font-semibold text-foreground text-xl">Sign In</h3>
           <p className="text-muted-foreground text-sm">
             Sign in with your account to access your matched betting data.
           </p>
@@ -45,7 +45,13 @@ function LoginContent() {
 
 export default function Page() {
   return (
-    <Suspense fallback={<div className="flex h-dvh w-screen items-center justify-center">Loading...</div>}>
+    <Suspense
+      fallback={
+        <div className="flex h-dvh w-screen items-center justify-center">
+          Loading...
+        </div>
+      }
+    >
       <LoginContent />
     </Suspense>
   );

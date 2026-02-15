@@ -90,8 +90,9 @@ export default async function Page() {
   const exposureData30 = deriveExposureRange(exposureData90, 30);
 
   // Helper to check if an account is active (treats null/undefined as active for backwards compatibility)
-  const isActive = (status: string | null | undefined) => !status || status === "active";
-  
+  const isActive = (status: string | null | undefined) =>
+    !status || status === "active";
+
   // Transform accounts for QuickTransactionSheet
   const accounts = accountsWithBalances
     .filter((a) => isActive(a.status))
@@ -123,40 +124,40 @@ export default async function Page() {
             Review parsed bets and jump into a new upload flow.
           </p>
         </div>
-        <DashboardActions 
-          pendingReviewCount={summary.pendingReviewCount} 
+        <DashboardActions
           accounts={accounts}
+          pendingReviewCount={summary.pendingReviewCount}
           wallets={wallets}
         />
       </div>
 
       <ExposureAlertBanner
-        totalExposure={summary.openExposure}
         openPositions={summary.openPositions}
         threshold={5000}
+        totalExposure={summary.openExposure}
       />
 
       <FreeBetExpiryBanner
-        expiringCount={expiringFreeBetsCount}
         daysThreshold={7}
+        expiringCount={expiringFreeBetsCount}
       />
 
       <DashboardSummaryCards
-        totalProfit={summary.totalProfit}
-        settledCount={summary.settledCount}
         openExposure={summary.openExposure}
         openPositions={summary.openPositions}
         pendingReviewCount={summary.pendingReviewCount}
         recentActivityCount={summary.recentActivityCount}
         roi={summary.roi}
+        settledCount={summary.settledCount}
+        totalProfit={summary.totalProfit}
       />
 
       <ExposureTimelineWithControls
+        currentExposure={summary.openExposure}
         data7={exposureData7}
         data14={exposureData14}
         data30={exposureData30}
         data90={exposureData90}
-        currentExposure={summary.openExposure}
       />
 
       <PendingSettlementCard

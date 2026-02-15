@@ -212,10 +212,7 @@ export async function PATCH(request: Request) {
     // Determine action type based on what changed
     let action: "update" | "status_change" | "attach_leg" = "update";
     if (changes) {
-      if (
-        "status" in changes &&
-        Object.keys(changes).length === 1
-      ) {
+      if ("status" in changes && Object.keys(changes).length === 1) {
         action = "status_change";
       } else if (
         ("backBetId" in changes || "layBetId" in changes) &&

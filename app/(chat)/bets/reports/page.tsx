@@ -3,8 +3,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { auth } from "@/app/(auth)/auth";
-import { BookmakerProfitWithBonusesTable } from "@/components/bets/bookmaker-profit-with-bonuses-table";
 import { BalanceChartWithControls } from "@/components/bets/balance-chart";
+import { BookmakerProfitWithBonusesTable } from "@/components/bets/bookmaker-profit-with-bonuses-table";
 import { BreakdownChartWithToggle } from "@/components/bets/breakdown-charts";
 import { ExportButton } from "@/components/bets/export-button";
 import { ProfitChartWithControls } from "@/components/bets/profit-chart";
@@ -14,8 +14,8 @@ import { ReportingSummaryCard } from "@/components/bets/reporting-summary-card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  getBookmakerProfitWithBonuses,
   getBalanceSnapshots,
+  getBookmakerProfitWithBonuses,
   getMatchedBetsForReporting,
   getOpenExposure,
   getProfitByBookmaker,
@@ -28,8 +28,8 @@ import {
   calculateReportingSummary,
   enrichWithROI,
   getDateRange,
-  snapshotsToBalanceData,
   type MatchedBetWithLegs,
+  snapshotsToBalanceData,
 } from "@/lib/reporting";
 
 export const metadata = {
@@ -48,7 +48,9 @@ export default async function Page(props: Props) {
   }
 
   const searchParams = await props.searchParams;
-  const period = (searchParams.period as "week" | "month" | "quarter" | "year" | "all") || "month";
+  const period =
+    (searchParams.period as "week" | "month" | "quarter" | "year" | "all") ||
+    "month";
   const { startDate, endDate } = getDateRange(period);
 
   return (
@@ -64,13 +66,13 @@ export default async function Page(props: Props) {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button asChild variant="outline" size="sm">
+          <Button asChild size="sm" variant="outline">
             <Link href="/bets/import">
               <Upload className="mr-2 h-4 w-4" />
               Import
             </Link>
           </Button>
-          <ExportButton startDate={startDate} endDate={endDate} />
+          <ExportButton endDate={endDate} startDate={startDate} />
           <Button asChild variant="outline">
             <Link href="/bets">← Dashboard</Link>
           </Button>
@@ -83,9 +85,9 @@ export default async function Page(props: Props) {
 
       <Suspense fallback={<SummarySkeleton />}>
         <ReportingContent
-          userId={session.user.id}
-          startDate={startDate}
           endDate={endDate}
+          startDate={startDate}
+          userId={session.user.id}
         />
       </Suspense>
     </div>
@@ -135,17 +137,25 @@ async function ReportingContent({
   }));
 
   // Calculate summary and cumulative profit data (all async for FX conversion)
-  const [summary, dayChartData, weekChartData, monthChartData] = await Promise.all([
-    calculateReportingSummary(betsWithLegs, openExposureData.totalExposure, totalBonuses),
-    calculateCumulativeProfitData(betsWithLegs, "day"),
-    calculateCumulativeProfitData(betsWithLegs, "week"),
-    calculateCumulativeProfitData(betsWithLegs, "month"),
-  ]);
+  const [summary, dayChartData, weekChartData, monthChartData] =
+    await Promise.all([
+      calculateReportingSummary(
+        betsWithLegs,
+        openExposureData.totalExposure,
+        totalBonuses
+      ),
+      calculateCumulativeProfitData(betsWithLegs, "day"),
+      calculateCumulativeProfitData(betsWithLegs, "week"),
+      calculateCumulativeProfitData(betsWithLegs, "month"),
+    ]);
 
   // Generate balance chart data from snapshots (grouped by day/week/month)
   const balanceDayChartData = snapshotsToBalanceData(balanceSnapshots, "day");
   const balanceWeekChartData = snapshotsToBalanceData(balanceSnapshots, "week");
-  const balanceMonthChartData = snapshotsToBalanceData(balanceSnapshots, "month");
+  const balanceMonthChartData = snapshotsToBalanceData(
+    balanceSnapshots,
+    "month"
+  );
 
   // Enrich breakdown data with ROI
   const bookmakerBreakdown = enrichWithROI(
@@ -181,29 +191,29 @@ async function ReportingContent({
 
       <ProfitChartWithControls
         dayData={dayChartData}
-        weekData={weekChartData}
         monthData={monthChartData}
         title="Cumulative Profit"
+        weekData={weekChartData}
       />
 
       <BalanceChartWithControls
         dayData={balanceDayChartData}
-        weekData={balanceWeekChartData}
         monthData={balanceMonthChartData}
         title="Cumulative Total Balance"
+        weekData={balanceWeekChartData}
       />
 
       {/* Performance Breakdown Charts - show matched set profit by category */}
       <div className="grid gap-6 lg:grid-cols-2">
         <BreakdownChartWithToggle
-          title="Profit by Strategy"
           data={promoBreakdown}
           emptyMessage="No promo data"
+          title="Profit by Strategy"
         />
         <BreakdownChartWithToggle
-          title="Profit by Bookmaker"
           data={bookmakerBreakdown}
           emptyMessage="No bookmaker data"
+          title="Profit by Bookmaker"
         />
       </div>
 
@@ -215,14 +225,14 @@ async function ReportingContent({
       {/* Detailed breakdown tables */}
       <div className="grid gap-6 lg:grid-cols-2">
         <ReportingBreakdownTable
-          title="By Strategy"
           data={promoBreakdown}
           emptyMessage="No settled matched bets"
+          title="By Strategy"
         />
         <ReportingBreakdownTable
-          title="By Exchange"
           data={exchangeBreakdown}
           emptyMessage="No settled matched bets"
+          title="By Exchange"
         />
       </div>
     </div>
@@ -233,7 +243,7 @@ function FilterSkeleton() {
   return (
     <div className="flex gap-2">
       {[1, 2, 3, 4, 5].map((i) => (
-        <Skeleton key={i} className="h-8 w-24" />
+        <Skeleton className="h-8 w-24" key={i} />
       ))}
     </div>
   );
@@ -244,7 +254,7 @@ function SummarySkeleton() {
     <div className="space-y-6">
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {[1, 2, 3, 4].map((i) => (
-          <Skeleton key={i} className="h-24" />
+          <Skeleton className="h-24" key={i} />
         ))}
       </div>
       <div className="grid gap-6 lg:grid-cols-2">

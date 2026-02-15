@@ -1,9 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/app/(auth)/auth";
-import {
-  generateMatchedBetsCsv,
-  type ExportableMatchedBet,
-} from "@/lib/csv";
+import { type ExportableMatchedBet, generateMatchedBetsCsv } from "@/lib/csv";
 import { getSettledMatchedBetsForReporting } from "@/lib/db/queries";
 import { createXlsxBuffer } from "@/lib/xlsx";
 

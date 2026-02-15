@@ -8,7 +8,7 @@ import {
 
 /**
  * GET /api/bets/settings/api-keys
- * 
+ *
  * Returns the user's API key status (has key, hint, created date).
  * Does NOT return the actual key - that is only shown once on generation.
  */
@@ -26,7 +26,7 @@ export async function GET() {
 
 /**
  * POST /api/bets/settings/api-keys
- * 
+ *
  * Generates a new API key for the user.
  * Returns the full key - this is the ONLY time it will be visible.
  * Any existing key is replaced.
@@ -50,7 +50,7 @@ export async function POST() {
 
 /**
  * DELETE /api/bets/settings/api-keys
- * 
+ *
  * Revokes the user's API key.
  * Any future requests with this key will be rejected.
  */

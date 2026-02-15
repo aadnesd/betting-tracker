@@ -3,8 +3,8 @@ import { z } from "zod";
 import { auth } from "@/app/(auth)/auth";
 import {
   createAuditEntry,
-  createMatchedBetRecord,
   createManualScreenshot,
+  createMatchedBetRecord,
   getOrCreateAccount,
   getOrCreatePromoByType,
   markFreeBetAsUsed,
@@ -177,9 +177,7 @@ export async function POST(request: Request) {
       promoType: body.promoType ?? null,
       status: "matched",
       netExposure,
-      notes: body.notes
-        ? `[Manual Entry] ${body.notes}`
-        : "[Manual Entry]",
+      notes: body.notes ? `[Manual Entry] ${body.notes}` : "[Manual Entry]",
     });
 
     // Mark free bet as used if one was selected
@@ -239,7 +237,7 @@ export async function POST(request: Request) {
           source: "quick_add",
           freeBetId: body.freeBetId ?? null,
         },
-        notes: body.freeBetId 
+        notes: body.freeBetId
           ? `Created via Quick Add with free bet ${body.freeBetId}`
           : (body.notes ?? "Created via Quick Add"),
       }),

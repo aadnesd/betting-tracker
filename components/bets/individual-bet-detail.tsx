@@ -9,7 +9,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { cn } from "@/lib/utils";
 import type {
   Account,
   BackBet,
@@ -18,6 +17,7 @@ import type {
   MatchedBet,
   ScreenshotUpload,
 } from "@/lib/db/schema";
+import { cn } from "@/lib/utils";
 
 const betKindLabels = {
   back: "Back bet",
@@ -104,14 +104,14 @@ export function IndividualBetDetail({
           <p className="text-muted-foreground text-sm">{bet.market}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button asChild variant="outline" size="sm">
+          <Button asChild size="sm" variant="outline">
             <Link href="/bets/all">← All bets</Link>
           </Button>
-          <Button asChild variant="outline" size="sm">
+          <Button asChild size="sm" variant="outline">
             <Link href="/bets">Dashboard</Link>
           </Button>
           {bet.status !== "settled" && (
-            <Button asChild variant="outline" size="sm">
+            <Button asChild size="sm" variant="outline">
               <Link href={`/bets/${betKind}/${bet.id}/edit`}>Edit</Link>
             </Button>
           )}
@@ -134,12 +134,16 @@ export function IndividualBetDetail({
             </div>
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">Stake</span>
-              <span className="font-medium">{formatCurrency(stake, currency)}</span>
+              <span className="font-medium">
+                {formatCurrency(stake, currency)}
+              </span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">
                 {betKind === "lay" ? (
-                  <ValueWithTooltip type="layLiability">Liability</ValueWithTooltip>
+                  <ValueWithTooltip type="layLiability">
+                    Liability
+                  </ValueWithTooltip>
                 ) : (
                   "Potential win"
                 )}
@@ -213,10 +217,8 @@ export function IndividualBetDetail({
                   <span className="text-muted-foreground">Matched set</span>
                   <BetStatusBadge status={matchedBet.status} />
                 </div>
-                <Button asChild variant="outline" size="sm">
-                  <Link href={`/bets/${matchedBet.id}`}>
-                    View matched set
-                  </Link>
+                <Button asChild size="sm" variant="outline">
+                  <Link href={`/bets/${matchedBet.id}`}>View matched set</Link>
                 </Button>
                 {otherLeg && (
                   <div className="rounded-md border bg-muted/50 p-2">
@@ -225,7 +227,8 @@ export function IndividualBetDetail({
                     </p>
                     <p className="font-medium text-sm">{otherLeg.selection}</p>
                     <p className="text-muted-foreground text-xs">
-                      {formatOdds(Number(otherLeg.odds))} · {formatCurrency(
+                      {formatOdds(Number(otherLeg.odds))} ·{" "}
+                      {formatCurrency(
                         Number(otherLeg.stake),
                         otherLeg.currency ?? currency
                       )}
@@ -247,7 +250,8 @@ export function IndividualBetDetail({
                   {footballMatch.homeTeam} vs {footballMatch.awayTeam}
                 </p>
                 <p className="text-muted-foreground text-xs">
-                  {footballMatch.competition} · {format(
+                  {footballMatch.competition} ·{" "}
+                  {format(
                     new Date(footballMatch.matchDate),
                     "dd MMM yyyy, HH:mm"
                   )}
@@ -314,8 +318,8 @@ export function IndividualBetDetail({
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">Matched set</span>
                   <Link
+                    className="inline-flex items-center gap-1 text-emerald-700 text-sm"
                     href={`/bets/${matchedBet.id}`}
-                    className="inline-flex items-center gap-1 text-sm text-emerald-700"
                   >
                     View details <ExternalLink className="h-3 w-3" />
                   </Link>
@@ -326,16 +330,16 @@ export function IndividualBetDetail({
         </div>
 
         <IndividualBetActions
+          accountBalance={accountBalance}
           betId={bet.id}
           betKind={betKind}
-          status={bet.status}
-          odds={odds}
-          stake={stake}
           currency={currency}
-          selection={bet.selection}
-          accountBalance={accountBalance}
           matchedBetId={matchedBet?.id ?? null}
+          odds={odds}
+          selection={bet.selection}
           settlementInfo={settlementInfo}
+          stake={stake}
+          status={bet.status}
         />
       </div>
 
@@ -352,7 +356,7 @@ export function IndividualBetDetail({
             <ul className="space-y-3">
               {auditEntries.map((entry) => (
                 <li
-                  className="flex items-start gap-3 border-l-2 border-muted pl-3"
+                  className="flex items-start gap-3 border-muted border-l-2 pl-3"
                   key={entry.id}
                 >
                   <div className="flex-1">
@@ -364,12 +368,11 @@ export function IndividualBetDetail({
                         {entry.notes}
                       </p>
                     )}
-                    {entry.changes !== null &&
-                      entry.changes !== undefined && (
-                        <pre className="mt-1 overflow-x-auto rounded bg-muted/50 p-2 text-xs">
-                          {JSON.stringify(entry.changes, null, 2)}
-                        </pre>
-                      )}
+                    {entry.changes !== null && entry.changes !== undefined && (
+                      <pre className="mt-1 overflow-x-auto rounded bg-muted/50 p-2 text-xs">
+                        {JSON.stringify(entry.changes, null, 2)}
+                      </pre>
+                    )}
                   </div>
                   <p className="text-muted-foreground text-xs">
                     {format(new Date(entry.createdAt), "dd MMM yyyy, HH:mm")}

@@ -40,7 +40,7 @@ describe("Clipboard Paste Intake", () => {
     test("supports file validation constraints", () => {
       // Max file size is 10MB
       const MAX_FILE_SIZE = 10 * 1024 * 1024;
-      expect(MAX_FILE_SIZE).toBe(10485760);
+      expect(MAX_FILE_SIZE).toBe(10_485_760);
 
       // Accepted file types
       const acceptedTypes = ["image/png", "image/jpeg", "image/webp"];
@@ -73,7 +73,9 @@ describe("Clipboard Paste Intake", () => {
 
     test("tracks single image ready state", () => {
       // Form supports single-image draft mode
-      const backFile: File | null = new File([""], "back.png", { type: "image/png" });
+      const backFile: File | null = new File([""], "back.png", {
+        type: "image/png",
+      });
       const layFile: File | null = null;
 
       // XOR: exactly one of them is ready
@@ -85,7 +87,13 @@ describe("Clipboard Paste Intake", () => {
       // Upload state machine
       type UploadState = "idle" | "uploading" | "parsing" | "success" | "error";
 
-      const validStates: UploadState[] = ["idle", "uploading", "parsing", "success", "error"];
+      const validStates: UploadState[] = [
+        "idle",
+        "uploading",
+        "parsing",
+        "success",
+        "error",
+      ];
       expect(validStates).toHaveLength(5);
       expect(validStates).toContain("idle");
       expect(validStates).toContain("success");
@@ -109,7 +117,7 @@ describe("Clipboard Paste Intake", () => {
     });
 
     test("does not auto-parse if already triggered", () => {
-      let autoParseTriggered = true; // Already triggered
+      const autoParseTriggered = true; // Already triggered
       const uploadState = "idle";
       const backFile = new File([""], "back.png", { type: "image/png" });
       const layFile = new File([""], "lay.png", { type: "image/png" });
@@ -214,7 +222,9 @@ describe("Clipboard Paste Intake", () => {
 
     test("accepts valid-sized image files", () => {
       const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-      const validFile = new File(["x".repeat(1000)], "bet.png", { type: "image/png" });
+      const validFile = new File(["x".repeat(1000)], "bet.png", {
+        type: "image/png",
+      });
 
       const isValidSize = validFile.size <= MAX_FILE_SIZE;
       const isValidType = validFile.type.startsWith("image/");

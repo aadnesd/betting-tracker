@@ -1,11 +1,11 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
 import { NextResponse } from "next/server";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import * as authModule from "@/app/(auth)/auth";
 import {
   POST as createAccountRoute,
-  PATCH as updateAccountRoute,
   GET as getAccountRoute,
+  PATCH as updateAccountRoute,
 } from "@/app/(chat)/api/bets/accounts/route";
-import * as authModule from "@/app/(auth)/auth";
 import * as dbQueries from "@/lib/db/queries";
 
 const user = { id: "user-1" };
@@ -190,7 +190,9 @@ describe("accounts API routes (unit)", () => {
       (dbQueries.getAccountById as vi.Mock).mockResolvedValueOnce(
         originalAccount
       );
-      (dbQueries.updateAccount as vi.Mock).mockResolvedValueOnce(updatedAccount);
+      (dbQueries.updateAccount as vi.Mock).mockResolvedValueOnce(
+        updatedAccount
+      );
 
       const res = await updateAccountRoute(
         new Request("http://localhost/api/bets/accounts", {
@@ -246,7 +248,9 @@ describe("accounts API routes (unit)", () => {
       (dbQueries.getAccountById as vi.Mock).mockResolvedValueOnce(
         originalAccount
       );
-      (dbQueries.updateAccount as vi.Mock).mockResolvedValueOnce(updatedAccount);
+      (dbQueries.updateAccount as vi.Mock).mockResolvedValueOnce(
+        updatedAccount
+      );
 
       const res = await updateAccountRoute(
         new Request("http://localhost/api/bets/accounts", {
