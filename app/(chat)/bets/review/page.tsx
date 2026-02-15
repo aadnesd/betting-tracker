@@ -68,7 +68,7 @@ export default async function Page() {
           <span className="text-amber-700 text-sm">needs review</span>
         </div>
         <div className="flex items-center gap-2 rounded-lg border bg-slate-50/50 px-3 py-2">
-          <span className="font-semibold text-slate-800 text-lg">
+          <span className="font-semibold text-lg text-slate-800">
             {draftCount}
           </span>
           <span className="text-slate-600 text-sm">drafts</span>
@@ -137,10 +137,7 @@ export default async function Page() {
                     {issues.length > 0 && (
                       <ul className="mt-1 space-y-0.5">
                         {issues.map((issue) => (
-                          <li
-                            className="text-amber-700 text-xs"
-                            key={issue}
-                          >
+                          <li className="text-amber-700 text-xs" key={issue}>
                             • {issue}
                           </li>
                         ))}

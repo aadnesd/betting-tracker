@@ -81,7 +81,9 @@ function resolveNokValue({
 export function calculateQualifyingLoss(bet: MatchedBetWithLegs): number {
   // Qualifying loss occurs when back/lay bets result in a net loss
   // that's intentional to unlock a free bet or bonus
-  const backPL = bet.back?.profitLoss ? Number.parseFloat(bet.back.profitLoss) : 0;
+  const backPL = bet.back?.profitLoss
+    ? Number.parseFloat(bet.back.profitLoss)
+    : 0;
   const layPL = bet.lay?.profitLoss ? Number.parseFloat(bet.lay.profitLoss) : 0;
   const totalPL = backPL + layPL;
 
@@ -178,9 +180,12 @@ export async function calculateReportingSummary(
 /**
  * Calculate qualifying loss for a matched bet, converted to NOK.
  */
-async function calculateQualifyingLossInNok(bet: MatchedBetWithLegs): Promise<number> {
+async function calculateQualifyingLossInNok(
+  bet: MatchedBetWithLegs
+): Promise<number> {
   const promoType = bet.matched.promoType;
-  const isQualifyingPromo = promoType === "Qualifying Bet" || promoType === "Sign-up Offer";
+  const isQualifyingPromo =
+    promoType === "Qualifying Bet" || promoType === "Sign-up Offer";
 
   if (!isQualifyingPromo) {
     return 0;
@@ -218,9 +223,9 @@ export function calculateROI(profit: number, stake: number): number {
 /**
  * Add ROI calculation to bookmaker/exchange/promo summaries.
  */
-export function enrichWithROI<T extends { totalProfitLoss: number; totalStake: number }>(
-  items: T[]
-): (T & { roi: number })[] {
+export function enrichWithROI<
+  T extends { totalProfitLoss: number; totalStake: number },
+>(items: T[]): (T & { roi: number })[] {
   return items.map((item) => ({
     ...item,
     roi: calculateROI(item.totalProfitLoss, item.totalStake),
@@ -341,7 +346,9 @@ export function getDateRange(
 /**
  * Group matched bets by week for trend analysis.
  */
-export function groupByWeek(bets: MatchedBetWithLegs[]): Map<string, MatchedBetWithLegs[]> {
+export function groupByWeek(
+  bets: MatchedBetWithLegs[]
+): Map<string, MatchedBetWithLegs[]> {
   const groups = new Map<string, MatchedBetWithLegs[]>();
 
   for (const bet of bets) {
@@ -363,7 +370,9 @@ export function groupByWeek(bets: MatchedBetWithLegs[]): Map<string, MatchedBetW
 /**
  * Group matched bets by month for trend analysis.
  */
-export function groupByMonth(bets: MatchedBetWithLegs[]): Map<string, MatchedBetWithLegs[]> {
+export function groupByMonth(
+  bets: MatchedBetWithLegs[]
+): Map<string, MatchedBetWithLegs[]> {
   const groups = new Map<string, MatchedBetWithLegs[]>();
 
   for (const bet of bets) {
@@ -453,13 +462,19 @@ export async function calculateCumulativeProfitData(
       }
       case "month": {
         key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-01`;
-        label = date.toLocaleDateString("en-GB", { month: "short", year: "numeric" });
+        label = date.toLocaleDateString("en-GB", {
+          month: "short",
+          year: "numeric",
+        });
         break;
       }
       default: {
         // day
         key = date.toISOString().split("T")[0];
-        label = date.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+        label = date.toLocaleDateString("en-GB", {
+          day: "numeric",
+          month: "short",
+        });
       }
     }
 
@@ -499,10 +514,16 @@ export async function calculateCumulativeProfitData(
         label = `Week of ${date.toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`;
         break;
       case "month":
-        label = date.toLocaleDateString("en-GB", { month: "short", year: "numeric" });
+        label = date.toLocaleDateString("en-GB", {
+          month: "short",
+          year: "numeric",
+        });
         break;
       default:
-        label = date.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+        label = date.toLocaleDateString("en-GB", {
+          day: "numeric",
+          month: "short",
+        });
     }
 
     dataPoints.push({
@@ -558,7 +579,10 @@ export function snapshotsToBalanceData(
   }
 
   // Group snapshots by the specified period and take the latest value per period
-  const groups = new Map<string, { date: string; label: string; value: number }>();
+  const groups = new Map<
+    string,
+    { date: string; label: string; value: number }
+  >();
 
   for (const snapshot of snapshots) {
     const date = snapshot.createdAt;
@@ -578,13 +602,19 @@ export function snapshotsToBalanceData(
       }
       case "month": {
         key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-01`;
-        label = date.toLocaleDateString("en-GB", { month: "short", year: "numeric" });
+        label = date.toLocaleDateString("en-GB", {
+          month: "short",
+          year: "numeric",
+        });
         break;
       }
       case "day":
       default: {
         key = date.toISOString().split("T")[0];
-        label = date.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+        label = date.toLocaleDateString("en-GB", {
+          day: "numeric",
+          month: "short",
+        });
         break;
       }
     }

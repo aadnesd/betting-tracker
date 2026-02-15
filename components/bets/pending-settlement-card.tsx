@@ -1,15 +1,21 @@
 "use client";
 
 import { format } from "date-fns";
-import { Calendar, CheckCircle, Clock, ExternalLink, Trophy } from "lucide-react";
+import {
+  Calendar,
+  CheckCircle,
+  Clock,
+  ExternalLink,
+  Trophy,
+} from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import type { PendingSettlementBet } from "@/lib/db/queries";
 import { formatNOK } from "@/lib/reporting";
 import { cn } from "@/lib/utils";
-import type { PendingSettlementBet } from "@/lib/db/queries";
 
 export type SettlementFilter = "today" | "thisWeek" | "all";
 
@@ -22,7 +28,7 @@ interface PendingSettlementCardProps {
 /**
  * Dashboard widget showing matched bets awaiting settlement.
  * Groups bets by match date and provides quick-settle actions.
- * 
+ *
  * Why: Streamlines the settlement workflow by showing all bets
  * ready to be settled with linked match information.
  */
@@ -43,36 +49,41 @@ export function PendingSettlementCard({
       <CardHeader className="pb-3">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-2">
-            <div className={cn(
-              "rounded-full p-2",
-              hasPending ? "bg-blue-100" : "bg-gray-100"
-            )}>
-              <Clock className={cn(
-                "h-4 w-4",
-                hasPending ? "text-blue-600" : "text-gray-400"
-              )} />
+            <div
+              className={cn(
+                "rounded-full p-2",
+                hasPending ? "bg-blue-100" : "bg-gray-100"
+              )}
+            >
+              <Clock
+                className={cn(
+                  "h-4 w-4",
+                  hasPending ? "text-blue-600" : "text-gray-400"
+                )}
+              />
             </div>
             <div>
               <CardTitle className="text-base">Pending Settlement</CardTitle>
               <p className="text-muted-foreground text-xs">
-                {totalCount} bet{totalCount !== 1 ? "s" : ""} awaiting settlement
+                {totalCount} bet{totalCount !== 1 ? "s" : ""} awaiting
+                settlement
               </p>
             </div>
           </div>
           <div className="flex gap-1">
             <FilterButton
-              label="Today"
               active={activeFilter === "today"}
+              label="Today"
               onClick={() => setActiveFilter("today")}
             />
             <FilterButton
-              label="This Week"
               active={activeFilter === "thisWeek"}
+              label="This Week"
               onClick={() => setActiveFilter("thisWeek")}
             />
             <FilterButton
-              label="All"
               active={activeFilter === "all"}
+              label="All"
               onClick={() => setActiveFilter("all")}
             />
           </div>
@@ -104,7 +115,7 @@ export function PendingSettlementCard({
                 </div>
                 <div className="space-y-2">
                   {dateBets.map((bet) => (
-                    <PendingBetRow key={bet.id} bet={bet} />
+                    <PendingBetRow bet={bet} key={bet.id} />
                   ))}
                 </div>
                 <Separator className="mt-3" />
@@ -112,7 +123,7 @@ export function PendingSettlementCard({
             ))}
             {bets.length < totalCount && (
               <div className="pt-2 text-center">
-                <Button asChild variant="link" size="sm">
+                <Button asChild size="sm" variant="link">
                   <Link href="/bets?status=matched">
                     View all {totalCount} pending bets →
                   </Link>
@@ -137,10 +148,10 @@ function FilterButton({
 }) {
   return (
     <Button
-      variant={active ? "default" : "ghost"}
-      size="sm"
       className="h-7 px-2 text-xs"
       onClick={onClick}
+      size="sm"
+      variant={active ? "default" : "ghost"}
     >
       {label}
     </Button>
@@ -153,11 +164,11 @@ function PendingBetRow({ bet }: { bet: PendingSettlementBet }) {
 
   return (
     <Link
-      href={`/bets/${bet.id}`}
       className={cn(
         "block rounded-md border p-3 transition-colors hover:bg-muted/50",
         isMatchFinished && "border-green-200 bg-green-50/30"
       )}
+      href={`/bets/${bet.id}`}
     >
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="space-y-1">
@@ -174,7 +185,8 @@ function PendingBetRow({ bet }: { bet: PendingSettlementBet }) {
               </span>
               {isMatchFinished && bet.footballMatch!.homeScore !== null && (
                 <span className="font-semibold text-green-600">
-                  ({bet.footballMatch!.homeScore} - {bet.footballMatch!.awayScore})
+                  ({bet.footballMatch!.homeScore} -{" "}
+                  {bet.footballMatch!.awayScore})
                 </span>
               )}
               <MatchStatusBadge status={bet.footballMatch!.status} />
@@ -187,10 +199,14 @@ function PendingBetRow({ bet }: { bet: PendingSettlementBet }) {
         </div>
         <div className="flex items-center gap-3">
           {bet.netExposure && (
-            <span className={cn(
-              "font-medium text-sm",
-              Number(bet.netExposure) >= 0 ? "text-green-600" : "text-amber-600"
-            )}>
+            <span
+              className={cn(
+                "font-medium text-sm",
+                Number(bet.netExposure) >= 0
+                  ? "text-green-600"
+                  : "text-amber-600"
+              )}
+            >
               {formatNOK(Number(bet.netExposure))}
             </span>
           )}
@@ -224,7 +240,10 @@ function MatchStatusBadge({ status }: { status: string }) {
     CANCELLED: { label: "Cancelled", className: "bg-red-100 text-red-700" },
   };
 
-  const config = statusConfig[status] ?? { label: status, className: "bg-gray-100 text-gray-700" };
+  const config = statusConfig[status] ?? {
+    label: status,
+    className: "bg-gray-100 text-gray-700",
+  };
 
   return (
     <span className={cn("rounded-full px-2 py-0.5 text-xs", config.className)}>
@@ -237,13 +256,15 @@ function MatchStatusBadge({ status }: { status: string }) {
  * Group bets by date for display.
  * Uses match date if available, otherwise falls back to creation date.
  */
-function groupBetsByDate(bets: PendingSettlementBet[]): Record<string, PendingSettlementBet[]> {
+function groupBetsByDate(
+  bets: PendingSettlementBet[]
+): Record<string, PendingSettlementBet[]> {
   const groups: Record<string, PendingSettlementBet[]> = {};
 
   for (const bet of bets) {
     const date = bet.footballMatch?.matchDate ?? bet.createdAt;
     const dateKey = formatDateGroupLabel(new Date(date));
-    
+
     if (!groups[dateKey]) {
       groups[dateKey] = [];
     }
@@ -256,13 +277,13 @@ function groupBetsByDate(bets: PendingSettlementBet[]): Record<string, PendingSe
 function formatDateGroupLabel(date: Date): string {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  
+
   const tomorrow = new Date(today);
   tomorrow.setDate(tomorrow.getDate() + 1);
-  
+
   const yesterday = new Date(today);
   yesterday.setDate(yesterday.getDate() - 1);
-  
+
   const dateNormalized = new Date(date);
   dateNormalized.setHours(0, 0, 0, 0);
 
@@ -275,6 +296,6 @@ function formatDateGroupLabel(date: Date): string {
   if (dateNormalized.getTime() === yesterday.getTime()) {
     return "Yesterday";
   }
-  
+
   return format(date, "EEEE, dd MMM yyyy");
 }

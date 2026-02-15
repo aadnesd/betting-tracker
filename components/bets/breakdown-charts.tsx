@@ -69,7 +69,11 @@ function CustomBarTooltip({
   payload,
 }: {
   active?: boolean;
-  payload?: Array<{ value: number; dataKey: string; payload: BreakdownDataPoint }>;
+  payload?: Array<{
+    value: number;
+    dataKey: string;
+    payload: BreakdownDataPoint;
+  }>;
 }) {
   if (!active || !payload || payload.length === 0) {
     return null;
@@ -83,16 +87,25 @@ function CustomBarTooltip({
       <div className="mt-2 space-y-1 text-sm">
         <p className="text-muted-foreground">
           Profit:{" "}
-          <span className={dataPoint.totalProfitLoss >= 0 ? "text-green-600" : "text-red-600"}>
+          <span
+            className={
+              dataPoint.totalProfitLoss >= 0 ? "text-green-600" : "text-red-600"
+            }
+          >
             {formatNOK(dataPoint.totalProfitLoss)}
           </span>
         </p>
         <p className="text-muted-foreground">
-          Stake: <span className="text-foreground">{formatNOK(dataPoint.totalStake)}</span>
+          Stake:{" "}
+          <span className="text-foreground">
+            {formatNOK(dataPoint.totalStake)}
+          </span>
         </p>
         <p className="text-muted-foreground">
           ROI:{" "}
-          <span className={dataPoint.roi >= 0 ? "text-green-600" : "text-red-600"}>
+          <span
+            className={dataPoint.roi >= 0 ? "text-green-600" : "text-red-600"}
+          >
             {formatPercentage(dataPoint.roi)}
           </span>
         </p>
@@ -109,7 +122,11 @@ function CustomPieTooltip({
   payload,
 }: {
   active?: boolean;
-  payload?: Array<{ value: number; dataKey: string; payload: BreakdownDataPoint & { fill: string } }>;
+  payload?: Array<{
+    value: number;
+    dataKey: string;
+    payload: BreakdownDataPoint & { fill: string };
+  }>;
 }) {
   if (!active || !payload || payload.length === 0) {
     return null;
@@ -123,16 +140,25 @@ function CustomPieTooltip({
       <div className="mt-2 space-y-1 text-sm">
         <p className="text-muted-foreground">
           Profit:{" "}
-          <span className={dataPoint.totalProfitLoss >= 0 ? "text-green-600" : "text-red-600"}>
+          <span
+            className={
+              dataPoint.totalProfitLoss >= 0 ? "text-green-600" : "text-red-600"
+            }
+          >
             {formatNOK(dataPoint.totalProfitLoss)}
           </span>
         </p>
         <p className="text-muted-foreground">
-          Stake: <span className="text-foreground">{formatNOK(dataPoint.totalStake)}</span>
+          Stake:{" "}
+          <span className="text-foreground">
+            {formatNOK(dataPoint.totalStake)}
+          </span>
         </p>
         <p className="text-muted-foreground">
           ROI:{" "}
-          <span className={dataPoint.roi >= 0 ? "text-green-600" : "text-red-600"}>
+          <span
+            className={dataPoint.roi >= 0 ? "text-green-600" : "text-red-600"}
+          >
             {formatPercentage(dataPoint.roi)}
           </span>
         </p>
@@ -161,7 +187,9 @@ export function BreakdownBarChart({
   onItemClick,
 }: BreakdownChartProps) {
   // Sort by profit descending
-  const sortedData = [...data].sort((a, b) => b.totalProfitLoss - a.totalProfitLoss);
+  const sortedData = [...data].sort(
+    (a, b) => b.totalProfitLoss - a.totalProfitLoss
+  );
 
   if (sortedData.length === 0) {
     return (
@@ -193,45 +221,52 @@ export function BreakdownBarChart({
       </CardHeader>
       <CardContent>
         <div className="h-48 w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={sortedData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+          <ResponsiveContainer height="100%" width="100%">
+            <BarChart
+              data={sortedData}
+              margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
+            >
+              <CartesianGrid className="stroke-muted" strokeDasharray="3 3" />
               <XAxis
-                dataKey="name"
-                tick={{ fontSize: 12 }}
-                tickLine={false}
+                angle={-45}
                 axisLine={false}
                 className="text-muted-foreground"
-                interval={0}
-                angle={-45}
-                textAnchor="end"
+                dataKey="name"
                 height={60}
-              />
-              <YAxis
+                interval={0}
+                textAnchor="end"
                 tick={{ fontSize: 12 }}
                 tickLine={false}
+              />
+              <YAxis
                 axisLine={false}
                 className="text-muted-foreground"
                 domain={[yMin, yMax]}
-                tickFormatter={(value) => `${value >= 0 ? "" : "-"}${Math.abs(value)}`}
+                tick={{ fontSize: 12 }}
+                tickFormatter={(value) =>
+                  `${value >= 0 ? "" : "-"}${Math.abs(value)}`
+                }
+                tickLine={false}
               />
               <Tooltip content={<CustomBarTooltip />} />
               <Bar
-                dataKey="totalProfitLoss"
-                radius={[4, 4, 0, 0]}
                 cursor={onItemClick ? "pointer" : "default"}
+                dataKey="totalProfitLoss"
                 onClick={(_data, _index, event) => {
                   // The payload contains our original data
-                  const payload = (_data as unknown as { payload?: BreakdownDataPoint }).payload;
+                  const payload = (
+                    _data as unknown as { payload?: BreakdownDataPoint }
+                  ).payload;
                   if (payload && onItemClick) {
                     onItemClick(payload);
                   }
                 }}
+                radius={[4, 4, 0, 0]}
               >
                 {sortedData.map((entry, index) => (
                   <Cell
-                    key={`cell-${entry.name}`}
                     fill={getBarColor(entry.totalProfitLoss, index)}
+                    key={`cell-${entry.name}`}
                   />
                 ))}
               </Bar>
@@ -260,8 +295,8 @@ export function BreakdownPieChart({
   onItemClick,
 }: BreakdownChartProps) {
   // Sort by absolute profit descending for pie display
-  const sortedData = [...data].sort((a, b) => 
-    Math.abs(b.totalProfitLoss) - Math.abs(a.totalProfitLoss)
+  const sortedData = [...data].sort(
+    (a, b) => Math.abs(b.totalProfitLoss) - Math.abs(a.totalProfitLoss)
   );
 
   if (sortedData.length === 0) {
@@ -283,7 +318,10 @@ export function BreakdownPieChart({
   const pieData = sortedData.map((item, index) => ({
     ...item,
     value: Math.abs(item.totalProfitLoss) || 0.01, // Prevent zero-size slices
-    fill: item.totalProfitLoss >= 0 ? COLORS[index % COLORS.length] : NEGATIVE_COLORS[0],
+    fill:
+      item.totalProfitLoss >= 0
+        ? COLORS[index % COLORS.length]
+        : NEGATIVE_COLORS[0],
   }));
 
   return (
@@ -293,18 +331,16 @@ export function BreakdownPieChart({
       </CardHeader>
       <CardContent>
         <div className="h-48 w-full">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer height="100%" width="100%">
             <PieChart>
               <Pie
-                data={pieData}
-                dataKey="value"
-                nameKey="name"
+                cursor={onItemClick ? "pointer" : "default"}
                 cx="50%"
                 cy="50%"
-                outerRadius={70}
+                data={pieData}
+                dataKey="value"
                 innerRadius={35}
-                paddingAngle={2}
-                cursor={onItemClick ? "pointer" : "default"}
+                nameKey="name"
                 onClick={(data) => {
                   // Data is the pie segment data
                   const item = data as unknown as BreakdownDataPoint;
@@ -312,9 +348,11 @@ export function BreakdownPieChart({
                     onItemClick(item);
                   }
                 }}
+                outerRadius={70}
+                paddingAngle={2}
               >
                 {pieData.map((entry) => (
-                  <Cell key={`cell-${entry.name}`} fill={entry.fill} />
+                  <Cell fill={entry.fill} key={`cell-${entry.name}`} />
                 ))}
               </Pie>
               <Tooltip content={<CustomPieTooltip />} />
@@ -325,8 +363,8 @@ export function BreakdownPieChart({
         <div className="mt-2 flex flex-wrap justify-center gap-2 text-xs">
           {pieData.slice(0, 6).map((entry) => (
             <div
+              className="flex cursor-pointer items-center gap-1 hover:opacity-80"
               key={entry.name}
-              className="flex items-center gap-1 cursor-pointer hover:opacity-80"
               onClick={() => onItemClick?.(entry)}
             >
               <div
@@ -337,7 +375,9 @@ export function BreakdownPieChart({
             </div>
           ))}
           {pieData.length > 6 && (
-            <span className="text-muted-foreground">+{pieData.length - 6} more</span>
+            <span className="text-muted-foreground">
+              +{pieData.length - 6} more
+            </span>
           )}
         </div>
       </CardContent>
@@ -385,15 +425,15 @@ export function BreakdownChartWithToggle({
         <div className="flex gap-1">
           {(["bar", "pie"] as const).map((option) => (
             <button
-              key={option}
-              type="button"
-              onClick={() => setChartType(option)}
               className={cn(
-                "rounded-md px-3 py-1 text-sm font-medium transition-colors",
+                "rounded-md px-3 py-1 font-medium text-sm transition-colors",
                 chartType === option
                   ? "bg-primary text-primary-foreground"
                   : "bg-muted text-muted-foreground hover:bg-muted/80"
               )}
+              key={option}
+              onClick={() => setChartType(option)}
+              type="button"
             >
               {option.charAt(0).toUpperCase() + option.slice(1)}
             </button>
@@ -419,7 +459,9 @@ function BreakdownBarChartContent({
   data: BreakdownDataPoint[];
   onItemClick?: (item: BreakdownDataPoint) => void;
 }) {
-  const sortedData = [...data].sort((a, b) => b.totalProfitLoss - a.totalProfitLoss);
+  const sortedData = [...data].sort(
+    (a, b) => b.totalProfitLoss - a.totalProfitLoss
+  );
 
   const values = sortedData.map((d) => d.totalProfitLoss);
   const minValue = Math.min(...values, 0);
@@ -430,42 +472,52 @@ function BreakdownBarChartContent({
 
   return (
     <div className="h-48 w-full">
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={sortedData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+      <ResponsiveContainer height="100%" width="100%">
+        <BarChart
+          data={sortedData}
+          margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
+        >
+          <CartesianGrid className="stroke-muted" strokeDasharray="3 3" />
           <XAxis
-            dataKey="name"
-            tick={{ fontSize: 12 }}
-            tickLine={false}
+            angle={-45}
             axisLine={false}
             className="text-muted-foreground"
-            interval={0}
-            angle={-45}
-            textAnchor="end"
+            dataKey="name"
             height={60}
-          />
-          <YAxis
+            interval={0}
+            textAnchor="end"
             tick={{ fontSize: 12 }}
             tickLine={false}
+          />
+          <YAxis
             axisLine={false}
             className="text-muted-foreground"
             domain={[yMin, yMax]}
-            tickFormatter={(value) => `${value >= 0 ? "" : "-"}${Math.abs(value)}`}
+            tick={{ fontSize: 12 }}
+            tickFormatter={(value) =>
+              `${value >= 0 ? "" : "-"}${Math.abs(value)}`
+            }
+            tickLine={false}
           />
           <Tooltip content={<CustomBarTooltip />} />
           <Bar
-            dataKey="totalProfitLoss"
-            radius={[4, 4, 0, 0]}
             cursor={onItemClick ? "pointer" : "default"}
+            dataKey="totalProfitLoss"
             onClick={(_data) => {
-              const payload = (_data as unknown as { payload?: BreakdownDataPoint }).payload;
+              const payload = (
+                _data as unknown as { payload?: BreakdownDataPoint }
+              ).payload;
               if (payload && onItemClick) {
                 onItemClick(payload);
               }
             }}
+            radius={[4, 4, 0, 0]}
           >
             {sortedData.map((entry, index) => (
-              <Cell key={`cell-${entry.name}`} fill={getBarColor(entry.totalProfitLoss, index)} />
+              <Cell
+                fill={getBarColor(entry.totalProfitLoss, index)}
+                key={`cell-${entry.name}`}
+              />
             ))}
           </Bar>
         </BarChart>
@@ -488,33 +540,36 @@ function BreakdownPieChartContent({
   const pieData = sortedData.map((item, index) => ({
     ...item,
     value: Math.abs(item.totalProfitLoss) || 0.01,
-    fill: item.totalProfitLoss >= 0 ? COLORS[index % COLORS.length] : NEGATIVE_COLORS[0],
+    fill:
+      item.totalProfitLoss >= 0
+        ? COLORS[index % COLORS.length]
+        : NEGATIVE_COLORS[0],
   }));
 
   return (
     <>
       <div className="h-48 w-full">
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveContainer height="100%" width="100%">
           <PieChart>
             <Pie
-              data={pieData}
-              dataKey="value"
-              nameKey="name"
+              cursor={onItemClick ? "pointer" : "default"}
               cx="50%"
               cy="50%"
-              outerRadius={70}
+              data={pieData}
+              dataKey="value"
               innerRadius={35}
-              paddingAngle={2}
-              cursor={onItemClick ? "pointer" : "default"}
+              nameKey="name"
               onClick={(data) => {
                 const item = data as unknown as BreakdownDataPoint;
                 if (item && onItemClick) {
                   onItemClick(item);
                 }
               }}
+              outerRadius={70}
+              paddingAngle={2}
             >
               {pieData.map((entry) => (
-                <Cell key={`cell-${entry.name}`} fill={entry.fill} />
+                <Cell fill={entry.fill} key={`cell-${entry.name}`} />
               ))}
             </Pie>
             <Tooltip content={<CustomPieTooltip />} />
@@ -525,16 +580,21 @@ function BreakdownPieChartContent({
       <div className="mt-2 flex flex-wrap justify-center gap-2 text-xs">
         {pieData.slice(0, 6).map((entry) => (
           <div
-            key={entry.name}
             className="flex cursor-pointer items-center gap-1 hover:opacity-80"
+            key={entry.name}
             onClick={() => onItemClick?.(entry)}
           >
-            <div className="h-3 w-3 rounded-sm" style={{ backgroundColor: entry.fill }} />
+            <div
+              className="h-3 w-3 rounded-sm"
+              style={{ backgroundColor: entry.fill }}
+            />
             <span className="text-muted-foreground">{entry.name}</span>
           </div>
         ))}
         {pieData.length > 6 && (
-          <span className="text-muted-foreground">+{pieData.length - 6} more</span>
+          <span className="text-muted-foreground">
+            +{pieData.length - 6} more
+          </span>
         )}
       </div>
     </>

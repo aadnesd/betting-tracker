@@ -5,7 +5,7 @@
  * correctly compute balances from transactions and filter accounts
  * for the /bets/settings/accounts page.
  */
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock server-only to allow testing server modules
 vi.mock("server-only", () => ({}));
@@ -96,7 +96,9 @@ describe("account balance queries", () => {
         accountId: "acct-1",
       };
       // Type check: the function should return a number
-      const returnType: Awaited<ReturnType<typeof dbQueries.getAccountBalance>> = 100;
+      const returnType: Awaited<
+        ReturnType<typeof dbQueries.getAccountBalance>
+      > = 100;
       expect(typeof returnType).toBe("number");
     });
   });
@@ -111,7 +113,8 @@ describe("account balance queries", () => {
         kind?: "bookmaker" | "exchange";
         status?: "active" | "archived";
         limit?: number;
-      }) => Promise<dbQueries.AccountWithBalance[]> = dbQueries.listAccountsWithBalances;
+      }) => Promise<dbQueries.AccountWithBalance[]> =
+        dbQueries.listAccountsWithBalances;
       expect(fn).toBeDefined();
     });
 
@@ -203,7 +206,7 @@ describe("account balance queries", () => {
   describe("isActive helper logic", () => {
     // Test the isActive logic that treats null/undefined status as active
     // This is used in Quick Add page and other places to filter accounts
-    
+
     it("treats null status as active for backwards compatibility", () => {
       // The isActive function used in Quick Add and other pages should treat
       // null or undefined status as active, since older accounts may not have
@@ -220,8 +223,18 @@ describe("account balance queries", () => {
 
     it("filters accounts correctly with null status fallback", () => {
       const accounts = [
-        { id: "1", name: "Active Account", kind: "bookmaker", status: "active" },
-        { id: "2", name: "Archived Account", kind: "bookmaker", status: "archived" },
+        {
+          id: "1",
+          name: "Active Account",
+          kind: "bookmaker",
+          status: "active",
+        },
+        {
+          id: "2",
+          name: "Archived Account",
+          kind: "bookmaker",
+          status: "archived",
+        },
         { id: "3", name: "Legacy Account", kind: "bookmaker", status: null },
         { id: "4", name: "Exchange", kind: "exchange", status: "active" },
         { id: "5", name: "Legacy Exchange", kind: "exchange", status: null },
@@ -241,7 +254,9 @@ describe("account balance queries", () => {
       expect(activeExchanges).toHaveLength(2); // Exchange + Legacy Exchange
       expect(activeBookmakers.map((a) => a.name)).toContain("Active Account");
       expect(activeBookmakers.map((a) => a.name)).toContain("Legacy Account");
-      expect(activeBookmakers.map((a) => a.name)).not.toContain("Archived Account");
+      expect(activeBookmakers.map((a) => a.name)).not.toContain(
+        "Archived Account"
+      );
     });
   });
 
@@ -252,7 +267,8 @@ describe("account balance queries", () => {
       // Verify function signature
       const fn: (args: {
         userId: string;
-      }) => Promise<dbQueries.OpenBetStakes[]> = dbQueries.getOpenBetStakesByAccount;
+      }) => Promise<dbQueries.OpenBetStakes[]> =
+        dbQueries.getOpenBetStakesByAccount;
       expect(fn).toBeDefined();
     });
 
@@ -292,7 +308,9 @@ describe("account balance queries", () => {
       );
       // Verify free bet is excluded from total
       expect(mockOpenStakes.totalOpenStake).not.toBe(
-        mockOpenStakes.openBackStake + mockOpenStakes.openFreeBetStake + mockOpenStakes.openLayLiability
+        mockOpenStakes.openBackStake +
+          mockOpenStakes.openFreeBetStake +
+          mockOpenStakes.openLayLiability
       );
     });
 
@@ -312,7 +330,9 @@ describe("account balance queries", () => {
       };
 
       // The stake is what you win, liability is what you risk
-      expect(layExample.openLayLiability).toBeGreaterThan(layExample.openLayStake);
+      expect(layExample.openLayLiability).toBeGreaterThan(
+        layExample.openLayStake
+      );
     });
   });
 });

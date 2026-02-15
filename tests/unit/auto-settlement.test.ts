@@ -5,7 +5,7 @@
  * correctly identify matched bets linked to finished football matches that need settlement.
  * This is critical for the auto-settlement workflow that reduces manual settlement work.
  */
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock server-only to allow testing server modules
 vi.mock("server-only", () => ({}));
@@ -39,7 +39,7 @@ vi.mock("drizzle-orm/postgres-js", () => ({
                       layAccountId: "acct-2",
                       layAccountCommission: "0.05",
                       footballMatchId: "match-1",
-                      externalId: 538001,
+                      externalId: 538_001,
                       homeTeam: "Arsenal FC",
                       awayTeam: "Chelsea FC",
                       competition: "Premier League",
@@ -132,7 +132,7 @@ describe("auto-settlement detection queries", () => {
         // Football match result
         footballMatch: {
           id: "match-1",
-          externalId: 538001,
+          externalId: 538_001,
           homeTeam: "Arsenal FC",
           awayTeam: "Chelsea FC",
           competition: "Premier League",
@@ -191,7 +191,7 @@ describe("auto-settlement detection queries", () => {
         layAccountCommission: 0.02, // 2% exchange commission
         footballMatch: {
           id: "match-1",
-          externalId: 538002,
+          externalId: 538_002,
           homeTeam: "Liverpool FC",
           awayTeam: "Everton FC",
           competition: "Premier League",
@@ -242,7 +242,7 @@ describe("auto-settlement detection queries", () => {
         layAccountId: null,
         footballMatch: {
           id: "match-2",
-          externalId: 538003,
+          externalId: 538_003,
           homeTeam: "Man City FC",
           awayTeam: "Man United FC",
           competition: "Premier League",

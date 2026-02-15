@@ -1,5 +1,11 @@
 import { format } from "date-fns";
-import { CalendarDays, Trophy, TrendingUp, TrendingDown, Gift } from "lucide-react";
+import {
+  CalendarDays,
+  Gift,
+  TrendingDown,
+  TrendingUp,
+  Trophy,
+} from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -10,13 +16,18 @@ import { MatchedBetDetailActions } from "@/components/bets/matched-bet-detail-ac
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { computeMatchedBetOutcomes } from "@/lib/bet-calculations";
 import {
   getMatchedBetWithParts,
   listAuditEntriesByEntity,
 } from "@/lib/db/queries";
-import { computeMatchedBetOutcomes } from "@/lib/bet-calculations";
+import type {
+  BackBet,
+  FootballMatch,
+  LayBet,
+  ScreenshotUpload,
+} from "@/lib/db/schema";
 import { convertAmountToNok } from "@/lib/fx-rates";
-import type { BackBet, FootballMatch, LayBet, ScreenshotUpload } from "@/lib/db/schema";
 
 export const metadata = {
   title: "Matched bet detail",
@@ -42,7 +53,15 @@ export default async function Page({ params }: PageProps) {
     notFound();
   }
 
-  const { matched, back, lay, backScreenshot, layScreenshot, footballMatch, freeBet } = data;
+  const {
+    matched,
+    back,
+    lay,
+    backScreenshot,
+    layScreenshot,
+    footballMatch,
+    freeBet,
+  } = data;
 
   // Fetch audit history for this matched bet
   const auditEntries = await listAuditEntriesByEntity({
@@ -77,7 +96,12 @@ export default async function Page({ params }: PageProps) {
     const backCurrency = (back.currency ?? "NOK").toUpperCase();
     const layCurrency = (lay.currency ?? "NOK").toUpperCase();
 
-    if (!Number.isNaN(backStake) && !Number.isNaN(backOdds) && !Number.isNaN(layStake) && !Number.isNaN(layOdds)) {
+    if (
+      !Number.isNaN(backStake) &&
+      !Number.isNaN(backOdds) &&
+      !Number.isNaN(layStake) &&
+      !Number.isNaN(layOdds)
+    ) {
       const outcomes = computeMatchedBetOutcomes({
         backStake,
         backOdds,
@@ -92,8 +116,14 @@ export default async function Page({ params }: PageProps) {
         // profitIfWins = backProfit - layLiability
         // backProfit is in back currency, layLiability is in lay currency
         (async () => {
-          const backProfitNok = await convertAmountToNok(outcomes.backProfit, backCurrency);
-          const layLiabilityNok = await convertAmountToNok(outcomes.layLiability, layCurrency);
+          const backProfitNok = await convertAmountToNok(
+            outcomes.backProfit,
+            backCurrency
+          );
+          const layLiabilityNok = await convertAmountToNok(
+            outcomes.layLiability,
+            layCurrency
+          );
           return backProfitNok - layLiabilityNok;
         })(),
         // profitIfLoses = layStake (for free bet) or layStake - backStake
@@ -102,7 +132,10 @@ export default async function Page({ params }: PageProps) {
           if (isFreeBet) {
             return layStakeNok; // No back stake lost
           }
-          const backStakeNok = await convertAmountToNok(backStake, backCurrency);
+          const backStakeNok = await convertAmountToNok(
+            backStake,
+            backCurrency
+          );
           return layStakeNok - backStakeNok;
         })(),
       ]);
@@ -143,9 +176,7 @@ export default async function Page({ params }: PageProps) {
       {/* Mismatch alerts */}
       {mismatches.length > 0 && (
         <div className="rounded-md border border-amber-200 bg-amber-50 p-4">
-          <p className="mb-2 font-medium text-amber-800">
-            ⚠️ Issues detected
-          </p>
+          <p className="mb-2 font-medium text-amber-800">⚠️ Issues detected</p>
           <ul className="space-y-1">
             {mismatches.map((issue, i) => (
               <li className="text-amber-700 text-sm" key={i}>
@@ -175,7 +206,9 @@ export default async function Page({ params }: PageProps) {
                 <TrendingUp className="h-3 w-3" />
                 If selection wins
               </p>
-              <p className={`font-semibold text-lg ${betOutcomes.profitIfWins >= 0 ? "text-green-600" : "text-red-600"}`}>
+              <p
+                className={`font-semibold text-lg ${betOutcomes.profitIfWins >= 0 ? "text-green-600" : "text-red-600"}`}
+              >
                 NOK {betOutcomes.profitIfWins.toFixed(2)}
               </p>
             </div>
@@ -184,22 +217,26 @@ export default async function Page({ params }: PageProps) {
                 <TrendingDown className="h-3 w-3" />
                 If selection loses
               </p>
-              <p className={`font-semibold text-lg ${betOutcomes.profitIfLoses >= 0 ? "text-green-600" : "text-red-600"}`}>
+              <p
+                className={`font-semibold text-lg ${betOutcomes.profitIfLoses >= 0 ? "text-green-600" : "text-red-600"}`}
+              >
                 NOK {betOutcomes.profitIfLoses.toFixed(2)}
               </p>
             </div>
           </>
-        ) : matched.netExposure && (
-          <div className="rounded-lg border bg-muted/50 px-4 py-3">
-            <p className="text-muted-foreground text-xs uppercase tracking-wide">
-              <ValueWithTooltip type="netExposure" side="right">
-                Net exposure
-              </ValueWithTooltip>
-            </p>
-            <p className="font-semibold text-lg">
-              NOK {Number(matched.netExposure).toFixed(2)}
-            </p>
-          </div>
+        ) : (
+          matched.netExposure && (
+            <div className="rounded-lg border bg-muted/50 px-4 py-3">
+              <p className="text-muted-foreground text-xs uppercase tracking-wide">
+                <ValueWithTooltip side="right" type="netExposure">
+                  Net exposure
+                </ValueWithTooltip>
+              </p>
+              <p className="font-semibold text-lg">
+                NOK {Number(matched.netExposure).toFixed(2)}
+              </p>
+            </div>
+          )
         )}
         {matched.promoType && (
           <div className="rounded-lg border bg-purple-50 px-4 py-3">
@@ -220,9 +257,7 @@ export default async function Page({ params }: PageProps) {
       </div>
 
       {/* Linked Football Match */}
-      {footballMatch && (
-        <MatchInfoCard match={footballMatch} />
-      )}
+      {footballMatch && <MatchInfoCard match={footballMatch} />}
 
       {/* Two-column layout for back and lay */}
       <div className="grid gap-6 lg:grid-cols-2">
@@ -254,9 +289,9 @@ export default async function Page({ params }: PageProps) {
 
       {/* Actions */}
       <MatchedBetDetailActions
-        matchedBetId={matched.id}
         currentStatus={matched.status}
         hasBothLegs={!!back && !!lay}
+        matchedBetId={matched.id}
         mismatches={mismatches}
       />
 
@@ -271,32 +306,37 @@ export default async function Page({ params }: PageProps) {
           ) : (
             <ul className="space-y-3">
               {auditEntries.map((entry) => {
-                const hasChanges = entry.changes !== null && entry.changes !== undefined;
+                const hasChanges =
+                  entry.changes !== null && entry.changes !== undefined;
                 return (
-                <li
-                  className="flex items-start gap-3 border-l-2 border-muted pl-3"
-                  key={entry.id}
-                >
-                  <div className="flex-1">
-                    <p className="font-medium text-sm">
-                      {formatAction(entry.action)}
-                    </p>
-                    {entry.notes && (
-                      <p className="text-muted-foreground text-sm">
-                        {entry.notes}
+                  <li
+                    className="flex items-start gap-3 border-muted border-l-2 pl-3"
+                    key={entry.id}
+                  >
+                    <div className="flex-1">
+                      <p className="font-medium text-sm">
+                        {formatAction(entry.action)}
                       </p>
-                    )}
-                    {hasChanges && (
-                      <pre className="mt-1 overflow-x-auto rounded bg-muted/50 p-2 text-xs">
-                        {JSON.stringify(entry.changes as Record<string, unknown>, null, 2)}
-                      </pre>
-                    )}
-                  </div>
-                  <p className="text-muted-foreground text-xs">
-                    {format(new Date(entry.createdAt), "dd MMM HH:mm")}
-                  </p>
-                </li>
-              );
+                      {entry.notes && (
+                        <p className="text-muted-foreground text-sm">
+                          {entry.notes}
+                        </p>
+                      )}
+                      {hasChanges && (
+                        <pre className="mt-1 overflow-x-auto rounded bg-muted/50 p-2 text-xs">
+                          {JSON.stringify(
+                            entry.changes as Record<string, unknown>,
+                            null,
+                            2
+                          )}
+                        </pre>
+                      )}
+                    </div>
+                    <p className="text-muted-foreground text-xs">
+                      {format(new Date(entry.createdAt), "dd MMM HH:mm")}
+                    </p>
+                  </li>
+                );
               })}
             </ul>
           )}
@@ -366,8 +406,12 @@ function BetCard({
         <div className="grid grid-cols-2 gap-3 text-sm">
           <Field label="Market" value={bet.market} />
           <Field label="Selection" value={bet.selection} />
-          <Field label="Odds" value={bet.odds} highlight />
-          <Field label="Stake" value={`${bet.stake} ${bet.currency ?? ""}`} highlight />
+          <Field highlight label="Odds" value={bet.odds} />
+          <Field
+            highlight
+            label="Stake"
+            value={`${bet.stake} ${bet.currency ?? ""}`}
+          />
           <Field label="Exchange" value={bet.exchange} />
           <Field
             label="Placed at"
@@ -505,41 +549,40 @@ function detectMismatches(
 function MatchInfoCard({ match }: { match: FootballMatch }) {
   const matchDate = new Date(match.matchDate);
   const isFinished = match.status === "FINISHED";
-  const isUpcoming =
-    match.status === "SCHEDULED" || match.status === "TIMED";
+  const isUpcoming = match.status === "SCHEDULED" || match.status === "TIMED";
   const isLive = match.status === "IN_PLAY" || match.status === "PAUSED";
 
   const getStatusBadge = () => {
     if (isFinished) {
       return (
-        <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-emerald-800 text-xs font-medium">
+        <span className="rounded-full bg-emerald-100 px-2 py-0.5 font-medium text-emerald-800 text-xs">
           Finished
         </span>
       );
     }
     if (isLive) {
       return (
-        <span className="rounded-full bg-red-100 px-2 py-0.5 text-red-800 text-xs font-medium animate-pulse">
+        <span className="animate-pulse rounded-full bg-red-100 px-2 py-0.5 font-medium text-red-800 text-xs">
           Live
         </span>
       );
     }
     if (isUpcoming) {
       return (
-        <span className="rounded-full bg-blue-100 px-2 py-0.5 text-blue-800 text-xs font-medium">
+        <span className="rounded-full bg-blue-100 px-2 py-0.5 font-medium text-blue-800 text-xs">
           Upcoming
         </span>
       );
     }
     return (
-      <span className="rounded-full bg-gray-100 px-2 py-0.5 text-gray-800 text-xs font-medium">
+      <span className="rounded-full bg-gray-100 px-2 py-0.5 font-medium text-gray-800 text-xs">
         {match.status}
       </span>
     );
   };
 
   return (
-    <Card className="border-amber-200 bg-amber-50/30 dark:bg-amber-950/10 dark:border-amber-800">
+    <Card className="border-amber-200 bg-amber-50/30 dark:border-amber-800 dark:bg-amber-950/10">
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-base">
           <Trophy className="h-4 w-4 text-amber-600" />
@@ -551,7 +594,7 @@ function MatchInfoCard({ match }: { match: FootballMatch }) {
         <div className="space-y-3">
           {/* Teams */}
           <div className="flex items-center justify-between">
-            <div className="text-center flex-1">
+            <div className="flex-1 text-center">
               <p className="font-semibold text-lg">{match.homeTeam}</p>
               {isFinished && match.homeScore !== null && (
                 <p className="font-bold text-2xl text-amber-700 dark:text-amber-400">
@@ -559,8 +602,8 @@ function MatchInfoCard({ match }: { match: FootballMatch }) {
                 </p>
               )}
             </div>
-            <div className="px-4 text-muted-foreground font-medium">vs</div>
-            <div className="text-center flex-1">
+            <div className="px-4 font-medium text-muted-foreground">vs</div>
+            <div className="flex-1 text-center">
               <p className="font-semibold text-lg">{match.awayTeam}</p>
               {isFinished && match.awayScore !== null && (
                 <p className="font-bold text-2xl text-amber-700 dark:text-amber-400">
@@ -571,8 +614,8 @@ function MatchInfoCard({ match }: { match: FootballMatch }) {
           </div>
 
           {/* Match details */}
-          <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground border-t pt-3">
-            <span className="bg-amber-100 dark:bg-amber-900 px-2 py-0.5 rounded font-medium text-amber-800 dark:text-amber-200">
+          <div className="flex flex-wrap items-center gap-3 border-t pt-3 text-muted-foreground text-sm">
+            <span className="rounded bg-amber-100 px-2 py-0.5 font-medium text-amber-800 dark:bg-amber-900 dark:text-amber-200">
               {match.competitionCode || match.competition}
             </span>
             <div className="flex items-center gap-1">

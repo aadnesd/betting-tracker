@@ -9,7 +9,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { describe, expect, it, beforeAll } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 
 // We need to import the parser directly and call the model
 // This test does NOT set PLAYWRIGHT env var, so isTestEnvironment will be false
@@ -58,7 +58,7 @@ describe("AI Bet Parsing Integration", () => {
 
   it.skipIf(!canRunRealAI)(
     "parses bet2.png (back) and bet3.png (lay) correctly",
-    { timeout: 60000 },
+    { timeout: 60_000 },
     async () => {
       // Dynamic import to avoid issues with module initialization
       const { parseMatchedBetFromScreenshots } = await import(
@@ -95,7 +95,7 @@ describe("AI Bet Parsing Integration", () => {
       // Based on user's report: lay liability is 11036.78 NOK at 1.46 odds
       // If AI extracted correctly, liability should be set
       if (result.lay.liability) {
-        expect(result.lay.liability).toBeCloseTo(11036.78, 0);
+        expect(result.lay.liability).toBeCloseTo(11_036.78, 0);
       } else {
         // If liability not extracted, stake should be liability / (odds - 1)
         // 11036.78 / 0.46 ≈ 23992.78
@@ -120,13 +120,13 @@ describe("AI Bet Parsing Integration", () => {
       });
 
       // Liability should be around 11036.78 NOK
-      expect(layLiability).toBeCloseTo(11036.78, -1); // Within 10 units
+      expect(layLiability).toBeCloseTo(11_036.78, -1); // Within 10 units
     }
   );
 
   it.skipIf(!canRunRealAI)(
     "parses bet2.png as both back and lay (same image test)",
-    { timeout: 60000 },
+    { timeout: 60_000 },
     async () => {
       const { parseMatchedBetFromScreenshots } = await import(
         "@/lib/bet-parser"

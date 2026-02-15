@@ -190,10 +190,7 @@ export async function GET(request: Request) {
   const id = searchParams.get("id");
 
   if (!id) {
-    return NextResponse.json(
-      { error: "Account ID required" },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "Account ID required" }, { status: 400 });
   }
 
   try {

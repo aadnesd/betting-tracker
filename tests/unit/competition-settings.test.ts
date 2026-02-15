@@ -5,7 +5,7 @@
  * and getAllEnabledCompetitions correctly manage user competition preferences
  * for the /bets/settings/competitions page and cron sync job.
  */
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock server-only to allow testing server modules
 vi.mock("server-only", () => ({}));
@@ -26,7 +26,9 @@ vi.mock("drizzle-orm/postgres-js", () => ({
     select: vi.fn(() => ({
       from: vi.fn(() => ({
         where: vi.fn(() => ({
-          limit: vi.fn().mockImplementation(() => Promise.resolve(mockSelectResult)),
+          limit: vi
+            .fn()
+            .mockImplementation(() => Promise.resolve(mockSelectResult)),
         })),
       })),
     })),
@@ -47,8 +49,8 @@ vi.mock("postgres", () => ({
 
 import * as dbQueries from "@/lib/db/queries";
 import {
-  DEFAULT_COMPETITION_CODES,
   AVAILABLE_COMPETITIONS,
+  DEFAULT_COMPETITION_CODES,
 } from "@/lib/db/schema";
 
 describe("competition settings queries", () => {
@@ -129,7 +131,9 @@ describe("competition settings queries", () => {
 
     it("returns default competitions when user has no settings", async () => {
       // Empty mockSelectResult = no settings
-      const result = await dbQueries.getEnabledCompetitions({ userId: "user-1" });
+      const result = await dbQueries.getEnabledCompetitions({
+        userId: "user-1",
+      });
       expect(result).toEqual(DEFAULT_COMPETITION_CODES);
     });
   });
@@ -162,7 +166,9 @@ describe("competition settings queries", () => {
 
     it("is an array of strings", () => {
       expect(Array.isArray(DEFAULT_COMPETITION_CODES)).toBe(true);
-      expect(DEFAULT_COMPETITION_CODES.every((c) => typeof c === "string")).toBe(true);
+      expect(
+        DEFAULT_COMPETITION_CODES.every((c) => typeof c === "string")
+      ).toBe(true);
     });
   });
 

@@ -1,6 +1,4 @@
-import { cn } from "@/lib/utils";
-import { formatNOK, formatPercentage } from "@/lib/reporting";
-import type { BookmakerProfitWithBonuses } from "@/lib/db/queries";
+import { Gift } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -9,7 +7,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Gift } from "lucide-react";
+import type { BookmakerProfitWithBonuses } from "@/lib/db/queries";
+import { formatNOK, formatPercentage } from "@/lib/reporting";
+import { cn } from "@/lib/utils";
 
 type Props = {
   data: BookmakerProfitWithBonuses[];
@@ -64,7 +64,9 @@ export function BookmakerProfitWithBonusesTable({
             <TableBody>
               {sorted.map((row) => (
                 <TableRow key={row.accountId}>
-                  <TableCell className="font-medium">{row.accountName}</TableCell>
+                  <TableCell className="font-medium">
+                    {row.accountName}
+                  </TableCell>
                   <TableCell className="text-right">{row.betCount}</TableCell>
                   <TableCell className="text-right">
                     {formatNOK(row.totalStake)}
@@ -72,7 +74,9 @@ export function BookmakerProfitWithBonusesTable({
                   <TableCell
                     className={cn(
                       "text-right",
-                      row.bettingProfit >= 0 ? "text-emerald-600" : "text-rose-600"
+                      row.bettingProfit >= 0
+                        ? "text-emerald-600"
+                        : "text-rose-600"
                     )}
                   >
                     {formatNOK(row.bettingProfit)}
@@ -80,7 +84,9 @@ export function BookmakerProfitWithBonusesTable({
                   <TableCell
                     className={cn(
                       "text-right",
-                      row.bonusTotal > 0 ? "text-blue-600" : "text-muted-foreground"
+                      row.bonusTotal > 0
+                        ? "text-blue-600"
+                        : "text-muted-foreground"
                     )}
                   >
                     {row.bonusTotal > 0 ? formatNOK(row.bonusTotal) : "—"}
@@ -88,7 +94,9 @@ export function BookmakerProfitWithBonusesTable({
                   <TableCell
                     className={cn(
                       "text-right font-semibold",
-                      row.totalProfit >= 0 ? "text-emerald-600" : "text-rose-600"
+                      row.totalProfit >= 0
+                        ? "text-emerald-600"
+                        : "text-rose-600"
                     )}
                   >
                     {formatNOK(row.totalProfit)}
@@ -126,7 +134,9 @@ export function BookmakerProfitWithBonusesTable({
                       : "text-rose-600"
                   )}
                 >
-                  {formatNOK(sorted.reduce((sum, r) => sum + r.bettingProfit, 0))}
+                  {formatNOK(
+                    sorted.reduce((sum, r) => sum + r.bettingProfit, 0)
+                  )}
                 </span>
               </span>
               <span>

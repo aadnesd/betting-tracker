@@ -41,7 +41,10 @@ interface TransactionRowProps {
  * Why: Allows users to manage individual transactions, including deletion
  * of incorrect or duplicate entries.
  */
-export function TransactionRow({ transaction, accountId }: TransactionRowProps) {
+export function TransactionRow({
+  transaction,
+  accountId,
+}: TransactionRowProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -84,12 +87,12 @@ export function TransactionRow({ transaction, accountId }: TransactionRowProps) 
   };
 
   return (
-    <div className="flex items-center justify-between rounded-md border p-3 group hover:bg-muted/30 transition-colors">
+    <div className="group flex items-center justify-between rounded-md border p-3 transition-colors hover:bg-muted/30">
       <div className="flex items-center gap-3">
         {icon}
         <div>
           <p className="font-medium capitalize">{transaction.type}</p>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-muted-foreground text-xs">
             {occurredAt.toLocaleDateString("en-GB", {
               day: "numeric",
               month: "short",
@@ -109,12 +112,12 @@ export function TransactionRow({ transaction, accountId }: TransactionRowProps) 
           {transaction.currency} {amount.toFixed(2)}
         </p>
 
-        <AlertDialog open={open} onOpenChange={setOpen}>
+        <AlertDialog onOpenChange={setOpen} open={open}>
           <AlertDialogTrigger asChild>
             <Button
-              variant="ghost"
+              className="h-8 w-8 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
               size="icon"
-              className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
+              variant="ghost"
             >
               <Trash2 className="h-4 w-4" />
               <span className="sr-only">Delete transaction</span>
@@ -125,19 +128,21 @@ export function TransactionRow({ transaction, accountId }: TransactionRowProps) 
               <AlertDialogTitle>Delete transaction?</AlertDialogTitle>
               <AlertDialogDescription>
                 This will permanently delete this {transaction.type} of{" "}
-                {transaction.currency} {amount.toFixed(2)}. This action cannot be
-                undone.
+                {transaction.currency} {amount.toFixed(2)}. This action cannot
+                be undone.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+              <AlertDialogCancel disabled={isDeleting}>
+                Cancel
+              </AlertDialogCancel>
               <AlertDialogAction
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                disabled={isDeleting}
                 onClick={(e) => {
                   e.preventDefault();
                   handleDelete();
                 }}
-                disabled={isDeleting}
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               >
                 {isDeleting ? "Deleting..." : "Delete"}
               </AlertDialogAction>

@@ -627,12 +627,13 @@ export function calculateLayProfitLoss(
       // Selection won: layer loses liability (no commission on losses)
       return -liability;
 
-    case "loss":
+    case "loss": {
       // Selection lost: layer wins the lay stake minus commission
       // Commission is only applied to profits
       const grossProfit = layStake;
       const commission = grossProfit * commissionRate;
       return grossProfit - commission;
+    }
 
     case "push":
       // Push: no profit/loss

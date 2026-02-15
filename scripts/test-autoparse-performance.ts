@@ -1,12 +1,12 @@
 /**
  * Performance test script for the autoparse endpoint.
- * 
+ *
  * Tests the actual AI parsing flow with real images to measure:
  * 1. Image upload time (Vercel Blob)
  * 2. AI parsing time (the main bottleneck)
  * 3. Database operations
- * 
- * Usage: 
+ *
+ * Usage:
  *   npx tsx scripts/test-autoparse-performance.ts
  */
 
@@ -28,7 +28,9 @@ async function measureTime<T>(
 
 async function testWithImages(backPath: string, layPath: string) {
   console.log("\n" + "=".repeat(60));
-  console.log(`Testing with: ${path.basename(backPath)} / ${path.basename(layPath)}`);
+  console.log(
+    `Testing with: ${path.basename(backPath)} / ${path.basename(layPath)}`
+  );
   console.log("=".repeat(60));
 
   // Read images
@@ -63,7 +65,10 @@ async function testWithImages(backPath: string, layPath: string) {
     return res.json();
   });
 
-  console.log("   Upload response:", JSON.stringify(uploadResult.result, null, 2));
+  console.log(
+    "   Upload response:",
+    JSON.stringify(uploadResult.result, null, 2)
+  );
 
   // Step 2: Autoparse
   const autoparseResult = await measureTime("2. Autoparse (AI)", async () => {
@@ -92,7 +97,9 @@ async function testWithImages(backPath: string, layPath: string) {
   console.log("TIMING SUMMARY:");
   console.log(`  Upload:    ${uploadResult.durationMs}ms`);
   console.log(`  Autoparse: ${autoparseResult.durationMs}ms`);
-  console.log(`  TOTAL:     ${uploadResult.durationMs + autoparseResult.durationMs}ms`);
+  console.log(
+    `  TOTAL:     ${uploadResult.durationMs + autoparseResult.durationMs}ms`
+  );
   console.log("-".repeat(60));
 
   return {

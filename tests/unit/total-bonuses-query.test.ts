@@ -5,7 +5,7 @@
  * It's used in the reports summary to include bonuses in the overall profit calculation.
  * Bonuses are real profit that should be reflected in performance metrics.
  */
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock server-only to allow testing server modules
 vi.mock("server-only", () => ({}));
@@ -79,7 +79,9 @@ describe("getTotalBonusesForUser", () => {
   describe("return value", () => {
     it("returns a number representing total bonus amount", async () => {
       // The function is typed to return Promise<number>
-      const returnType: Awaited<ReturnType<typeof dbQueries.getTotalBonusesForUser>> = 100.5;
+      const returnType: Awaited<
+        ReturnType<typeof dbQueries.getTotalBonusesForUser>
+      > = 100.5;
       expect(typeof returnType).toBe("number");
     });
 
@@ -108,10 +110,10 @@ describe("getTotalBonusesForUser", () => {
       const bettingProfit = 100;
       const bonusTotal = 50;
       const totalStake = 1000;
-      
+
       const roiWithoutBonus = (bettingProfit / totalStake) * 100;
       const roiWithBonus = ((bettingProfit + bonusTotal) / totalStake) * 100;
-      
+
       expect(roiWithoutBonus).toBe(10);
       expect(roiWithBonus).toBe(15);
       expect(roiWithBonus).toBeGreaterThan(roiWithoutBonus);

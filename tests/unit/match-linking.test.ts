@@ -5,12 +5,12 @@
  * synced FootballMatch records. The simplified approach uses:
  * 1. Fuzzy trigram search in the database to find candidate matches
  * 2. LLM to select the correct match from candidates
- * 
+ *
  * This normalizes common team names, uses fuzzy search, and only calls the LLM
  * for disambiguation when multiple candidates remain.
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock the external dependencies
 vi.mock("@/lib/db/queries", () => ({
@@ -27,18 +27,20 @@ vi.mock("ai", () => ({
   generateText: vi.fn(),
 }));
 
+import { generateText } from "ai";
+
+import { searchFootballMatches } from "@/lib/db/queries";
 import {
   findCandidateMatches,
   linkBetToMatch,
-  selectMatchWithLLM,
   type MatchCandidate,
   type MatchLinkResult,
+  selectMatchWithLLM,
 } from "@/lib/match-linking";
 
-import { searchFootballMatches } from "@/lib/db/queries";
-import { generateText } from "ai";
-
-const mockSearchFootballMatches = searchFootballMatches as ReturnType<typeof vi.fn>;
+const mockSearchFootballMatches = searchFootballMatches as ReturnType<
+  typeof vi.fn
+>;
 const mockGenerateText = generateText as ReturnType<typeof vi.fn>;
 
 describe("Match Linking Module", () => {

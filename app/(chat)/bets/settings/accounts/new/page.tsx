@@ -47,7 +47,10 @@ export default function NewAccountPage() {
     {}
   );
 
-  const updateField = <K extends keyof FormData>(field: K, value: FormData[K]) => {
+  const updateField = <K extends keyof FormData>(
+    field: K,
+    value: FormData[K]
+  ) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
     if (errors[field]) {
       setErrors((prev) => ({ ...prev, [field]: undefined }));
@@ -96,8 +99,7 @@ export default function NewAccountPage() {
           name: formData.name.trim(),
           kind: formData.kind,
           currency: formData.currency || null,
-          commission:
-            formData.kind === "exchange" ? commissionDecimal : null,
+          commission: formData.kind === "exchange" ? commissionDecimal : null,
         }),
       });
 
@@ -107,7 +109,9 @@ export default function NewAccountPage() {
         throw new Error(data.error || "Failed to create account");
       }
 
-      toast.success(`${formData.kind === "exchange" ? "Exchange" : "Bookmaker"} account created!`);
+      toast.success(
+        `${formData.kind === "exchange" ? "Exchange" : "Bookmaker"} account created!`
+      );
       router.push("/bets/settings/accounts");
     } catch (error) {
       console.error("Create account error:", error);
@@ -123,8 +127,8 @@ export default function NewAccountPage() {
     <div className="container mx-auto max-w-xl px-4 py-8">
       <div className="mb-6">
         <Link
+          className="inline-flex items-center gap-2 text-muted-foreground text-sm transition-colors hover:text-foreground"
           href="/bets/settings/accounts"
-          className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
           <ArrowLeft className="h-4 w-4" />
           Back to Accounts
@@ -146,15 +150,15 @@ export default function NewAccountPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form className="space-y-6" onSubmit={handleSubmit}>
             {/* Account Type */}
             <div className="space-y-2">
               <Label htmlFor="kind">Account Type</Label>
               <Select
-                value={formData.kind}
                 onValueChange={(value: "bookmaker" | "exchange") =>
                   updateField("kind", value)
                 }
+                value={formData.kind}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -174,7 +178,7 @@ export default function NewAccountPage() {
                   </SelectItem>
                 </SelectContent>
               </Select>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-muted-foreground text-xs">
                 {formData.kind === "bookmaker"
                   ? "Bookmakers are where you place back bets with promotional offers"
                   : "Exchanges are where you lay bets to lock in profit"}
@@ -185,18 +189,18 @@ export default function NewAccountPage() {
             <div className="space-y-2">
               <Label htmlFor="name">Account Name</Label>
               <Input
+                className={errors.name ? "border-destructive" : ""}
                 id="name"
+                onChange={(e) => updateField("name", e.target.value)}
                 placeholder={
                   formData.kind === "bookmaker"
                     ? "e.g., bet365, Unibet, William Hill"
                     : "e.g., Betfair Exchange, Smarkets"
                 }
                 value={formData.name}
-                onChange={(e) => updateField("name", e.target.value)}
-                className={errors.name ? "border-destructive" : ""}
               />
               {errors.name && (
-                <p className="text-xs text-destructive">{errors.name}</p>
+                <p className="text-destructive text-xs">{errors.name}</p>
               )}
             </div>
 
@@ -204,8 +208,8 @@ export default function NewAccountPage() {
             <div className="space-y-2">
               <Label htmlFor="currency">Default Currency</Label>
               <Select
-                value={formData.currency}
                 onValueChange={(value) => updateField("currency", value)}
+                value={formData.currency}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -218,7 +222,7 @@ export default function NewAccountPage() {
                   ))}
                 </SelectContent>
               </Select>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-muted-foreground text-xs">
                 The default currency for this account's bets and transactions
               </p>
             </div>
@@ -228,22 +232,22 @@ export default function NewAccountPage() {
               <div className="space-y-2">
                 <Label htmlFor="commission">Commission Rate (%)</Label>
                 <Input
-                  id="commission"
-                  type="number"
-                  step="0.1"
-                  min="0"
-                  max="100"
-                  placeholder="e.g., 2 (for 2%)"
-                  value={formData.commission}
-                  onChange={(e) => updateField("commission", e.target.value)}
                   className={errors.commission ? "border-destructive" : ""}
+                  id="commission"
+                  max="100"
+                  min="0"
+                  onChange={(e) => updateField("commission", e.target.value)}
+                  placeholder="e.g., 2 (for 2%)"
+                  step="0.1"
+                  type="number"
+                  value={formData.commission}
                 />
                 {errors.commission && (
-                  <p className="text-xs text-destructive">
+                  <p className="text-destructive text-xs">
                     {errors.commission}
                   </p>
                 )}
-                <p className="text-xs text-muted-foreground">
+                <p className="text-muted-foreground text-xs">
                   The commission rate charged by the exchange on winning bets
                 </p>
               </div>
@@ -252,15 +256,15 @@ export default function NewAccountPage() {
             {/* Actions */}
             <div className="flex gap-4 pt-4">
               <Button
+                className="flex-1"
+                disabled={isSubmitting}
+                onClick={() => router.push("/bets/settings/accounts")}
                 type="button"
                 variant="outline"
-                className="flex-1"
-                onClick={() => router.push("/bets/settings/accounts")}
-                disabled={isSubmitting}
               >
                 Cancel
               </Button>
-              <Button type="submit" className="flex-1" disabled={isSubmitting}>
+              <Button className="flex-1" disabled={isSubmitting} type="submit">
                 {isSubmitting ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />

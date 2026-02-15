@@ -1,10 +1,10 @@
 import fs from "node:fs";
 import path from "node:path";
-import {
-  type APIRequestContext,
-  type Browser,
-  type BrowserContext,
-  type Page,
+import type {
+  APIRequestContext,
+  Browser,
+  BrowserContext,
+  Page,
 } from "@playwright/test";
 import { getUnixTime } from "date-fns";
 

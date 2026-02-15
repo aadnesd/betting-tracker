@@ -25,7 +25,7 @@ import { parseFootballDataMatch } from "@/app/(chat)/api/cron/sync-matches/route
 describe("Match Sync Parser", () => {
   describe("parseFootballDataMatch", () => {
     const sampleMatch = {
-      id: 432123,
+      id: 432_123,
       utcDate: "2026-01-15T15:00:00Z",
       status: "SCHEDULED" as const,
       homeTeam: {
@@ -55,7 +55,7 @@ describe("Match Sync Parser", () => {
 
     it("should parse external match ID correctly", () => {
       const result = parseFootballDataMatch(sampleMatch);
-      expect(result.externalId).toBe(432123);
+      expect(result.externalId).toBe(432_123);
     });
 
     it("should parse home team name correctly", () => {
@@ -187,7 +187,7 @@ describe("Match Sync Parser", () => {
   describe("Return type structure", () => {
     it("should return all required fields for CreateFootballMatchParams", () => {
       const sampleMatch = {
-        id: 432123,
+        id: 432_123,
         utcDate: "2026-01-15T15:00:00Z",
         status: "SCHEDULED" as const,
         homeTeam: { id: 57, name: "Arsenal FC" },
@@ -220,7 +220,7 @@ describe("Match Sync Parser", () => {
 
     it("should produce CreateFootballMatchParams compatible with upsertFootballMatch", async () => {
       const sampleMatch = {
-        id: 432123,
+        id: 432_123,
         utcDate: "2026-01-15T15:00:00Z",
         status: "FINISHED" as const,
         homeTeam: { id: 57, name: "Arsenal FC" },
@@ -232,7 +232,7 @@ describe("Match Sync Parser", () => {
       const result = parseFootballDataMatch(sampleMatch);
 
       // Verify the result has all required fields for CreateFootballMatchParams
-      expect(result.externalId).toBe(432123);
+      expect(result.externalId).toBe(432_123);
       expect(result.homeTeam).toBe("Arsenal FC");
       expect(result.awayTeam).toBe("Chelsea FC");
       expect(result.competition).toBe("Premier League");

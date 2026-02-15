@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/app/(auth)/auth";
-import { getAccountById, deleteAccount } from "@/lib/db/queries";
+import { deleteAccount, getAccountById } from "@/lib/db/queries";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -62,19 +62,28 @@ export async function DELETE(request: Request, { params }: RouteParams) {
     if (error instanceof Error) {
       if (error.message.includes("linked bets")) {
         return NextResponse.json(
-          { error: "Cannot delete account with linked bets. Archive it instead." },
+          {
+            error:
+              "Cannot delete account with linked bets. Archive it instead.",
+          },
           { status: 400 }
         );
       }
       if (error.message.includes("transactions")) {
         return NextResponse.json(
-          { error: "Cannot delete account with transactions. Archive it instead." },
+          {
+            error:
+              "Cannot delete account with transactions. Archive it instead.",
+          },
           { status: 400 }
         );
       }
       if (error.message.includes("linked free bets")) {
         return NextResponse.json(
-          { error: "Cannot delete account with linked free bets. Archive it instead." },
+          {
+            error:
+              "Cannot delete account with linked free bets. Archive it instead.",
+          },
           { status: 400 }
         );
       }

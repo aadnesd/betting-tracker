@@ -1,13 +1,7 @@
 import { cn } from "@/lib/utils";
 
 type Props = {
-  status:
-    | "draft"
-    | "placed"
-    | "matched"
-    | "settled"
-    | "needs_review"
-    | "error";
+  status: "draft" | "placed" | "matched" | "settled" | "needs_review" | "error";
   className?: string;
 };
 

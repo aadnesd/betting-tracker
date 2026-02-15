@@ -1,18 +1,18 @@
 /**
  * Azure Document Intelligence OCR Client
- * 
+ *
  * Uses Azure's Document Intelligence (Form Recognizer) for fast, accurate OCR
- * of betting slip screenshots. This is significantly faster than using 
+ * of betting slip screenshots. This is significantly faster than using
  * vision LLMs for text extraction.
- * 
- * The OCR extracts text, then we use a smaller/faster LLM to parse the 
+ *
+ * The OCR extracts text, then we use a smaller/faster LLM to parse the
  * structured betting data from the extracted text.
  */
 
 import {
+  type AnalyzeResult,
   AzureKeyCredential,
   DocumentAnalysisClient,
-  type AnalyzeResult,
 } from "@azure/ai-form-recognizer";
 
 let client: DocumentAnalysisClient | null = null;
@@ -43,7 +43,7 @@ export interface OcrResult {
 
 /**
  * Extract text from an image using Azure Document Intelligence OCR.
- * 
+ *
  * @param imageData - Either a URL string or a Buffer/Uint8Array of image data
  * @returns Extracted text and metadata
  */
@@ -79,7 +79,8 @@ export async function extractTextFromImage(
     poller = await client.beginAnalyzeDocument("prebuilt-read", imageData);
   }
 
-  const result = await poller.pollUntilDone() as AnalyzeResult<"prebuilt-read">;
+  const result =
+    (await poller.pollUntilDone()) as AnalyzeResult<"prebuilt-read">;
   const durationMs = Date.now() - startTime;
 
   if (!result.content) {
@@ -118,7 +119,8 @@ export async function extractTextFromImage(
     }
   }
 
-  const avgConfidence = confidenceCount > 0 ? totalConfidence / confidenceCount : 1;
+  const avgConfidence =
+    confidenceCount > 0 ? totalConfidence / confidenceCount : 1;
 
   return {
     text: result.content,

@@ -27,7 +27,9 @@ async function main() {
       return;
     }
 
-    console.log(`\nDeleting related data for ${guestUsers.length} guest users...`);
+    console.log(
+      `\nDeleting related data for ${guestUsers.length} guest users...`
+    );
 
     // Delete in order of dependencies (children first)
     // Using raw SQL with subqueries to handle tables without direct userId

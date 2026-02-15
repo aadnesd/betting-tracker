@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Loader2, X, Minus } from "lucide-react";
+import { Check, Loader2, Minus, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -37,7 +37,7 @@ function calculatePotentialPL(
   commissionRate = 0
 ): number {
   switch (outcome) {
-    case "won":
+    case "won": {
       // For back bet: win = stake × (odds - 1)
       // For lay bet: win = stake × (1 - commission) (backer loses stake, exchange takes commission)
       if (kind === "back") {
@@ -46,6 +46,7 @@ function calculatePotentialPL(
       // Lay bet win: profit minus commission
       const grossProfit = stake;
       return grossProfit * (1 - commissionRate);
+    }
     case "lost":
       // For back bet: lose stake
       // For lay bet: lose = stake × (odds - 1) (pay out winnings, no commission on losses)
@@ -94,7 +95,7 @@ export function BetSettlementDropdown({
 
       const pl = data.bet.profitLoss;
       const plFormatted = formatPL(pl, currency);
-      
+
       toast.success(`Bet settled: ${outcome}`, {
         description: `${selection} — P&L: ${plFormatted}`,
       });
@@ -109,13 +110,25 @@ export function BetSettlementDropdown({
     }
   };
 
-  const wonPL = calculatePotentialPL(betKind, "won", stake, odds, commissionRate);
-  const lostPL = calculatePotentialPL(betKind, "lost", stake, odds, commissionRate);
+  const wonPL = calculatePotentialPL(
+    betKind,
+    "won",
+    stake,
+    odds,
+    commissionRate
+  );
+  const lostPL = calculatePotentialPL(
+    betKind,
+    "lost",
+    stake,
+    odds,
+    commissionRate
+  );
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" disabled={isSettling}>
+        <Button disabled={isSettling} size="sm" variant="outline">
           {isSettling ? (
             <>
               <Loader2 className="mr-1 h-3 w-3 animate-spin" />
@@ -128,34 +141,38 @@ export function BetSettlementDropdown({
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <DropdownMenuItem
-          onClick={() => handleSettle("won")}
           className="flex items-center justify-between gap-4"
+          onClick={() => handleSettle("won")}
         >
           <span className="flex items-center gap-2">
             <Check className="h-4 w-4 text-emerald-600" />
             Won
           </span>
-          <span className="text-xs text-emerald-600">{formatPL(wonPL, currency)}</span>
+          <span className="text-emerald-600 text-xs">
+            {formatPL(wonPL, currency)}
+          </span>
         </DropdownMenuItem>
         <DropdownMenuItem
-          onClick={() => handleSettle("lost")}
           className="flex items-center justify-between gap-4"
+          onClick={() => handleSettle("lost")}
         >
           <span className="flex items-center gap-2">
             <X className="h-4 w-4 text-rose-600" />
             Lost
           </span>
-          <span className="text-xs text-rose-600">{formatPL(lostPL, currency)}</span>
+          <span className="text-rose-600 text-xs">
+            {formatPL(lostPL, currency)}
+          </span>
         </DropdownMenuItem>
         <DropdownMenuItem
-          onClick={() => handleSettle("push")}
           className="flex items-center justify-between gap-4"
+          onClick={() => handleSettle("push")}
         >
           <span className="flex items-center gap-2">
             <Minus className="h-4 w-4 text-muted-foreground" />
             Push
           </span>
-          <span className="text-xs text-muted-foreground">±0.00</span>
+          <span className="text-muted-foreground text-xs">±0.00</span>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

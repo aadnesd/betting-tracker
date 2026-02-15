@@ -1,11 +1,18 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import {
+  AlertTriangle,
+  Check,
+  Copy,
+  Key,
+  RefreshCw,
+  Trash2,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
-import { Copy, Key, Trash2, RefreshCw, Check, AlertTriangle } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { useCallback, useState } from "react";
 import { toast } from "@/components/toast";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 
 interface ApiKeyManagerProps {
   hasKey: boolean;
@@ -45,7 +52,8 @@ export function ApiKeyManager({ hasKey, hint, createdAt }: ApiKeyManagerProps) {
     } catch (error) {
       toast({
         type: "error",
-        description: error instanceof Error ? error.message : "Failed to generate key",
+        description:
+          error instanceof Error ? error.message : "Failed to generate key",
       });
     } finally {
       setIsGenerating(false);
@@ -53,7 +61,11 @@ export function ApiKeyManager({ hasKey, hint, createdAt }: ApiKeyManagerProps) {
   }, [router]);
 
   const handleRevoke = useCallback(async () => {
-    if (!confirm("Are you sure you want to revoke this API key? Any shortcuts using it will stop working.")) {
+    if (
+      !confirm(
+        "Are you sure you want to revoke this API key? Any shortcuts using it will stop working."
+      )
+    ) {
       return;
     }
 
@@ -76,7 +88,8 @@ export function ApiKeyManager({ hasKey, hint, createdAt }: ApiKeyManagerProps) {
     } catch (error) {
       toast({
         type: "error",
-        description: error instanceof Error ? error.message : "Failed to revoke key",
+        description:
+          error instanceof Error ? error.message : "Failed to revoke key",
       });
     } finally {
       setIsRevoking(false);
@@ -106,23 +119,24 @@ export function ApiKeyManager({ hasKey, hint, createdAt }: ApiKeyManagerProps) {
   if (newKey) {
     return (
       <div className="space-y-4">
-        <Alert variant="destructive" className="border-amber-500 bg-amber-50">
+        <Alert className="border-amber-500 bg-amber-50" variant="destructive">
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle className="text-amber-900">Save this key now!</AlertTitle>
           <AlertDescription className="text-amber-800">
-            This is the only time you'll see the full API key. Copy it and store it securely.
+            This is the only time you'll see the full API key. Copy it and store
+            it securely.
           </AlertDescription>
         </Alert>
 
         <div className="flex items-center gap-2">
-          <div className="flex-1 rounded-lg border bg-muted p-3 font-mono text-sm break-all">
+          <div className="flex-1 break-all rounded-lg border bg-muted p-3 font-mono text-sm">
             {newKey}
           </div>
           <Button
-            variant="outline"
-            size="icon"
-            onClick={handleCopy}
             className="flex-shrink-0"
+            onClick={handleCopy}
+            size="icon"
+            variant="outline"
           >
             {copied ? (
               <Check className="h-4 w-4 text-green-500" />
@@ -132,16 +146,16 @@ export function ApiKeyManager({ hasKey, hint, createdAt }: ApiKeyManagerProps) {
           </Button>
         </div>
 
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <div className="flex items-center gap-2 text-muted-foreground text-sm">
           <Key className="h-4 w-4" />
           <span>Created just now</span>
         </div>
 
         <Button
-          variant="destructive"
-          onClick={handleRevoke}
-          disabled={isRevoking}
           className="w-full sm:w-auto"
+          disabled={isRevoking}
+          onClick={handleRevoke}
+          variant="destructive"
         >
           {isRevoking ? (
             <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
@@ -160,11 +174,12 @@ export function ApiKeyManager({ hasKey, hint, createdAt }: ApiKeyManagerProps) {
       <div className="space-y-4">
         <div className="flex items-center gap-2">
           <div className="flex-1 rounded-lg border bg-muted p-3 font-mono text-sm">
-            {"•".repeat(56)}{hint}
+            {"•".repeat(56)}
+            {hint}
           </div>
         </div>
 
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <div className="flex items-center gap-2 text-muted-foreground text-sm">
           <Key className="h-4 w-4" />
           <span>
             Created{" "}
@@ -182,9 +197,9 @@ export function ApiKeyManager({ hasKey, hint, createdAt }: ApiKeyManagerProps) {
 
         <div className="flex flex-wrap gap-2">
           <Button
-            variant="destructive"
-            onClick={handleRevoke}
             disabled={isRevoking}
+            onClick={handleRevoke}
+            variant="destructive"
           >
             {isRevoking ? (
               <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
@@ -194,9 +209,9 @@ export function ApiKeyManager({ hasKey, hint, createdAt }: ApiKeyManagerProps) {
             Revoke Key
           </Button>
           <Button
-            variant="outline"
-            onClick={handleGenerate}
             disabled={isGenerating}
+            onClick={handleGenerate}
+            variant="outline"
           >
             {isGenerating ? (
               <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
@@ -214,11 +229,11 @@ export function ApiKeyManager({ hasKey, hint, createdAt }: ApiKeyManagerProps) {
   return (
     <div className="space-y-4">
       <p className="text-muted-foreground">
-        No API key has been generated yet. Generate one to start using iOS Shortcuts
-        for bet intake.
+        No API key has been generated yet. Generate one to start using iOS
+        Shortcuts for bet intake.
       </p>
 
-      <Button onClick={handleGenerate} disabled={isGenerating}>
+      <Button disabled={isGenerating} onClick={handleGenerate}>
         {isGenerating ? (
           <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
         ) : (

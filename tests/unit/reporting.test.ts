@@ -1,4 +1,5 @@
 import { describe, expect, test, vi } from "vitest";
+import type { BackBet, LayBet, MatchedBet } from "@/lib/db/schema";
 import {
   calculateCumulativeProfitData,
   calculateQualifyingLoss,
@@ -12,7 +13,6 @@ import {
   groupByWeek,
   type MatchedBetWithLegs,
 } from "@/lib/reporting";
-import type { BackBet, LayBet, MatchedBet } from "@/lib/db/schema";
 
 // FX conversion no longer used in reporting calculations (stored NOK values are used instead)
 

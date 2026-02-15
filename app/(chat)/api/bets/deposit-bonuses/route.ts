@@ -1,10 +1,10 @@
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/app/(auth)/auth";
 import {
   createDepositBonus,
-  listDepositBonusesByUser,
   getAccountById,
+  listDepositBonusesByUser,
 } from "@/lib/db/queries";
 
 const createDepositBonusSchema = z.object({
@@ -13,7 +13,9 @@ const createDepositBonusSchema = z.object({
   depositAmount: z.number().positive("Deposit amount must be positive"),
   bonusAmount: z.number().positive("Bonus amount must be positive"),
   currency: z.string().length(3),
-  wageringMultiplier: z.number().min(1, "Wagering multiplier must be at least 1"),
+  wageringMultiplier: z
+    .number()
+    .min(1, "Wagering multiplier must be at least 1"),
   wageringBase: z.enum(["deposit", "bonus", "deposit_plus_bonus"]),
   minOdds: z.number().min(1.01, "Minimum odds must be at least 1.01"),
   maxBetPercent: z.number().min(1).max(100).optional().nullable(),
@@ -45,10 +47,7 @@ export async function POST(request: NextRequest) {
     // Verify account belongs to user and is a bookmaker
     const account = await getAccountById({ id: parsed.data.accountId, userId });
     if (!account) {
-      return NextResponse.json(
-        { error: "Account not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "Account not found" }, { status: 404 });
     }
 
     if (account.kind !== "bookmaker") {

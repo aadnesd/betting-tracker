@@ -5,12 +5,11 @@
  * Run with: HOME=$PWD/.home pnpm exec tsx scripts/backfill-nok-values.ts
  */
 import { config } from "dotenv";
-import { drizzle } from "drizzle-orm/postgres-js";
 import { eq, isNull, or } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-
-import { convertAmountToNok } from "../lib/fx-rates";
 import { backBet, layBet } from "../lib/db/schema";
+import { convertAmountToNok } from "../lib/fx-rates";
 
 config({ path: ".env.local" });
 
@@ -64,7 +63,8 @@ async function backfillTable<T extends typeof backBet | typeof layBet>({
           .update(table)
           .set({
             stakeNok: stakeNok.toFixed(2),
-            profitLossNok: profitLossNok === null ? null : profitLossNok.toFixed(2),
+            profitLossNok:
+              profitLossNok === null ? null : profitLossNok.toFixed(2),
             // biome-ignore lint/suspicious/noExplicitAny: Generic table type requires type assertion
           } as any)
           .where(eq(table.id, row.id));

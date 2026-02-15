@@ -76,20 +76,20 @@ export function CalculationTooltip({
       <Tooltip>
         <TooltipTrigger asChild>
           <button
-            type="button"
-            className={`inline-flex items-center text-muted-foreground hover:text-foreground transition-colors ${className}`}
             aria-label={`Learn about ${explanation.title}`}
+            className={`inline-flex items-center text-muted-foreground transition-colors hover:text-foreground ${className}`}
+            type="button"
           >
             <HelpCircle className="h-3.5 w-3.5" />
           </button>
         </TooltipTrigger>
-        <TooltipContent side={side} className="max-w-xs">
+        <TooltipContent className="max-w-xs" side={side}>
           <div className="space-y-1">
-            <span className="font-medium block">{explanation.title}</span>
-            <span className="font-mono text-xs text-muted-foreground block">
+            <span className="block font-medium">{explanation.title}</span>
+            <span className="block font-mono text-muted-foreground text-xs">
               {explanation.formula}
             </span>
-            <span className="text-xs block">{explanation.description}</span>
+            <span className="block text-xs">{explanation.description}</span>
           </div>
         </TooltipContent>
       </Tooltip>
@@ -116,7 +116,7 @@ export function ValueWithTooltip({
   return (
     <span className={`inline-flex items-center gap-1 ${className}`}>
       {children}
-      <CalculationTooltip type={type} side={side} />
+      <CalculationTooltip side={side} type={type} />
     </span>
   );
 }

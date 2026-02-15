@@ -52,7 +52,9 @@ export function ScreenshotIntakeForm({
     lay?: ScreenshotRecord;
   }>({});
   // Use Record<string, unknown> instead of unknown to satisfy React's type system
-  const [parsedData, setParsedData] = useState<Record<string, unknown> | null>(null);
+  const [parsedData, setParsedData] = useState<Record<string, unknown> | null>(
+    null
+  );
 
   const bothImagesReady = backFile !== null && layFile !== null;
   const singleImageReady = (backFile !== null) !== (layFile !== null);
@@ -195,7 +197,9 @@ export function ScreenshotIntakeForm({
       setParsedData(parsed);
       setUploadState("success");
 
-      toast.success(`Draft ${kind} bet parsed. Add the other leg to complete the matched bet.`);
+      toast.success(
+        `Draft ${kind} bet parsed. Add the other leg to complete the matched bet.`
+      );
 
       // Navigate to review or handle via callback
       if (onParseComplete) {
@@ -248,20 +252,20 @@ export function ScreenshotIntakeForm({
         {/* Paste zones side by side on desktop, stacked on mobile */}
         <div className="grid gap-4 md:grid-cols-2">
           <PasteZone
+            disabled={isProcessing}
+            file={backFile}
+            isLoading={isProcessing}
             kind="back"
             label="Back Bet (Bookmaker)"
-            file={backFile}
             onImageChange={handleImageChange}
-            isLoading={isProcessing}
-            disabled={isProcessing}
           />
           <PasteZone
+            disabled={isProcessing}
+            file={layFile}
+            isLoading={isProcessing}
             kind="lay"
             label="Lay Bet (Exchange)"
-            file={layFile}
             onImageChange={handleImageChange}
-            isLoading={isProcessing}
-            disabled={isProcessing}
           />
         </div>
 
@@ -303,15 +307,20 @@ export function ScreenshotIntakeForm({
           {/* Manual actions */}
           <div className="flex flex-wrap items-center gap-2">
             {/* Parse button for both images (if auto-parse didn't trigger or failed) */}
-            {bothImagesReady && (uploadState === "idle" || uploadState === "error") && (
-              <Button onClick={uploadAndParse} disabled={isProcessing}>
-                Upload & Parse
-              </Button>
-            )}
+            {bothImagesReady &&
+              (uploadState === "idle" || uploadState === "error") && (
+                <Button disabled={isProcessing} onClick={uploadAndParse}>
+                  Upload & Parse
+                </Button>
+              )}
 
             {/* Draft button for single image */}
             {singleImageReady && uploadState === "idle" && (
-              <Button onClick={createDraft} variant="outline" disabled={isProcessing}>
+              <Button
+                disabled={isProcessing}
+                onClick={createDraft}
+                variant="outline"
+              >
                 Parse as Draft
               </Button>
             )}
@@ -319,9 +328,9 @@ export function ScreenshotIntakeForm({
             {/* Reset button when there's content */}
             {(backFile || layFile || uploadState !== "idle") && (
               <Button
+                disabled={isProcessing}
                 onClick={handleReset}
                 variant="ghost"
-                disabled={isProcessing}
               >
                 Clear & Start Over
               </Button>

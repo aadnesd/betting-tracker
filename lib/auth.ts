@@ -1,5 +1,5 @@
-import type { Session } from "next-auth";
 import { headers } from "next/headers";
+import type { Session } from "next-auth";
 import { auth } from "@/app/(auth)/auth";
 import { isTestEnvironment } from "@/lib/constants";
 

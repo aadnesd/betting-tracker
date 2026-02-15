@@ -11,8 +11,8 @@ import {
   YAxis,
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatNOK } from "@/lib/reporting";
 import type { ExposureDataPoint } from "@/lib/db/queries";
+import { formatNOK } from "@/lib/reporting";
 
 type ExposureTimelineChartProps = {
   data: ExposureDataPoint[];
@@ -25,7 +25,11 @@ function CustomTooltip({
   payload,
 }: {
   active?: boolean;
-  payload?: Array<{ value: number; dataKey: string; payload: ExposureDataPoint }>;
+  payload?: Array<{
+    value: number;
+    dataKey: string;
+    payload: ExposureDataPoint;
+  }>;
   label?: string;
 }) {
   if (!active || !payload || payload.length === 0) {
@@ -40,17 +44,26 @@ function CustomTooltip({
       <div className="mt-2 space-y-1 text-sm">
         <p className="text-muted-foreground">
           Exposure:{" "}
-          <span className={dataPoint.exposure > 0 ? "text-amber-600" : "text-green-600"}>
+          <span
+            className={
+              dataPoint.exposure > 0 ? "text-amber-600" : "text-green-600"
+            }
+          >
             {formatNOK(dataPoint.exposure)}
           </span>
         </p>
         <p className="text-muted-foreground">
-          Open positions: <span className="text-foreground">{dataPoint.openPositions}</span>
+          Open positions:{" "}
+          <span className="text-foreground">{dataPoint.openPositions}</span>
         </p>
         {dataPoint.change !== 0 && (
           <p className="text-muted-foreground">
             Change:{" "}
-            <span className={dataPoint.change > 0 ? "text-amber-600" : "text-green-600"}>
+            <span
+              className={
+                dataPoint.change > 0 ? "text-amber-600" : "text-green-600"
+              }
+            >
               {dataPoint.change > 0 ? "+" : ""}
               {formatNOK(dataPoint.change)}
             </span>
@@ -94,7 +107,8 @@ export function ExposureTimelineChart({
   const yMax = Math.ceil(maxValue + padding);
 
   // Get the current exposure value (last data point or provided value)
-  const displayedCurrentExposure = currentExposure ?? data[data.length - 1]?.exposure ?? 0;
+  const displayedCurrentExposure =
+    currentExposure ?? data[data.length - 1]?.exposure ?? 0;
 
   return (
     <Card>
@@ -111,40 +125,59 @@ export function ExposureTimelineChart({
       </CardHeader>
       <CardContent>
         <div className="h-64 w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+          <ResponsiveContainer height="100%" width="100%">
+            <AreaChart
+              data={data}
+              margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
+            >
               <defs>
-                <linearGradient id="exposureGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={gradientColor} stopOpacity={0.3} />
-                  <stop offset="95%" stopColor={gradientColor} stopOpacity={0} />
+                <linearGradient
+                  id="exposureGradient"
+                  x1="0"
+                  x2="0"
+                  y1="0"
+                  y2="1"
+                >
+                  <stop
+                    offset="5%"
+                    stopColor={gradientColor}
+                    stopOpacity={0.3}
+                  />
+                  <stop
+                    offset="95%"
+                    stopColor={gradientColor}
+                    stopOpacity={0}
+                  />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+              <CartesianGrid className="stroke-muted" strokeDasharray="3 3" />
               <XAxis
-                dataKey="label"
-                tick={{ fontSize: 12 }}
-                tickLine={false}
                 axisLine={false}
                 className="text-muted-foreground"
+                dataKey="label"
                 interval="preserveStartEnd"
-              />
-              <YAxis
                 tick={{ fontSize: 12 }}
                 tickLine={false}
+              />
+              <YAxis
                 axisLine={false}
                 className="text-muted-foreground"
                 domain={[yMin, yMax]}
-                tickFormatter={(value) => `${value >= 1000 ? `${(value / 1000).toFixed(0)}k` : value}`}
+                tick={{ fontSize: 12 }}
+                tickFormatter={(value) =>
+                  `${value >= 1000 ? `${(value / 1000).toFixed(0)}k` : value}`
+                }
+                tickLine={false}
               />
               <Tooltip content={<CustomTooltip />} />
               <Area
-                type="monotone"
+                activeDot={{ r: 4, strokeWidth: 2 }}
                 dataKey="exposure"
+                dot={false}
+                fill="url(#exposureGradient)"
                 stroke={strokeColor}
                 strokeWidth={2}
-                fill="url(#exposureGradient)"
-                dot={false}
-                activeDot={{ r: 4, strokeWidth: 2 }}
+                type="monotone"
               />
             </AreaChart>
           </ResponsiveContainer>
@@ -183,7 +216,11 @@ export function ExposureTimelineWithControls({
   };
 
   const data = dataMap[days];
-  const hasData = data7.length > 0 || data14.length > 0 || data30.length > 0 || data90.length > 0;
+  const hasData =
+    data7.length > 0 ||
+    data14.length > 0 ||
+    data30.length > 0 ||
+    data90.length > 0;
 
   if (!hasData) {
     return (
@@ -213,7 +250,8 @@ export function ExposureTimelineWithControls({
   const yMax = Math.ceil(maxValue + padding);
 
   // Get the current exposure value
-  const displayedCurrentExposure = currentExposure ?? data[data.length - 1]?.exposure ?? 0;
+  const displayedCurrentExposure =
+    currentExposure ?? data[data.length - 1]?.exposure ?? 0;
 
   const daysOptions: { value: DaysOption; label: string }[] = [
     { value: 7, label: "7d" },
@@ -239,14 +277,14 @@ export function ExposureTimelineWithControls({
         <div className="flex gap-1">
           {daysOptions.map((option) => (
             <button
-              key={option.value}
-              type="button"
-              onClick={() => setDays(option.value)}
-              className={`rounded-md px-3 py-1 text-sm font-medium transition-colors ${
+              className={`rounded-md px-3 py-1 font-medium text-sm transition-colors ${
                 days === option.value
                   ? "bg-primary text-primary-foreground"
                   : "bg-muted text-muted-foreground hover:bg-muted/80"
               }`}
+              key={option.value}
+              onClick={() => setDays(option.value)}
+              type="button"
             >
               {option.label}
             </button>
@@ -255,40 +293,59 @@ export function ExposureTimelineWithControls({
       </CardHeader>
       <CardContent>
         <div className="h-64 w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+          <ResponsiveContainer height="100%" width="100%">
+            <AreaChart
+              data={data}
+              margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
+            >
               <defs>
-                <linearGradient id="exposureGradientCtrl" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={gradientColor} stopOpacity={0.3} />
-                  <stop offset="95%" stopColor={gradientColor} stopOpacity={0} />
+                <linearGradient
+                  id="exposureGradientCtrl"
+                  x1="0"
+                  x2="0"
+                  y1="0"
+                  y2="1"
+                >
+                  <stop
+                    offset="5%"
+                    stopColor={gradientColor}
+                    stopOpacity={0.3}
+                  />
+                  <stop
+                    offset="95%"
+                    stopColor={gradientColor}
+                    stopOpacity={0}
+                  />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+              <CartesianGrid className="stroke-muted" strokeDasharray="3 3" />
               <XAxis
-                dataKey="label"
-                tick={{ fontSize: 12 }}
-                tickLine={false}
                 axisLine={false}
                 className="text-muted-foreground"
+                dataKey="label"
                 interval="preserveStartEnd"
-              />
-              <YAxis
                 tick={{ fontSize: 12 }}
                 tickLine={false}
+              />
+              <YAxis
                 axisLine={false}
                 className="text-muted-foreground"
                 domain={[yMin, yMax]}
-                tickFormatter={(value) => `${value >= 1000 ? `${(value / 1000).toFixed(0)}k` : value}`}
+                tick={{ fontSize: 12 }}
+                tickFormatter={(value) =>
+                  `${value >= 1000 ? `${(value / 1000).toFixed(0)}k` : value}`
+                }
+                tickLine={false}
               />
               <Tooltip content={<CustomTooltip />} />
               <Area
-                type="monotone"
+                activeDot={{ r: 4, strokeWidth: 2 }}
                 dataKey="exposure"
+                dot={false}
+                fill="url(#exposureGradientCtrl)"
                 stroke={strokeColor}
                 strokeWidth={2}
-                fill="url(#exposureGradientCtrl)"
-                dot={false}
-                activeDot={{ r: 4, strokeWidth: 2 }}
+                type="monotone"
               />
             </AreaChart>
           </ResponsiveContainer>

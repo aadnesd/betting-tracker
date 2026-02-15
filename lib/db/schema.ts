@@ -371,7 +371,9 @@ export const freeBetWageringBet = pgTable("FreeBetWageringBet", {
   matchedBetId: uuid("matchedBetId").references(() => matchedBet.id),
   stake: numeric("stake", { precision: 14, scale: 2 }).notNull(),
   odds: numeric("odds", { precision: 12, scale: 4 }).notNull(),
-  qualified: varchar("qualified", { enum: ["true", "false"] as const }).notNull(),
+  qualified: varchar("qualified", {
+    enum: ["true", "false"] as const,
+  }).notNull(),
 });
 
 export type FreeBetWageringBet = InferSelectModel<typeof freeBetWageringBet>;
@@ -554,7 +556,10 @@ export const balanceSnapshot = pgTable("BalanceSnapshot", {
     .notNull()
     .references(() => user.id),
   // Total capital in NOK at the time of snapshot
-  totalCapitalNok: numeric("totalCapitalNok", { precision: 20, scale: 2 }).notNull(),
+  totalCapitalNok: numeric("totalCapitalNok", {
+    precision: 20,
+    scale: 2,
+  }).notNull(),
   // Optional breakdown for debugging/analysis
   accountsNok: numeric("accountsNok", { precision: 20, scale: 2 }),
   walletsNok: numeric("walletsNok", { precision: 20, scale: 2 }),
@@ -567,7 +572,12 @@ export type BalanceSnapshot = InferSelectModel<typeof balanceSnapshot>;
  * Unlike free bets which are immediately usable, deposit bonuses require wagering to clear.
  * Why: Users need to track wagering progress to know when bonus funds become withdrawable.
  */
-const depositBonusStatusEnum = ["active", "cleared", "forfeited", "expired"] as const;
+const depositBonusStatusEnum = [
+  "active",
+  "cleared",
+  "forfeited",
+  "expired",
+] as const;
 const wageringBaseEnum = ["deposit", "bonus", "deposit_plus_bonus"] as const;
 
 export const depositBonus = pgTable("DepositBonus", {
@@ -581,26 +591,41 @@ export const depositBonus = pgTable("DepositBonus", {
     .references(() => account.id),
   name: text("name").notNull(),
   // The deposit amount that triggered the bonus
-  depositAmount: numeric("depositAmount", { precision: 14, scale: 2 }).notNull(),
+  depositAmount: numeric("depositAmount", {
+    precision: 14,
+    scale: 2,
+  }).notNull(),
   // The bonus amount received
   bonusAmount: numeric("bonusAmount", { precision: 14, scale: 2 }).notNull(),
   currency: varchar("currency", { length: 3 }).notNull(),
   // Wagering multiplier (e.g., 6 for 6x)
-  wageringMultiplier: numeric("wageringMultiplier", { precision: 6, scale: 2 }).notNull(),
+  wageringMultiplier: numeric("wageringMultiplier", {
+    precision: 6,
+    scale: 2,
+  }).notNull(),
   // What the multiplier applies to
   wageringBase: varchar("wageringBase", { enum: wageringBaseEnum }).notNull(),
   // Total amount to wager (computed from base × multiplier, stored for convenience)
-  wageringRequirement: numeric("wageringRequirement", { precision: 14, scale: 2 }).notNull(),
+  wageringRequirement: numeric("wageringRequirement", {
+    precision: 14,
+    scale: 2,
+  }).notNull(),
   // Amount wagered so far
-  wageringProgress: numeric("wageringProgress", { precision: 14, scale: 2 }).notNull().default("0"),
+  wageringProgress: numeric("wageringProgress", { precision: 14, scale: 2 })
+    .notNull()
+    .default("0"),
   // Minimum odds for bets to count toward wagering
   minOdds: numeric("minOdds", { precision: 12, scale: 4 }).notNull(),
   // Max bet as % of bonus (optional, e.g., 25 = max bet 250 on 1000 bonus)
   maxBetPercent: numeric("maxBetPercent", { precision: 5, scale: 2 }),
   expiresAt: timestamp("expiresAt"),
-  status: varchar("status", { enum: depositBonusStatusEnum }).notNull().default("active"),
+  status: varchar("status", { enum: depositBonusStatusEnum })
+    .notNull()
+    .default("active"),
   // Link to the deposit transaction that triggered this bonus
-  linkedTransactionId: uuid("linkedTransactionId").references(() => accountTransaction.id),
+  linkedTransactionId: uuid("linkedTransactionId").references(
+    () => accountTransaction.id
+  ),
   // When wagering was completed
   clearedAt: timestamp("clearedAt"),
   notes: text("notes"),
@@ -628,7 +653,9 @@ export const bonusQualifyingBet = pgTable("BonusQualifyingBet", {
   // The odds of the bet
   odds: numeric("odds", { precision: 12, scale: 4 }).notNull(),
   // Whether this bet met the minimum odds requirement
-  qualified: varchar("qualified", { enum: ["true", "false"] as const }).notNull(),
+  qualified: varchar("qualified", {
+    enum: ["true", "false"] as const,
+  }).notNull(),
 });
 
 export type BonusQualifyingBet = InferSelectModel<typeof bonusQualifyingBet>;

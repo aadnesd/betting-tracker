@@ -175,7 +175,9 @@ export function MatchedBetDetailActions({
       router.refresh();
     } catch (error) {
       console.error(error);
-      toast.error(error instanceof Error ? error.message : "Recalculation failed");
+      toast.error(
+        error instanceof Error ? error.message : "Recalculation failed"
+      );
     } finally {
       setIsRecalculating(false);
     }
@@ -189,8 +191,11 @@ export function MatchedBetDetailActions({
       <CardContent className="space-y-4">
         {/* Status select */}
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <label className="min-w-24 text-sm font-medium">Status</label>
-          <Select value={status} onValueChange={(v) => handleStatusChange(v as MatchedBetStatus)}>
+          <label className="min-w-24 font-medium text-sm">Status</label>
+          <Select
+            onValueChange={(v) => handleStatusChange(v as MatchedBetStatus)}
+            value={status}
+          >
             <SelectTrigger className="w-48">
               <SelectValue />
             </SelectTrigger>
@@ -205,11 +210,11 @@ export function MatchedBetDetailActions({
 
         {/* Notes input */}
         <div className="space-y-2">
-          <label className="text-sm font-medium">Add note (optional)</label>
+          <label className="font-medium text-sm">Add note (optional)</label>
           <Textarea
+            onChange={(e) => setNotes(e.target.value)}
             placeholder="Add a note to accompany this action..."
             value={notes}
-            onChange={(e) => setNotes(e.target.value)}
           />
         </div>
 
@@ -258,13 +263,13 @@ export function MatchedBetDetailActions({
 
           {/* Delete button with confirmation */}
           <DeleteConfirmDialog
-            title="Delete matched bet?"
             description="This action cannot be undone. The matched bet will be permanently deleted."
-            onConfirm={handleDelete}
             destructiveLabel="Delete"
-            showCascadeOption={hasBothLegs}
-            onCascadeChange={setCascadeDelete}
             disabled={isSaving}
+            onCascadeChange={setCascadeDelete}
+            onConfirm={handleDelete}
+            showCascadeOption={hasBothLegs}
+            title="Delete matched bet?"
           />
         </div>
 

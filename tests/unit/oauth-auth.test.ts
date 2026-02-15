@@ -64,9 +64,11 @@ describe("OAuth auth helpers", () => {
     mockDb.select.mockImplementation(() => mockSelect([]));
     mockDb.update.mockImplementation(() => mockUpdateReturning([]));
     mockDb.insert.mockImplementation(() => mockInsertReturning([]));
-    mockDb.transaction.mockImplementation(async (callback: (tx: typeof mockTx) => Promise<void>) => {
-      await callback(mockTx);
-    });
+    mockDb.transaction.mockImplementation(
+      async (callback: (tx: typeof mockTx) => Promise<void>) => {
+        await callback(mockTx);
+      }
+    );
   });
 
   it("exposes findOrCreateOAuthUser helper", () => {

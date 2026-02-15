@@ -5,9 +5,9 @@ interface XlsxSheetInput {
   rows: CellValue[][];
 }
 
-const ZIP_LOCAL_FILE_SIGNATURE = 0x04034b50;
-const ZIP_CENTRAL_DIRECTORY_SIGNATURE = 0x02014b50;
-const ZIP_END_OF_CENTRAL_DIRECTORY_SIGNATURE = 0x06054b50;
+const ZIP_LOCAL_FILE_SIGNATURE = 0x04_03_4b_50;
+const ZIP_CENTRAL_DIRECTORY_SIGNATURE = 0x02_01_4b_50;
+const ZIP_END_OF_CENTRAL_DIRECTORY_SIGNATURE = 0x06_05_4b_50;
 
 const CRC32_TABLE = new Uint32Array(256);
 let crcTableReady = false;
@@ -17,7 +17,7 @@ function ensureCrcTable() {
   for (let i = 0; i < 256; i += 1) {
     let c = i;
     for (let j = 0; j < 8; j += 1) {
-      c = (c & 1) !== 0 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+      c = (c & 1) !== 0 ? 0xed_b8_83_20 ^ (c >>> 1) : c >>> 1;
     }
     CRC32_TABLE[i] = c >>> 0;
   }
@@ -26,15 +26,15 @@ function ensureCrcTable() {
 
 function crc32(buffer: Buffer) {
   ensureCrcTable();
-  let crc = 0xffffffff;
+  let crc = 0xff_ff_ff_ff;
   for (const byte of buffer) {
     crc = CRC32_TABLE[(crc ^ byte) & 0xff] ^ (crc >>> 8);
   }
-  return (crc ^ 0xffffffff) >>> 0;
+  return (crc ^ 0xff_ff_ff_ff) >>> 0;
 }
 
 function sanitizeSheetName(name: string) {
-  const cleaned = name.replace(/[\[\]:\*\?\/\\]/g, " ").trim();
+  const cleaned = name.replace(/[[\]:*?/\\]/g, " ").trim();
   if (!cleaned) return "Sheet1";
   return cleaned.slice(0, 31);
 }
@@ -55,7 +55,7 @@ function escapeXml(value: string) {
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
-    .replace(/\"/g, "&quot;");
+    .replace(/"/g, "&quot;");
 }
 
 function buildSheetXml(rows: CellValue[][]) {

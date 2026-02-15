@@ -24,7 +24,10 @@ export function CompetitionSelector({
   const [enabled, setEnabled] = useState<Set<string>>(new Set(initialEnabled));
   const [saving, setSaving] = useState(false);
   const [resetting, setResetting] = useState(false);
-  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [message, setMessage] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
 
   // Group competitions by country/region
   const grouped = available.reduce(
@@ -97,7 +100,8 @@ export function CompetitionSelector({
     } catch (err) {
       setMessage({
         type: "error",
-        text: err instanceof Error ? err.message : "Failed to save competitions",
+        text:
+          err instanceof Error ? err.message : "Failed to save competitions",
       });
     } finally {
       setSaving(false);
@@ -131,7 +135,7 @@ export function CompetitionSelector({
     }
   };
 
-  const hasChanges = 
+  const hasChanges =
     enabled.size !== initialEnabled.length ||
     !initialEnabled.every((c) => enabled.has(c));
 
@@ -139,17 +143,17 @@ export function CompetitionSelector({
     <div className="space-y-6">
       {/* Actions */}
       <div className="flex flex-wrap items-center gap-2">
-        <Button variant="outline" size="sm" onClick={selectAll}>
+        <Button onClick={selectAll} size="sm" variant="outline">
           Select All
         </Button>
-        <Button variant="outline" size="sm" onClick={selectNone}>
+        <Button onClick={selectNone} size="sm" variant="outline">
           Select None
         </Button>
         <Button
-          variant="ghost"
-          size="sm"
-          onClick={handleReset}
           disabled={resetting}
+          onClick={handleReset}
+          size="sm"
+          variant="ghost"
         >
           {resetting ? "Resetting..." : "Reset to Defaults"}
         </Button>
@@ -165,22 +169,22 @@ export function CompetitionSelector({
                 const isDefault = defaults.includes(comp.code);
                 return (
                   <div
-                    key={comp.code}
                     className="flex items-start gap-3 rounded-md border p-3"
+                    key={comp.code}
                   >
                     <Checkbox
-                      id={`comp-${comp.code}`}
                       checked={enabled.has(comp.code)}
+                      id={`comp-${comp.code}`}
                       onCheckedChange={() => toggleCompetition(comp.code)}
                     />
                     <div className="flex-1">
                       <Label
-                        htmlFor={`comp-${comp.code}`}
                         className="cursor-pointer font-medium"
+                        htmlFor={`comp-${comp.code}`}
                       >
                         {comp.name}
                       </Label>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <div className="flex items-center gap-2 text-muted-foreground text-xs">
                         <span className="font-mono">{comp.code}</span>
                         {isDefault && (
                           <span className="rounded-full bg-blue-100 px-1.5 py-0.5 text-blue-700">
@@ -212,11 +216,11 @@ export function CompetitionSelector({
 
       {/* Save Button */}
       <div className="flex items-center gap-3 border-t pt-4">
-        <Button onClick={handleSave} disabled={saving || enabled.size === 0}>
+        <Button disabled={saving || enabled.size === 0} onClick={handleSave}>
           {saving ? "Saving..." : "Save Changes"}
         </Button>
         {hasChanges && (
-          <span className="text-sm text-muted-foreground">
+          <span className="text-muted-foreground text-sm">
             {enabled.size} competition{enabled.size !== 1 ? "s" : ""} selected
           </span>
         )}

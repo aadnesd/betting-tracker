@@ -61,15 +61,21 @@ export async function POST(
 
   try {
     let transaction;
-    
+
     // If wallet is specified for deposit/withdrawal, create linked transactions
-    if (body.walletId && (body.type === "deposit" || body.type === "withdrawal")) {
+    if (
+      body.walletId &&
+      (body.type === "deposit" || body.type === "withdrawal")
+    ) {
       // Verify wallet exists and belongs to user
       const wallet = await getWalletById(body.walletId);
       if (!wallet || wallet.userId !== session.user.id) {
-        return NextResponse.json({ error: "Wallet not found" }, { status: 404 });
+        return NextResponse.json(
+          { error: "Wallet not found" },
+          { status: 404 }
+        );
       }
-      
+
       if (body.type === "deposit") {
         // Deposit = money FROM wallet TO account
         const result = await createTransferToAccount({
@@ -167,7 +173,9 @@ export async function GET(
 
   const { searchParams } = new URL(request.url);
   const limitParam = searchParams.get("limit");
-  const limit = limitParam ? Math.min(Number.parseInt(limitParam, 10), 500) : 100;
+  const limit = limitParam
+    ? Math.min(Number.parseInt(limitParam, 10), 500)
+    : 100;
 
   try {
     const transactions = await listTransactionsByAccount({

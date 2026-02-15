@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { type ComponentProps, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { BetStatusBadge } from "@/components/bets/bet-status-badge";
-import { MatchPicker, type MatchOption } from "@/components/bets/match-picker";
+import { type MatchOption, MatchPicker } from "@/components/bets/match-picker";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -25,10 +25,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import {
-  applyAccountSelection,
-  type AccountOption,
-} from "@/lib/bet-accounts";
+import { type AccountOption, applyAccountSelection } from "@/lib/bet-accounts";
 import type { ParsedPair } from "@/lib/bet-parser";
 import { cn } from "@/lib/utils";
 
@@ -156,7 +153,7 @@ export function BetReviewForm({
       <div className="space-y-4">
         {/* Back button */}
         {onBack && (
-          <Button variant="ghost" size="sm" onClick={onBack} className="gap-1">
+          <Button className="gap-1" onClick={onBack} size="sm" variant="ghost">
             <ArrowLeft className="h-4 w-4" />
             Upload different screenshots
           </Button>
@@ -207,8 +204,8 @@ export function BetReviewForm({
               <Label>Linked match (optional)</Label>
               <MatchPicker
                 onChange={handleMatchChange}
-                value={parsed.matchId ?? null}
                 placeholder="Search for a football match to link"
+                value={parsed.matchId ?? null}
               />
               {parsed.matchId ? (
                 <div className="flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-emerald-800 text-sm">
@@ -224,9 +221,9 @@ export function BetReviewForm({
                 </div>
               ) : parsed.matchCandidates && parsed.matchCandidates > 0 ? (
                 <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-amber-800 text-sm">
-                  We found {parsed.matchCandidates} candidate matches but did not
-                  link one automatically. Please choose the correct match above
-                  if applicable.
+                  We found {parsed.matchCandidates} candidate matches but did
+                  not link one automatically. Please choose the correct match
+                  above if applicable.
                 </div>
               ) : null}
             </div>
@@ -252,7 +249,10 @@ export function BetReviewForm({
                 className="h-4 w-4 accent-amber-500"
                 id="needs-review-toggle"
                 onChange={(e) =>
-                  setParsed((prev) => ({ ...prev, needsReview: e.target.checked }))
+                  setParsed((prev) => ({
+                    ...prev,
+                    needsReview: e.target.checked,
+                  }))
                 }
                 type="checkbox"
               />
@@ -264,9 +264,7 @@ export function BetReviewForm({
               allowCurrencyEdit
               label="Back bet"
               onAddAccount={handleAddAccount}
-              onChange={(val) =>
-                setParsed((prev) => ({ ...prev, back: val }))
-              }
+              onChange={(val) => setParsed((prev) => ({ ...prev, back: val }))}
               value={parsed.back}
             />
             <BetFields
@@ -275,9 +273,7 @@ export function BetReviewForm({
               allowCurrencyEdit
               label="Lay bet"
               onAddAccount={handleAddAccount}
-              onChange={(val) =>
-                setParsed((prev) => ({ ...prev, lay: val }))
-              }
+              onChange={(val) => setParsed((prev) => ({ ...prev, lay: val }))}
               value={parsed.lay}
             />
             <div className="rounded-md border bg-muted/50 p-3 text-sm">
@@ -294,10 +290,10 @@ export function BetReviewForm({
               )}
             </div>
             <Button
+              className="w-full"
               disabled={isSaving}
               onClick={handleSave}
               variant="default"
-              className="w-full"
             >
               {isSaving ? "Saving..." : "Accept & Save Matched Bet"}
             </Button>

@@ -3,14 +3,14 @@ import { z } from "zod";
 import { getTestAwareSession } from "@/lib/auth";
 import type { ParsedBet, ParsedPair } from "@/lib/bet-parser";
 import {
+  isOcrConfigured,
   parseMatchedBetFromScreenshots,
   parseMatchedBetWithOcr,
-  isOcrConfigured,
 } from "@/lib/bet-parser";
 import {
-  parseMatchedBetWithAgent,
   type AgentAccount,
   type AgentParsedPair,
+  parseMatchedBetWithAgent,
 } from "@/lib/bet-parser-agent";
 import { evaluateNeedsReview } from "@/lib/bet-review";
 import {
@@ -124,7 +124,10 @@ export async function POST(request: Request) {
   timer.mark("fetchScreenshots");
 
   if (!backShot || !layShot) {
-    return NextResponse.json({ error: "Screenshots not found" }, { status: 404 });
+    return NextResponse.json(
+      { error: "Screenshots not found" },
+      { status: 404 }
+    );
   }
 
   try {
@@ -147,7 +150,7 @@ export async function POST(request: Request) {
     // Fall back to legacy parsers when OCR is not available
     console.log(
       `[bets/autoparse] Using ${useOcr ? (hasAccounts ? "Agent + OCR" : "OCR + LLM") : "Vision LLM"} approach ` +
-      `(${agentAccounts.length} accounts)`
+        `(${agentAccounts.length} accounts)`
     );
 
     let enrichedBack: ParsedBet;
@@ -175,8 +178,16 @@ export async function POST(request: Request) {
       });
       parsed = ocrResult;
       // No accounts exist, so no matching needed
-      enrichedBack = { ...ocrResult.back, accountId: null, unmatchedAccount: true };
-      enrichedLay = { ...ocrResult.lay, accountId: null, unmatchedAccount: true };
+      enrichedBack = {
+        ...ocrResult.back,
+        accountId: null,
+        unmatchedAccount: true,
+      };
+      enrichedLay = {
+        ...ocrResult.lay,
+        accountId: null,
+        unmatchedAccount: true,
+      };
       timer.mark(
         `aiParsing (OCR: ${ocrResult.ocrDurationMs}ms, LLM: ${ocrResult.llmDurationMs}ms)`
       );
@@ -228,7 +239,7 @@ export async function POST(request: Request) {
       if (matchLinkResult.matchId) {
         console.log(
           `[bets/autoparse] Linked to match ${matchLinkResult.matchId} ` +
-          `(confidence: ${matchLinkResult.matchConfidence}, candidates: ${matchLinkResult.matchCandidates})`
+            `(confidence: ${matchLinkResult.matchConfidence}, candidates: ${matchLinkResult.matchCandidates})`
         );
       } else if (matchLinkResult.matchCandidates > 0) {
         console.log(

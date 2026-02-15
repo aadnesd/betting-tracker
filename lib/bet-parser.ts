@@ -4,7 +4,7 @@ import { myProvider } from "@/lib/ai/providers";
 import { isTestEnvironment } from "@/lib/constants";
 
 // Re-export OCR-based parser for use when Azure is configured
-export { parseMatchedBetWithOcr, isOcrConfigured } from "@/lib/bet-parser-ocr";
+export { isOcrConfigured, parseMatchedBetWithOcr } from "@/lib/bet-parser-ocr";
 
 export type ParsedBet = {
   type: "back" | "lay";
@@ -108,7 +108,9 @@ async function callModelWithRetry(params: {
 
       const pair = pairSchema.parse(object);
       const attemptMs = Date.now() - attemptStart;
-      console.log(`[bet-parser] AI model call attempt ${i + 1} completed in ${attemptMs}ms`);
+      console.log(
+        `[bet-parser] AI model call attempt ${i + 1} completed in ${attemptMs}ms`
+      );
       return {
         ...pair,
         back: normalizeNumbers(pair.back),
@@ -116,7 +118,9 @@ async function callModelWithRetry(params: {
       };
     } catch (err) {
       const attemptMs = Date.now() - attemptStart;
-      console.log(`[bet-parser] AI model call attempt ${i + 1} failed after ${attemptMs}ms`);
+      console.log(
+        `[bet-parser] AI model call attempt ${i + 1} failed after ${attemptMs}ms`
+      );
       lastError = err;
     }
   }
@@ -194,12 +198,8 @@ export async function parseMatchedBetFromScreenshots({
   const parsed = await callModelWithRetry({ backImageUrl, layImageUrl });
   const layWithDefaults: ParsedBet = {
     ...parsed.lay,
-    exchange: parsed.lay.exchange?.trim()
-      ? parsed.lay.exchange
-      : "bfb247",
-    currency: parsed.lay.currency?.trim()
-      ? parsed.lay.currency
-      : "NOK",
+    exchange: parsed.lay.exchange?.trim() ? parsed.lay.exchange : "bfb247",
+    currency: parsed.lay.currency?.trim() ? parsed.lay.currency : "NOK",
   };
 
   // Cross-validate the pair; flag needsReview when markets diverge.
@@ -237,11 +237,11 @@ function extractFilenameFromDataUrl(value: string) {
   }
 }
 
-function resolveTestScenario(backName?: string | null, layName?: string | null) {
-  const combined = [backName, layName]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase();
+function resolveTestScenario(
+  backName?: string | null,
+  layName?: string | null
+) {
+  const combined = [backName, layName].filter(Boolean).join(" ").toLowerCase();
 
   if (combined.includes("cat") || combined.includes("non-bet")) {
     return "error";

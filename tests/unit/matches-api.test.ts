@@ -7,12 +7,8 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as authModule from "@/app/(auth)/auth";
-import {
-  GET as listMatchesRoute,
-} from "@/app/(chat)/api/bets/matches/route";
-import {
-  GET as getMatchByIdRoute,
-} from "@/app/(chat)/api/bets/matches/[id]/route";
+import { GET as getMatchByIdRoute } from "@/app/(chat)/api/bets/matches/[id]/route";
+import { GET as listMatchesRoute } from "@/app/(chat)/api/bets/matches/route";
 import * as dbQueries from "@/lib/db/queries";
 
 // Mock auth to return a test user
@@ -30,7 +26,9 @@ vi.mock("@/lib/db/queries", () => ({
 describe("/api/bets/matches", () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    (authModule.auth as vi.Mock).mockResolvedValue({ user: { id: "test-user-id" } });
+    (authModule.auth as vi.Mock).mockResolvedValue({
+      user: { id: "test-user-id" },
+    });
   });
 
   describe("formatMatch helper", () => {
@@ -231,7 +229,9 @@ describe("/api/bets/matches", () => {
 describe("/api/bets/matches/:id", () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    (authModule.auth as vi.Mock).mockResolvedValue({ user: { id: "test-user-id" } });
+    (authModule.auth as vi.Mock).mockResolvedValue({
+      user: { id: "test-user-id" },
+    });
   });
 
   it("returns 401 when unauthenticated", async () => {

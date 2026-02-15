@@ -73,7 +73,11 @@ export const {
         if (!dbUser) {
           // User was deleted from database - return empty session
           // This will cause useSession to show unauthenticated state
-          return { ...session, user: undefined, expires: new Date(0).toISOString() };
+          return {
+            ...session,
+            user: undefined,
+            expires: new Date(0).toISOString(),
+          };
         }
         session.user.id = token.id;
       }

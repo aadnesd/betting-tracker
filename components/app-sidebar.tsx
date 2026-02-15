@@ -1,8 +1,5 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import type { User } from "next-auth";
 import {
   BarChart3,
   Gift,
@@ -13,6 +10,9 @@ import {
   Settings,
   Wallet,
 } from "lucide-react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import type { User } from "next-auth";
 import { SidebarUserNav } from "@/components/sidebar-user-nav";
 import {
   Sidebar,

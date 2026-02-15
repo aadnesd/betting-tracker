@@ -12,7 +12,9 @@ vi.mock("server-only", () => ({}));
 
 // Mock drizzle and other DB dependencies
 vi.mock("@/lib/db/queries", () => ({
-  deleteMatchedBet: vi.fn().mockResolvedValue({ success: true, cascade: false }),
+  deleteMatchedBet: vi
+    .fn()
+    .mockResolvedValue({ success: true, cascade: false }),
   deleteAccount: vi.fn().mockResolvedValue({ success: true }),
   deleteAccountTransaction: vi.fn().mockResolvedValue({ success: true }),
   deleteBet: vi.fn().mockResolvedValue({ success: true }),
@@ -20,11 +22,11 @@ vi.mock("@/lib/db/queries", () => ({
 }));
 
 import {
-  deleteMatchedBet,
   deleteAccount,
   deleteAccountTransaction,
   deleteBet,
   deleteFreeBet,
+  deleteMatchedBet,
 } from "@/lib/db/queries";
 
 describe("Delete Query Functions - Type Safety", () => {

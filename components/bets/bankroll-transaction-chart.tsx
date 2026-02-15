@@ -13,8 +13,8 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { TransactionTrendPoint } from "@/lib/db/queries";
 
 interface Props {
@@ -49,14 +49,17 @@ function CustomTooltip({ active, payload, label }: CustomTooltipProps) {
       <p className="mb-2 font-medium">{label}</p>
       <div className="space-y-1 text-sm">
         {payload.map((entry) => (
-          <div key={entry.name} className="flex items-center gap-2">
+          <div className="flex items-center gap-2" key={entry.name}>
             <div
               className="h-3 w-3 rounded-full"
               style={{ backgroundColor: entry.color }}
             />
             <span className="capitalize">{entry.name}:</span>
             <span className="font-medium">
-              NOK {entry.value.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+              NOK{" "}
+              {entry.value.toLocaleString(undefined, {
+                minimumFractionDigits: 2,
+              })}
             </span>
           </div>
         ))}
@@ -85,7 +88,8 @@ export function BankrollTransactionChart({ data30, data90 }: Props) {
         <CardContent>
           <div className="flex h-[300px] items-center justify-center">
             <p className="text-muted-foreground">
-              No transaction data available yet. Record deposits and withdrawals to see trends.
+              No transaction data available yet. Record deposits and withdrawals
+              to see trends.
             </p>
           </div>
         </CardContent>
@@ -100,36 +104,36 @@ export function BankrollTransactionChart({ data30, data90 }: Props) {
         <div className="flex gap-2">
           <div className="inline-flex h-8 items-center rounded-md border bg-muted p-0.5">
             <Button
-              variant={chartType === "bar" ? "secondary" : "ghost"}
-              size="sm"
               className="h-7 px-3 text-xs"
               onClick={() => setChartType("bar")}
+              size="sm"
+              variant={chartType === "bar" ? "secondary" : "ghost"}
             >
               Bar
             </Button>
             <Button
-              variant={chartType === "area" ? "secondary" : "ghost"}
-              size="sm"
               className="h-7 px-3 text-xs"
               onClick={() => setChartType("area")}
+              size="sm"
+              variant={chartType === "area" ? "secondary" : "ghost"}
             >
               Area
             </Button>
           </div>
           <div className="inline-flex h-8 items-center rounded-md border bg-muted p-0.5">
             <Button
-              variant={timeRange === "30d" ? "secondary" : "ghost"}
-              size="sm"
               className="h-7 px-3 text-xs"
               onClick={() => setTimeRange("30d")}
+              size="sm"
+              variant={timeRange === "30d" ? "secondary" : "ghost"}
             >
               30 Days
             </Button>
             <Button
-              variant={timeRange === "90d" ? "secondary" : "ghost"}
-              size="sm"
               className="h-7 px-3 text-xs"
               onClick={() => setTimeRange("90d")}
+              size="sm"
+              variant={timeRange === "90d" ? "secondary" : "ghost"}
             >
               90 Days
             </Button>
@@ -138,91 +142,97 @@ export function BankrollTransactionChart({ data30, data90 }: Props) {
       </CardHeader>
       <CardContent>
         <div className="h-[300px] w-full">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer height="100%" width="100%">
             {chartType === "bar" ? (
-              <BarChart data={data} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+              <BarChart
+                data={data}
+                margin={{ top: 10, right: 10, left: 10, bottom: 0 }}
+              >
+                <CartesianGrid className="stroke-muted" strokeDasharray="3 3" />
                 <XAxis
-                  dataKey="label"
-                  tickLine={false}
                   axisLine={false}
                   className="text-xs"
-                  tick={{ fontSize: 10 }}
+                  dataKey="label"
                   interval="preserveStartEnd"
+                  tick={{ fontSize: 10 }}
+                  tickLine={false}
                 />
                 <YAxis
-                  tickLine={false}
                   axisLine={false}
-                  tickFormatter={formatValue}
                   className="text-xs"
+                  tickFormatter={formatValue}
+                  tickLine={false}
                   width={50}
                 />
                 <Tooltip content={<CustomTooltip />} />
                 <Legend wrapperStyle={{ fontSize: "12px" }} />
                 <Bar
                   dataKey="deposits"
-                  name="Deposits"
                   fill="#10b981"
+                  name="Deposits"
                   radius={[4, 4, 0, 0]}
                 />
                 <Bar
                   dataKey="withdrawals"
-                  name="Withdrawals"
                   fill="#ef4444"
+                  name="Withdrawals"
                   radius={[4, 4, 0, 0]}
                 />
                 <Bar
                   dataKey="bonuses"
-                  name="Bonuses"
                   fill="#3b82f6"
+                  name="Bonuses"
                   radius={[4, 4, 0, 0]}
                 />
               </BarChart>
             ) : (
-              <AreaChart data={data} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+              <AreaChart
+                data={data}
+                margin={{ top: 10, right: 10, left: 10, bottom: 0 }}
+              >
+                <CartesianGrid className="stroke-muted" strokeDasharray="3 3" />
                 <XAxis
-                  dataKey="label"
-                  tickLine={false}
                   axisLine={false}
                   className="text-xs"
-                  tick={{ fontSize: 10 }}
+                  dataKey="label"
                   interval="preserveStartEnd"
+                  tick={{ fontSize: 10 }}
+                  tickLine={false}
                 />
                 <YAxis
-                  tickLine={false}
                   axisLine={false}
-                  tickFormatter={formatValue}
                   className="text-xs"
+                  tickFormatter={formatValue}
+                  tickLine={false}
                   width={50}
                 />
                 <Tooltip content={<CustomTooltip />} />
                 <Legend wrapperStyle={{ fontSize: "12px" }} />
                 <Area
-                  type="monotone"
                   dataKey="deposits"
-                  name="Deposits"
-                  stroke="#10b981"
                   fill="#10b981"
                   fillOpacity={0.3}
+                  name="Deposits"
                   stackId="1"
+                  stroke="#10b981"
+                  type="monotone"
                 />
                 <Area
-                  type="monotone"
                   dataKey="bonuses"
-                  name="Bonuses"
-                  stroke="#3b82f6"
                   fill="#3b82f6"
                   fillOpacity={0.3}
+                  name="Bonuses"
                   stackId="1"
+                  stroke="#3b82f6"
+                  type="monotone"
                 />
                 <Area
-                  type="monotone"
                   dataKey="withdrawals"
-                  name="Withdrawals"
-                  stroke="#ef4444"
                   fill="#ef4444"
                   fillOpacity={0.3}
+                  name="Withdrawals"
+                  stroke="#ef4444"
+                  type="monotone"
                 />
               </AreaChart>
             )}

@@ -45,11 +45,19 @@ interface FormData {
 
 const CURRENCIES = ["NOK", "EUR", "GBP", "USD", "SEK", "DKK"] as const;
 
-const TRANSACTION_TYPES: { value: TransactionType; label: string; description: string }[] = [
+const TRANSACTION_TYPES: {
+  value: TransactionType;
+  label: string;
+  description: string;
+}[] = [
   { value: "deposit", label: "Deposit", description: "Money added to account" },
   { value: "withdrawal", label: "Withdrawal", description: "Money taken out" },
   { value: "bonus", label: "Bonus", description: "Free bet or bonus funds" },
-  { value: "adjustment", label: "Adjustment", description: "Manual balance correction" },
+  {
+    value: "adjustment",
+    label: "Adjustment",
+    description: "Manual balance correction",
+  },
 ];
 
 export function TransactionForm({
@@ -75,10 +83,14 @@ export function TransactionForm({
   );
 
   // Get selected wallet and check if currencies differ
-  const selectedWallet = wallets.find(w => w.id === formData.walletId);
-  const showWalletAmount = selectedWallet && selectedWallet.currency !== formData.currency;
+  const selectedWallet = wallets.find((w) => w.id === formData.walletId);
+  const showWalletAmount =
+    selectedWallet && selectedWallet.currency !== formData.currency;
 
-  const updateField = <K extends keyof FormData>(field: K, value: FormData[K]) => {
+  const updateField = <K extends keyof FormData>(
+    field: K,
+    value: FormData[K]
+  ) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
     if (errors[field]) {
       setErrors((prev) => ({ ...prev, [field]: undefined }));
@@ -103,7 +115,8 @@ export function TransactionForm({
     if (showWalletAmount) {
       const walletAmt = Number.parseFloat(formData.walletAmount);
       if (!formData.walletAmount || Number.isNaN(walletAmt)) {
-        newErrors.walletAmount = "Wallet amount is required for cross-currency transfers";
+        newErrors.walletAmount =
+          "Wallet amount is required for cross-currency transfers";
       } else if (walletAmt <= 0) {
         newErrors.walletAmount = "Wallet amount must be positive";
       }
@@ -139,11 +152,14 @@ export function TransactionForm({
         payload.walletCurrency = selectedWallet.currency;
       }
 
-      const response = await fetch(`/api/bets/accounts/${accountId}/transactions`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      const response = await fetch(
+        `/api/bets/accounts/${accountId}/transactions`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        }
+      );
 
       const data = await response.json();
 
@@ -151,8 +167,10 @@ export function TransactionForm({
         throw new Error(data.error || "Failed to create transaction");
       }
 
-      toast.success(`${formData.type.charAt(0).toUpperCase() + formData.type.slice(1)} recorded!`);
-      
+      toast.success(
+        `${formData.type.charAt(0).toUpperCase() + formData.type.slice(1)} recorded!`
+      );
+
       if (onSuccess) {
         onSuccess();
       } else {
@@ -170,10 +188,12 @@ export function TransactionForm({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form className="space-y-6" onSubmit={handleSubmit}>
       {/* Account Info */}
       <div className="rounded-lg bg-muted/50 p-4">
-        <p className="text-sm text-muted-foreground">Recording transaction for</p>
+        <p className="text-muted-foreground text-sm">
+          Recording transaction for
+        </p>
         <p className="font-semibold">{accountName}</p>
       </div>
 
@@ -181,7 +201,6 @@ export function TransactionForm({
       <div className="space-y-2">
         <Label htmlFor="type">Transaction Type</Label>
         <Select
-          value={formData.type}
           onValueChange={(value: TransactionType) => {
             updateField("type", value);
             // Clear wallet selection when switching to bonus/adjustment
@@ -190,6 +209,7 @@ export function TransactionForm({
               updateField("walletAmount", "");
             }
           }}
+          value={formData.type}
         >
           <SelectTrigger>
             <SelectValue />
@@ -204,74 +224,85 @@ export function TransactionForm({
             ))}
           </SelectContent>
         </Select>
-        <p className="text-xs text-muted-foreground">
-          {TRANSACTION_TYPES.find(t => t.value === formData.type)?.description}
+        <p className="text-muted-foreground text-xs">
+          {
+            TRANSACTION_TYPES.find((t) => t.value === formData.type)
+              ?.description
+          }
         </p>
       </div>
 
       {/* Wallet Selector - Only for deposits and withdrawals */}
-      {(formData.type === "deposit" || formData.type === "withdrawal") && wallets.length > 0 && (
-        <div className="space-y-2">
-          <Label htmlFor="wallet">
-            <span className="flex items-center gap-2">
-              <Wallet className="h-4 w-4" />
-              {formData.type === "deposit" ? "From Wallet (optional)" : "To Wallet (optional)"}
-            </span>
-          </Label>
-          <Select
-            value={formData.walletId}
-            onValueChange={(value) => updateField("walletId", value === "none" ? "" : value)}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select a wallet..." />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">
-                <span className="text-muted-foreground">No wallet (manual entry)</span>
-              </SelectItem>
-              {wallets.map((w) => (
-                <SelectItem key={w.id} value={w.id}>
-                  <div className="flex items-center gap-2">
-                    <span>{w.name}</span>
-                    <span className="text-xs text-muted-foreground">
-                      ({w.currency})
-                    </span>
-                  </div>
+      {(formData.type === "deposit" || formData.type === "withdrawal") &&
+        wallets.length > 0 && (
+          <div className="space-y-2">
+            <Label htmlFor="wallet">
+              <span className="flex items-center gap-2">
+                <Wallet className="h-4 w-4" />
+                {formData.type === "deposit"
+                  ? "From Wallet (optional)"
+                  : "To Wallet (optional)"}
+              </span>
+            </Label>
+            <Select
+              onValueChange={(value) =>
+                updateField("walletId", value === "none" ? "" : value)
+              }
+              value={formData.walletId}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select a wallet..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">
+                  <span className="text-muted-foreground">
+                    No wallet (manual entry)
+                  </span>
                 </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <p className="text-xs text-muted-foreground">
-            {formData.type === "deposit"
-              ? "If selected, the wallet balance will decrease by this amount."
-              : "If selected, the wallet balance will increase by this amount."}
-          </p>
-        </div>
-      )}
+                {wallets.map((w) => (
+                  <SelectItem key={w.id} value={w.id}>
+                    <div className="flex items-center gap-2">
+                      <span>{w.name}</span>
+                      <span className="text-muted-foreground text-xs">
+                        ({w.currency})
+                      </span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-muted-foreground text-xs">
+              {formData.type === "deposit"
+                ? "If selected, the wallet balance will decrease by this amount."
+                : "If selected, the wallet balance will increase by this amount."}
+            </p>
+          </div>
+        )}
 
       {/* Wallet Amount for cross-currency transfers */}
       {showWalletAmount && selectedWallet && (
         <div className="space-y-2 rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950">
-          <Label htmlFor="walletAmount" className="flex items-center gap-2">
+          <Label className="flex items-center gap-2" htmlFor="walletAmount">
             <Wallet className="h-4 w-4" />
             Amount in {selectedWallet.currency}
           </Label>
           <Input
-            id="walletAmount"
-            type="number"
-            step="0.01"
-            min="0.01"
-            placeholder={`0.00 ${selectedWallet.currency}`}
-            value={formData.walletAmount}
-            onChange={(e) => updateField("walletAmount", e.target.value)}
             className={errors.walletAmount ? "border-destructive" : ""}
+            id="walletAmount"
+            min="0.01"
+            onChange={(e) => updateField("walletAmount", e.target.value)}
+            placeholder={`0.00 ${selectedWallet.currency}`}
+            step="0.01"
+            type="number"
+            value={formData.walletAmount}
           />
           {errors.walletAmount && (
-            <p className="text-xs text-destructive">{errors.walletAmount}</p>
+            <p className="text-destructive text-xs">{errors.walletAmount}</p>
           )}
-          <p className="text-xs text-muted-foreground">
-            Account uses {formData.currency}, wallet uses {selectedWallet.currency}. 
-            Enter the equivalent amount in {selectedWallet.currency}.
+          <p className="text-muted-foreground text-xs">
+            Account uses {formData.currency}, wallet uses{" "}
+            {selectedWallet.currency}. Enter the equivalent amount in{" "}
+            {selectedWallet.currency}.
           </p>
         </div>
       )}
@@ -281,25 +312,25 @@ export function TransactionForm({
         <div className="space-y-2">
           <Label htmlFor="amount">Amount</Label>
           <Input
-            id="amount"
-            type="number"
-            step="0.01"
-            min="0.01"
-            placeholder="0.00"
-            value={formData.amount}
-            onChange={(e) => updateField("amount", e.target.value)}
             className={errors.amount ? "border-destructive" : ""}
+            id="amount"
+            min="0.01"
+            onChange={(e) => updateField("amount", e.target.value)}
+            placeholder="0.00"
+            step="0.01"
+            type="number"
+            value={formData.amount}
           />
           {errors.amount && (
-            <p className="text-xs text-destructive">{errors.amount}</p>
+            <p className="text-destructive text-xs">{errors.amount}</p>
           )}
         </div>
 
         <div className="space-y-2">
           <Label htmlFor="currency">Currency</Label>
           <Select
-            value={formData.currency}
             onValueChange={(value) => updateField("currency", value)}
+            value={formData.currency}
           >
             <SelectTrigger>
               <SelectValue />
@@ -313,7 +344,7 @@ export function TransactionForm({
             </SelectContent>
           </Select>
           {errors.currency && (
-            <p className="text-xs text-destructive">{errors.currency}</p>
+            <p className="text-destructive text-xs">{errors.currency}</p>
           )}
         </div>
       </div>
@@ -323,16 +354,16 @@ export function TransactionForm({
         <Label htmlFor="occurredAt">Date</Label>
         <Input
           id="occurredAt"
-          type="date"
-          value={formData.occurredAt.toISOString().split("T")[0]}
           onChange={(e) => {
             const date = new Date(e.target.value);
             if (!Number.isNaN(date.getTime())) {
               updateField("occurredAt", date);
             }
           }}
+          type="date"
+          value={formData.occurredAt.toISOString().split("T")[0]}
         />
-        <p className="text-xs text-muted-foreground">
+        <p className="text-muted-foreground text-xs">
           When did this transaction occur?
         </p>
       </div>
@@ -342,29 +373,25 @@ export function TransactionForm({
         <Label htmlFor="notes">Notes (optional)</Label>
         <Textarea
           id="notes"
-          placeholder="e.g., Initial deposit, Welcome bonus, etc."
-          value={formData.notes}
           onChange={(e) => updateField("notes", e.target.value)}
+          placeholder="e.g., Initial deposit, Welcome bonus, etc."
           rows={3}
+          value={formData.notes}
         />
       </div>
 
       {/* Actions */}
       <div className="flex gap-4 pt-4">
         <Button
+          className="flex-1"
+          disabled={isSubmitting}
+          onClick={() => router.push(`/bets/settings/accounts/${accountId}`)}
           type="button"
           variant="outline"
-          className="flex-1"
-          onClick={() => router.push(`/bets/settings/accounts/${accountId}`)}
-          disabled={isSubmitting}
         >
           Cancel
         </Button>
-        <Button
-          type="submit"
-          className="flex-1"
-          disabled={isSubmitting}
-        >
+        <Button className="flex-1" disabled={isSubmitting} type="submit">
           {isSubmitting ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />

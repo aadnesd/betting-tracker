@@ -11,7 +11,9 @@ async function main() {
   const buffer = fs.readFileSync(imagePath);
   const dataUrl = `data:image/png;base64,${buffer.toString("base64")}`;
 
-  console.log(`Testing with: ${imagePath} (${(buffer.length / 1024).toFixed(1)}KB)`);
+  console.log(
+    `Testing with: ${imagePath} (${(buffer.length / 1024).toFixed(1)}KB)`
+  );
   console.log("");
 
   // Step 1: OCR
@@ -20,8 +22,10 @@ async function main() {
   const ocrStart = Date.now();
   const ocrResult = await extractTextFromImage(dataUrl);
   console.log(`  Duration: ${Date.now() - ocrStart}ms`);
-  console.log(`  Lines: ${ocrResult.lines.length}, Confidence: ${(ocrResult.confidence * 100).toFixed(0)}%`);
-  console.log(`  Full text:`);
+  console.log(
+    `  Lines: ${ocrResult.lines.length}, Confidence: ${(ocrResult.confidence * 100).toFixed(0)}%`
+  );
+  console.log("  Full text:");
   console.log(`  "${ocrResult.text}"`);
   console.log("");
 
@@ -36,7 +40,10 @@ async function main() {
     selection: z.string().describe("The team or outcome selected"),
     odds: z.number().describe("The decimal odds"),
     stake: z.number().optional().describe("The stake amount"),
-    liability: z.number().optional().describe("The liability amount for lay bets"),
+    liability: z
+      .number()
+      .optional()
+      .describe("The liability amount for lay bets"),
     currency: z.string().optional().describe("Currency code, defaults to NOK"),
     bookmaker: z.string().optional().describe("The bookmaker or exchange name"),
   });
@@ -51,7 +58,7 @@ OCR Text:
 ${ocrResult.text}`,
   });
   console.log(`  Duration: ${Date.now() - llmStart}ms`);
-  console.log(`  Parsed:`, JSON.stringify(result.object, null, 2));
+  console.log("  Parsed:", JSON.stringify(result.object, null, 2));
   console.log("");
 
   // Step 3: Match Search
@@ -86,14 +93,14 @@ ${ocrResult.text}`,
     const searchTerms = [selection];
     if (selection === "man city") searchTerms.push("manchester city");
     if (selection === "man utd") searchTerms.push("manchester united");
-    
+
     const matching =
-      data.matches?.filter(
-        (m) =>
-          searchTerms.some(term => 
+      data.matches?.filter((m) =>
+        searchTerms.some(
+          (term) =>
             m.homeTeam.name.toLowerCase().includes(term) ||
             m.awayTeam.name.toLowerCase().includes(term)
-          )
+        )
       ) || [];
 
     console.log(`  Duration: ${Date.now() - searchStart}ms`);

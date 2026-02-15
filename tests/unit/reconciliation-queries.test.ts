@@ -5,7 +5,7 @@
  * correctly filter matched bets by status for the reconciliation queue view.
  * These queries power the /bets/review page and dashboard count badges.
  */
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock server-only to allow testing server modules
 vi.mock("server-only", () => ({}));
@@ -111,7 +111,9 @@ describe("reconciliation queue queries", () => {
         statuses: validStatuses,
       };
       // Type-check passes if this compiles
-      const _typeCheck: Parameters<typeof dbQueries.listMatchedBetsByStatus>[0] = params;
+      const _typeCheck: Parameters<
+        typeof dbQueries.listMatchedBetsByStatus
+      >[0] = params;
     }).not.toThrow();
   });
 });

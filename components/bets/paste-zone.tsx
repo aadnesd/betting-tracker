@@ -5,7 +5,13 @@ import { useCallback, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-type PasteZoneState = "empty" | "hovering" | "focused" | "preview" | "loading" | "error";
+type PasteZoneState =
+  | "empty"
+  | "hovering"
+  | "focused"
+  | "preview"
+  | "loading"
+  | "error";
 
 interface PasteZoneProps {
   /** Identifier for this zone (e.g., "back" or "lay") */
@@ -200,41 +206,37 @@ export function PasteZone({
       </div>
 
       <div
-        ref={containerRef}
-        role="button"
-        tabIndex={disabled ? -1 : 0}
+        aria-label={`${label} paste zone. ${hasImage ? "Image ready" : "Click and paste or drag an image"}`}
         className={cn(
           "relative flex min-h-[200px] flex-col items-center justify-center rounded-lg border-2 border-dashed p-4 transition-all focus:outline-none",
           // Empty state
           state === "empty" &&
             "cursor-pointer border-muted-foreground/25 bg-muted/50 hover:border-muted-foreground/50",
           // Hovering (drag over)
-          state === "hovering" &&
-            "border-primary bg-primary/5",
+          state === "hovering" && "border-primary bg-primary/5",
           // Focused (ready for paste)
-          state === "focused" &&
-            "border-primary ring-2 ring-primary/20",
+          state === "focused" && "border-primary ring-2 ring-primary/20",
           // Preview state
-          state === "preview" &&
-            "border-emerald-300 bg-emerald-50/50",
+          state === "preview" && "border-emerald-300 bg-emerald-50/50",
           // Loading state
           state === "loading" &&
             "cursor-wait border-muted-foreground/25 bg-muted/30",
           // Error state
-          state === "error" &&
-            "border-destructive/50 bg-destructive/5",
+          state === "error" && "border-destructive/50 bg-destructive/5",
           // Disabled
           disabled && "cursor-not-allowed opacity-50"
         )}
-        onClick={handleContainerClick}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
-        onPaste={handlePaste}
-        onFocus={() => setIsFocused(true)}
         onBlur={() => setIsFocused(false)}
+        onClick={handleContainerClick}
+        onDragLeave={handleDragLeave}
+        onDragOver={handleDragOver}
+        onDrop={handleDrop}
+        onFocus={() => setIsFocused(true)}
         onKeyDown={handleKeyDown}
-        aria-label={`${label} paste zone. ${hasImage ? "Image ready" : "Click and paste or drag an image"}`}
+        onPaste={handlePaste}
+        ref={containerRef}
+        role="button"
+        tabIndex={disabled ? -1 : 0}
       >
         {isLoading ? (
           // Loading state
@@ -246,22 +248,22 @@ export function PasteZone({
           // Preview state
           <div className="relative w-full">
             <Image
-              src={previewUrl}
               alt={`${label} preview`}
-              width={320}
-              height={192}
               className="mx-auto max-h-[180px] w-auto rounded-md border object-contain"
+              height={192}
+              src={previewUrl}
+              width={320}
             />
             <Button
-              type="button"
-              variant="destructive"
-              size="sm"
-              className="absolute right-0 top-0 h-7 w-7 p-0"
+              aria-label={`Remove ${label} image`}
+              className="absolute top-0 right-0 h-7 w-7 p-0"
               onClick={(e) => {
                 e.stopPropagation();
                 handleRemove();
               }}
-              aria-label={`Remove ${label} image`}
+              size="sm"
+              type="button"
+              variant="destructive"
             >
               <X className="h-4 w-4" />
             </Button>
@@ -289,22 +291,22 @@ export function PasteZone({
                 <span>Drop file here</span>
               </div>
               <input
-                ref={fileInputRef}
-                type="file"
                 accept="image/png,image/jpeg,image/webp"
-                onChange={handleFileInputChange}
                 className="hidden"
                 disabled={disabled}
+                onChange={handleFileInputChange}
+                ref={fileInputRef}
+                type="file"
               />
               <Button
-                type="button"
-                variant="outline"
-                size="sm"
+                disabled={disabled}
                 onClick={(e) => {
                   e.stopPropagation();
                   fileInputRef.current?.click();
                 }}
-                disabled={disabled}
+                size="sm"
+                type="button"
+                variant="outline"
               >
                 Browse files
               </Button>

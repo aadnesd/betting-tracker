@@ -14,7 +14,11 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { getFreeBetById, listAccountsByUser, listQualifyingBetsForPromo } from "@/lib/db/queries";
+import {
+  getFreeBetById,
+  listAccountsByUser,
+  listQualifyingBetsForPromo,
+} from "@/lib/db/queries";
 
 export const metadata = {
   title: "Free Bet Details",
@@ -86,7 +90,9 @@ export default async function FreeBetDetailPage({
     ? Number.parseFloat(freeBet.unlockTarget)
     : 0;
   const progressPercent =
-    unlockTarget > 0 ? Math.min((unlockProgress / unlockTarget) * 100, 100) : 100;
+    unlockTarget > 0
+      ? Math.min((unlockProgress / unlockTarget) * 100, 100)
+      : 100;
 
   const hasWinWageringConfig = freeBet.winWageringMultiplier != null;
   const winWageringMultiplier = freeBet.winWageringMultiplier
@@ -114,8 +120,8 @@ export default async function FreeBetDetailPage({
             {freeBet.name} {getStatusBadge(freeBet.status)}
           </h1>
           <p className="text-muted-foreground text-sm">
-            {account?.name || "Unknown account"} •{" "}
-            {freeBet.currency} {Number(freeBet.value).toFixed(2)}
+            {account?.name || "Unknown account"} • {freeBet.currency}{" "}
+            {Number(freeBet.value).toFixed(2)}
           </p>
         </div>
         <Button asChild variant="outline">
@@ -154,7 +160,9 @@ export default async function FreeBetDetailPage({
             {freeBet.minOdds && (
               <div>
                 <dt className="text-muted-foreground">Min Odds</dt>
-                <dd className="font-medium">{Number(freeBet.minOdds).toFixed(2)}</dd>
+                <dd className="font-medium">
+                  {Number(freeBet.minOdds).toFixed(2)}
+                </dd>
               </div>
             )}
             <div>
@@ -219,11 +227,17 @@ export default async function FreeBetDetailPage({
                     ? `${freeBet.currency} ${unlockProgress.toFixed(2)} of ${unlockTarget.toFixed(2)}`
                     : `${unlockProgress.toFixed(0)} of ${unlockTarget.toFixed(0)} bets`}
                 </span>
-                <span className="font-medium">{progressPercent.toFixed(0)}%</span>
+                <span className="font-medium">
+                  {progressPercent.toFixed(0)}%
+                </span>
               </div>
               <Progress
+                className={
+                  freeBet.status === "locked"
+                    ? "bg-amber-100"
+                    : "bg-emerald-100"
+                }
                 value={progressPercent}
-                className={freeBet.status === "locked" ? "bg-amber-100" : "bg-emerald-100"}
               />
             </div>
 
@@ -254,9 +268,9 @@ export default async function FreeBetDetailPage({
                 <div className="space-y-2">
                   {qualifyingBets.map((qb) => (
                     <Link
-                      key={qb.id}
-                      href={`/bets/${qb.matchedBetId}`}
                       className="flex items-center justify-between rounded-lg border p-3 hover:bg-muted/50"
+                      href={`/bets/${qb.matchedBetId}`}
+                      key={qb.id}
                     >
                       <div>
                         <p className="font-medium text-sm">
@@ -287,7 +301,8 @@ export default async function FreeBetDetailPage({
 
             {qualifyingBets.length === 0 && freeBet.status === "locked" && (
               <p className="text-muted-foreground text-sm">
-                No qualifying bets yet. Place bets at this bookmaker to make progress toward unlocking.
+                No qualifying bets yet. Place bets at this bookmaker to make
+                progress toward unlocking.
               </p>
             )}
           </CardContent>
@@ -314,27 +329,36 @@ export default async function FreeBetDetailPage({
                       {freeBet.currency} {winWageringProgress.toFixed(2)} of{" "}
                       {winWageringRequirement.toFixed(2)}
                     </span>
-                    <span className="font-medium">{winWageringPercent.toFixed(0)}%</span>
+                    <span className="font-medium">
+                      {winWageringPercent.toFixed(0)}%
+                    </span>
                   </div>
-                  <Progress value={winWageringPercent} className="bg-blue-100" />
+                  <Progress
+                    className="bg-blue-100"
+                    value={winWageringPercent}
+                  />
                 </div>
                 <dl className="grid grid-cols-2 gap-4 text-sm">
                   <div>
                     <dt className="text-muted-foreground">Multiplier</dt>
-                    <dd className="font-medium">{winWageringMultiplier.toFixed(2)}×</dd>
+                    <dd className="font-medium">
+                      {winWageringMultiplier.toFixed(2)}×
+                    </dd>
                   </div>
                   {freeBet.winWageringMinOdds && (
                     <div>
                       <dt className="text-muted-foreground">Min Odds</dt>
                       <dd className="font-medium">
-                        {Number.parseFloat(freeBet.winWageringMinOdds).toFixed(2)}
+                        {Number.parseFloat(freeBet.winWageringMinOdds).toFixed(
+                          2
+                        )}
                       </dd>
                     </div>
                   )}
                 </dl>
               </>
             ) : (
-              <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
+              <div className="rounded-md border border-dashed p-4 text-muted-foreground text-sm">
                 Wagering will start after this free bet wins. Multiplier:{" "}
                 <span className="font-medium text-foreground">
                   {winWageringMultiplier.toFixed(2)}×
@@ -364,7 +388,6 @@ export default async function FreeBetDetailPage({
           <CardContent>
             <FreeBetForm
               accounts={bookmakers}
-              mode="edit"
               initialData={{
                 id: freeBet.id,
                 accountId: freeBet.accountId,
@@ -381,9 +404,11 @@ export default async function FreeBetDetailPage({
                 unlockTarget: freeBet.unlockTarget ?? undefined,
                 unlockMinOdds: freeBet.unlockMinOdds ?? undefined,
                 stakeReturned: freeBet.stakeReturned ?? false,
-                winWageringMultiplier: freeBet.winWageringMultiplier ?? undefined,
+                winWageringMultiplier:
+                  freeBet.winWageringMultiplier ?? undefined,
                 winWageringMinOdds: freeBet.winWageringMinOdds ?? undefined,
               }}
+              mode="edit"
             />
           </CardContent>
         </Card>

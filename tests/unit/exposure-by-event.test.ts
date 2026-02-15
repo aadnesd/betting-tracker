@@ -99,7 +99,13 @@ describe("Exposure by event data structure", () => {
     const events: ExposureByEvent[] = [
       {
         matchId: "match-1",
-        match: { homeTeam: "A", awayTeam: "B", competition: "PL", matchDate: new Date(), status: "SCHEDULED" },
+        match: {
+          homeTeam: "A",
+          awayTeam: "B",
+          competition: "PL",
+          matchDate: new Date(),
+          status: "SCHEDULED",
+        },
         totalExposure: 500,
         betCount: 1,
         betIds: ["bet-1"],
@@ -107,7 +113,13 @@ describe("Exposure by event data structure", () => {
       },
       {
         matchId: "match-2",
-        match: { homeTeam: "C", awayTeam: "D", competition: "PL", matchDate: new Date(), status: "SCHEDULED" },
+        match: {
+          homeTeam: "C",
+          awayTeam: "D",
+          competition: "PL",
+          matchDate: new Date(),
+          status: "SCHEDULED",
+        },
         totalExposure: 2000,
         betCount: 2,
         betIds: ["bet-2", "bet-3"],
@@ -115,7 +127,13 @@ describe("Exposure by event data structure", () => {
       },
       {
         matchId: "match-3",
-        match: { homeTeam: "E", awayTeam: "F", competition: "PL", matchDate: new Date(), status: "SCHEDULED" },
+        match: {
+          homeTeam: "E",
+          awayTeam: "F",
+          competition: "PL",
+          matchDate: new Date(),
+          status: "SCHEDULED",
+        },
         totalExposure: 1500,
         betCount: 1,
         betIds: ["bet-4"],
@@ -123,7 +141,9 @@ describe("Exposure by event data structure", () => {
       },
     ];
 
-    const sorted = [...events].sort((a, b) => b.totalExposure - a.totalExposure);
+    const sorted = [...events].sort(
+      (a, b) => b.totalExposure - a.totalExposure
+    );
 
     expect(sorted[0].totalExposure).toBe(2000);
     expect(sorted[1].totalExposure).toBe(1500);
@@ -157,7 +177,13 @@ describe("Exposure by event data structure", () => {
     const events: ExposureByEvent[] = [
       {
         matchId: "match-1",
-        match: { homeTeam: "A", awayTeam: "B", competition: "PL", matchDate: new Date(), status: "SCHEDULED" },
+        match: {
+          homeTeam: "A",
+          awayTeam: "B",
+          competition: "PL",
+          matchDate: new Date(),
+          status: "SCHEDULED",
+        },
         totalExposure: 1000,
         betCount: 1,
         betIds: ["bet-1"],
@@ -183,9 +209,30 @@ describe("Exposure by event data structure", () => {
 
   test("calculates total exposure across all events", () => {
     const events: ExposureByEvent[] = [
-      { matchId: "m1", match: null, totalExposure: 1000, betCount: 1, betIds: ["b1"], promoTypes: [] },
-      { matchId: "m2", match: null, totalExposure: 2000, betCount: 2, betIds: ["b2", "b3"], promoTypes: [] },
-      { matchId: null, match: null, totalExposure: 500, betCount: 1, betIds: ["b4"], promoTypes: [] },
+      {
+        matchId: "m1",
+        match: null,
+        totalExposure: 1000,
+        betCount: 1,
+        betIds: ["b1"],
+        promoTypes: [],
+      },
+      {
+        matchId: "m2",
+        match: null,
+        totalExposure: 2000,
+        betCount: 2,
+        betIds: ["b2", "b3"],
+        promoTypes: [],
+      },
+      {
+        matchId: null,
+        match: null,
+        totalExposure: 500,
+        betCount: 1,
+        betIds: ["b4"],
+        promoTypes: [],
+      },
     ];
 
     const totalExposure = events.reduce((sum, e) => sum + e.totalExposure, 0);
@@ -199,13 +246,36 @@ describe("Exposure by event data structure", () => {
 describe("Exposure by event risk scenarios", () => {
   test("identifies high exposure events", () => {
     const events: ExposureByEvent[] = [
-      { matchId: "m1", match: null, totalExposure: 1000, betCount: 1, betIds: [], promoTypes: [] },
-      { matchId: "m2", match: null, totalExposure: 6000, betCount: 3, betIds: [], promoTypes: [] },
-      { matchId: "m3", match: null, totalExposure: 500, betCount: 1, betIds: [], promoTypes: [] },
+      {
+        matchId: "m1",
+        match: null,
+        totalExposure: 1000,
+        betCount: 1,
+        betIds: [],
+        promoTypes: [],
+      },
+      {
+        matchId: "m2",
+        match: null,
+        totalExposure: 6000,
+        betCount: 3,
+        betIds: [],
+        promoTypes: [],
+      },
+      {
+        matchId: "m3",
+        match: null,
+        totalExposure: 500,
+        betCount: 1,
+        betIds: [],
+        promoTypes: [],
+      },
     ];
 
     const warningThreshold = 5000;
-    const highExposure = events.filter((e) => e.totalExposure >= warningThreshold);
+    const highExposure = events.filter(
+      (e) => e.totalExposure >= warningThreshold
+    );
 
     expect(highExposure).toHaveLength(1);
     expect(highExposure[0].matchId).toBe("m2");

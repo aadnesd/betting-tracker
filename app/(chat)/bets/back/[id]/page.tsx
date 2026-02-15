@@ -38,7 +38,9 @@ export default async function Page({ params }: PageProps) {
 
   const [account, screenshot, matchedBet, auditEntries] = await Promise.all([
     bet.accountId ? getAccountById({ id: bet.accountId, userId }) : null,
-    bet.screenshotId ? getScreenshotById({ id: bet.screenshotId, userId }) : null,
+    bet.screenshotId
+      ? getScreenshotById({ id: bet.screenshotId, userId })
+      : null,
     getMatchedBetByLegId({ betId: bet.id, kind: "back", userId }),
     listAuditEntriesByEntity({
       entityType: "back_bet",
@@ -83,15 +85,15 @@ export default async function Page({ params }: PageProps) {
 
   return (
     <IndividualBetDetail
-      bet={bet}
-      betKind="back"
       account={account}
       accountBalance={accountBalance}
+      auditEntries={auditEntries}
+      bet={bet}
+      betKind="back"
+      footballMatch={footballMatch}
       matchedBet={matchedBet}
       otherLeg={otherLeg}
       screenshot={screenshot}
-      footballMatch={footballMatch}
-      auditEntries={auditEntries}
       settlementInfo={settlementInfo}
     />
   );

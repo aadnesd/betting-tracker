@@ -7,12 +7,11 @@
  */
 
 import { config } from "dotenv";
-import { drizzle } from "drizzle-orm/postgres-js";
 import { eq, isNull } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-
-import { convertAmountToNok } from "../lib/fx-rates";
 import { accountTransaction } from "../lib/db/schema";
+import { convertAmountToNok } from "../lib/fx-rates";
 
 config({ path: ".env.local" });
 
@@ -64,7 +63,7 @@ async function backfillTransactionNok() {
     }
   }
 
-  console.log(`\n✅ Backfill complete!`);
+  console.log("\n✅ Backfill complete!");
   console.log(`   Success: ${successCount}`);
   console.log(`   Errors: ${errorCount}`);
 

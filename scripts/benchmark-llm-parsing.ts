@@ -1,14 +1,15 @@
 /**
  * Benchmark different LLM models for bet parsing performance.
- * 
+ *
  * Uses pre-extracted OCR text to isolate LLM performance.
  */
 
 import { config } from "dotenv";
+
 config({ path: ".env.local" });
 
-import { generateObject } from "ai";
 import { gateway } from "@ai-sdk/gateway";
+import { generateObject } from "ai";
 import { z } from "zod";
 
 // Pre-extracted OCR text from bet2.png and bet3.png
@@ -81,7 +82,8 @@ const pairSchema = z.object({
   notes: z.string().optional(),
 });
 
-const SYSTEM_PROMPT = `You are a precise matched-betting parser. Parse betting slip text extracted via OCR. Extract exact numbers. If data is missing or unclear, set conservative defaults and mark needsReview=true. Return confidence scores (0-1) for each field based on how clear the OCR text is.`;
+const SYSTEM_PROMPT =
+  "You are a precise matched-betting parser. Parse betting slip text extracted via OCR. Extract exact numbers. If data is missing or unclear, set conservative defaults and mark needsReview=true. Return confidence scores (0-1) for each field based on how clear the OCR text is.";
 
 const USER_PROMPT = `Parse these two betting slip texts:
 
@@ -138,7 +140,7 @@ async function benchmarkModel(modelId: string): Promise<BenchmarkResult> {
     const result = pairSchema.parse(object);
 
     console.log(`   ✅ Completed in ${durationMs}ms`);
-    
+
     return {
       model: modelId,
       durationMs,
@@ -148,24 +150,26 @@ async function benchmarkModel(modelId: string): Promise<BenchmarkResult> {
   } catch (error) {
     const durationMs = Date.now() - startTime;
     const errorMessage = error instanceof Error ? error.message : String(error);
-    
+
     // Try to extract any partial response for debugging
-    let rawResponse: unknown = undefined;
-    if (error && typeof error === 'object' && 'response' in error) {
+    let rawResponse: unknown;
+    if (error && typeof error === "object" && "response" in error) {
       rawResponse = (error as { response?: unknown }).response;
     }
-    if (error && typeof error === 'object' && 'text' in error) {
+    if (error && typeof error === "object" && "text" in error) {
       rawResponse = (error as { text?: unknown }).text;
     }
-    if (error && typeof error === 'object' && 'cause' in error) {
+    if (error && typeof error === "object" && "cause" in error) {
       const cause = (error as { cause?: unknown }).cause;
-      if (cause && typeof cause === 'object' && 'text' in cause) {
+      if (cause && typeof cause === "object" && "text" in cause) {
         rawResponse = (cause as { text?: unknown }).text;
       }
     }
-    
-    console.log(`   ❌ Failed after ${durationMs}ms: ${errorMessage.substring(0, 100)}`);
-    
+
+    console.log(
+      `   ❌ Failed after ${durationMs}ms: ${errorMessage.substring(0, 100)}`
+    );
+
     return {
       model: modelId,
       durationMs,
@@ -203,7 +207,9 @@ async function main() {
     const backOdds = r.result?.back.odds ?? "N/A";
     const layOdds = r.result?.lay.odds ?? "N/A";
     const layStake = r.result?.lay.stake ?? "N/A";
-    console.log(`| ${r.model.padEnd(30)} | ${String(r.durationMs).padStart(6)}ms | ${status} | ${String(backOdds).padStart(9)} | ${String(layOdds).padStart(8)} | ${String(layStake).padStart(9)} |`);
+    console.log(
+      `| ${r.model.padEnd(30)} | ${String(r.durationMs).padStart(6)}ms | ${status} | ${String(backOdds).padStart(9)} | ${String(layOdds).padStart(8)} | ${String(layStake).padStart(9)} |`
+    );
   }
 
   // Detailed outputs
@@ -226,7 +232,11 @@ async function main() {
       console.log("Error:", r.error);
       if (r.rawResponse) {
         console.log("\nRaw response (for debugging):");
-        console.log(typeof r.rawResponse === 'string' ? r.rawResponse : JSON.stringify(r.rawResponse, null, 2));
+        console.log(
+          typeof r.rawResponse === "string"
+            ? r.rawResponse
+            : JSON.stringify(r.rawResponse, null, 2)
+        );
       }
     }
   }
@@ -237,7 +247,9 @@ async function main() {
     const fastest = successfulResults.reduce((a, b) =>
       a.durationMs < b.durationMs ? a : b
     );
-    console.log("\n============================================================");
+    console.log(
+      "\n============================================================"
+    );
     console.log(`🏆 FASTEST: ${fastest.model} at ${fastest.durationMs}ms`);
     console.log("============================================================");
   }

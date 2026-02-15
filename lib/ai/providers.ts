@@ -6,10 +6,10 @@ import {
 } from "ai";
 import { isTestEnvironment } from "../constants";
 import {
+  artifactModel as mockArtifactModel,
   chatModel as mockChatModel,
   reasoningModel as mockReasoningModel,
   titleModel as mockTitleModel,
-  artifactModel as mockArtifactModel,
 } from "./models.mock";
 
 export const myProvider = isTestEnvironment

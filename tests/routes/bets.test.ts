@@ -69,7 +69,9 @@ test.describe("/api/bets", () => {
   test("can upload screenshots, auto-parse, and save matched bet (happy path)", async ({
     adaContext,
   }) => {
-    const { bookmakerId, exchangeId } = await createAccounts(adaContext.request);
+    const { bookmakerId, exchangeId } = await createAccounts(
+      adaContext.request
+    );
 
     const uploadJson = await uploadScreenshots({
       request: adaContext.request,
@@ -136,18 +138,21 @@ test.describe("/api/bets", () => {
     expect(parsed.back.unmatchedAccount).toBe(true);
     expect(parsed.lay.unmatchedAccount).toBe(true);
 
-    const create = await babbageContext.request.post("/api/bets/create-matched", {
-      data: {
-        backScreenshotId: uploadJson.back.id,
-        layScreenshotId: uploadJson.lay.id,
-        market: parsed.back.market,
-        selection: parsed.back.selection,
-        needsReview: parsed.needsReview,
-        notes: parsed.notes,
-        back: parsed.back,
-        lay: parsed.lay,
-      },
-    });
+    const create = await babbageContext.request.post(
+      "/api/bets/create-matched",
+      {
+        data: {
+          backScreenshotId: uploadJson.back.id,
+          layScreenshotId: uploadJson.lay.id,
+          market: parsed.back.market,
+          selection: parsed.back.selection,
+          needsReview: parsed.needsReview,
+          notes: parsed.notes,
+          back: parsed.back,
+          lay: parsed.lay,
+        },
+      }
+    );
 
     expect(create.status()).toBe(200);
     const created = await create.json();

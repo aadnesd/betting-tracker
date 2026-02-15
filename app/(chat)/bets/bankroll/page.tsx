@@ -42,7 +42,16 @@ export default async function BankrollPage() {
   const userId = session.user.id;
 
   // Fetch all data in parallel
-  const [summary, accounts, openBetStakes, wallets, walletTotals, trends30, trends90, fxRates] = await Promise.all([
+  const [
+    summary,
+    accounts,
+    openBetStakes,
+    wallets,
+    walletTotals,
+    trends30,
+    trends90,
+    fxRates,
+  ] = await Promise.all([
     getBankrollSummary({ userId }),
     listAccountsWithBalances({ userId, status: "active" }),
     getOpenBetStakesByAccount({ userId }),
@@ -84,7 +93,8 @@ export default async function BankrollPage() {
   const totalOpenStakes = totalOpenBackStake + totalOpenLayLiability;
 
   // Total capital now includes wallet balances
-  const totalCapitalWithWallets = summary.totalCapital + walletTotals.totalBalanceNok;
+  const totalCapitalWithWallets =
+    summary.totalCapital + walletTotals.totalBalanceNok;
 
   return (
     <div className="space-y-6 p-4 md:p-8">
@@ -99,13 +109,13 @@ export default async function BankrollPage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button asChild variant="outline" size="sm">
+          <Button asChild size="sm" variant="outline">
             <Link href="/bets">← Dashboard</Link>
           </Button>
-          <Button asChild variant="outline" size="sm">
+          <Button asChild size="sm" variant="outline">
             <Link href="/bets/settings/accounts">Manage Accounts</Link>
           </Button>
-          <Button asChild variant="outline" size="sm">
+          <Button asChild size="sm" variant="outline">
             <Link href="/bets/settings/wallets">Manage Wallets</Link>
           </Button>
         </div>
@@ -122,8 +132,10 @@ export default async function BankrollPage() {
           </CardHeader>
           <CardContent>
             <p
-              className={`text-2xl font-bold ${
-                totalCapitalWithWallets >= 0 ? "text-emerald-600" : "text-red-600"
+              className={`font-bold text-2xl ${
+                totalCapitalWithWallets >= 0
+                  ? "text-emerald-600"
+                  : "text-red-600"
               }`}
             >
               {formatNOK(totalCapitalWithWallets)}
@@ -132,7 +144,11 @@ export default async function BankrollPage() {
               Across {summary.activeAccountCount} account
               {summary.activeAccountCount !== 1 ? "s" : ""}
               {walletTotals.walletCount > 0 && (
-                <> + {walletTotals.walletCount} wallet{walletTotals.walletCount !== 1 ? "s" : ""}</>
+                <>
+                  {" "}
+                  + {walletTotals.walletCount} wallet
+                  {walletTotals.walletCount !== 1 ? "s" : ""}
+                </>
               )}
             </p>
           </CardContent>
@@ -147,7 +163,7 @@ export default async function BankrollPage() {
           </CardHeader>
           <CardContent>
             <p
-              className={`text-2xl font-bold ${
+              className={`font-bold text-2xl ${
                 summary.bookmakerBalance >= 0
                   ? "text-emerald-600"
                   : "text-red-600"
@@ -176,7 +192,7 @@ export default async function BankrollPage() {
           </CardHeader>
           <CardContent>
             <p
-              className={`text-2xl font-bold ${
+              className={`font-bold text-2xl ${
                 summary.exchangeBalance >= 0
                   ? "text-emerald-600"
                   : "text-red-600"
@@ -205,16 +221,22 @@ export default async function BankrollPage() {
           </CardHeader>
           <CardContent>
             <p
-              className={`text-2xl font-bold ${
-                walletTotals.totalBalanceNok >= 0 ? "text-emerald-600" : "text-red-600"
+              className={`font-bold text-2xl ${
+                walletTotals.totalBalanceNok >= 0
+                  ? "text-emerald-600"
+                  : "text-red-600"
               }`}
             >
               {formatNOK(walletTotals.totalBalanceNok)}
             </p>
             <p className="text-muted-foreground text-xs">
-              {walletTotals.walletCount} wallet{walletTotals.walletCount !== 1 ? "s" : ""}
+              {walletTotals.walletCount} wallet
+              {walletTotals.walletCount !== 1 ? "s" : ""}
               {walletTotals.walletCount > 0 && (
-                <Link href="/bets/settings/wallets" className="ml-1 text-primary hover:underline">
+                <Link
+                  className="ml-1 text-primary hover:underline"
+                  href="/bets/settings/wallets"
+                >
                   View
                 </Link>
               )}
@@ -234,7 +256,7 @@ export default async function BankrollPage() {
           </CardHeader>
           <CardContent>
             <p
-              className={`text-xl font-bold ${
+              className={`font-bold text-xl ${
                 summary.netDeposits >= 0 ? "text-emerald-600" : "text-red-600"
               }`}
             >
@@ -251,7 +273,7 @@ export default async function BankrollPage() {
             <ArrowDownRight className="h-5 w-5 text-emerald-600" />
           </CardHeader>
           <CardContent>
-            <p className="text-xl font-bold text-emerald-600">
+            <p className="font-bold text-emerald-600 text-xl">
               {formatNOK(summary.totalDeposits)}
             </p>
           </CardContent>
@@ -265,7 +287,7 @@ export default async function BankrollPage() {
             <ArrowUpRight className="h-5 w-5 text-red-600" />
           </CardHeader>
           <CardContent>
-            <p className="text-xl font-bold text-red-600">
+            <p className="font-bold text-red-600 text-xl">
               {formatNOK(summary.totalWithdrawals)}
             </p>
           </CardContent>
@@ -279,7 +301,7 @@ export default async function BankrollPage() {
             <Gift className="h-5 w-5 text-blue-600" />
           </CardHeader>
           <CardContent>
-            <p className="text-xl font-bold text-blue-600">
+            <p className="font-bold text-blue-600 text-xl">
               {formatNOK(summary.totalBonuses)}
             </p>
           </CardContent>
@@ -287,10 +309,7 @@ export default async function BankrollPage() {
       </div>
 
       {/* Transaction Trend Chart */}
-      <BankrollTransactionChart
-        data30={trends30}
-        data90={trends90}
-      />
+      <BankrollTransactionChart data30={trends30} data90={trends90} />
 
       {/* Account Breakdown */}
       <div className="grid gap-6 lg:grid-cols-2">
@@ -307,8 +326,8 @@ export default async function BankrollPage() {
               <p className="text-muted-foreground text-sm">
                 No bookmaker accounts yet.{" "}
                 <Link
-                  href="/bets/settings/accounts/new"
                   className="text-primary hover:underline"
+                  href="/bets/settings/accounts/new"
                 >
                   Add one
                 </Link>
@@ -323,9 +342,9 @@ export default async function BankrollPage() {
                   const availableBalance = acc.currentBalance - openBackStake;
                   return (
                     <Link
-                      key={acc.id}
-                      href={`/bets/settings/accounts/${acc.id}`}
                       className="flex items-center justify-between rounded-md border p-3 transition-colors hover:bg-muted/50"
+                      href={`/bets/settings/accounts/${acc.id}`}
+                      key={acc.id}
                     >
                       <div>
                         <p className="font-medium">{acc.name}</p>
@@ -336,13 +355,21 @@ export default async function BankrollPage() {
                         {openBackStake > 0 && (
                           <p className="mt-0.5 flex items-center gap-1 text-amber-600 text-xs">
                             <Lock className="h-3 w-3" />
-                            {formatCurrency(openBackStake, acc.currency ?? "NOK")} in open bets
+                            {formatCurrency(
+                              openBackStake,
+                              acc.currency ?? "NOK"
+                            )}{" "}
+                            in open bets
                           </p>
                         )}
                         {openFreeBetStake > 0 && (
                           <p className="mt-0.5 flex items-center gap-1 text-blue-600 text-xs">
                             <Ticket className="h-3 w-3" />
-                            {formatCurrency(openFreeBetStake, acc.currency ?? "NOK")} in free bets
+                            {formatCurrency(
+                              openFreeBetStake,
+                              acc.currency ?? "NOK"
+                            )}{" "}
+                            in free bets
                           </p>
                         )}
                       </div>
@@ -354,11 +381,18 @@ export default async function BankrollPage() {
                               : "text-red-600"
                           }`}
                         >
-                          {formatCurrency(availableBalance, acc.currency ?? "NOK")}
+                          {formatCurrency(
+                            availableBalance,
+                            acc.currency ?? "NOK"
+                          )}
                         </p>
                         {openBackStake > 0 && (
                           <p className="text-muted-foreground text-xs">
-                            of {formatCurrency(acc.currentBalance, acc.currency ?? "NOK")}
+                            of{" "}
+                            {formatCurrency(
+                              acc.currentBalance,
+                              acc.currency ?? "NOK"
+                            )}
                           </p>
                         )}
                       </div>
@@ -382,8 +416,8 @@ export default async function BankrollPage() {
               <p className="text-muted-foreground text-sm">
                 No exchange accounts yet.{" "}
                 <Link
-                  href="/bets/settings/accounts/new"
                   className="text-primary hover:underline"
+                  href="/bets/settings/accounts/new"
                 >
                   Add one
                 </Link>
@@ -394,12 +428,13 @@ export default async function BankrollPage() {
                 .map((acc) => {
                   const openStakes = openStakesMap.get(acc.id);
                   const openLayLiability = openStakes?.openLayLiability || 0;
-                  const availableBalance = acc.currentBalance - openLayLiability;
+                  const availableBalance =
+                    acc.currentBalance - openLayLiability;
                   return (
                     <Link
-                      key={acc.id}
-                      href={`/bets/settings/accounts/${acc.id}`}
                       className="flex items-center justify-between rounded-md border p-3 transition-colors hover:bg-muted/50"
+                      href={`/bets/settings/accounts/${acc.id}`}
+                      key={acc.id}
                     >
                       <div>
                         <p className="font-medium">{acc.name}</p>
@@ -415,7 +450,11 @@ export default async function BankrollPage() {
                         {openLayLiability > 0 && (
                           <p className="mt-0.5 flex items-center gap-1 text-amber-600 text-xs">
                             <Lock className="h-3 w-3" />
-                            {formatCurrency(openLayLiability, acc.currency ?? "NOK")} lay liability
+                            {formatCurrency(
+                              openLayLiability,
+                              acc.currency ?? "NOK"
+                            )}{" "}
+                            lay liability
                           </p>
                         )}
                       </div>
@@ -427,11 +466,18 @@ export default async function BankrollPage() {
                               : "text-red-600"
                           }`}
                         >
-                          {formatCurrency(availableBalance, acc.currency ?? "NOK")}
+                          {formatCurrency(
+                            availableBalance,
+                            acc.currency ?? "NOK"
+                          )}
                         </p>
                         {openLayLiability > 0 && (
                           <p className="text-muted-foreground text-xs">
-                            of {formatCurrency(acc.currentBalance, acc.currency ?? "NOK")}
+                            of{" "}
+                            {formatCurrency(
+                              acc.currentBalance,
+                              acc.currency ?? "NOK"
+                            )}
                           </p>
                         )}
                       </div>
@@ -459,8 +505,8 @@ export default async function BankrollPage() {
                 <p className="text-muted-foreground text-sm">
                   No e-wallets yet.{" "}
                   <Link
-                    href="/bets/settings/wallets/new"
                     className="text-primary hover:underline"
+                    href="/bets/settings/wallets/new"
                   >
                     Add one
                   </Link>
@@ -470,9 +516,9 @@ export default async function BankrollPage() {
                   .sort((a, b) => b.balance - a.balance)
                   .map((w) => (
                     <Link
-                      key={w.id}
-                      href={`/bets/settings/wallets/${w.id}`}
                       className="flex items-center justify-between rounded-md border p-3 transition-colors hover:bg-muted/50"
+                      href={`/bets/settings/wallets/${w.id}`}
+                      key={w.id}
                     >
                       <div>
                         <p className="font-medium">{w.name}</p>
@@ -506,8 +552,8 @@ export default async function BankrollPage() {
                 <p className="text-muted-foreground text-sm">
                   No crypto wallets yet.{" "}
                   <Link
-                    href="/bets/settings/wallets/new"
                     className="text-primary hover:underline"
+                    href="/bets/settings/wallets/new"
                   >
                     Add one
                   </Link>
@@ -517,9 +563,9 @@ export default async function BankrollPage() {
                   .sort((a, b) => b.balance - a.balance)
                   .map((w) => (
                     <Link
-                      key={w.id}
-                      href={`/bets/settings/wallets/${w.id}`}
                       className="flex items-center justify-between rounded-md border p-3 transition-colors hover:bg-muted/50"
+                      href={`/bets/settings/wallets/${w.id}`}
+                      key={w.id}
                     >
                       <div>
                         <p className="font-medium">{w.name}</p>
@@ -545,43 +591,47 @@ export default async function BankrollPage() {
       {/* FX Rates */}
       <div className="rounded-lg border border-muted bg-muted/30 p-4">
         <h3 className="mb-3 font-medium text-muted-foreground text-sm">
-          <Banknote className="mb-0.5 mr-2 inline h-4 w-4" />
+          <Banknote className="mr-2 mb-0.5 inline h-4 w-4" />
           Exchange Rates
         </h3>
         <div className="flex flex-wrap gap-4">
           {fxRates.rates.map(({ from, to, rate }) => (
-            <div key={`${from}-${to}`} className="text-sm">
-              <span className="font-medium">{from}/{to}:</span>{" "}
-              <span className={rate ? "text-foreground" : "text-muted-foreground"}>
-                {rate ? rate.toLocaleString("en-US", { maximumFractionDigits: 2 }) : "—"}
+            <div className="text-sm" key={`${from}-${to}`}>
+              <span className="font-medium">
+                {from}/{to}:
+              </span>{" "}
+              <span
+                className={rate ? "text-foreground" : "text-muted-foreground"}
+              >
+                {rate
+                  ? rate.toLocaleString("en-US", { maximumFractionDigits: 2 })
+                  : "—"}
               </span>
             </div>
           ))}
         </div>
         <p className="mt-2 text-muted-foreground text-xs">
-          Updated: {fxRates.lastUpdated.toLocaleTimeString("nb-NO", { hour: "2-digit", minute: "2-digit" })}
+          Updated:{" "}
+          {fxRates.lastUpdated.toLocaleTimeString("nb-NO", {
+            hour: "2-digit",
+            minute: "2-digit",
+          })}
         </p>
       </div>
 
       {/* Quick Info */}
       <div className="rounded-lg border border-blue-200 bg-blue-50/50 p-4">
         <h3 className="mb-2 font-medium text-blue-900">
-          <TrendingUp className="mb-0.5 mr-2 inline h-4 w-4" />
+          <TrendingUp className="mr-2 mb-0.5 inline h-4 w-4" />
           Bankroll Management Tips
         </h3>
         <ul className="space-y-1 text-blue-800 text-sm">
           <li>
             • Keep sufficient funds in your exchange to cover lay liabilities
           </li>
-          <li>
-            • Regularly withdraw profits to lock in gains
-          </li>
-          <li>
-            • Track deposits and withdrawals to understand your true ROI
-          </li>
-          <li>
-            • Consider spreading funds across multiple bookmakers
-          </li>
+          <li>• Regularly withdraw profits to lock in gains</li>
+          <li>• Track deposits and withdrawals to understand your true ROI</li>
+          <li>• Consider spreading funds across multiple bookmakers</li>
         </ul>
       </div>
     </div>

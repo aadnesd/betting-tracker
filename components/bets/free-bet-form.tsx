@@ -6,6 +6,11 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { DeleteConfirmDialog } from "@/components/bets/delete-confirm-dialog";
 import { Button } from "@/components/ui/button";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -16,11 +21,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
 
 interface Account {
   id: string;
@@ -92,7 +92,8 @@ export function FreeBetForm({ accounts, initialData, mode }: FreeBetFormProps) {
     hasWinWageringRequirements: hasExistingWinWagering,
     winWageringMultiplier: initialData?.winWageringMultiplier ?? "",
     winWageringMinOdds: initialData?.winWageringMinOdds ?? "",
-    winWageringExpiresInDays: initialData?.winWageringExpiresInDays?.toString() ?? "",
+    winWageringExpiresInDays:
+      initialData?.winWageringExpiresInDays?.toString() ?? "",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showUnlockSection, setShowUnlockSection] = useState(hasExistingUnlock);
@@ -298,11 +299,11 @@ export function FreeBetForm({ accounts, initialData, mode }: FreeBetFormProps) {
   const bookmakers = accounts.filter((a) => a.currency); // Only show accounts with currency set
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form className="space-y-6" onSubmit={handleSubmit}>
       {/* Account Selection */}
       <div className="space-y-2">
         <Label htmlFor="accountId">Bookmaker Account</Label>
-        <Select value={formData.accountId} onValueChange={handleAccountChange}>
+        <Select onValueChange={handleAccountChange} value={formData.accountId}>
           <SelectTrigger
             className={errors.accountId ? "border-destructive" : ""}
           >
@@ -310,11 +311,11 @@ export function FreeBetForm({ accounts, initialData, mode }: FreeBetFormProps) {
           </SelectTrigger>
           <SelectContent>
             {bookmakers.length === 0 ? (
-              <div className="p-2 text-center text-sm text-muted-foreground">
+              <div className="p-2 text-center text-muted-foreground text-sm">
                 No bookmaker accounts found.{" "}
                 <a
-                  href="/bets/settings/accounts/new"
                   className="text-primary underline"
+                  href="/bets/settings/accounts/new"
                 >
                   Add one first
                 </a>
@@ -329,9 +330,9 @@ export function FreeBetForm({ accounts, initialData, mode }: FreeBetFormProps) {
           </SelectContent>
         </Select>
         {errors.accountId && (
-          <p className="text-xs text-destructive">{errors.accountId}</p>
+          <p className="text-destructive text-xs">{errors.accountId}</p>
         )}
-        <p className="text-xs text-muted-foreground">
+        <p className="text-muted-foreground text-xs">
           Which bookmaker gave you this free bet?
         </p>
       </div>
@@ -340,15 +341,15 @@ export function FreeBetForm({ accounts, initialData, mode }: FreeBetFormProps) {
       <div className="space-y-2">
         <Label htmlFor="name">Free Bet Name</Label>
         <Input
-          id="name"
-          type="text"
-          placeholder="e.g., Welcome Offer, Acca Boost, Weekend Free Bet"
-          value={formData.name}
-          onChange={(e) => updateField("name", e.target.value)}
           className={errors.name ? "border-destructive" : ""}
+          id="name"
+          onChange={(e) => updateField("name", e.target.value)}
+          placeholder="e.g., Welcome Offer, Acca Boost, Weekend Free Bet"
+          type="text"
+          value={formData.name}
         />
         {errors.name && (
-          <p className="text-xs text-destructive">{errors.name}</p>
+          <p className="text-destructive text-xs">{errors.name}</p>
         )}
       </div>
 
@@ -357,25 +358,25 @@ export function FreeBetForm({ accounts, initialData, mode }: FreeBetFormProps) {
         <div className="space-y-2">
           <Label htmlFor="value">Value</Label>
           <Input
-            id="value"
-            type="number"
-            step="0.01"
-            min="0.01"
-            placeholder="0.00"
-            value={formData.value}
-            onChange={(e) => updateField("value", e.target.value)}
             className={errors.value ? "border-destructive" : ""}
+            id="value"
+            min="0.01"
+            onChange={(e) => updateField("value", e.target.value)}
+            placeholder="0.00"
+            step="0.01"
+            type="number"
+            value={formData.value}
           />
           {errors.value && (
-            <p className="text-xs text-destructive">{errors.value}</p>
+            <p className="text-destructive text-xs">{errors.value}</p>
           )}
         </div>
 
         <div className="space-y-2">
           <Label htmlFor="currency">Currency</Label>
           <Select
-            value={formData.currency}
             onValueChange={(value) => updateField("currency", value)}
+            value={formData.currency}
           >
             <SelectTrigger>
               <SelectValue />
@@ -389,7 +390,7 @@ export function FreeBetForm({ accounts, initialData, mode }: FreeBetFormProps) {
             </SelectContent>
           </Select>
           {errors.currency && (
-            <p className="text-xs text-destructive">{errors.currency}</p>
+            <p className="text-destructive text-xs">{errors.currency}</p>
           )}
         </div>
       </div>
@@ -398,19 +399,19 @@ export function FreeBetForm({ accounts, initialData, mode }: FreeBetFormProps) {
       <div className="space-y-2">
         <Label htmlFor="minOdds">Minimum Odds (optional)</Label>
         <Input
-          id="minOdds"
-          type="number"
-          step="any"
-          min="1.00"
-          placeholder="e.g., 2.00"
-          value={formData.minOdds}
-          onChange={(e) => updateField("minOdds", e.target.value)}
           className={errors.minOdds ? "border-destructive" : ""}
+          id="minOdds"
+          min="1.00"
+          onChange={(e) => updateField("minOdds", e.target.value)}
+          placeholder="e.g., 2.00"
+          step="any"
+          type="number"
+          value={formData.minOdds}
         />
         {errors.minOdds && (
-          <p className="text-xs text-destructive">{errors.minOdds}</p>
+          <p className="text-destructive text-xs">{errors.minOdds}</p>
         )}
-        <p className="text-xs text-muted-foreground">
+        <p className="text-muted-foreground text-xs">
           Some free bets require minimum odds to qualify
         </p>
       </div>
@@ -419,10 +420,10 @@ export function FreeBetForm({ accounts, initialData, mode }: FreeBetFormProps) {
       <div className="space-y-2">
         <Label htmlFor="stakeReturned">Stake Return</Label>
         <Select
-          value={formData.stakeReturned ? "returned" : "not_returned"}
           onValueChange={(value) =>
             updateField("stakeReturned", value === "returned")
           }
+          value={formData.stakeReturned ? "returned" : "not_returned"}
         >
           <SelectTrigger>
             <SelectValue />
@@ -432,7 +433,7 @@ export function FreeBetForm({ accounts, initialData, mode }: FreeBetFormProps) {
             <SelectItem value="returned">Stake returned</SelectItem>
           </SelectContent>
         </Select>
-        <p className="text-xs text-muted-foreground">
+        <p className="text-muted-foreground text-xs">
           Choose whether the free bet stake is returned on a win.
         </p>
       </div>
@@ -442,11 +443,11 @@ export function FreeBetForm({ accounts, initialData, mode }: FreeBetFormProps) {
         <Label htmlFor="expiresAt">Expiry Date (optional)</Label>
         <Input
           id="expiresAt"
+          onChange={(e) => updateField("expiresAt", e.target.value)}
           type="date"
           value={formData.expiresAt}
-          onChange={(e) => updateField("expiresAt", e.target.value)}
         />
-        <p className="text-xs text-muted-foreground">
+        <p className="text-muted-foreground text-xs">
           When does this free bet expire? Leave blank if no expiry.
         </p>
       </div>
@@ -456,24 +457,24 @@ export function FreeBetForm({ accounts, initialData, mode }: FreeBetFormProps) {
         <Label htmlFor="notes">Notes (optional)</Label>
         <Textarea
           id="notes"
-          placeholder="e.g., Terms & conditions, wagering requirements, etc."
-          value={formData.notes}
           onChange={(e) => updateField("notes", e.target.value)}
+          placeholder="e.g., Terms & conditions, wagering requirements, etc."
           rows={3}
+          value={formData.notes}
         />
       </div>
 
       {/* Unlock Requirements (Collapsible) */}
       {mode === "create" && (
         <Collapsible
-          open={showUnlockSection}
           onOpenChange={setShowUnlockSection}
+          open={showUnlockSection}
         >
           <CollapsibleTrigger asChild>
             <Button
+              className="flex w-full items-center justify-between p-0 hover:bg-transparent"
               type="button"
               variant="ghost"
-              className="flex w-full items-center justify-between p-0 hover:bg-transparent"
             >
               <span className="font-medium text-sm">
                 Unlock Requirements (optional)
@@ -493,15 +494,15 @@ export function FreeBetForm({ accounts, initialData, mode }: FreeBetFormProps) {
             {/* Enable unlock tracking */}
             <div className="flex items-center gap-2">
               <input
-                type="checkbox"
-                id="hasUnlockRequirements"
                 checked={formData.hasUnlockRequirements}
+                className="h-4 w-4 rounded border-gray-300"
+                id="hasUnlockRequirements"
                 onChange={(e) =>
                   updateField("hasUnlockRequirements", e.target.checked)
                 }
-                className="h-4 w-4 rounded border-gray-300"
+                type="checkbox"
               />
-              <Label htmlFor="hasUnlockRequirements" className="text-sm">
+              <Label className="text-sm" htmlFor="hasUnlockRequirements">
                 This promo has unlock requirements
               </Label>
             </div>
@@ -512,10 +513,10 @@ export function FreeBetForm({ accounts, initialData, mode }: FreeBetFormProps) {
                 <div className="space-y-2">
                   <Label htmlFor="unlockType">Unlock Type</Label>
                   <Select
-                    value={formData.unlockType}
                     onValueChange={(value: "stake" | "bets") =>
                       updateField("unlockType", value)
                     }
+                    value={formData.unlockType}
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -539,21 +540,21 @@ export function FreeBetForm({ accounts, initialData, mode }: FreeBetFormProps) {
                       : "Required Number of Bets"}
                   </Label>
                   <Input
+                    className={errors.unlockTarget ? "border-destructive" : ""}
                     id="unlockTarget"
-                    type="number"
-                    step={formData.unlockType === "stake" ? "0.01" : "1"}
                     min={formData.unlockType === "stake" ? "0.01" : "1"}
-                    placeholder={
-                      formData.unlockType === "stake" ? "50.00" : "3"
-                    }
-                    value={formData.unlockTarget}
                     onChange={(e) =>
                       updateField("unlockTarget", e.target.value)
                     }
-                    className={errors.unlockTarget ? "border-destructive" : ""}
+                    placeholder={
+                      formData.unlockType === "stake" ? "50.00" : "3"
+                    }
+                    step={formData.unlockType === "stake" ? "0.01" : "1"}
+                    type="number"
+                    value={formData.unlockTarget}
                   />
                   {errors.unlockTarget && (
-                    <p className="text-xs text-destructive">
+                    <p className="text-destructive text-xs">
                       {errors.unlockTarget}
                     </p>
                   )}
@@ -570,19 +571,19 @@ export function FreeBetForm({ accounts, initialData, mode }: FreeBetFormProps) {
                     Minimum Odds for Qualifying Bets (optional)
                   </Label>
                   <Input
+                    className={errors.unlockMinOdds ? "border-destructive" : ""}
                     id="unlockMinOdds"
-                    type="number"
-                    step="any"
                     min="1.00"
-                    placeholder="e.g., 1.50"
-                    value={formData.unlockMinOdds}
                     onChange={(e) =>
                       updateField("unlockMinOdds", e.target.value)
                     }
-                    className={errors.unlockMinOdds ? "border-destructive" : ""}
+                    placeholder="e.g., 1.50"
+                    step="any"
+                    type="number"
+                    value={formData.unlockMinOdds}
                   />
                   {errors.unlockMinOdds && (
-                    <p className="text-xs text-destructive">
+                    <p className="text-destructive text-xs">
                       {errors.unlockMinOdds}
                     </p>
                   )}
@@ -598,14 +599,14 @@ export function FreeBetForm({ accounts, initialData, mode }: FreeBetFormProps) {
 
       {/* Wagering requirements for winnings */}
       <Collapsible
-        open={showWinWageringSection}
         onOpenChange={setShowWinWageringSection}
+        open={showWinWageringSection}
       >
         <CollapsibleTrigger asChild>
           <Button
+            className="flex w-full items-center justify-between p-0 hover:bg-transparent"
             type="button"
             variant="ghost"
-            className="flex w-full items-center justify-between p-0 hover:bg-transparent"
           >
             <span className="font-medium text-sm">
               Winnings Wagering Requirements (optional)
@@ -624,15 +625,15 @@ export function FreeBetForm({ accounts, initialData, mode }: FreeBetFormProps) {
 
           <div className="flex items-center gap-2">
             <input
-              type="checkbox"
-              id="hasWinWageringRequirements"
               checked={formData.hasWinWageringRequirements}
+              className="h-4 w-4 rounded border-gray-300"
+              id="hasWinWageringRequirements"
               onChange={(e) =>
                 updateField("hasWinWageringRequirements", e.target.checked)
               }
-              className="h-4 w-4 rounded border-gray-300"
+              type="checkbox"
             />
-            <Label htmlFor="hasWinWageringRequirements" className="text-sm">
+            <Label className="text-sm" htmlFor="hasWinWageringRequirements">
               Winnings have wagering requirements
             </Label>
           </div>
@@ -644,21 +645,21 @@ export function FreeBetForm({ accounts, initialData, mode }: FreeBetFormProps) {
                   Wagering Multiplier
                 </Label>
                 <Input
-                  id="winWageringMultiplier"
-                  type="number"
-                  step="0.1"
-                  min="0.1"
-                  placeholder="e.g., 3"
-                  value={formData.winWageringMultiplier}
-                  onChange={(e) =>
-                    updateField("winWageringMultiplier", e.target.value)
-                  }
                   className={
                     errors.winWageringMultiplier ? "border-destructive" : ""
                   }
+                  id="winWageringMultiplier"
+                  min="0.1"
+                  onChange={(e) =>
+                    updateField("winWageringMultiplier", e.target.value)
+                  }
+                  placeholder="e.g., 3"
+                  step="0.1"
+                  type="number"
+                  value={formData.winWageringMultiplier}
                 />
                 {errors.winWageringMultiplier && (
-                  <p className="text-xs text-destructive">
+                  <p className="text-destructive text-xs">
                     {errors.winWageringMultiplier}
                   </p>
                 )}
@@ -672,21 +673,21 @@ export function FreeBetForm({ accounts, initialData, mode }: FreeBetFormProps) {
                   Minimum Odds for Wagering (optional)
                 </Label>
                 <Input
-                  id="winWageringMinOdds"
-                  type="number"
-                  step="any"
-                  min="1.00"
-                  placeholder="e.g., 1.50"
-                  value={formData.winWageringMinOdds}
-                  onChange={(e) =>
-                    updateField("winWageringMinOdds", e.target.value)
-                  }
                   className={
                     errors.winWageringMinOdds ? "border-destructive" : ""
                   }
+                  id="winWageringMinOdds"
+                  min="1.00"
+                  onChange={(e) =>
+                    updateField("winWageringMinOdds", e.target.value)
+                  }
+                  placeholder="e.g., 1.50"
+                  step="any"
+                  type="number"
+                  value={formData.winWageringMinOdds}
                 />
                 {errors.winWageringMinOdds && (
-                  <p className="text-xs text-destructive">
+                  <p className="text-destructive text-xs">
                     {errors.winWageringMinOdds}
                   </p>
                 )}
@@ -701,21 +702,21 @@ export function FreeBetForm({ accounts, initialData, mode }: FreeBetFormProps) {
                   Days to Complete Wagering (optional)
                 </Label>
                 <Input
-                  id="winWageringExpiresInDays"
-                  type="number"
-                  step="1"
-                  min="1"
-                  placeholder="e.g., 30"
-                  value={formData.winWageringExpiresInDays}
-                  onChange={(e) =>
-                    updateField("winWageringExpiresInDays", e.target.value)
-                  }
                   className={
                     errors.winWageringExpiresInDays ? "border-destructive" : ""
                   }
+                  id="winWageringExpiresInDays"
+                  min="1"
+                  onChange={(e) =>
+                    updateField("winWageringExpiresInDays", e.target.value)
+                  }
+                  placeholder="e.g., 30"
+                  step="1"
+                  type="number"
+                  value={formData.winWageringExpiresInDays}
                 />
                 {errors.winWageringExpiresInDays && (
-                  <p className="text-xs text-destructive">
+                  <p className="text-destructive text-xs">
                     {errors.winWageringExpiresInDays}
                   </p>
                 )}
@@ -750,15 +751,15 @@ export function FreeBetForm({ accounts, initialData, mode }: FreeBetFormProps) {
       {/* Actions */}
       <div className="flex gap-4 pt-4">
         <Button
+          className="flex-1"
+          disabled={isSubmitting}
+          onClick={() => router.push("/bets/settings/promos")}
           type="button"
           variant="outline"
-          className="flex-1"
-          onClick={() => router.push("/bets/settings/promos")}
-          disabled={isSubmitting}
         >
           Cancel
         </Button>
-        <Button type="submit" className="flex-1" disabled={isSubmitting}>
+        <Button className="flex-1" disabled={isSubmitting} type="submit">
           {isSubmitting ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -774,22 +775,22 @@ export function FreeBetForm({ accounts, initialData, mode }: FreeBetFormProps) {
 
       {/* Delete section - only for edit mode */}
       {mode === "edit" && initialData?.id && initialData.status !== "used" && (
-        <div className="border-t pt-6 mt-6">
+        <div className="mt-6 border-t pt-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-destructive">
+              <p className="font-medium text-destructive text-sm">
                 Danger Zone
               </p>
-              <p className="text-xs text-muted-foreground mt-1">
+              <p className="mt-1 text-muted-foreground text-xs">
                 Delete this free bet permanently. This cannot be undone.
               </p>
             </div>
             <DeleteConfirmDialog
-              title="Delete free bet?"
               description={`This will permanently delete the free bet "${initialData.name}" worth ${initialData.currency} ${Number.parseFloat(initialData.value).toFixed(2)}. This action cannot be undone.`}
-              onConfirm={handleDelete}
               destructiveLabel="Delete Free Bet"
               disabled={isSubmitting}
+              onConfirm={handleDelete}
+              title="Delete free bet?"
             />
           </div>
         </div>

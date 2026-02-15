@@ -16,9 +16,9 @@ import {
   lte,
   ne,
   or,
+  type SQL,
   sql,
   sum,
-  type SQL,
 } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
@@ -32,10 +32,11 @@ import {
   backBet,
   balanceSnapshot,
   bonusQualifyingBet,
-  depositBonus,
+  DEFAULT_COMPETITION_CODES,
   type DepositBonusStatus,
-  footballMatch,
+  depositBonus,
   type FootballMatchStatus,
+  footballMatch,
   freeBet,
   freeBetWageringBet,
   layBet,
@@ -46,13 +47,12 @@ import {
   type User,
   user,
   userSettings,
-  wallet,
-  walletTransaction,
   type WageringBase,
-  type WalletType,
   type WalletStatus,
   type WalletTransactionType,
-  DEFAULT_COMPETITION_CODES,
+  type WalletType,
+  wallet,
+  walletTransaction,
 } from "./schema";
 import { generateHashedPassword } from "./utils";
 
@@ -682,7 +682,7 @@ export interface OpenBetStakes {
  * Sums stakes from back_bet and lay_bet tables where status != 'settled'.
  * For lay bets, also calculates liability = stake * (odds - 1).
  * Why: Shows how much capital is tied up in active positions vs available for withdrawal.
- * 
+ *
  * Note: Free bet stakes are EXCLUDED from openBackStake since they don't lock real money.
  * A back bet is considered a free bet if its linked matchedBet has a free bet promo type.
  */
@@ -768,8 +768,12 @@ export async function getOpenBetStakesByAccount({
           openLayStake: 0,
           openLayLiability: 0,
         };
-        existing.openBackStake = Number.parseFloat(String(row.totalStake) || "0");
-        existing.openFreeBetStake = Number.parseFloat(String(row.freeBetStake) || "0");
+        existing.openBackStake = Number.parseFloat(
+          String(row.totalStake) || "0"
+        );
+        existing.openFreeBetStake = Number.parseFloat(
+          String(row.freeBetStake) || "0"
+        );
         accountMap.set(row.accountId, existing);
       }
     }
@@ -782,8 +786,12 @@ export async function getOpenBetStakesByAccount({
           openLayStake: 0,
           openLayLiability: 0,
         };
-        existing.openLayStake = Number.parseFloat(String(row.totalStake) || "0");
-        existing.openLayLiability = Number.parseFloat(String(row.totalLiability) || "0");
+        existing.openLayStake = Number.parseFloat(
+          String(row.totalStake) || "0"
+        );
+        existing.openLayLiability = Number.parseFloat(
+          String(row.totalLiability) || "0"
+        );
         accountMap.set(row.accountId, existing);
       }
     }
@@ -918,12 +926,12 @@ export async function getTransactionTrends({
 /**
  * Get balance trends (net deposits/withdrawals/bonuses/adjustments) grouped by day/week/month.
  * Includes both account transactions (bookmakers/exchanges) and wallet transactions.
- * 
+ *
  * IMPORTANT: Internal transfers (wallet <-> account) are excluded to avoid double-counting.
  * Only external money flows are counted:
  * - Account deposits/withdrawals NOT linked to wallet transactions
  * - Wallet deposits/withdrawals NOT linked to account transactions
- * 
+ *
  * Uses pre-computed amountNok from the database (no FX API calls needed).
  * Falls back to live FX conversion for legacy rows without amountNok.
  */
@@ -1018,8 +1026,7 @@ export async function getBalanceTrends({
         const currency = row.currency ?? "NOK";
         amountNok = await convertAmountToNok(amount, currency);
       }
-      const signedAmount =
-        row.type === "withdrawal" ? -amountNok : amountNok;
+      const signedAmount = row.type === "withdrawal" ? -amountNok : amountNok;
       const key = String(row.periodDate);
 
       totals.set(key, (totals.get(key) ?? 0) + signedAmount);
@@ -1054,10 +1061,16 @@ export async function getBalanceTrends({
       const date = new Date(dateStr);
       const label =
         groupBy === "month"
-          ? date.toLocaleDateString("en-GB", { month: "short", year: "numeric" })
+          ? date.toLocaleDateString("en-GB", {
+              month: "short",
+              year: "numeric",
+            })
           : groupBy === "week"
             ? `Week of ${date.toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`
-            : date.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+            : date.toLocaleDateString("en-GB", {
+                day: "numeric",
+                month: "short",
+              });
 
       return {
         date: dateStr,
@@ -2396,8 +2409,8 @@ export async function getMatchedBetWithParts({
         matched: matchedBet,
         back: backBet,
         lay: layBet,
-        footballMatch: footballMatch,
-        freeBet: freeBet,
+        footballMatch,
+        freeBet,
       })
       .from(matchedBet)
       .leftJoin(backBet, eq(matchedBet.backBetId, backBet.id))
@@ -5135,10 +5148,7 @@ export async function addFreeBetWageringBet({
         updates.winWageringCompletedAt = new Date();
       }
 
-      await db
-        .update(freeBet)
-        .set(updates)
-        .where(eq(freeBet.id, freeBetId));
+      await db.update(freeBet).set(updates).where(eq(freeBet.id, freeBetId));
     }
 
     await db.insert(auditLog).values({
@@ -5730,9 +5740,7 @@ export async function createLockedPromo({
         unlockProgress: "0",
         stakeReturned: stakeReturned ?? false,
         winWageringMultiplier:
-          winWageringMultiplier != null
-            ? String(winWageringMultiplier)
-            : null,
+          winWageringMultiplier != null ? String(winWageringMultiplier) : null,
         winWageringMinOdds:
           winWageringMinOdds != null ? String(winWageringMinOdds) : null,
         winWageringExpiresInDays: winWageringExpiresInDays ?? null,
@@ -6634,8 +6642,12 @@ export async function deleteBet({
             .where(eq(depositBonus.id, qb.depositBonusId));
 
           if (bonus) {
-            const currentProgress = Number.parseFloat(bonus.wageringProgress ?? "0");
-            const requirement = Number.parseFloat(bonus.wageringRequirement ?? "0");
+            const currentProgress = Number.parseFloat(
+              bonus.wageringProgress ?? "0"
+            );
+            const requirement = Number.parseFloat(
+              bonus.wageringRequirement ?? "0"
+            );
             const newProgress = Math.max(0, currentProgress - stakeValue);
 
             const updates: Record<string, unknown> = {
@@ -6711,10 +6723,7 @@ export async function deleteBet({
               winWageringProgress: newProgress.toString(),
             };
 
-            if (
-              fb.winWageringCompletedAt &&
-              newProgress < requirement
-            ) {
+            if (fb.winWageringCompletedAt && newProgress < requirement) {
               updates.winWageringCompletedAt = null;
             }
 
@@ -6896,8 +6905,12 @@ export async function deleteMatchedBet({
           .where(eq(depositBonus.id, bqb.depositBonusId));
 
         if (bonus) {
-          const currentProgress = Number.parseFloat(bonus.wageringProgress ?? "0");
-          const requirement = Number.parseFloat(bonus.wageringRequirement ?? "0");
+          const currentProgress = Number.parseFloat(
+            bonus.wageringProgress ?? "0"
+          );
+          const requirement = Number.parseFloat(
+            bonus.wageringRequirement ?? "0"
+          );
           const newProgress = Math.max(0, currentProgress - stakeValue);
 
           const updates: Record<string, unknown> = {
@@ -6935,7 +6948,9 @@ export async function deleteMatchedBet({
       }
 
       // Delete the bonus qualifying bet link
-      await db.delete(bonusQualifyingBet).where(eq(bonusQualifyingBet.id, bqb.id));
+      await db
+        .delete(bonusQualifyingBet)
+        .where(eq(bonusQualifyingBet.id, bqb.id));
     }
 
     // Handle free bet winnings wagering bets referencing this matched bet
@@ -7156,7 +7171,7 @@ export async function validateShortcutApiKey(
     const now = new Date();
     if (settings.lastShortcutRequestAt) {
       const elapsed = now.getTime() - settings.lastShortcutRequestAt.getTime();
-      const minInterval = 10000; // 10 seconds
+      const minInterval = 10_000; // 10 seconds
       if (elapsed < minInterval) {
         const retryAfter = Math.ceil((minInterval - elapsed) / 1000);
         return { valid: false, error: "rate_limited", retryAfter };
@@ -7666,7 +7681,10 @@ export async function createTransferToAccount(params: {
       .set({ linkedAccountTransactionId: accountTx.id })
       .where(eq(walletTransaction.id, walletTx.id));
 
-    return { walletTx: { ...walletTx, linkedAccountTransactionId: accountTx.id }, accountTx };
+    return {
+      walletTx: { ...walletTx, linkedAccountTransactionId: accountTx.id },
+      accountTx,
+    };
   } catch (_error) {
     throw new ChatSDKError(
       "bad_request:database",
@@ -7725,7 +7743,10 @@ export async function createTransferFromAccount(params: {
       .set({ linkedWalletTransactionId: walletTx.id })
       .where(eq(accountTransaction.id, accountTx.id));
 
-    return { walletTx, accountTx: { ...accountTx, linkedWalletTransactionId: walletTx.id } };
+    return {
+      walletTx,
+      accountTx: { ...accountTx, linkedWalletTransactionId: walletTx.id },
+    };
   } catch (_error) {
     throw new ChatSDKError(
       "bad_request:database",
@@ -7907,9 +7928,7 @@ export async function getBalanceSnapshots({
     return rows.map((row) => ({
       createdAt: row.createdAt,
       totalCapitalNok: Number.parseFloat(row.totalCapitalNok ?? "0"),
-      accountsNok: row.accountsNok
-        ? Number.parseFloat(row.accountsNok)
-        : null,
+      accountsNok: row.accountsNok ? Number.parseFloat(row.accountsNok) : null,
       walletsNok: row.walletsNok ? Number.parseFloat(row.walletsNok) : null,
     }));
   } catch (_error) {
@@ -8203,7 +8222,10 @@ export async function updateDepositBonus(params: UpdateDepositBonusParams) {
       .update(depositBonus)
       .set(updates)
       .where(
-        and(eq(depositBonus.id, params.id), eq(depositBonus.userId, params.userId))
+        and(
+          eq(depositBonus.id, params.id),
+          eq(depositBonus.userId, params.userId)
+        )
       )
       .returning();
 
@@ -8253,9 +8275,7 @@ export async function updateDepositBonusProgress({
     const [result] = await db
       .update(depositBonus)
       .set(updates)
-      .where(
-        and(eq(depositBonus.id, id), eq(depositBonus.userId, userId))
-      )
+      .where(and(eq(depositBonus.id, id), eq(depositBonus.userId, userId)))
       .returning();
 
     // Create audit entry for progress update
@@ -8272,9 +8292,10 @@ export async function updateDepositBonusProgress({
           newProgress,
           cleared: updates.status === "cleared",
         },
-        notes: updates.status === "cleared"
-          ? "Wagering complete - bonus cleared"
-          : `Wagering progress updated: ${newProgress.toFixed(2)} / ${requirement.toFixed(2)}`,
+        notes:
+          updates.status === "cleared"
+            ? "Wagering complete - bonus cleared"
+            : `Wagering progress updated: ${newProgress.toFixed(2)} / ${requirement.toFixed(2)}`,
       });
     }
 
@@ -8303,9 +8324,7 @@ export async function forfeitDepositBonus({
     const [result] = await db
       .update(depositBonus)
       .set({ status: "forfeited" })
-      .where(
-        and(eq(depositBonus.id, id), eq(depositBonus.userId, userId))
-      )
+      .where(and(eq(depositBonus.id, id), eq(depositBonus.userId, userId)))
       .returning();
 
     if (result) {
@@ -8348,9 +8367,7 @@ export async function deleteDepositBonus({
     // Delete the bonus
     const [result] = await db
       .delete(depositBonus)
-      .where(
-        and(eq(depositBonus.id, id), eq(depositBonus.userId, userId))
-      )
+      .where(and(eq(depositBonus.id, id), eq(depositBonus.userId, userId)))
       .returning();
 
     if (result) {
@@ -8491,8 +8508,11 @@ export async function getActiveDepositBonusesSummary({
   totalWageringRemaining: number;
 }> {
   try {
-    const bonuses = await listDepositBonusesByUser({ userId, status: "active" });
-    
+    const bonuses = await listDepositBonusesByUser({
+      userId,
+      status: "active",
+    });
+
     let totalBonusValue = 0;
     let totalWageringRemaining = 0;
 

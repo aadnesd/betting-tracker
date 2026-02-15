@@ -5,7 +5,7 @@
  * betting profit from matched bets with bonus transactions per bookmaker,
  * enabling users to compare bookmaker reward programs.
  */
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock server-only to allow testing server modules
 vi.mock("server-only", () => ({}));
@@ -34,8 +34,8 @@ vi.mock("postgres", () => ({
   default: vi.fn(() => ({})),
 }));
 
-import * as dbQueries from "@/lib/db/queries";
 import type { BookmakerProfitWithBonuses } from "@/lib/db/queries";
+import * as dbQueries from "@/lib/db/queries";
 
 describe("getBookmakerProfitWithBonuses", () => {
   beforeEach(() => {
@@ -57,24 +57,26 @@ describe("getBookmakerProfitWithBonuses", () => {
     });
 
     it("accepts all date range parameters", () => {
-      const params: Parameters<typeof dbQueries.getBookmakerProfitWithBonuses>[0] =
-        {
-          userId: "user-1",
-          startDate: new Date("2025-01-01"),
-          endDate: new Date("2025-12-31"),
-        };
+      const params: Parameters<
+        typeof dbQueries.getBookmakerProfitWithBonuses
+      >[0] = {
+        userId: "user-1",
+        startDate: new Date("2025-01-01"),
+        endDate: new Date("2025-12-31"),
+      };
       expect(params.userId).toBe("user-1");
       expect(params.startDate).toBeInstanceOf(Date);
       expect(params.endDate).toBeInstanceOf(Date);
     });
 
     it("allows null date parameters for all-time queries", () => {
-      const params: Parameters<typeof dbQueries.getBookmakerProfitWithBonuses>[0] =
-        {
-          userId: "user-1",
-          startDate: null,
-          endDate: null,
-        };
+      const params: Parameters<
+        typeof dbQueries.getBookmakerProfitWithBonuses
+      >[0] = {
+        userId: "user-1",
+        startDate: null,
+        endDate: null,
+      };
       expect(params.startDate).toBeNull();
       expect(params.endDate).toBeNull();
     });

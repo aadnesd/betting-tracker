@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/app/(auth)/auth";
-import { getMatchedBetWithParts, deleteMatchedBet } from "@/lib/db/queries";
+import { deleteMatchedBet, getMatchedBetWithParts } from "@/lib/db/queries";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -21,10 +21,16 @@ export async function GET(request: Request, { params }: RouteParams) {
   const { id } = await params;
 
   try {
-    const matchedBet = await getMatchedBetWithParts({ id, userId: session.user.id });
+    const matchedBet = await getMatchedBetWithParts({
+      id,
+      userId: session.user.id,
+    });
 
     if (!matchedBet) {
-      return NextResponse.json({ error: "Matched bet not found" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Matched bet not found" },
+        { status: 404 }
+      );
     }
 
     return NextResponse.json({ matchedBet });
@@ -59,7 +65,10 @@ export async function DELETE(request: Request, { params }: RouteParams) {
     });
 
     if (!result) {
-      return NextResponse.json({ error: "Matched bet not found" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Matched bet not found" },
+        { status: 404 }
+      );
     }
 
     return NextResponse.json({ success: true, cascade: result.cascade });

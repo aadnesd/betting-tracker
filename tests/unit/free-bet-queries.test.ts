@@ -6,7 +6,7 @@
  * This is critical for the P6 promo tracking feature that helps users
  * manage their free bet inventory, track expiry, and link to matched bets.
  */
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock server-only to allow testing server modules
 vi.mock("server-only", () => ({}));
@@ -200,10 +200,8 @@ describe("FreeBet CRUD queries", () => {
       expect(typeof dbQueries.getFreeBetById).toBe("function");
 
       // Verify function signature
-      const fn: (args: {
-        id: string;
-        userId: string;
-      }) => Promise<unknown> = dbQueries.getFreeBetById;
+      const fn: (args: { id: string; userId: string }) => Promise<unknown> =
+        dbQueries.getFreeBetById;
       expect(fn).toBeDefined();
     });
 
@@ -241,10 +239,11 @@ describe("FreeBet CRUD queries", () => {
         userId: "user-1",
         status: "used",
       };
-      const expiredParams: Parameters<typeof dbQueries.listFreeBetsByUser>[0] = {
-        userId: "user-1",
-        status: "expired",
-      };
+      const expiredParams: Parameters<typeof dbQueries.listFreeBetsByUser>[0] =
+        {
+          userId: "user-1",
+          status: "expired",
+        };
 
       expect(activeParams.status).toBe("active");
       expect(usedParams.status).toBe("used");
@@ -281,9 +280,8 @@ describe("FreeBet CRUD queries", () => {
       expect(typeof dbQueries.updateFreeBet).toBe("function");
 
       // Verify function signature
-      const fn: (
-        args: dbQueries.UpdateFreeBetParams
-      ) => Promise<unknown> = dbQueries.updateFreeBet;
+      const fn: (args: dbQueries.UpdateFreeBetParams) => Promise<unknown> =
+        dbQueries.updateFreeBet;
       expect(fn).toBeDefined();
     });
 
@@ -370,9 +368,7 @@ describe("FreeBet CRUD queries", () => {
       expect(typeof dbQueries.getActiveFreeBetsSummary).toBe("function");
 
       // Verify function signature
-      const fn: (args: {
-        userId: string;
-      }) => Promise<{
+      const fn: (args: { userId: string }) => Promise<{
         count: number;
         totalValue: number;
       }> = dbQueries.getActiveFreeBetsSummary;
@@ -534,10 +530,7 @@ describe("FreeBet CRUD queries", () => {
       expect(typeof dbQueries.removeQualifyingBet).toBe("function");
 
       // Verify function signature
-      const fn: (args: {
-        qualifyingBetId: string;
-        userId: string;
-      }) => Promise<{
+      const fn: (args: { qualifyingBetId: string; userId: string }) => Promise<{
         success: boolean;
         newProgress: number;
       }> = dbQueries.removeQualifyingBet;

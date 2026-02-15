@@ -1,11 +1,11 @@
-import { redirect } from "next/navigation";
-import Link from "next/link";
-import { auth } from "@/app/(auth)/auth";
-import { listAccountsByUser } from "@/lib/db/queries";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import { auth } from "@/app/(auth)/auth";
 import { DepositBonusForm } from "@/components/bets/deposit-bonus-form";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { listAccountsByUser } from "@/lib/db/queries";
 
 export default async function NewDepositBonusPage() {
   const session = await auth();
@@ -22,16 +22,16 @@ export default async function NewDepositBonusPage() {
   }));
 
   return (
-    <div className="container mx-auto max-w-2xl p-4 space-y-6">
+    <div className="container mx-auto max-w-2xl space-y-6 p-4">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" asChild>
+        <Button asChild size="icon" variant="ghost">
           <Link href="/bets/settings/promos">
             <ArrowLeft className="h-4 w-4" />
           </Link>
         </Button>
         <div>
-          <h1 className="text-2xl font-bold">New Deposit Bonus</h1>
+          <h1 className="font-bold text-2xl">New Deposit Bonus</h1>
           <p className="text-muted-foreground">
             Track a deposit bonus with wagering requirements
           </p>

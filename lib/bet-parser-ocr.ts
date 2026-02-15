@@ -1,19 +1,19 @@
 /**
  * OCR-based bet parser for faster parsing.
- * 
+ *
  * Strategy:
  * 1. Use Azure Document Intelligence for fast, accurate text extraction
  * 2. Use a lightweight LLM to parse the structured data from extracted text
- * 
+ *
  * This is significantly faster than sending images to a vision LLM.
  */
 
-import { generateObject } from "ai";
 import { gateway } from "@ai-sdk/gateway";
+import { generateObject } from "ai";
 import { z } from "zod";
 import { extractTextFromImages } from "@/lib/azure-ocr";
-import { isTestEnvironment } from "@/lib/constants";
 import type { ParsedBet, ParsedPair } from "@/lib/bet-parser";
+import { isTestEnvironment } from "@/lib/constants";
 
 const confidenceShape = z
   .record(z.string(), z.number().min(0).max(1))
@@ -50,7 +50,7 @@ function normalizeNumbers(bet: ParsedBet): ParsedBet {
 
 /**
  * Parse matched bet from screenshots using OCR + LLM.
- * 
+ *
  * This is faster than using vision LLMs because:
  * 1. Azure OCR is optimized for text extraction (~1-2 sec)
  * 2. Text-only LLM calls are much faster than vision calls
@@ -96,14 +96,19 @@ export async function parseMatchedBetWithOcr({
 
   // Step 1: Extract text from both images in parallel
   const ocrStart = Date.now();
-  const [backOcr, layOcr] = await extractTextFromImages([backImageUrl, layImageUrl]);
+  const [backOcr, layOcr] = await extractTextFromImages([
+    backImageUrl,
+    layImageUrl,
+  ]);
   const ocrDurationMs = Date.now() - ocrStart;
 
-  console.log(`[bet-parser-ocr] OCR completed in ${ocrDurationMs}ms (back: ${backOcr.durationMs}ms, lay: ${layOcr.durationMs}ms)`);
+  console.log(
+    `[bet-parser-ocr] OCR completed in ${ocrDurationMs}ms (back: ${backOcr.durationMs}ms, lay: ${layOcr.durationMs}ms)`
+  );
 
   // Step 2: Use LLM to parse the extracted text
   const llmStart = Date.now();
-  
+
   const { object } = await generateObject({
     model: gateway.languageModel("google/gemini-2.0-flash"),
     schema: pairSchema,
@@ -152,16 +157,12 @@ Flag needsReview=true if the markets or selections don't align between back and 
   console.log(`[bet-parser-ocr] LLM parsing completed in ${llmDurationMs}ms`);
 
   const pair = pairSchema.parse(object);
-  
+
   // Apply defaults for lay bet
   const layWithDefaults: ParsedBet = {
     ...normalizeNumbers(pair.lay),
-    exchange: pair.lay.exchange?.trim()
-      ? pair.lay.exchange
-      : "bfb247",
-    currency: pair.lay.currency?.trim()
-      ? pair.lay.currency
-      : "NOK",
+    exchange: pair.lay.exchange?.trim() ? pair.lay.exchange : "bfb247",
+    currency: pair.lay.currency?.trim() ? pair.lay.currency : "NOK",
   };
 
   // Cross-validate the pair
