@@ -120,8 +120,8 @@ async function processBet(
     layBetId: bet.layBetId,
     backAccountId: bet.backAccountId,
     layAccountId: bet.layAccountId,
-    backCurrency: null, // Currency is stored on bet, will default to NOK
-    layCurrency: null,
+    backCurrency: bet.backCurrency,
+    layCurrency: bet.layCurrency,
     market: bet.market,
     selection: bet.selection,
     matchResult,
