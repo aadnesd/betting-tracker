@@ -2403,7 +2403,8 @@ export async function getMatchedBetWithParts({
   userId: string;
 }) {
   try {
-    // First get the matched bet with back/lay bets and football match joined
+    // First get the matched bet with back/lay bets, football match, and exchange commission joined
+    const exchangeAccount = aliasedTable(account, "exchangeAccount");
     const [row] = await db
       .select({
         matched: matchedBet,
@@ -2411,10 +2412,12 @@ export async function getMatchedBetWithParts({
         lay: layBet,
         footballMatch,
         freeBet,
+        layAccountCommission: exchangeAccount.commission,
       })
       .from(matchedBet)
       .leftJoin(backBet, eq(matchedBet.backBetId, backBet.id))
       .leftJoin(layBet, eq(matchedBet.layBetId, layBet.id))
+      .leftJoin(exchangeAccount, eq(layBet.accountId, exchangeAccount.id))
       .leftJoin(footballMatch, eq(matchedBet.matchId, footballMatch.id))
       .leftJoin(freeBet, eq(freeBet.usedInMatchedBetId, matchedBet.id))
       .where(eq(matchedBet.id, id));
@@ -2453,6 +2456,9 @@ export async function getMatchedBetWithParts({
       layScreenshot,
       footballMatch: row.footballMatch,
       freeBet: row.freeBet,
+      layAccountCommission: row.layAccountCommission
+        ? Number.parseFloat(row.layAccountCommission)
+        : null,
     };
   } catch (_error) {
     throw new ChatSDKError(

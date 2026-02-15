@@ -61,6 +61,7 @@ export default async function Page({ params }: PageProps) {
     layScreenshot,
     footballMatch,
     freeBet,
+    layAccountCommission,
   } = data;
 
   // Fetch audit history for this matched bet
@@ -109,6 +110,7 @@ export default async function Page({ params }: PageProps) {
         layOdds,
         isFreeBet,
         freeBetStakeReturned,
+        commissionRate: layAccountCommission ?? 0,
       });
 
       // Convert to NOK for consistent display
@@ -126,17 +128,21 @@ export default async function Page({ params }: PageProps) {
           );
           return backProfitNok - layLiabilityNok;
         })(),
-        // profitIfLoses = layStake (for free bet) or layStake - backStake
+        // profitIfLoses = layStake * (1 - commission) (for free bet) or layStake * (1 - commission) - backStake
         (async () => {
-          const layStakeNok = await convertAmountToNok(layStake, layCurrency);
+          const commission = layAccountCommission ?? 0;
+          const layWinNetNok = await convertAmountToNok(
+            layStake * (1 - commission),
+            layCurrency
+          );
           if (isFreeBet) {
-            return layStakeNok; // No back stake lost
+            return layWinNetNok; // No back stake lost
           }
           const backStakeNok = await convertAmountToNok(
             backStake,
             backCurrency
           );
-          return layStakeNok - backStakeNok;
+          return layWinNetNok - backStakeNok;
         })(),
       ]);
 
