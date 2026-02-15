@@ -2670,11 +2670,13 @@ export type BetReadyForSettlement = {
   backStake: string | null;
   backAccountId: string | null;
   backBetPlacedAt: Date | null;
+  backCurrency: string | null;
   // Lay bet info
   layBetId: string | null;
   layOdds: string | null;
   layStake: string | null;
   layAccountId: string | null;
+  layCurrency: string | null;
   /** Exchange commission rate as a decimal (e.g., 0.05 for 5%). Null if no exchange account or commission not set. */
   layAccountCommission: number | null;
   // Football match result
@@ -2728,11 +2730,13 @@ export async function findBetsReadyForAutoSettlement({
         backStake: backBet.stake,
         backAccountId: backBet.accountId,
         backBetPlacedAt: backBet.placedAt,
+        backCurrency: backBet.currency,
         // Lay bet
         layBetId: layBet.id,
         layOdds: layBet.odds,
         layStake: layBet.stake,
         layAccountId: layBet.accountId,
+        layCurrency: layBet.currency,
         // Exchange account commission
         layAccountCommission: exchangeAccount.commission,
         // Football match
@@ -2789,10 +2793,12 @@ export async function findBetsReadyForAutoSettlement({
         backStake: row.backStake,
         backAccountId: row.backAccountId,
         backBetPlacedAt: row.backBetPlacedAt,
+        backCurrency: row.backCurrency,
         layBetId: row.layBetId,
         layOdds: row.layOdds,
         layStake: row.layStake,
         layAccountId: row.layAccountId,
+        layCurrency: row.layCurrency,
         layAccountCommission: row.layAccountCommission
           ? Number.parseFloat(row.layAccountCommission)
           : null,
