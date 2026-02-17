@@ -347,26 +347,7 @@ Remaining blocker: Rerun Playwright route tests in an environment that permits b
 
 - [x] **Promo progress tracking**: For recurring promos (e.g., "Bet £50 to unlock £10 free bet"), track progress toward unlock. DoD: promo detail shows progress bar and linked qualifying bets. Why: Helps complete multi-step promos. Implementation: Extended FreeBet schema with `locked` status and unlock requirement fields (unlockType: stake|bets, unlockTarget, unlockMinOdds, unlockProgress). Created QualifyingBet table to link bets that contribute to unlocking a promo. Added queries: `createLockedPromo` for creating promos with unlock requirements, `addQualifyingBet` and `removeQualifyingBet` for managing qualifying bets with automatic progress updates, `listFreeBetsWithProgress` for displaying promos with progress info, `listQualifyingBetsForPromo` for listing linked bets. Updated FreeBetForm with collapsible "Unlock Requirements" section for creating locked promos. Updated promo detail page with progress card showing progress bar (percentage, current vs target), unlock requirements summary, and qualifying bets list with links to matched bets. Updated promos list page to show locked promos in a separate section with progress bars. Tests: 9 new tests in free-bet-queries.test.ts covering new query functions and types (179 total tests passing).
 
-- [ ] **Deposit bonus tracking**: Add `DepositBonus` table for bonuses with wagering requirements (e.g., "Deposit 1000 NOK, get 100% bonus with 6x wagering at 1.80+ odds"). Unlike free bets which are immediately usable, deposit bonuses require wagering to clear.
-
-  **Spec:** See `specs/deposit-bonuses.md` for full requirements.
-
-  **Data Model:**
-  - `DepositBonus` table: id, userId, accountId, name, depositAmount, bonusAmount, currency, wageringMultiplier (e.g., 6), wageringBase (deposit/bonus/deposit_plus_bonus), wageringRequirement (computed), wageringProgress (default 0), minOdds, maxBetPercent (optional), expiresAt, status (active/cleared/forfeited/expired), linkedTransactionId (FK → AccountTransaction), clearedAt, notes.
-  - `BonusQualifyingBet` table: id, depositBonusId, betId, betType (back/matched), stake, odds, qualified (bool).
-
-  **Implementation Steps:**
-  1. Add schema tables to `lib/db/schema.ts` + generate migration
-  2. Add CRUD queries: `createDepositBonus`, `getDepositBonusById`, `listDepositBonusesByUser`, `listActiveDepositBonuses`, `updateDepositBonusProgress`, `markBonusCleared`, `addBonusQualifyingBet`, `listBonusQualifyingBets`
-  3. Create API routes: `GET/POST /api/bets/deposit-bonuses`, `GET/PATCH/DELETE /api/bets/deposit-bonuses/[id]`, `POST /api/bets/deposit-bonuses/[id]/qualifying-bets`
-  4. Extend promos settings page with "Deposit Bonuses" tab/section showing active bonuses with progress bars
-  5. Create deposit bonus form: account selector, deposit/bonus amounts, wagering multiplier, wagering base radio, min odds, expiry, link to recent deposit dropdown
-  6. Create detail page with progress card (wagered X / Y, remaining, %) and qualifying bets list
-  7. Hook into bet settlement: when settling a bet on an account with active bonus, check if odds >= minOdds, add stake to progress, create BonusQualifyingBet record, auto-mark cleared when progress >= requirement
-
-  **DoD:** Users can create deposit bonuses with wagering requirements, see progress update as bets settle, view qualifying bets, and bonus auto-marks as cleared when wagering complete. Tests cover schema, queries, API, and progress tracking.
-
-  **Why:** Deposit bonuses are a major profit source in matched betting but require careful wagering tracking. Currently users must track this manually in spreadsheets.
+- [x] **Deposit bonus tracking**: Add `DepositBonus` table for bonuses with wagering requirements (e.g., "Deposit 1000 NOK, get 100% bonus with 6x wagering at 1.80+ odds"). Unlike free bets which are immediately usable, deposit bonuses require wagering to clear. Implementation: Added `DepositBonus`/`BonusQualifyingBet` schema and migration, completed CRUD/progress queries in `lib/db/queries.ts`, shipped deposit bonus API routes (`/api/bets/deposit-bonuses`, `/api/bets/deposit-bonuses/[id]`, `/api/bets/deposit-bonuses/[id]/qualifying-bets`), and wired settlement to append qualifying bets, advance wagering progress, and auto-mark bonuses as cleared when requirements are met. Tests: added `tests/unit/deposit-bonus-queries.test.ts` for schema/query/progress coverage.
 
 ## P7 — Match Data & Auto-Settlement
 
