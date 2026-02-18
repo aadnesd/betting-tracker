@@ -4,6 +4,69 @@ import Google from "next-auth/providers/google";
 import { findOrCreateOAuthUser, getUserById } from "@/lib/db/queries";
 import { authConfig } from "./auth.config";
 
+const USER_EXISTS_CACHE_TTL_MS = 15_000;
+const USER_EXISTS_CACHE_MAX_SIZE = 1000;
+
+type UserExistsCacheEntry = {
+  exists: boolean;
+  expiresAt: number;
+};
+
+const userExistsCache = new Map<string, UserExistsCacheEntry>();
+const inFlightUserChecks = new Map<string, Promise<boolean>>();
+
+function compactUserExistsCache(now: number): void {
+  for (const [userId, entry] of userExistsCache) {
+    if (entry.expiresAt <= now) {
+      userExistsCache.delete(userId);
+    }
+  }
+
+  while (userExistsCache.size > USER_EXISTS_CACHE_MAX_SIZE) {
+    const oldestUserId = userExistsCache.keys().next().value as
+      | string
+      | undefined;
+    if (!oldestUserId) {
+      break;
+    }
+    userExistsCache.delete(oldestUserId);
+  }
+}
+
+function doesUserExist(userId: string): Promise<boolean> {
+  const now = Date.now();
+  const cached = userExistsCache.get(userId);
+
+  if (cached && cached.expiresAt > now) {
+    return cached.exists;
+  }
+
+  const inFlight = inFlightUserChecks.get(userId);
+  if (inFlight) {
+    return inFlight;
+  }
+
+  const checkPromise = getUserById(userId)
+    .then((dbUser) => {
+      const exists = Boolean(dbUser);
+      const cacheTime = Date.now();
+
+      userExistsCache.set(userId, {
+        exists,
+        expiresAt: cacheTime + USER_EXISTS_CACHE_TTL_MS,
+      });
+      compactUserExistsCache(cacheTime);
+
+      return exists;
+    })
+    .finally(() => {
+      inFlightUserChecks.delete(userId);
+    });
+
+  inFlightUserChecks.set(userId, checkPromise);
+  return checkPromise;
+}
+
 declare module "next-auth" {
   interface Session extends DefaultSession {
     user: {
@@ -38,7 +101,7 @@ export const {
     }),
   ],
   callbacks: {
-    async signIn({ user, account, profile }) {
+    signIn({ user, account, profile }) {
       if (account?.provider === "google" || account?.provider === "github") {
         const email = user?.email ?? profile?.email;
         return Boolean(email);
@@ -68,9 +131,9 @@ export const {
     },
     async session({ session, token }) {
       if (session.user && token.id) {
-        // Verify the user still exists in the database
-        const dbUser = await getUserById(token.id);
-        if (!dbUser) {
+        const userExists = await doesUserExist(token.id);
+
+        if (!userExists) {
           // User was deleted from database - return empty session
           // This will cause useSession to show unauthenticated state
           return {
