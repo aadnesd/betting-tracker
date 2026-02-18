@@ -16,6 +16,7 @@
     "db:check": "drizzle-kit check",
     "db:up": "drizzle-kit up",
     "test": "export PLAYWRIGHT=True && pnpm exec playwright test",
+    "perf:pages": "tsx scripts/test-page-load-performance.ts",
     "test:unit": "vitest run tests/unit",
     "test:integration": "REAL_AI=true vitest run tests/integration"
   },
