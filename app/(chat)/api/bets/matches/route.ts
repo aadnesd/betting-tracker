@@ -1,13 +1,16 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/app/(auth)/auth";
-import { listUpcomingMatches, searchFootballMatches } from "@/lib/db/queries";
+import {
+  listUpcomingMatchesCached,
+  searchFootballMatchesCached,
+} from "@/lib/db/cached-queries";
 
 /**
  * GET /api/bets/matches - Search or list football matches
  *
  * Query parameters:
- * - search: Optional search term to filter by team name
- * - limit: Maximum number of results (default 20)
+ * - search: Optional search term to filter by team name (min 2 chars)
+ * - limit: Maximum number of results (default 20, capped at 50)
  *
  * Returns upcoming matches (next 14 days) if no search term provided,
  * or matches matching the search term.
@@ -20,34 +23,26 @@ export async function GET(request: Request) {
   }
 
   const { searchParams } = new URL(request.url);
-  const search = searchParams.get("search");
-  const limit = Math.min(Number(searchParams.get("limit")) || 20, 100);
+  const rawSearch = searchParams.get("search");
+  const search = rawSearch?.trim() ?? "";
+  const limit = Math.min(
+    Math.max(Number(searchParams.get("limit")) || 20, 1),
+    50
+  );
+  const shouldSearch = search.length >= 2;
 
   try {
-    type SearchMatchRow = Awaited<
-      ReturnType<typeof searchFootballMatches>
-    >[number];
-    type UpcomingMatchRow = Awaited<
-      ReturnType<typeof listUpcomingMatches>
-    >[number];
-    type MatchRow = SearchMatchRow | UpcomingMatchRow;
-    let matches: MatchRow[] = [];
+    let matches: Awaited<ReturnType<typeof searchFootballMatchesCached>> = [];
 
-    if (search && search.trim().length > 0) {
-      const fromDate = new Date();
-      fromDate.setDate(fromDate.getDate() - 14);
-
+    if (shouldSearch) {
       // Search for matches by team name
-      matches = await searchFootballMatches({
-        searchTerm: search.trim(),
-        fromDate,
-        limit,
-      });
+      matches = await searchFootballMatchesCached(
+        search.trim().toLowerCase(),
+        limit
+      );
     } else {
       // List upcoming matches
-      matches = await listUpcomingMatches({
-        daysAhead: 14,
-      });
+      matches = await listUpcomingMatchesCached(limit);
     }
 
     // Map to a simpler format for the frontend

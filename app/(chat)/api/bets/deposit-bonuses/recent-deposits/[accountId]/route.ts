@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { auth } from "@/app/(auth)/auth";
-import { getRecentDepositsForAccount } from "@/lib/db/queries";
+import { getRecentDepositsForAccountCached } from "@/lib/db/cached-queries";
 
 export async function GET(
   request: NextRequest,
@@ -16,11 +16,11 @@ export async function GET(
   const { accountId } = await params;
 
   try {
-    const deposits = await getRecentDepositsForAccount({
+    const deposits = await getRecentDepositsForAccountCached(
       accountId,
       userId,
-      limit: 10,
-    });
+      10
+    );
 
     return NextResponse.json(deposits);
   } catch (error) {

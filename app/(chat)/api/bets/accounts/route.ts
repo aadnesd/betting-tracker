@@ -5,6 +5,7 @@ import {
   createAccount,
   createAuditEntry,
   getAccountById,
+  listAccountsByUser,
   updateAccount,
 } from "@/lib/db/queries";
 
@@ -189,11 +190,20 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const id = searchParams.get("id");
 
-  if (!id) {
-    return NextResponse.json({ error: "Account ID required" }, { status: 400 });
-  }
-
   try {
+    if (!id) {
+      const limit = Math.min(
+        Math.max(Number(searchParams.get("limit")) || 200, 1),
+        500
+      );
+      const accounts = await listAccountsByUser({
+        userId: session.user.id,
+        limit,
+      });
+
+      return NextResponse.json(accounts);
+    }
+
     const account = await getAccountById({
       id,
       userId: session.user.id,
