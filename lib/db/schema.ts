@@ -3,6 +3,7 @@ import {
   boolean,
   foreignKey,
   integer,
+  index,
   jsonb,
   numeric,
   pgTable,
@@ -47,22 +48,36 @@ export type ScreenshotUpload = InferSelectModel<typeof screenshotUpload>;
 const accountKindEnum = ["bookmaker", "exchange"] as const;
 const accountStatusEnum = ["active", "archived"] as const;
 
-export const account = pgTable("Account", {
-  id: uuid("id").primaryKey().notNull().defaultRandom(),
-  createdAt: timestamp("createdAt").notNull(),
-  userId: uuid("userId")
-    .notNull()
-    .references(() => user.id),
-  name: text("name").notNull(),
-  nameNormalized: text("nameNormalized").notNull(),
-  kind: varchar("kind", { enum: accountKindEnum }).notNull(),
-  currency: varchar("currency", { length: 3 }),
-  commission: numeric("commission", { precision: 6, scale: 4 }),
-  status: varchar("status", { enum: accountStatusEnum })
-    .notNull()
-    .default("active"),
-  limits: jsonb("limits"),
-});
+export const account = pgTable(
+  "Account",
+  {
+    id: uuid("id").primaryKey().notNull().defaultRandom(),
+    createdAt: timestamp("createdAt").notNull(),
+    userId: uuid("userId")
+      .notNull()
+      .references(() => user.id),
+    name: text("name").notNull(),
+    nameNormalized: text("nameNormalized").notNull(),
+    kind: varchar("kind", { enum: accountKindEnum }).notNull(),
+    currency: varchar("currency", { length: 3 }),
+    commission: numeric("commission", { precision: 6, scale: 4 }),
+    status: varchar("status", { enum: accountStatusEnum })
+      .notNull()
+      .default("active"),
+    limits: jsonb("limits"),
+  },
+  (table) => ({
+    accountUserIdx: index("account_user_idx").on(table.userId),
+    accountUserStatusIdx: index("account_user_status_idx").on(
+      table.userId,
+      table.status
+    ),
+    accountUserNameIdx: index("account_user_name_idx").on(
+      table.userId,
+      table.nameNormalized
+    ),
+  })
+);
 
 export type Account = InferSelectModel<typeof account>;
 
@@ -89,33 +104,45 @@ const transactionTypeEnum = [
   "adjustment",
 ] as const;
 
-export const accountTransaction = pgTable("AccountTransaction", {
-  id: uuid("id").primaryKey().notNull().defaultRandom(),
-  createdAt: timestamp("createdAt").notNull(),
-  userId: uuid("userId")
-    .notNull()
-    .references(() => user.id),
-  accountId: uuid("accountId")
-    .notNull()
-    .references(() => account.id),
-  type: varchar("type", { enum: transactionTypeEnum }).notNull(),
-  amount: numeric("amount", { precision: 14, scale: 2 }).notNull(),
-  currency: varchar("currency", { length: 3 }).notNull(),
-  // Pre-computed NOK equivalent (computed at write-time to avoid FX API calls on read)
-  amountNok: numeric("amountNok", { precision: 14, scale: 2 }),
-  occurredAt: timestamp("occurredAt").notNull(),
-  notes: text("notes"),
-  // Link to corresponding wallet transaction (for deposit/withdrawal linked to wallet)
-  linkedWalletTransactionId: uuid("linkedWalletTransactionId"),
-  // Link to originating bet (for settlement/reversal transactions)
-  // Enables cascade deletion when bet is deleted
-  linkedBackBetId: uuid("linkedBackBetId").references(() => backBet.id, {
-    onDelete: "cascade",
-  }),
-  linkedLayBetId: uuid("linkedLayBetId").references(() => layBet.id, {
-    onDelete: "cascade",
-  }),
-});
+export const accountTransaction = pgTable(
+  "AccountTransaction",
+  {
+    id: uuid("id").primaryKey().notNull().defaultRandom(),
+    createdAt: timestamp("createdAt").notNull(),
+    userId: uuid("userId")
+      .notNull()
+      .references(() => user.id),
+    accountId: uuid("accountId")
+      .notNull()
+      .references(() => account.id),
+    type: varchar("type", { enum: transactionTypeEnum }).notNull(),
+    amount: numeric("amount", { precision: 14, scale: 2 }).notNull(),
+    currency: varchar("currency", { length: 3 }).notNull(),
+    // Pre-computed NOK equivalent (computed at write-time to avoid FX API calls on read)
+    amountNok: numeric("amountNok", { precision: 14, scale: 2 }),
+    occurredAt: timestamp("occurredAt").notNull(),
+    notes: text("notes"),
+    // Link to corresponding wallet transaction (for deposit/withdrawal linked to wallet)
+    linkedWalletTransactionId: uuid("linkedWalletTransactionId"),
+    // Link to originating bet (for settlement/reversal transactions)
+    // Enables cascade deletion when bet is deleted
+    linkedBackBetId: uuid("linkedBackBetId").references(() => backBet.id, {
+      onDelete: "cascade",
+    }),
+    linkedLayBetId: uuid("linkedLayBetId").references(() => layBet.id, {
+      onDelete: "cascade",
+    }),
+  },
+  (table) => ({
+    accountTxUserIdx: index("account_tx_user_idx").on(table.userId),
+    accountTxAccountIdx: index("account_tx_account_idx").on(table.accountId),
+    accountTxAccountTypeDateIdx: index("account_tx_account_type_date_idx").on(
+      table.accountId,
+      table.type,
+      table.occurredAt
+    ),
+  })
+);
 
 export type AccountTransaction = InferSelectModel<typeof accountTransaction>;
 
@@ -206,34 +233,47 @@ export const layBet = pgTable("LayBet", {
 
 export type LayBet = InferSelectModel<typeof layBet>;
 
-export const matchedBet = pgTable("MatchedBet", {
-  id: uuid("id").primaryKey().notNull().defaultRandom(),
-  createdAt: timestamp("createdAt").notNull(),
-  userId: uuid("userId")
-    .notNull()
-    .references(() => user.id),
-  backBetId: uuid("backBetId").references(() => backBet.id),
-  layBetId: uuid("layBetId").references(() => layBet.id),
-  // Link to a football match for auto-settlement (optional until match picker is implemented)
-  matchId: uuid("matchId"),
-  market: text("market").notNull(),
-  selection: text("selection").notNull(),
-  // Normalized selection for Match Odds: HOME_TEAM, AWAY_TEAM, DRAW (populated during match linking)
-  normalizedSelection: varchar("normalizedSelection", {
-    enum: ["HOME_TEAM", "AWAY_TEAM", "DRAW"],
-  }),
-  promoId: uuid("promoId").references(() => promo.id),
-  promoType: text("promoType"),
-  status: varchar("status", {
-    enum: ["draft", "matched", "settled", "needs_review"],
+export const matchedBet = pgTable(
+  "MatchedBet",
+  {
+    id: uuid("id").primaryKey().notNull().defaultRandom(),
+    createdAt: timestamp("createdAt").notNull(),
+    userId: uuid("userId")
+      .notNull()
+      .references(() => user.id),
+    backBetId: uuid("backBetId").references(() => backBet.id),
+    layBetId: uuid("layBetId").references(() => layBet.id),
+    // Link to a football match for auto-settlement (optional until match picker is implemented)
+    matchId: uuid("matchId"),
+    market: text("market").notNull(),
+    selection: text("selection").notNull(),
+    // Normalized selection for Match Odds: HOME_TEAM, AWAY_TEAM, DRAW (populated during match linking)
+    normalizedSelection: varchar("normalizedSelection", {
+      enum: ["HOME_TEAM", "AWAY_TEAM", "DRAW"],
+    }),
+    promoId: uuid("promoId").references(() => promo.id),
+    promoType: text("promoType"),
+    status: varchar("status", {
+      enum: ["draft", "matched", "settled", "needs_review"],
+    })
+      .notNull()
+      .default("draft"),
+    netExposure: numeric("netExposure", { precision: 14, scale: 2 }),
+    notes: text("notes"),
+    confirmedAt: timestamp("confirmedAt"),
+    lastError: text("lastError"),
+  },
+  (table) => ({
+    matchedBetUserStatusIdx: index("matched_bet_user_status_idx").on(
+      table.userId,
+      table.status
+    ),
+    matchedBetUserCreatedIdx: index("matched_bet_user_created_idx").on(
+      table.userId,
+      table.createdAt
+    ),
   })
-    .notNull()
-    .default("draft"),
-  netExposure: numeric("netExposure", { precision: 14, scale: 2 }),
-  notes: text("notes"),
-  confirmedAt: timestamp("confirmedAt"),
-  lastError: text("lastError"),
-});
+);
 
 export type MatchedBet = InferSelectModel<typeof matchedBet>;
 
@@ -278,65 +318,74 @@ export type AuditLog = InferSelectModel<typeof auditLog>;
 
 const freeBetStatusEnum = ["active", "used", "expired", "locked"] as const;
 
-export const freeBet = pgTable("FreeBet", {
-  id: uuid("id").primaryKey().notNull().defaultRandom(),
-  createdAt: timestamp("createdAt").notNull(),
-  userId: uuid("userId")
-    .notNull()
-    .references(() => user.id),
-  accountId: uuid("accountId")
-    .notNull()
-    .references(() => account.id),
-  name: text("name").notNull(),
-  value: numeric("value", { precision: 14, scale: 2 }).notNull(),
-  currency: varchar("currency", { length: 3 }).notNull(),
-  minOdds: numeric("minOdds", { precision: 12, scale: 4 }),
-  expiresAt: timestamp("expiresAt"),
-  status: varchar("status", { enum: freeBetStatusEnum })
-    .notNull()
-    .default("active"),
-  usedInMatchedBetId: uuid("usedInMatchedBetId").references(
-    () => matchedBet.id
-  ),
-  notes: text("notes"),
-  // Progress tracking for recurring/multi-step promos
-  // unlockType: null = already unlocked, 'stake' = total stake required, 'bets' = number of bets required
-  unlockType: varchar("unlockType", { enum: ["stake", "bets"] as const }),
-  // The target value to unlock (e.g., 50 for "Bet £50", or 3 for "Place 3 bets")
-  unlockTarget: numeric("unlockTarget", { precision: 14, scale: 2 }),
-  // Minimum odds required for qualifying bets (separate from minOdds for using the free bet)
-  unlockMinOdds: numeric("unlockMinOdds", { precision: 12, scale: 4 }),
-  // Current progress toward unlock
-  unlockProgress: numeric("unlockProgress", {
-    precision: 14,
-    scale: 2,
-  }).default("0"),
-  // Whether the stake is returned on winning free bets
-  stakeReturned: boolean("stakeReturned").notNull().default(false),
-  // Wagering requirements for winnings if the free bet wins
-  winWageringMultiplier: numeric("winWageringMultiplier", {
-    precision: 6,
-    scale: 2,
-  }),
-  winWageringMinOdds: numeric("winWageringMinOdds", {
-    precision: 12,
-    scale: 4,
-  }),
-  winWageringRequirement: numeric("winWageringRequirement", {
-    precision: 14,
-    scale: 2,
-  }),
-  winWageringProgress: numeric("winWageringProgress", {
-    precision: 14,
-    scale: 2,
-  }).default("0"),
-  // Days allowed to complete wagering after the free bet wins
-  winWageringExpiresInDays: integer("winWageringExpiresInDays"),
-  winWageringStartedAt: timestamp("winWageringStartedAt"),
-  // Calculated deadline: startedAt + expiresInDays
-  winWageringExpiresAt: timestamp("winWageringExpiresAt"),
-  winWageringCompletedAt: timestamp("winWageringCompletedAt"),
-});
+export const freeBet = pgTable(
+  "FreeBet",
+  {
+    id: uuid("id").primaryKey().notNull().defaultRandom(),
+    createdAt: timestamp("createdAt").notNull(),
+    userId: uuid("userId")
+      .notNull()
+      .references(() => user.id),
+    accountId: uuid("accountId")
+      .notNull()
+      .references(() => account.id),
+    name: text("name").notNull(),
+    value: numeric("value", { precision: 14, scale: 2 }).notNull(),
+    currency: varchar("currency", { length: 3 }).notNull(),
+    minOdds: numeric("minOdds", { precision: 12, scale: 4 }),
+    expiresAt: timestamp("expiresAt"),
+    status: varchar("status", { enum: freeBetStatusEnum })
+      .notNull()
+      .default("active"),
+    usedInMatchedBetId: uuid("usedInMatchedBetId").references(
+      () => matchedBet.id
+    ),
+    notes: text("notes"),
+    // Progress tracking for recurring/multi-step promos
+    // unlockType: null = already unlocked, 'stake' = total stake required, 'bets' = number of bets required
+    unlockType: varchar("unlockType", { enum: ["stake", "bets"] as const }),
+    // The target value to unlock (e.g., 50 for "Bet £50", or 3 for "Place 3 bets")
+    unlockTarget: numeric("unlockTarget", { precision: 14, scale: 2 }),
+    // Minimum odds required for qualifying bets (separate from minOdds for using the free bet)
+    unlockMinOdds: numeric("unlockMinOdds", { precision: 12, scale: 4 }),
+    // Current progress toward unlock
+    unlockProgress: numeric("unlockProgress", {
+      precision: 14,
+      scale: 2,
+    }).default("0"),
+    // Whether the stake is returned on winning free bets
+    stakeReturned: boolean("stakeReturned").notNull().default(false),
+    // Wagering requirements for winnings if the free bet wins
+    winWageringMultiplier: numeric("winWageringMultiplier", {
+      precision: 6,
+      scale: 2,
+    }),
+    winWageringMinOdds: numeric("winWageringMinOdds", {
+      precision: 12,
+      scale: 4,
+    }),
+    winWageringRequirement: numeric("winWageringRequirement", {
+      precision: 14,
+      scale: 2,
+    }),
+    winWageringProgress: numeric("winWageringProgress", {
+      precision: 14,
+      scale: 2,
+    }).default("0"),
+    // Days allowed to complete wagering after the free bet wins
+    winWageringExpiresInDays: integer("winWageringExpiresInDays"),
+    winWageringStartedAt: timestamp("winWageringStartedAt"),
+    // Calculated deadline: startedAt + expiresInDays
+    winWageringExpiresAt: timestamp("winWageringExpiresAt"),
+    winWageringCompletedAt: timestamp("winWageringCompletedAt"),
+  },
+  (table) => ({
+    freeBetUserStatusIdx: index("free_bet_user_status_idx").on(
+      table.userId,
+      table.status
+    ),
+  })
+);
 
 export type FreeBet = InferSelectModel<typeof freeBet>;
 
@@ -395,27 +444,36 @@ const matchStatusEnum = [
   "CANCELLED",
 ] as const;
 
-export const footballMatch = pgTable("FootballMatch", {
-  id: uuid("id").primaryKey().notNull().defaultRandom(),
-  createdAt: timestamp("createdAt").notNull(),
-  // External ID from football-data.org API
-  externalId: numeric("externalId", { precision: 10, scale: 0 })
-    .notNull()
-    .unique(),
-  homeTeam: text("homeTeam").notNull(),
-  awayTeam: text("awayTeam").notNull(),
-  competition: text("competition").notNull(),
-  // Competition code from football-data.org (e.g., "PL" for Premier League)
-  competitionCode: varchar("competitionCode", { length: 10 }),
-  matchDate: timestamp("matchDate").notNull(),
-  status: varchar("status", { enum: matchStatusEnum })
-    .notNull()
-    .default("SCHEDULED"),
-  homeScore: numeric("homeScore", { precision: 3, scale: 0 }),
-  awayScore: numeric("awayScore", { precision: 3, scale: 0 }),
-  // When the match data was last synced from the API
-  lastSyncedAt: timestamp("lastSyncedAt").notNull(),
-});
+export const footballMatch = pgTable(
+  "FootballMatch",
+  {
+    id: uuid("id").primaryKey().notNull().defaultRandom(),
+    createdAt: timestamp("createdAt").notNull(),
+    // External ID from football-data.org API
+    externalId: numeric("externalId", { precision: 10, scale: 0 })
+      .notNull()
+      .unique(),
+    homeTeam: text("homeTeam").notNull(),
+    awayTeam: text("awayTeam").notNull(),
+    competition: text("competition").notNull(),
+    // Competition code from football-data.org (e.g., "PL" for Premier League)
+    competitionCode: varchar("competitionCode", { length: 10 }),
+    matchDate: timestamp("matchDate").notNull(),
+    status: varchar("status", { enum: matchStatusEnum })
+      .notNull()
+      .default("SCHEDULED"),
+    homeScore: numeric("homeScore", { precision: 3, scale: 0 }),
+    awayScore: numeric("awayScore", { precision: 3, scale: 0 }),
+    // When the match data was last synced from the API
+    lastSyncedAt: timestamp("lastSyncedAt").notNull(),
+  },
+  (table) => ({
+    footballMatchStatusDateIdx: index("football_match_status_date_idx").on(
+      table.status,
+      table.matchDate
+    ),
+  })
+);
 
 export type FootballMatch = InferSelectModel<typeof footballMatch>;
 
@@ -487,20 +545,26 @@ export const DEFAULT_COMPETITION_CODES = [
 const walletTypeEnum = ["fiat", "crypto", "hybrid"] as const;
 const walletStatusEnum = ["active", "archived"] as const;
 
-export const wallet = pgTable("Wallet", {
-  id: uuid("id").primaryKey().notNull().defaultRandom(),
-  createdAt: timestamp("createdAt").notNull(),
-  userId: uuid("userId")
-    .notNull()
-    .references(() => user.id),
-  name: text("name").notNull(),
-  type: varchar("type", { enum: walletTypeEnum }).notNull(),
-  currency: varchar("currency", { length: 10 }).notNull(), // Allow longer codes for crypto (e.g., "USDT", "MATIC")
-  notes: text("notes"),
-  status: varchar("status", { enum: walletStatusEnum })
-    .notNull()
-    .default("active"),
-});
+export const wallet = pgTable(
+  "Wallet",
+  {
+    id: uuid("id").primaryKey().notNull().defaultRandom(),
+    createdAt: timestamp("createdAt").notNull(),
+    userId: uuid("userId")
+      .notNull()
+      .references(() => user.id),
+    name: text("name").notNull(),
+    type: varchar("type", { enum: walletTypeEnum }).notNull(),
+    currency: varchar("currency", { length: 10 }).notNull(), // Allow longer codes for crypto (e.g., "USDT", "MATIC")
+    notes: text("notes"),
+    status: varchar("status", { enum: walletStatusEnum })
+      .notNull()
+      .default("active"),
+  },
+  (table) => ({
+    walletUserIdx: index("wallet_user_idx").on(table.userId),
+  })
+);
 
 export type Wallet = InferSelectModel<typeof wallet>;
 export type WalletType = (typeof walletTypeEnum)[number];
@@ -521,27 +585,36 @@ const walletTransactionTypeEnum = [
   "adjustment",
 ] as const;
 
-export const walletTransaction = pgTable("WalletTransaction", {
-  id: uuid("id").primaryKey().notNull().defaultRandom(),
-  createdAt: timestamp("createdAt").notNull(),
-  walletId: uuid("walletId")
-    .notNull()
-    .references(() => wallet.id),
-  type: varchar("type", { enum: walletTransactionTypeEnum }).notNull(),
-  amount: numeric("amount", { precision: 20, scale: 8 }).notNull(), // 8 decimals for crypto
-  currency: varchar("currency", { length: 10 }).notNull(),
-  // FK to Account for bookmaker/exchange transfers
-  relatedAccountId: uuid("relatedAccountId").references(() => account.id),
-  // FK to Wallet for wallet-to-wallet transfers
-  relatedWalletId: uuid("relatedWalletId").references(() => wallet.id),
-  // Link to corresponding account transaction (for transfers to/from accounts)
-  linkedAccountTransactionId: uuid("linkedAccountTransactionId"),
-  // External reference (e.g., blockchain tx hash)
-  externalRef: text("externalRef"),
-  // When the transaction occurred
-  date: timestamp("date").notNull(),
-  notes: text("notes"),
-});
+export const walletTransaction = pgTable(
+  "WalletTransaction",
+  {
+    id: uuid("id").primaryKey().notNull().defaultRandom(),
+    createdAt: timestamp("createdAt").notNull(),
+    walletId: uuid("walletId")
+      .notNull()
+      .references(() => wallet.id),
+    type: varchar("type", { enum: walletTransactionTypeEnum }).notNull(),
+    amount: numeric("amount", { precision: 20, scale: 8 }).notNull(), // 8 decimals for crypto
+    currency: varchar("currency", { length: 10 }).notNull(),
+    // FK to Account for bookmaker/exchange transfers
+    relatedAccountId: uuid("relatedAccountId").references(() => account.id),
+    // FK to Wallet for wallet-to-wallet transfers
+    relatedWalletId: uuid("relatedWalletId").references(() => wallet.id),
+    // Link to corresponding account transaction (for transfers to/from accounts)
+    linkedAccountTransactionId: uuid("linkedAccountTransactionId"),
+    // External reference (e.g., blockchain tx hash)
+    externalRef: text("externalRef"),
+    // When the transaction occurred
+    date: timestamp("date").notNull(),
+    notes: text("notes"),
+  },
+  (table) => ({
+    walletTxWalletDateIdx: index("wallet_tx_wallet_date_idx").on(
+      table.walletId,
+      table.date
+    ),
+  })
+);
 
 export type WalletTransaction = InferSelectModel<typeof walletTransaction>;
 export type WalletTransactionType = (typeof walletTransactionTypeEnum)[number];
@@ -583,56 +656,65 @@ const depositBonusStatusEnum = [
 ] as const;
 const wageringBaseEnum = ["deposit", "bonus", "deposit_plus_bonus"] as const;
 
-export const depositBonus = pgTable("DepositBonus", {
-  id: uuid("id").primaryKey().notNull().defaultRandom(),
-  createdAt: timestamp("createdAt").notNull(),
-  userId: uuid("userId")
-    .notNull()
-    .references(() => user.id),
-  accountId: uuid("accountId")
-    .notNull()
-    .references(() => account.id),
-  name: text("name").notNull(),
-  // The deposit amount that triggered the bonus
-  depositAmount: numeric("depositAmount", {
-    precision: 14,
-    scale: 2,
-  }).notNull(),
-  // The bonus amount received
-  bonusAmount: numeric("bonusAmount", { precision: 14, scale: 2 }).notNull(),
-  currency: varchar("currency", { length: 3 }).notNull(),
-  // Wagering multiplier (e.g., 6 for 6x)
-  wageringMultiplier: numeric("wageringMultiplier", {
-    precision: 6,
-    scale: 2,
-  }).notNull(),
-  // What the multiplier applies to
-  wageringBase: varchar("wageringBase", { enum: wageringBaseEnum }).notNull(),
-  // Total amount to wager (computed from base × multiplier, stored for convenience)
-  wageringRequirement: numeric("wageringRequirement", {
-    precision: 14,
-    scale: 2,
-  }).notNull(),
-  // Amount wagered so far
-  wageringProgress: numeric("wageringProgress", { precision: 14, scale: 2 })
-    .notNull()
-    .default("0"),
-  // Minimum odds for bets to count toward wagering
-  minOdds: numeric("minOdds", { precision: 12, scale: 4 }).notNull(),
-  // Max bet as % of bonus (optional, e.g., 25 = max bet 250 on 1000 bonus)
-  maxBetPercent: numeric("maxBetPercent", { precision: 5, scale: 2 }),
-  expiresAt: timestamp("expiresAt"),
-  status: varchar("status", { enum: depositBonusStatusEnum })
-    .notNull()
-    .default("active"),
-  // Link to the deposit transaction that triggered this bonus
-  linkedTransactionId: uuid("linkedTransactionId").references(
-    () => accountTransaction.id
-  ),
-  // When wagering was completed
-  clearedAt: timestamp("clearedAt"),
-  notes: text("notes"),
-});
+export const depositBonus = pgTable(
+  "DepositBonus",
+  {
+    id: uuid("id").primaryKey().notNull().defaultRandom(),
+    createdAt: timestamp("createdAt").notNull(),
+    userId: uuid("userId")
+      .notNull()
+      .references(() => user.id),
+    accountId: uuid("accountId")
+      .notNull()
+      .references(() => account.id),
+    name: text("name").notNull(),
+    // The deposit amount that triggered the bonus
+    depositAmount: numeric("depositAmount", {
+      precision: 14,
+      scale: 2,
+    }).notNull(),
+    // The bonus amount received
+    bonusAmount: numeric("bonusAmount", { precision: 14, scale: 2 }).notNull(),
+    currency: varchar("currency", { length: 3 }).notNull(),
+    // Wagering multiplier (e.g., 6 for 6x)
+    wageringMultiplier: numeric("wageringMultiplier", {
+      precision: 6,
+      scale: 2,
+    }).notNull(),
+    // What the multiplier applies to
+    wageringBase: varchar("wageringBase", { enum: wageringBaseEnum }).notNull(),
+    // Total amount to wager (computed from base × multiplier, stored for convenience)
+    wageringRequirement: numeric("wageringRequirement", {
+      precision: 14,
+      scale: 2,
+    }).notNull(),
+    // Amount wagered so far
+    wageringProgress: numeric("wageringProgress", { precision: 14, scale: 2 })
+      .notNull()
+      .default("0"),
+    // Minimum odds for bets to count toward wagering
+    minOdds: numeric("minOdds", { precision: 12, scale: 4 }).notNull(),
+    // Max bet as % of bonus (optional, e.g., 25 = max bet 250 on 1000 bonus)
+    maxBetPercent: numeric("maxBetPercent", { precision: 5, scale: 2 }),
+    expiresAt: timestamp("expiresAt"),
+    status: varchar("status", { enum: depositBonusStatusEnum })
+      .notNull()
+      .default("active"),
+    // Link to the deposit transaction that triggered this bonus
+    linkedTransactionId: uuid("linkedTransactionId").references(
+      () => accountTransaction.id
+    ),
+    // When wagering was completed
+    clearedAt: timestamp("clearedAt"),
+    notes: text("notes"),
+  },
+  (table) => ({
+    depositBonusUserStatusIdx: index("deposit_bonus_user_status_idx").on(
+      table.userId,
+      table.status
+    ),
+  })
+);
 
 export type DepositBonus = InferSelectModel<typeof depositBonus>;
 export type DepositBonusStatus = (typeof depositBonusStatusEnum)[number];

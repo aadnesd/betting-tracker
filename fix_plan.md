@@ -5,9 +5,9 @@ Prioritized implementation tasks. Check off when complete with tests passing.
 ---
 ## Status
 
-**Last updated**: 24 January 2026
-**Build**: ✅ Passing
-**Tests**: ✅ `pnpm exec vitest run` (573 tests passing)
+**Last updated**: 21 February 2026
+**Build**: ❌ Failed (sandbox: tsx IPC EPERM, unchanged)
+**Tests**: ✅ `pnpm exec vitest run tests/unit/matches-api.test.ts tests/unit/football-match.test.ts` + `pnpm exec vitest run tests/unit/wallet-queries.test.ts`
 **Tag**: v0.0.60
 
 Remaining blocker: Rerun Playwright route tests in an environment that permits binding the dev server.
@@ -15,6 +15,12 @@ Remaining blocker: Rerun Playwright route tests in an environment that permits b
 ---
 
 ## Bugs — Active Issues
+
+- [ ] **Performance issues in APIs**: The apis take 1-2 seconds each, is there any caching that could be improved on the DB side perhaps? **Progress:** added caching for `/api/bets/matches` (search/upcoming), `/api/bets/matches/:id`, `/api/bets/wallets`, and the recent deposits endpoint using `lib/db/cached-queries.ts` with `revalidate` set to 60-300s. Moved wallet balance aggregation into SQL to remove N+1 scans, added indexes for `Account`, `AccountTransaction`, `MatchedBet`, `FreeBet`, `DepositBonus`, `FootballMatch`, `Wallet`, and `WalletTransaction` (migration `0032_remarkable_krista_starr.sql`). Test run: `pnpm exec vitest run tests/unit/wallet-queries.test.ts`. Perf verification still pending.
+  Findings: `listWalletsByUser` previously performed N+1 wallet balance queries because `calculateWalletBalance` fetched all transactions per wallet. Schema was missing indexes for common filters on `userId`, `status`, and `date` across `accounts`, `transactions`, `matched_bets`, and `wallet_transactions` (now addressed by SQL aggregation + indexes).
+  Todos: confirm perf improvements under load and run broader profiling to catch remaining hotspots.
+- [x] **Account list API mismatch in WalletTransactionForm**: `WalletTransactionForm` fetches `/api/bets/accounts` expecting a list, but `GET /api/bets/accounts` requires an id and returns 400, so the account transfer dropdowns stay empty. Implementation: added a list response for `GET /api/bets/accounts` when no id is provided; no `WalletTransactionForm` change needed. Tests: `pnpm exec vitest run tests/unit/accounts-api.test.ts` (why: validates account list responses and error handling for the accounts API).
+- [x] **Matches API performance (listUpcomingMatches ignores limit)**: `listUpcomingMatches` returns all upcoming matches when no search term is provided, ignoring the intended limit. This causes large responses and slow `/api/bets/matches` calls. Implementation: added a `limit` parameter to `listUpcomingMatches`, enforced it in the `/api/bets/matches` no-search path, and added coverage to ensure the limit is respected. Tests: `pnpm exec vitest run tests/unit/matches-api.test.ts tests/unit/football-match.test.ts`. Why: guards against oversized match payloads and slow responses.
 
 - [x] **Autoparse review locks lay currency to NOK**: The screenshot review form disables the lay currency input by forcing `readOnlyCurrency="NOK"`, which violates the "manual override on any field" requirement in `specs/ai-autoparse.md`. DoD: allow editing lay currency in the review form (default to NOK only when missing), keep account selection syncing currency, and ensure saved payloads can carry non-NOK exchange currencies.
 

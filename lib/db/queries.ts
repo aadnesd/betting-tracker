@@ -6118,17 +6118,22 @@ export async function listFootballMatches({
 export async function listUpcomingMatches({
   daysAhead = 14,
   competitionCode,
+  fromDate,
+  limit = 50,
 }: {
   daysAhead?: number;
   competitionCode?: string;
+  fromDate?: Date;
+  limit?: number;
 } = {}) {
   try {
-    const now = new Date();
-    const futureDate = new Date();
+    const startDate = fromDate ?? new Date();
+    const futureDate = new Date(startDate);
     futureDate.setDate(futureDate.getDate() + daysAhead);
+    const cappedLimit = Math.min(Math.max(limit, 1), 200);
 
     const conditions: SQL<unknown>[] = [
-      gte(footballMatch.matchDate, now),
+      gte(footballMatch.matchDate, startDate),
       lte(footballMatch.matchDate, futureDate),
       inArray(footballMatch.status, ["SCHEDULED", "TIMED"]),
     ];
@@ -6141,7 +6146,8 @@ export async function listUpcomingMatches({
       .select()
       .from(footballMatch)
       .where(and(...conditions))
-      .orderBy(asc(footballMatch.matchDate));
+      .orderBy(asc(footballMatch.matchDate))
+      .limit(cappedLimit);
 
     return rows;
   } catch (_error) {
@@ -7509,30 +7515,49 @@ export async function listWalletsByUser(
   userId: string
 ): Promise<WalletWithBalance[]> {
   try {
-    const wallets = await db
-      .select()
+    const balanceExpression = sql<string>`COALESCE(
+      SUM(
+        CASE
+          WHEN ${walletTransaction.type} IN ('withdrawal', 'transfer_to_account', 'transfer_to_wallet', 'fee')
+            THEN -1 * ${walletTransaction.amount}::numeric
+          ELSE ${walletTransaction.amount}::numeric
+        END
+      ),
+      0
+    )`;
+
+    const balanceSubquery = db
+      .select({
+        walletId: walletTransaction.walletId,
+        balance: balanceExpression.as("balance"),
+      })
+      .from(walletTransaction)
+      .groupBy(walletTransaction.walletId)
+      .as("wallet_balance");
+
+    const rows = await db
+      .select({
+        id: wallet.id,
+        createdAt: wallet.createdAt,
+        userId: wallet.userId,
+        name: wallet.name,
+        type: wallet.type,
+        currency: wallet.currency,
+        notes: wallet.notes,
+        status: wallet.status,
+        balance: sql<string>`COALESCE(${balanceSubquery.balance}, '0')`,
+      })
       .from(wallet)
+      .leftJoin(balanceSubquery, eq(wallet.id, balanceSubquery.walletId))
       .where(eq(wallet.userId, userId))
       .orderBy(desc(wallet.createdAt));
 
-    // Calculate balance for each wallet
-    const walletsWithBalance: WalletWithBalance[] = [];
-    for (const w of wallets) {
-      const balance = await calculateWalletBalance(w.id);
-      walletsWithBalance.push({
-        id: w.id,
-        createdAt: w.createdAt,
-        userId: w.userId,
-        name: w.name,
-        type: w.type as WalletType,
-        currency: w.currency,
-        notes: w.notes,
-        status: w.status as WalletStatus,
-        balance,
-      });
-    }
-
-    return walletsWithBalance;
+    return rows.map((row) => ({
+      ...row,
+      type: row.type as WalletType,
+      status: row.status as WalletStatus,
+      balance: Number.parseFloat(String(row.balance) || "0"),
+    }));
   } catch (_error) {
     throw new ChatSDKError("bad_request:database", "Failed to list wallets");
   }
@@ -7604,36 +7629,23 @@ export async function calculateWalletBalance(
   walletId: string
 ): Promise<number> {
   try {
-    const transactions = await db
+    const [result] = await db
       .select({
-        type: walletTransaction.type,
-        amount: walletTransaction.amount,
+        balance: sql<string>`COALESCE(
+          SUM(
+            CASE
+              WHEN ${walletTransaction.type} IN ('withdrawal', 'transfer_to_account', 'transfer_to_wallet', 'fee')
+                THEN -1 * ${walletTransaction.amount}::numeric
+              ELSE ${walletTransaction.amount}::numeric
+            END
+          ),
+          0
+        )`,
       })
       .from(walletTransaction)
       .where(eq(walletTransaction.walletId, walletId));
 
-    let balance = 0;
-    for (const tx of transactions) {
-      const amount = Number(tx.amount);
-      switch (tx.type) {
-        case "deposit":
-        case "transfer_from_account":
-        case "transfer_from_wallet":
-          balance += amount;
-          break;
-        case "withdrawal":
-        case "transfer_to_account":
-        case "transfer_to_wallet":
-        case "fee":
-          balance -= amount;
-          break;
-        case "adjustment":
-          balance += amount; // Can be positive or negative
-          break;
-      }
-    }
-
-    return balance;
+    return Number.parseFloat(result?.balance ?? "0");
   } catch (_error) {
     throw new ChatSDKError(
       "bad_request:database",
