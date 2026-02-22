@@ -30,6 +30,8 @@ export async function GET(request: Request) {
     50
   );
   const shouldSearch = search.length >= 2;
+  const searchFromDate = new Date();
+  searchFromDate.setDate(searchFromDate.getDate() - 7);
 
   try {
     let matches: Awaited<ReturnType<typeof searchFootballMatchesCached>> = [];
@@ -38,7 +40,8 @@ export async function GET(request: Request) {
       // Search for matches by team name
       matches = await searchFootballMatchesCached(
         search.trim().toLowerCase(),
-        limit
+        limit,
+        searchFromDate.toISOString()
       );
     } else {
       // List upcoming matches
