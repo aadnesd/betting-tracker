@@ -38,7 +38,7 @@ function doesUserExist(userId: string): Promise<boolean> {
   const cached = userExistsCache.get(userId);
 
   if (cached && cached.expiresAt > now) {
-    return cached.exists;
+    return Promise.resolve(cached.exists);
   }
 
   const inFlight = inFlightUserChecks.get(userId);
