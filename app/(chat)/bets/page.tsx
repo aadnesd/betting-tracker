@@ -8,7 +8,7 @@ import { DashboardActions } from "@/components/bets/dashboard-actions";
 import { DashboardSummaryCards } from "@/components/bets/dashboard-summary-cards";
 import { ExposureAlertBanner } from "@/components/bets/exposure-alert-banner";
 import { ExposureByEventCard } from "@/components/bets/exposure-by-event-card";
-import { ExposureTimelineWithControls } from "@/components/bets/exposure-timeline-chart";
+import { BalanceChartWithControls } from "@/components/bets/balance-chart";
 import { FreeBetExpiryBanner } from "@/components/bets/free-bet-expiry-banner";
 import { PendingSettlementCard } from "@/components/bets/pending-settlement-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,17 +18,23 @@ import {
   countPendingSettlementBets,
   getDashboardSummary,
   getExposureByEvent,
-  getExposureTimeline,
+  getBalanceSnapshots,
   getPendingSettlementBets,
   listAccountsWithBalances,
   listActiveWalletsByUser,
   listMatchedBetsByUser,
 } from "@/lib/db/queries";
+import { snapshotsToBalanceData } from "@/lib/reporting";
 
-const getExposureTimelineCached = unstable_cache(
-  async (userId: string) => getExposureTimeline({ userId, daysBack: 90 }),
-  ["bets-exposure-timeline"],
-  { revalidate: 60 }
+const getBalanceSnapshotsCached = unstable_cache(
+  async (userId: string, startDateIso: string, endDateIso: string) =>
+    getBalanceSnapshots({
+      userId,
+      startDate: new Date(startDateIso),
+      endDate: new Date(endDateIso),
+    }),
+  ["bets-balance-snapshots"],
+  { revalidate: 300 }
 );
 
 const getDashboardSummaryCached = unstable_cache(
@@ -56,11 +62,15 @@ export default async function Page() {
 
   const userId = session.user.id;
 
+  const endDate = new Date();
+  const startDate = new Date(endDate);
+  startDate.setDate(startDate.getDate() - 90);
+
   const [
     bets,
     summary,
     expiringFreeBetsCount,
-    exposureData90,
+    balanceSnapshots,
     exposureByEvent,
     pendingSettlementBets,
     pendingSettlementCount,
@@ -73,13 +83,24 @@ export default async function Page() {
     }),
     getDashboardSummaryCached(userId),
     countExpiringFreeBets({ userId, daysUntilExpiry: 7 }),
-    getExposureTimelineCached(userId),
+    getBalanceSnapshotsCached(
+      userId,
+      startDate.toISOString(),
+      endDate.toISOString()
+    ),
     getExposureByEvent({ userId }),
     getPendingSettlementBets({ userId, filter: "all", limit: 10 }),
     countPendingSettlementBets({ userId }),
     listAccountsWithBalancesCached(userId),
     listActiveWalletsByUser(userId),
   ]);
+
+  const balanceDayChartData = snapshotsToBalanceData(balanceSnapshots, "day");
+  const balanceWeekChartData = snapshotsToBalanceData(balanceSnapshots, "week");
+  const balanceMonthChartData = snapshotsToBalanceData(
+    balanceSnapshots,
+    "month"
+  );
 
   // Helper to check if an account is active (treats null/undefined as active for backwards compatibility)
   const isActive = (status: string | null | undefined) =>
@@ -144,9 +165,11 @@ export default async function Page() {
         totalProfit={summary.totalProfit}
       />
 
-      <ExposureTimelineWithControls
-        currentExposure={summary.openExposure}
-        data90={exposureData90}
+      <BalanceChartWithControls
+        dayData={balanceDayChartData}
+        monthData={balanceMonthChartData}
+        title="Total Balance"
+        weekData={balanceWeekChartData}
       />
 
       <PendingSettlementCard
