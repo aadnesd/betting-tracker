@@ -22,6 +22,22 @@ export const user = pgTable("User", {
 
 export type User = InferSelectModel<typeof user>;
 
+export const fxRate = pgTable(
+  "FxRate",
+  {
+    baseCurrency: varchar("baseCurrency", { length: 8 })
+      .primaryKey()
+      .notNull(),
+    rateToNok: numeric("rateToNok", { precision: 18, scale: 8 }).notNull(),
+    updatedAt: timestamp("updatedAt").notNull(),
+  },
+  (table) => ({
+    fxRateUpdatedAtIdx: index("fx_rate_updated_at_idx").on(table.updatedAt),
+  })
+);
+
+export type FxRate = InferSelectModel<typeof fxRate>;
+
 export const screenshotUpload = pgTable("ScreenshotUpload", {
   id: uuid("id").primaryKey().notNull().defaultRandom(),
   createdAt: timestamp("createdAt").notNull(),
