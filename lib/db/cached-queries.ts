@@ -17,10 +17,10 @@ export const listUpcomingMatchesCached = unstable_cache(
 );
 
 export const searchFootballMatchesCached = unstable_cache(
-  async (searchTerm: string, limit: number) =>
+  async (searchTerm: string, limit: number, fromDateIso: string) =>
     searchFootballMatches({
       searchTerm,
-      fromDate: new Date(),
+      fromDate: new Date(fromDateIso),
       limit,
     }),
   ["api-matches-search"],

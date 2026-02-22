@@ -248,7 +248,8 @@ describe("/api/bets/matches", () => {
 
       expect(cachedQueries.searchFootballMatchesCached).toHaveBeenCalledWith(
         "ma",
-        5
+        5,
+        expect.any(String)
       );
       expect(cachedQueries.listUpcomingMatchesCached).not.toHaveBeenCalled();
     });
