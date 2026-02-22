@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/app/(auth)/auth";
+import { revalidateDashboard } from "@/lib/cache";
 import {
   autoCompleteDepositBonusesIfEligible,
   deleteAccountTransaction,
@@ -83,6 +84,8 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       );
     }
 
+    revalidateDashboard(session.user.id);
+
     return NextResponse.json({ success: true, transaction: updated });
   } catch (error) {
     console.error("Error updating transaction:", error);
@@ -136,6 +139,8 @@ export async function DELETE(_request: Request, { params }: RouteParams) {
         error
       );
     }
+
+    revalidateDashboard(session.user.id);
 
     return NextResponse.json({ success: true });
   } catch (error) {

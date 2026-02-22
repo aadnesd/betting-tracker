@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/app/(auth)/auth";
+import { revalidateDashboard } from "@/lib/cache";
 import {
   createTransferBetweenWallets,
   createTransferFromAccount,
@@ -159,6 +160,8 @@ export async function POST(
         notes: notes ?? null,
       });
     }
+
+    revalidateDashboard(session.user.id);
 
     return NextResponse.json(result, { status: 201 });
   } catch (error) {

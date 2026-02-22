@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/app/(auth)/auth";
+import { revalidateDashboard } from "@/lib/cache";
 import { type CsvRowError, parseBalancesCsv, parseBetsCsv } from "@/lib/csv";
 import {
   createBetForImport,
@@ -147,6 +148,8 @@ async function importBets(userId: string, csvContent: string) {
     }
   }
 
+  revalidateDashboard(userId);
+
   return NextResponse.json({
     success: allErrors.length === 0,
     imported: importedCount,
@@ -217,6 +220,8 @@ async function importBalances(userId: string, csvContent: string) {
       });
     }
   }
+
+  revalidateDashboard(userId);
 
   return NextResponse.json({
     success: allErrors.length === 0,

@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/app/(auth)/auth";
+import { revalidateDashboard } from "@/lib/cache";
 import {
   createFreeBet,
   createLockedPromo,
@@ -95,6 +96,8 @@ export async function POST(request: NextRequest) {
         winWageringExpiresInDays: parsed.data.winWageringExpiresInDays ?? null,
       });
     }
+
+    revalidateDashboard(userId);
 
     return NextResponse.json(freeBet, { status: 201 });
   } catch (error) {

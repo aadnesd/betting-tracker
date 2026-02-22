@@ -13,6 +13,7 @@ import { FreeBetExpiryBanner } from "@/components/bets/free-bet-expiry-banner";
 import { PendingSettlementCard } from "@/components/bets/pending-settlement-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { dashboardTag } from "@/lib/cache";
 import {
   countExpiringFreeBets,
   countPendingSettlementBets,
@@ -26,28 +27,16 @@ import {
 } from "@/lib/db/queries";
 import { snapshotsToBalanceData } from "@/lib/reporting";
 
-const getBalanceSnapshotsCached = unstable_cache(
-  async (userId: string, startDateIso: string, endDateIso: string) =>
-    getBalanceSnapshots({
-      userId,
-      startDate: new Date(startDateIso),
-      endDate: new Date(endDateIso),
-    }),
-  ["bets-balance-snapshots"],
-  { revalidate: 300 }
-);
-
-const getDashboardSummaryCached = unstable_cache(
-  async (userId: string) => getDashboardSummary({ userId }),
-  ["bets-dashboard-summary"],
-  { revalidate: 60 }
-);
-
-const listAccountsWithBalancesCached = unstable_cache(
-  async (userId: string) => listAccountsWithBalances({ userId }),
-  ["bets-accounts-with-balances"],
-  { revalidate: 60 }
-);
+async function cacheDashboard<T>(
+  userId: string,
+  key: string,
+  loader: () => Promise<T>
+) {
+  return unstable_cache(loader, ["dashboard", userId, key], {
+    tags: [dashboardTag(userId)],
+    revalidate: false,
+  })();
+}
 
 export const metadata = {
   title: "Matched bets",
@@ -66,6 +55,9 @@ export default async function Page() {
   const startDate = new Date(endDate);
   startDate.setDate(startDate.getDate() - 90);
 
+  const startDateIso = startDate.toISOString();
+  const endDateIso = endDate.toISOString();
+
   const [
     bets,
     summary,
@@ -77,22 +69,38 @@ export default async function Page() {
     accountsWithBalances,
     activeWallets,
   ] = await Promise.all([
-    listMatchedBetsByUser({
-      userId,
-      limit: 50,
-    }),
-    getDashboardSummaryCached(userId),
-    countExpiringFreeBets({ userId, daysUntilExpiry: 7 }),
-    getBalanceSnapshotsCached(
-      userId,
-      startDate.toISOString(),
-      endDate.toISOString()
+    cacheDashboard(userId, "recent-matched-bets", () =>
+      listMatchedBetsByUser({
+        userId,
+        limit: 50,
+      })
     ),
-    getExposureByEvent({ userId }),
-    getPendingSettlementBets({ userId, filter: "all", limit: 10 }),
-    countPendingSettlementBets({ userId }),
-    listAccountsWithBalancesCached(userId),
-    listActiveWalletsByUser(userId),
+    cacheDashboard(userId, "summary", () => getDashboardSummary({ userId })),
+    cacheDashboard(userId, "expiring-free-bets", () =>
+      countExpiringFreeBets({ userId, daysUntilExpiry: 7 })
+    ),
+    cacheDashboard(userId, `balance-snapshots:${startDateIso}:${endDateIso}`, () =>
+      getBalanceSnapshots({
+        userId,
+        startDate,
+        endDate,
+      })
+    ),
+    cacheDashboard(userId, "exposure-by-event", () =>
+      getExposureByEvent({ userId })
+    ),
+    cacheDashboard(userId, "pending-settlement-list", () =>
+      getPendingSettlementBets({ userId, filter: "all", limit: 10 })
+    ),
+    cacheDashboard(userId, "pending-settlement-count", () =>
+      countPendingSettlementBets({ userId })
+    ),
+    cacheDashboard(userId, "accounts-with-balances", () =>
+      listAccountsWithBalances({ userId })
+    ),
+    cacheDashboard(userId, "active-wallets", () =>
+      listActiveWalletsByUser(userId)
+    ),
   ]);
 
   const balanceDayChartData = snapshotsToBalanceData(balanceSnapshots, "day");

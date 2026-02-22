@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/app/(auth)/auth";
+import { revalidateDashboard } from "@/lib/cache";
 import { createWallet } from "@/lib/db/queries";
 import { listWalletsByUserCached } from "@/lib/db/cached-queries";
 
@@ -53,6 +54,8 @@ export async function POST(request: Request) {
       currency: parsed.data.currency,
       notes: parsed.data.notes ?? null,
     });
+
+    revalidateDashboard(session.user.id);
 
     return NextResponse.json(wallet, { status: 201 });
   } catch (error) {

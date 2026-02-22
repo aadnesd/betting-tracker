@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/app/(auth)/auth";
+import { revalidateDashboard } from "@/lib/cache";
 import {
   createAccount,
   createAuditEntry,
@@ -72,6 +73,8 @@ export async function POST(request: Request) {
       },
       notes: `Created ${body.kind} account: ${body.name}`,
     });
+
+    revalidateDashboard(session.user.id);
 
     return NextResponse.json({
       success: true,
@@ -166,6 +169,8 @@ export async function PATCH(request: Request) {
         notes: `Updated account: ${updated.name}`,
       });
     }
+
+    revalidateDashboard(session.user.id);
 
     return NextResponse.json({
       success: true,

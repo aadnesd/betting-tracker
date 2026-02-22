@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidateDashboard } from "@/lib/cache";
 import {
   activateFreeBetWageringOnWin,
   applyAutoSettlement,
@@ -206,6 +207,7 @@ export async function POST(request: Request) {
   try {
     // Fetch all bets ready for auto-settlement
     const bets = await findBetsReadyForAutoSettlement({ limit: 100 });
+    const affectedUserIds = new Set(bets.map((bet) => bet.userId));
 
     console.log(`[Auto-Settle] Found ${bets.length} bets ready for settlement`);
 
@@ -250,6 +252,10 @@ export async function POST(request: Request) {
     console.log(
       `[Auto-Settle] Complete. Processed: ${result.processed}, Settled: ${result.settled}, Flagged: ${result.flaggedForReview}, Errors: ${result.errors}`
     );
+
+    for (const userId of affectedUserIds) {
+      revalidateDashboard(userId);
+    }
 
     return NextResponse.json({
       success: true,
