@@ -56,6 +56,7 @@ export function AppSidebar({ user }: { user: User | undefined }) {
               className="flex flex-row items-center gap-2 px-2 py-1"
               href="/bets"
               onClick={() => setOpenMobile(false)}
+              prefetch={false}
             >
               <span className="font-semibold text-lg">Bet Tracker</span>
             </Link>
@@ -74,6 +75,7 @@ export function AppSidebar({ user }: { user: User | undefined }) {
                       <Link
                         href={item.href}
                         onClick={() => setOpenMobile(false)}
+                        prefetch={false}
                       >
                         <item.icon className="size-4" />
                         <span>{item.name}</span>
@@ -100,6 +102,7 @@ export function AppSidebar({ user }: { user: User | undefined }) {
                       <Link
                         href={item.href}
                         onClick={() => setOpenMobile(false)}
+                        prefetch={false}
                       >
                         <span>{item.name}</span>
                       </Link>
