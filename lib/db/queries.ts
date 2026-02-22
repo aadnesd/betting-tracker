@@ -2133,6 +2133,11 @@ export type IndividualBetListItem = {
   matchedBetStatus: "draft" | "matched" | "settled" | "needs_review" | null;
 };
 
+export type PaginatedIndividualBetList = {
+  bets: IndividualBetListItem[];
+  hasMore: boolean;
+};
+
 export async function listAllBetsByUser({
   userId,
   status,
@@ -2141,6 +2146,7 @@ export async function listAllBetsByUser({
   toDate,
   search,
   limit = 50,
+  offset = 0,
 }: {
   userId: string;
   status?: "placed" | "settled";
@@ -2149,8 +2155,12 @@ export async function listAllBetsByUser({
   toDate?: Date;
   search?: string;
   limit?: number;
-}): Promise<IndividualBetListItem[]> {
+  offset?: number;
+}): Promise<PaginatedIndividualBetList> {
   try {
+    const safeLimit = Math.max(1, limit);
+    const safeOffset = Math.max(0, offset);
+    const queryLimit = safeLimit + safeOffset + 1;
     const normalizedSearch = search?.trim().toLowerCase();
     const backConditions: SQL<unknown>[] = [eq(backBet.userId, userId)];
     const layConditions: SQL<unknown>[] = [eq(layBet.userId, userId)];
@@ -2218,7 +2228,7 @@ export async function listAllBetsByUser({
         .leftJoin(matchedBet, eq(matchedBet.backBetId, backBet.id))
         .where(and(...backConditions))
         .orderBy(desc(sql`COALESCE(${backBet.placedAt}, ${backBet.createdAt})`))
-        .limit(limit),
+        .limit(queryLimit),
       db
         .select({
           id: layBet.id,
@@ -2245,7 +2255,7 @@ export async function listAllBetsByUser({
         .leftJoin(matchedBet, eq(matchedBet.layBetId, layBet.id))
         .where(and(...layConditions))
         .orderBy(desc(sql`COALESCE(${layBet.placedAt}, ${layBet.createdAt})`))
-        .limit(limit),
+        .limit(queryLimit),
     ]);
 
     const combined: IndividualBetListItem[] = [
