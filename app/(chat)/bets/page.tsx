@@ -16,7 +16,6 @@ import { Separator } from "@/components/ui/separator";
 import {
   countExpiringFreeBets,
   countPendingSettlementBets,
-  type ExposureDataPoint,
   getDashboardSummary,
   getExposureByEvent,
   getExposureTimeline,
@@ -43,9 +42,6 @@ const listAccountsWithBalancesCached = unstable_cache(
   ["bets-accounts-with-balances"],
   { revalidate: 60 }
 );
-
-const deriveExposureRange = (data: ExposureDataPoint[], days: number) =>
-  data.slice(-days);
 
 export const metadata = {
   title: "Matched bets",
@@ -84,10 +80,6 @@ export default async function Page() {
     listAccountsWithBalancesCached(userId),
     listActiveWalletsByUser(userId),
   ]);
-
-  const exposureData7 = deriveExposureRange(exposureData90, 7);
-  const exposureData14 = deriveExposureRange(exposureData90, 14);
-  const exposureData30 = deriveExposureRange(exposureData90, 30);
 
   // Helper to check if an account is active (treats null/undefined as active for backwards compatibility)
   const isActive = (status: string | null | undefined) =>
@@ -154,9 +146,6 @@ export default async function Page() {
 
       <ExposureTimelineWithControls
         currentExposure={summary.openExposure}
-        data7={exposureData7}
-        data14={exposureData14}
-        data30={exposureData30}
         data90={exposureData90}
       />
 
