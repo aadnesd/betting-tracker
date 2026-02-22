@@ -2315,7 +2315,12 @@ export async function listAllBetsByUser({
       return dateB - dateA;
     });
 
-    return combined.slice(0, limit);
+    const pagedBets = combined.slice(safeOffset, safeOffset + safeLimit + 1);
+
+    return {
+      bets: pagedBets.slice(0, safeLimit),
+      hasMore: pagedBets.length > safeLimit,
+    };
   } catch (error) {
     console.error("[listAllBetsByUser] Database error:", error);
     throw new ChatSDKError(
