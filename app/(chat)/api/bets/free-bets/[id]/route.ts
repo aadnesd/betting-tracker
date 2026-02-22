@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/app/(auth)/auth";
+import { revalidateDashboard } from "@/lib/cache";
 import {
   deleteFreeBet,
   getFreeBetById,
@@ -94,6 +95,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         userId,
         matchedBetId: parsed.data.usedInMatchedBetId,
       });
+      revalidateDashboard(userId);
       return NextResponse.json(updated);
     }
 
@@ -117,6 +119,8 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       winWageringMultiplier: parsed.data.winWageringMultiplier,
       winWageringMinOdds: parsed.data.winWageringMinOdds,
     });
+
+    revalidateDashboard(userId);
 
     return NextResponse.json(updated);
   } catch (error) {
@@ -147,6 +151,8 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
         { status: 404 }
       );
     }
+
+    revalidateDashboard(userId);
 
     return NextResponse.json({ success: true });
   } catch (error: unknown) {

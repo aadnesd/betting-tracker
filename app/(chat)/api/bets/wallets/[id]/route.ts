@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/app/(auth)/auth";
+import { revalidateDashboard } from "@/lib/cache";
 import {
   archiveWallet,
   deleteWallet,
@@ -79,6 +80,9 @@ export async function PATCH(
     }
 
     const updated = await updateWallet(id, parsed.data);
+
+    revalidateDashboard(session.user.id);
+
     return NextResponse.json(updated);
   } catch (error) {
     console.error("Error updating wallet:", error);
@@ -119,6 +123,8 @@ export async function DELETE(
     } else {
       await archiveWallet(id);
     }
+
+    revalidateDashboard(session.user.id);
 
     return NextResponse.json({ success: true });
   } catch (error) {

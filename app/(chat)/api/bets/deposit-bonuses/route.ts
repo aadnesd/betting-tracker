@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/app/(auth)/auth";
+import { revalidateDashboard } from "@/lib/cache";
 import {
   createDepositBonus,
   getAccountById,
@@ -72,6 +73,8 @@ export async function POST(request: NextRequest) {
       linkedTransactionId: parsed.data.linkedTransactionId,
       notes: parsed.data.notes || null,
     });
+
+    revalidateDashboard(userId);
 
     return NextResponse.json(bonus, { status: 201 });
   } catch (error) {

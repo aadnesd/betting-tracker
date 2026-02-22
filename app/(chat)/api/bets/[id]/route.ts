@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/app/(auth)/auth";
+import { revalidateDashboard } from "@/lib/cache";
 import { deleteMatchedBet, getMatchedBetWithParts } from "@/lib/db/queries";
 
 interface RouteParams {
@@ -70,6 +71,8 @@ export async function DELETE(request: Request, { params }: RouteParams) {
         { status: 404 }
       );
     }
+
+    revalidateDashboard(session.user.id);
 
     return NextResponse.json({ success: true, cascade: result.cascade });
   } catch (error: unknown) {

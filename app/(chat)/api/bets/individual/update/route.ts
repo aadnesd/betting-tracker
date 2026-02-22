@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/app/(auth)/auth";
 import { computeNetExposureInputs } from "@/lib/bet-calculations";
+import { revalidateDashboard } from "@/lib/cache";
 import {
   createAccountTransaction,
   createAuditEntry,
@@ -464,6 +465,8 @@ export async function POST(request: Request) {
         });
       }
     }
+
+    revalidateDashboard(userId);
 
     return NextResponse.json({
       success: true,

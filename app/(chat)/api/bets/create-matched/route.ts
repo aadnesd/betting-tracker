@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getTestAwareSession } from "@/lib/auth";
 import { computeNetExposureInputs } from "@/lib/bet-calculations";
 import { evaluateNeedsReview, formatNeedsReviewNote } from "@/lib/bet-review";
+import { revalidateDashboard } from "@/lib/cache";
 import {
   createAuditEntry,
   createMatchedBetRecord,
@@ -444,6 +445,8 @@ export async function POST(request: Request) {
 
     // Run all audit entries in parallel; failures are logged but don't fail the request
     await Promise.allSettled(auditPromises);
+
+    revalidateDashboard(session.user.id);
 
     return NextResponse.json({
       matched,

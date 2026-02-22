@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/app/(auth)/auth";
 import { computeNetExposureInputs } from "@/lib/bet-calculations";
+import { revalidateDashboard } from "@/lib/cache";
 import {
   createAuditEntry,
   getMatchedBetWithParts,
@@ -129,6 +130,8 @@ export async function POST(request: Request) {
       },
       notes: `Recalculated net exposure with FX conversion: ${backCurrency}→NOK, ${layCurrency}→NOK`,
     });
+
+    revalidateDashboard(session.user.id);
 
     return NextResponse.json({
       success: true,

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/app/(auth)/auth";
+import { revalidateDashboard } from "@/lib/cache";
 import {
   activateFreeBetWageringOnWin,
   autoCompleteDepositBonusesIfEligible,
@@ -286,6 +287,8 @@ export async function POST(request: Request) {
         }
       }
     }
+
+    revalidateDashboard(session.user.id);
 
     return NextResponse.json({
       success: true,

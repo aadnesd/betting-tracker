@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/app/(auth)/auth";
+import { revalidateDashboard } from "@/lib/cache";
 import {
   autoCompleteDepositBonusesIfEligible,
   createAccountTransaction,
@@ -148,6 +149,8 @@ export async function POST(
       },
       notes: `Recorded ${body.type}: ${body.currency} ${body.amount.toFixed(2)}${body.walletId ? " (linked to wallet)" : ""}`,
     });
+
+    revalidateDashboard(session.user.id);
 
     return NextResponse.json({
       success: true,

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/app/(auth)/auth";
+import { revalidateDashboard } from "@/lib/cache";
 import { deleteAccount, getAccountById } from "@/lib/db/queries";
 
 interface RouteParams {
@@ -53,6 +54,8 @@ export async function DELETE(request: Request, { params }: RouteParams) {
     if (!result) {
       return NextResponse.json({ error: "Account not found" }, { status: 404 });
     }
+
+    revalidateDashboard(session.user.id);
 
     return NextResponse.json({ success: true });
   } catch (error: unknown) {
