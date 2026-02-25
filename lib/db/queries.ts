@@ -21,7 +21,7 @@ import {
   sum,
 } from "drizzle-orm";
 import { ChatSDKError } from "../errors";
-import { convertAmountToNok } from "../fx-rates";
+import { convertAmountToNok, convertAmountToNokStrict } from "../fx-rates";
 import { generateUUID } from "../utils";
 import { db } from "./connection";
 import {
@@ -1262,7 +1262,7 @@ export async function createAccountTransaction({
   try {
     // Pre-compute NOK equivalent at write time to avoid FX API calls on read
     const normalizedCurrency = currency.toUpperCase();
-    const amountNok = await convertAmountToNok(amount, normalizedCurrency);
+    const amountNok = await convertAmountToNokStrict(amount, normalizedCurrency);
 
     const values: typeof accountTransaction.$inferInsert = {
       createdAt: new Date(),
@@ -1452,11 +1452,14 @@ export async function saveBackBet({
   ...bet
 }: BetInputBase & { userId: string; screenshotId: string }) {
   try {
-    const stakeNok = await convertAmountToNok(bet.stake, bet.currency ?? "NOK");
+    const stakeNok = await convertAmountToNokStrict(
+      bet.stake,
+      bet.currency ?? "NOK"
+    );
     const profitLossNok =
       bet.profitLoss === undefined || bet.profitLoss === null
         ? null
-        : await convertAmountToNok(bet.profitLoss, bet.currency ?? "NOK");
+        : await convertAmountToNokStrict(bet.profitLoss, bet.currency ?? "NOK");
 
     const values: typeof backBet.$inferInsert = {
       createdAt: new Date(),
@@ -1497,11 +1500,14 @@ export async function saveLayBet({
   ...bet
 }: BetInputBase & { userId: string; screenshotId: string }) {
   try {
-    const stakeNok = await convertAmountToNok(bet.stake, bet.currency ?? "NOK");
+    const stakeNok = await convertAmountToNokStrict(
+      bet.stake,
+      bet.currency ?? "NOK"
+    );
     const profitLossNok =
       bet.profitLoss === undefined || bet.profitLoss === null
         ? null
-        : await convertAmountToNok(bet.profitLoss, bet.currency ?? "NOK");
+        : await convertAmountToNokStrict(bet.profitLoss, bet.currency ?? "NOK");
 
     const values: typeof layBet.$inferInsert = {
       createdAt: new Date(),
@@ -1649,7 +1655,7 @@ export async function updateBackBetDetails({
   placedAt: Date | null;
 }) {
   try {
-    const stakeNok = await convertAmountToNok(stake, currency ?? "NOK");
+    const stakeNok = await convertAmountToNokStrict(stake, currency ?? "NOK");
     const updates: Partial<typeof backBet.$inferInsert> = {
       market,
       selection,
@@ -1748,7 +1754,7 @@ export async function updateLayBetDetails({
   placedAt: Date | null;
 }) {
   try {
-    const stakeNok = await convertAmountToNok(stake, currency ?? "NOK");
+    const stakeNok = await convertAmountToNokStrict(stake, currency ?? "NOK");
     const updates: Partial<typeof layBet.$inferInsert> = {
       market,
       selection,
@@ -2725,6 +2731,7 @@ export type BetReadyForSettlement = {
   backOdds: string | null;
   backStake: string | null;
   backAccountId: string | null;
+  backCurrency: string | null;
   backBetPlacedAt: Date | null;
   backCurrency: string | null;
   // Lay bet info
@@ -2785,6 +2792,7 @@ export async function findBetsReadyForAutoSettlement({
         backOdds: backBet.odds,
         backStake: backBet.stake,
         backAccountId: backBet.accountId,
+        backCurrency: backBet.currency,
         backBetPlacedAt: backBet.placedAt,
         backCurrency: backBet.currency,
         // Lay bet
@@ -2848,6 +2856,7 @@ export async function findBetsReadyForAutoSettlement({
         backOdds: row.backOdds,
         backStake: row.backStake,
         backAccountId: row.backAccountId,
+        backCurrency: row.backCurrency,
         backBetPlacedAt: row.backBetPlacedAt,
         backCurrency: row.backCurrency,
         layBetId: row.layBetId,
@@ -2965,11 +2974,11 @@ export async function applyAutoSettlement(
   let transactionsCreated = 0;
 
   try {
-    const backProfitLossNok = await convertAmountToNok(
+    const backProfitLossNok = await convertAmountToNokStrict(
       params.backProfitLoss,
       params.backCurrency ?? "NOK"
     );
-    const layProfitLossNok = await convertAmountToNok(
+    const layProfitLossNok = await convertAmountToNokStrict(
       params.layProfitLoss,
       params.layCurrency ?? "NOK"
     );
@@ -3005,7 +3014,8 @@ export async function applyAutoSettlement(
           accountId: params.backAccountId,
           type: "adjustment",
           amount: params.backProfitLoss.toFixed(2),
-          currency: params.backCurrency ?? "NOK",
+          currency: (params.backCurrency ?? "NOK").toUpperCase(),
+          amountNok: backProfitLossNok.toFixed(2),
           occurredAt: now,
           notes: `Auto-settlement: ${params.market} - ${params.selection} (${params.matchResult})`,
           linkedBackBetId: params.backBetId,
@@ -3034,7 +3044,8 @@ export async function applyAutoSettlement(
           accountId: params.layAccountId,
           type: "adjustment",
           amount: params.layProfitLoss.toFixed(2),
-          currency: params.layCurrency ?? "NOK",
+          currency: (params.layCurrency ?? "NOK").toUpperCase(),
+          amountNok: layProfitLossNok.toFixed(2),
           occurredAt: now,
           notes: `Auto-settlement: ${params.market} - ${params.selection} (${params.matchResult})`,
           linkedLayBetId: params.layBetId,
