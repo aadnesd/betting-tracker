@@ -18,7 +18,7 @@ import {
   updateLayBet,
   updateMatchedBetRecord,
 } from "@/lib/db/queries";
-import { convertAmountToNok } from "@/lib/fx-rates";
+import { convertAmountToNokStrict } from "@/lib/fx-rates";
 import {
   calculateLayProfitLoss,
   calculateProfitLoss,
@@ -164,7 +164,7 @@ export async function POST(request: Request) {
 
     const now = new Date();
     const currency = bet.currency ?? "NOK";
-    const profitLossNok = await convertAmountToNok(profitLoss, currency);
+    const profitLossNok = await convertAmountToNokStrict(profitLoss, currency);
 
     // Update the bet
     const updateFn = body.betKind === "back" ? updateBackBet : updateLayBet;

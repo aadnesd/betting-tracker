@@ -202,17 +202,8 @@ export async function convertAmountToNok(
   amount: number,
   currency?: string | null
 ): Promise<number> {
-  if (!currency || currency.toUpperCase() === TARGET_CURRENCY) {
-    return amount;
-  }
-
   try {
-    const rate = await fetchRate(currency);
-    const converted = amount * rate;
-    console.log(
-      `[FX] Converted ${amount} ${currency} → ${converted.toFixed(2)} NOK (rate: ${rate})`
-    );
-    return converted;
+    return await convertAmountToNokStrict(amount, currency);
   } catch (error) {
     console.error(
       `[FX] Failed to convert ${amount} ${currency} to NOK:`,
@@ -221,6 +212,26 @@ export async function convertAmountToNok(
     // Fallback: return amount unchanged (will be wrong but won't crash)
     return amount;
   }
+}
+
+/**
+ * Convert amount to NOK and throw on FX lookup failure.
+ * Use this when persisting normalized NOK values to avoid corrupt writes.
+ */
+export async function convertAmountToNokStrict(
+  amount: number,
+  currency?: string | null
+): Promise<number> {
+  if (!currency || currency.toUpperCase() === TARGET_CURRENCY) {
+    return amount;
+  }
+
+  const rate = await fetchRate(currency);
+  const converted = amount * rate;
+  console.log(
+    `[FX] Converted ${amount} ${currency} → ${converted.toFixed(2)} NOK (rate: ${rate})`
+  );
+  return converted;
 }
 
 /**
