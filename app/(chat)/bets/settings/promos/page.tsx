@@ -139,6 +139,9 @@ export default async function PromosSettingsPage({
   const clearedDepositBonuses = depositBonuses.filter(
     (db) => db.status === "cleared"
   );
+  const completedEarlyDepositBonuses = depositBonuses.filter(
+    (db) => db.status === "completed_early"
+  );
   const inactiveDepositBonuses = depositBonuses.filter(
     (db) => db.status === "forfeited" || db.status === "expired"
   );
@@ -574,17 +577,25 @@ export default async function PromosSettingsPage({
 
       {/* Cleared/Forfeited Deposit Bonuses */}
       {(clearedDepositBonuses.length > 0 ||
+        completedEarlyDepositBonuses.length > 0 ||
         inactiveDepositBonuses.length > 0) && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-muted-foreground">
               <Wallet className="h-5 w-5" />
               Deposit Bonus History (
-              {clearedDepositBonuses.length + inactiveDepositBonuses.length})
+              {clearedDepositBonuses.length +
+                completedEarlyDepositBonuses.length +
+                inactiveDepositBonuses.length}
+              )
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {[...clearedDepositBonuses, ...inactiveDepositBonuses].map((db) => (
+            {[
+              ...clearedDepositBonuses,
+              ...completedEarlyDepositBonuses,
+              ...inactiveDepositBonuses,
+            ].map((db) => (
               <Link
                 className="block rounded-md border border-muted bg-muted/30 p-4 transition-colors hover:bg-muted/50"
                 href={`/bets/settings/promos/deposit-bonus/${db.id}`}
@@ -600,6 +611,10 @@ export default async function PromosSettingsPage({
                         <span className="rounded-full border border-green-200 bg-green-50 px-2 py-0.5 text-green-600 text-xs">
                           Cleared
                         </span>
+                      ) : db.status === "completed_early" ? (
+                        <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-amber-700 text-xs">
+                          Completed Early
+                        </span>
                       ) : db.status === "forfeited" ? (
                         <span className="rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-gray-600 text-xs">
                           Forfeited
@@ -613,7 +628,12 @@ export default async function PromosSettingsPage({
                     <div className="flex flex-wrap items-center gap-3 text-muted-foreground text-sm">
                       {db.accountName && <span>{db.accountName}</span>}
                       {db.clearedAt && (
-                        <span>Cleared: {formatDate(db.clearedAt)}</span>
+                        <span>
+                          {db.status === "completed_early"
+                            ? "Completed"
+                            : "Cleared"}
+                          : {formatDate(db.clearedAt)}
+                        </span>
                       )}
                     </div>
                   </div>

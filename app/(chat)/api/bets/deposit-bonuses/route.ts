@@ -97,6 +97,7 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get("status") as
       | "active"
       | "cleared"
+      | "completed_early"
       | "forfeited"
       | "expired"
       | null;

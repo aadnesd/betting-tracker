@@ -24,6 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import type { SettlementOutcome } from "@/lib/settled-bet-edit";
 
 export interface AccountOption {
   id: string;
@@ -46,7 +47,15 @@ interface StandaloneBetFormProps {
     accountId: string;
     currency: string;
     placedAt: Date;
+    status?:
+      | "draft"
+      | "placed"
+      | "matched"
+      | "settled"
+      | "needs_review"
+      | "error";
     matchId?: string | null;
+    settlementOutcome?: SettlementOutcome | null;
     notes?: string | null;
   };
 }
@@ -61,6 +70,7 @@ interface FormData {
   currency: string;
   placedAt: string;
   matchId: string;
+  settlementOutcome: SettlementOutcome | "";
   notes: string;
 }
 
@@ -72,6 +82,7 @@ export function StandaloneBetForm({
 }: StandaloneBetFormProps) {
   const router = useRouter();
   const isEdit = Boolean(mode === "edit" && initialData);
+  const isSettledEdit = isEdit && initialData?.status === "settled";
 
   const initialKind = initialData?.kind ?? "back";
   const initialAccounts = initialKind === "back" ? bookmakers : exchanges;
@@ -91,6 +102,7 @@ export function StandaloneBetForm({
     currency: initialData?.currency ?? fallbackCurrency,
     placedAt: initialPlacedAt, // datetime-local format
     matchId: initialData?.matchId ?? "",
+    settlementOutcome: initialData?.settlementOutcome ?? "",
     notes: initialData?.notes ?? "",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -151,6 +163,12 @@ export function StandaloneBetForm({
     if (!formData.accountId) {
       newErrors.accountId = "Account is required";
     }
+    if (isSettledEdit && !formData.settlementOutcome) {
+      newErrors.settlementOutcome = "Settlement outcome is required";
+    }
+    if (isSettledEdit && !formData.notes.trim()) {
+      newErrors.notes = "Correction reason is required";
+    }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -185,6 +203,7 @@ export function StandaloneBetForm({
           placedAt: formData.placedAt
             ? new Date(formData.placedAt).toISOString()
             : undefined,
+          settlementOutcome: formData.settlementOutcome || undefined,
           notes: formData.notes.trim() || undefined,
         }),
       });
@@ -263,9 +282,11 @@ export function StandaloneBetForm({
         <CardHeader>
           <CardTitle>{isEdit ? "Edit Bet" : "Create Standalone Bet"}</CardTitle>
           <CardDescription>
-            {isEdit
-              ? "Update the details of this individual bet"
-              : "Add a single back or lay bet without a matched pair"}
+            {isSettledEdit
+              ? "Correct settlement details and metadata for this settled bet"
+              : isEdit
+                ? "Update the details of this individual bet"
+                : "Add a single back or lay bet without a matched pair"}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -335,6 +356,7 @@ export function StandaloneBetForm({
                   </div>
                 ) : (
                   <Select
+                    disabled={isSettledEdit}
                     onValueChange={handleAccountChange}
                     value={formData.accountId}
                   >
@@ -357,6 +379,11 @@ export function StandaloneBetForm({
                 )}
                 {errors.accountId && (
                   <p className="text-destructive text-xs">{errors.accountId}</p>
+                )}
+                {isSettledEdit && (
+                  <p className="text-muted-foreground text-xs">
+                    Account and currency are locked for settled-bet corrections.
+                  </p>
                 )}
               </div>
 
@@ -412,6 +439,7 @@ export function StandaloneBetForm({
                 <div className="space-y-2">
                   <Label htmlFor="odds">Odds</Label>
                   <Input
+                    disabled={isSettledEdit}
                     id="odds"
                     min="1.01"
                     onChange={(e) => updateField("odds", e.target.value)}
@@ -427,6 +455,7 @@ export function StandaloneBetForm({
                 <div className="space-y-2">
                   <Label htmlFor="stake">Stake ({formData.currency})</Label>
                   <Input
+                    disabled={isSettledEdit}
                     id="stake"
                     min="0.01"
                     onChange={(e) => updateField("stake", e.target.value)}
@@ -469,6 +498,32 @@ export function StandaloneBetForm({
                 </div>
               )}
 
+              {isSettledEdit && (
+                <div className="space-y-2">
+                  <Label htmlFor="settlementOutcome">Correct outcome</Label>
+                  <Select
+                    onValueChange={(value) =>
+                      updateField("settlementOutcome", value)
+                    }
+                    value={formData.settlementOutcome}
+                  >
+                    <SelectTrigger id="settlementOutcome">
+                      <SelectValue placeholder="Select corrected outcome" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="won">Won</SelectItem>
+                      <SelectItem value="lost">Lost</SelectItem>
+                      <SelectItem value="push">Push</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {errors.settlementOutcome && (
+                    <p className="text-destructive text-xs">
+                      {errors.settlementOutcome}
+                    </p>
+                  )}
+                </div>
+              )}
+
               {/* Date Placed */}
               <div className="space-y-2">
                 <Label htmlFor="placedAt">Date Placed</Label>
@@ -482,14 +537,23 @@ export function StandaloneBetForm({
 
               {/* Notes */}
               <div className="space-y-2">
-                <Label htmlFor="notes">Notes (optional)</Label>
+                <Label htmlFor="notes">
+                  {isSettledEdit ? "Correction reason" : "Notes (optional)"}
+                </Label>
                 <Textarea
                   id="notes"
                   onChange={(e) => updateField("notes", e.target.value)}
-                  placeholder="Any additional notes..."
+                  placeholder={
+                    isSettledEdit
+                      ? "Explain why this settled bet is being corrected..."
+                      : "Any additional notes..."
+                  }
                   rows={2}
                   value={formData.notes}
                 />
+                {errors.notes && (
+                  <p className="text-destructive text-xs">{errors.notes}</p>
+                )}
               </div>
 
               {/* Submit */}

@@ -242,6 +242,8 @@ const auditEntityTypeEnum = [
   "lay_bet",
   "matched_bet",
   "account",
+  "wallet",
+  "wallet_transaction",
   "screenshot",
   "free_bet",
   "deposit_bonus",
@@ -575,6 +577,7 @@ export type BalanceSnapshot = InferSelectModel<typeof balanceSnapshot>;
 const depositBonusStatusEnum = [
   "active",
   "cleared",
+  "completed_early",
   "forfeited",
   "expired",
 ] as const;

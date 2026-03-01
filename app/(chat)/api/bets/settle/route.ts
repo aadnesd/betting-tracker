@@ -3,6 +3,7 @@ import { z } from "zod";
 import { auth } from "@/app/(auth)/auth";
 import {
   activateFreeBetWageringOnWin,
+  autoCompleteDepositBonusesIfEligible,
   createAccountTransaction,
   createAuditEntry,
   getAccountById,
@@ -229,6 +230,18 @@ export async function POST(request: Request) {
         odds,
         placedAt: bet.placedAt,
       });
+
+      try {
+        await autoCompleteDepositBonusesIfEligible({
+          userId: session.user.id,
+          accountId: bet.accountId,
+        });
+      } catch (error) {
+        console.error(
+          "[settle] Failed to evaluate deposit bonus auto-completion",
+          error
+        );
+      }
     }
 
     if (body.betKind === "back" && matchedFreeBetId && body.outcome === "won") {

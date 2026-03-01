@@ -3,17 +3,30 @@ import { z } from "zod";
 import { auth } from "@/app/(auth)/auth";
 import { computeNetExposureInputs } from "@/lib/bet-calculations";
 import {
+  createAccountTransaction,
   createAuditEntry,
   getAccountById,
   getBackBetById,
   getFootballMatchById,
+  getFreeBetByMatchedBetId,
   getLayBetById,
   getMatchedBetByLegId,
+  updateBackBet,
   updateBackBetDetails,
+  updateLayBet,
   updateLayBetDetails,
   updateMatchedBetRecord,
 } from "@/lib/db/queries";
 import { convertAmountToNok } from "@/lib/fx-rates";
+import {
+  canUserEditSettledBets,
+  deriveSettlementOutcomeFromProfitLoss,
+} from "@/lib/settled-bet-edit";
+import {
+  calculateLayProfitLoss,
+  calculateProfitLoss,
+  isFreeBetPromoType,
+} from "@/lib/settlement";
 
 const updateSchema = z.object({
   betId: z.string().uuid(),
@@ -26,6 +39,7 @@ const updateSchema = z.object({
   currency: z.string().length(3),
   matchId: z.string().uuid().optional().nullable(),
   placedAt: z.string().optional().nullable(),
+  settlementOutcome: z.enum(["won", "lost", "push"]).optional().nullable(),
   notes: z.string().optional(),
 });
 
@@ -81,9 +95,25 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Bet not found" }, { status: 404 });
     }
 
-    if (bet.status === "settled") {
+    const isSettled = bet.status === "settled";
+    const canEditSettled = canUserEditSettledBets({
+      userId,
+      email: session.user.email,
+    });
+
+    if (isSettled && !canEditSettled) {
       return NextResponse.json(
-        { error: "Settled bets cannot be edited" },
+        {
+          error:
+            "Settled bets can only be edited by authorized users. Contact an administrator.",
+        },
+        { status: 403 }
+      );
+    }
+
+    if (isSettled && !payload.notes?.trim()) {
+      return NextResponse.json(
+        { error: "Correction reason is required when editing a settled bet" },
         { status: 400 }
       );
     }
@@ -125,6 +155,31 @@ export async function POST(request: Request) {
 
     const matchIdForUpdate =
       payload.matchId === undefined ? (bet.matchId ?? null) : payload.matchId;
+
+    if (isSettled) {
+      const immutableFieldErrors: string[] = [];
+      if (Number(bet.odds) !== payload.odds) {
+        immutableFieldErrors.push("odds");
+      }
+      if (Number(bet.stake) !== payload.stake) {
+        immutableFieldErrors.push("stake");
+      }
+      if ((bet.accountId ?? null) !== payload.accountId) {
+        immutableFieldErrors.push("accountId");
+      }
+      if ((bet.currency ?? null) !== payload.currency) {
+        immutableFieldErrors.push("currency");
+      }
+
+      if (immutableFieldErrors.length > 0) {
+        return NextResponse.json(
+          {
+            error: `Cannot change ${immutableFieldErrors.join(", ")} on settled bets`,
+          },
+          { status: 400 }
+        );
+      }
+    }
 
     const updated =
       payload.betKind === "back"
@@ -175,15 +230,146 @@ export async function POST(request: Request) {
 
     const changes = computeChanges(beforeState, afterState);
 
+    let settlementCorrection: {
+      fromOutcome: string | null;
+      toOutcome: string;
+      fromProfitLoss: number;
+      toProfitLoss: number;
+      deltaProfitLoss: number;
+    } | null = null;
+
+    if (isSettled && payload.settlementOutcome) {
+      const oldProfitLoss = Number(bet.profitLoss ?? 0);
+      const oldOutcome = deriveSettlementOutcomeFromProfitLoss({
+        kind: payload.betKind,
+        profitLoss: oldProfitLoss,
+      });
+
+      const matchedBet = await getMatchedBetByLegId({
+        betId: updated.id,
+        kind: payload.betKind,
+        userId,
+      });
+
+      let isFreeBet = false;
+      let freeBetStakeReturned = false;
+      if (payload.betKind === "back") {
+        const freeBet = matchedBet?.id
+          ? await getFreeBetByMatchedBetId({
+              matchedBetId: matchedBet.id,
+              userId,
+            })
+          : null;
+
+        freeBetStakeReturned = freeBet?.stakeReturned ?? false;
+        isFreeBet = freeBet
+          ? true
+          : isFreeBetPromoType(matchedBet?.promoType ?? null);
+      }
+
+      let commissionRate = 0;
+      if (payload.betKind === "lay" && updated.accountId) {
+        const exchangeAccount = await getAccountById({
+          id: updated.accountId,
+          userId,
+        });
+        if (exchangeAccount?.commission) {
+          commissionRate = Number.parseFloat(exchangeAccount.commission);
+        }
+      }
+
+      const stake = Number(updated.stake);
+      const odds = Number(updated.odds);
+      const newProfitLoss =
+        payload.betKind === "back"
+          ? calculateProfitLoss(
+              payload.settlementOutcome === "won"
+                ? "win"
+                : payload.settlementOutcome === "lost"
+                  ? "loss"
+                  : "push",
+              stake,
+              odds,
+              isFreeBet,
+              freeBetStakeReturned
+            )
+          : calculateLayProfitLoss(
+              payload.settlementOutcome === "won"
+                ? "loss"
+                : payload.settlementOutcome === "lost"
+                  ? "win"
+                  : "push",
+              stake,
+              odds,
+              commissionRate
+            );
+
+      const deltaProfitLoss = Number(
+        (newProfitLoss - oldProfitLoss).toFixed(2)
+      );
+
+      if (deltaProfitLoss !== 0 || oldOutcome !== payload.settlementOutcome) {
+        const currency = updated.currency ?? "NOK";
+        const profitLossNok = await convertAmountToNok(newProfitLoss, currency);
+
+        if (payload.betKind === "back") {
+          await updateBackBet({
+            id: updated.id,
+            userId,
+            profitLoss: newProfitLoss.toFixed(2),
+            profitLossNok: profitLossNok.toFixed(2),
+          });
+        } else {
+          await updateLayBet({
+            id: updated.id,
+            userId,
+            profitLoss: newProfitLoss.toFixed(2),
+            profitLossNok: profitLossNok.toFixed(2),
+          });
+        }
+
+        if (deltaProfitLoss !== 0 && updated.accountId) {
+          await createAccountTransaction({
+            userId,
+            accountId: updated.accountId,
+            type: "adjustment",
+            amount: deltaProfitLoss,
+            currency,
+            occurredAt: new Date(),
+            notes: `Settlement correction delta: ${payload.settlementOutcome} - ${updated.market} / ${updated.selection} @ ${odds}`,
+            linkedBackBetId: payload.betKind === "back" ? updated.id : null,
+            linkedLayBetId: payload.betKind === "lay" ? updated.id : null,
+          });
+        }
+      }
+
+      settlementCorrection = {
+        fromOutcome: oldOutcome,
+        toOutcome: payload.settlementOutcome,
+        fromProfitLoss: oldProfitLoss,
+        toProfitLoss: newProfitLoss,
+        deltaProfitLoss,
+      };
+    }
+
     await createAuditEntry({
       userId,
       entityType: payload.betKind === "back" ? "back_bet" : "lay_bet",
       entityId: updated.id,
       action: "update",
-      changes,
-      notes: payload.notes
-        ? `[Edit Bet] ${payload.notes}`
-        : "Updated bet details",
+      changes:
+        settlementCorrection || isSettled
+          ? {
+              ...(changes ?? {}),
+              settledBetEdit: isSettled,
+              ...(settlementCorrection ? { settlementCorrection } : {}),
+            }
+          : changes,
+      notes: isSettled
+        ? `[Settled Bet Correction] ${payload.notes?.trim()}`
+        : payload.notes
+          ? `[Edit Bet] ${payload.notes}`
+          : "Updated bet details",
     });
 
     const matchedBet = await getMatchedBetByLegId({
@@ -292,6 +478,7 @@ export async function POST(request: Request) {
         currency: updated.currency,
         placedAt: updated.placedAt,
         accountId: updated.accountId,
+        settlementCorrection,
       },
     });
   } catch (error) {

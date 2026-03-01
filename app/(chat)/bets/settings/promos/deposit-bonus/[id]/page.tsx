@@ -14,7 +14,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { getDepositBonusById, listBonusQualifyingBets } from "@/lib/db/queries";
+import {
+  getAccountBalance,
+  getDepositBonusById,
+  listBonusQualifyingBets,
+} from "@/lib/db/queries";
+import { DepositBonusCompleteEarlyButton } from "./complete-early-button";
 import { DepositBonusForfeitButton } from "./forfeit-button";
 
 export default async function DepositBonusDetailPage({
@@ -38,6 +43,10 @@ export default async function DepositBonusDetailPage({
     depositBonusId: id,
     limit: 50,
   });
+  const accountBalance = await getAccountBalance({
+    userId: session.user.id,
+    accountId: bonus.accountId,
+  });
 
   const wageringRequirement = Number.parseFloat(bonus.wageringRequirement);
   const wageringProgress = Number.parseFloat(bonus.wageringProgress);
@@ -46,6 +55,10 @@ export default async function DepositBonusDetailPage({
       ? Math.min((wageringProgress / wageringRequirement) * 100, 100)
       : 0;
   const remaining = Math.max(0, wageringRequirement - wageringProgress);
+  const canCompleteEarly =
+    bonus.status === "active" &&
+    wageringProgress < wageringRequirement &&
+    accountBalance <= 0;
 
   const getStatusBadge = () => {
     switch (bonus.status) {
@@ -68,6 +81,15 @@ export default async function DepositBonusDetailPage({
         return (
           <Badge className="text-base" variant="secondary">
             Forfeited
+          </Badge>
+        );
+      case "completed_early":
+        return (
+          <Badge
+            className="border-amber-500 text-amber-700 text-base"
+            variant="outline"
+          >
+            Completed Early
           </Badge>
         );
       case "expired":
@@ -109,6 +131,12 @@ export default async function DepositBonusDetailPage({
                   Edit
                 </Link>
               </Button>
+              {canCompleteEarly && (
+                <DepositBonusCompleteEarlyButton
+                  bonusId={id}
+                  bonusName={bonus.name}
+                />
+              )}
               <DepositBonusForfeitButton bonusId={id} bonusName={bonus.name} />
             </>
           )}
@@ -206,6 +234,14 @@ export default async function DepositBonusDetailPage({
                   Bonus Forfeited
                 </p>
               </div>
+            ) : bonus.status === "completed_early" ? (
+              <div className="flex flex-col items-center justify-center py-4 text-center">
+                <CheckCircle className="mb-2 h-12 w-12 text-amber-500" />
+                <p className="font-medium text-amber-700">Completed Early</p>
+                <p className="text-muted-foreground text-sm">
+                  Closed when account balance reached zero before full wagering.
+                </p>
+              </div>
             ) : (
               <>
                 <div className="text-center">
@@ -233,6 +269,12 @@ export default async function DepositBonusDetailPage({
                   <p className="text-muted-foreground">Total Required</p>
                   <p className="font-medium">
                     {bonus.currency} {wageringRequirement.toFixed(2)}
+                  </p>
+                </div>
+                <div className="border-t pt-2 text-sm">
+                  <p className="text-muted-foreground">Account Balance</p>
+                  <p className="font-medium">
+                    {bonus.currency} {accountBalance.toFixed(2)}
                   </p>
                 </div>
               </>

@@ -2,18 +2,22 @@ import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/app/(auth)/auth";
 import {
+  completeDepositBonusEarly,
   deleteDepositBonus,
   forfeitDepositBonus,
   getDepositBonusById,
   listBonusQualifyingBets,
   updateDepositBonus,
 } from "@/lib/db/queries";
+import { ChatSDKError } from "@/lib/errors";
 
 const updateDepositBonusSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   expiresAt: z.string().datetime().optional().nullable(),
   notes: z.string().max(500).optional().nullable(),
-  status: z.enum(["active", "cleared", "forfeited", "expired"]).optional(),
+  status: z
+    .enum(["active", "cleared", "completed_early", "forfeited", "expired"])
+    .optional(),
 });
 
 export async function GET(
@@ -103,6 +107,7 @@ export async function PATCH(
       status: parsed.data.status as
         | "active"
         | "cleared"
+        | "completed_early"
         | "forfeited"
         | "expired"
         | undefined,
@@ -185,8 +190,31 @@ export async function POST(
       return NextResponse.json(result);
     }
 
+    if (action === "complete_early") {
+      const reason =
+        body.reason ||
+        "User completed bonus early due to zero balance and no pending bets";
+      const result = await completeDepositBonusEarly({ id, userId, reason });
+
+      if (!result) {
+        return NextResponse.json(
+          { error: "Deposit bonus not found" },
+          { status: 404 }
+        );
+      }
+
+      return NextResponse.json(result);
+    }
+
     return NextResponse.json({ error: "Unknown action" }, { status: 400 });
   } catch (error) {
+    if (error instanceof ChatSDKError && error.type === "bad_request") {
+      return NextResponse.json(
+        { error: error.cause || error.message },
+        { status: 400 }
+      );
+    }
+
     console.error("Error processing deposit bonus action:", error);
     return NextResponse.json(
       { error: "Internal server error" },

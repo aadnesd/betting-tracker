@@ -821,6 +821,50 @@ export async function getOpenBetStakesByAccount({
 }
 
 /**
+ * Count unsettled bets on a specific account.
+ * Used by deposit bonus early-completion rules.
+ */
+export async function countPendingBetsForAccount({
+  userId,
+  accountId,
+}: {
+  userId: string;
+  accountId: string;
+}): Promise<number> {
+  try {
+    const [[backResult], [layResult]] = await Promise.all([
+      db
+        .select({ count: count(backBet.id) })
+        .from(backBet)
+        .where(
+          and(
+            eq(backBet.userId, userId),
+            eq(backBet.accountId, accountId),
+            ne(backBet.status, "settled")
+          )
+        ),
+      db
+        .select({ count: count(layBet.id) })
+        .from(layBet)
+        .where(
+          and(
+            eq(layBet.userId, userId),
+            eq(layBet.accountId, accountId),
+            ne(layBet.status, "settled")
+          )
+        ),
+    ]);
+
+    return (backResult?.count ?? 0) + (layResult?.count ?? 0);
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to count pending bets for account"
+    );
+  }
+}
+
+/**
  * Transaction trend data point for charts.
  */
 export interface TransactionTrendPoint {
@@ -3082,6 +3126,8 @@ export type AuditEntityType =
   | "lay_bet"
   | "matched_bet"
   | "account"
+  | "wallet"
+  | "wallet_transaction"
   | "screenshot";
 
 export type AuditAction =
@@ -6447,6 +6493,98 @@ export async function deleteAccountTransaction({
   }
 }
 
+export async function updateAccountTransaction({
+  id,
+  userId,
+  type,
+  amount,
+  currency,
+  occurredAt,
+  notes,
+}: {
+  id: string;
+  userId: string;
+  type: "deposit" | "withdrawal" | "bonus" | "adjustment";
+  amount: number;
+  currency: string;
+  occurredAt: Date;
+  notes?: string | null;
+}) {
+  try {
+    const [existing] = await db
+      .select()
+      .from(accountTransaction)
+      .where(
+        and(
+          eq(accountTransaction.id, id),
+          eq(accountTransaction.userId, userId)
+        )
+      )
+      .limit(1);
+
+    if (!existing) {
+      return null;
+    }
+
+    const normalizedCurrency = currency.toUpperCase();
+    const amountNok = await convertAmountToNok(amount, normalizedCurrency);
+
+    const [updated] = await db
+      .update(accountTransaction)
+      .set({
+        type,
+        amount: amount.toString(),
+        currency: normalizedCurrency,
+        amountNok: amountNok.toString(),
+        occurredAt,
+        notes: notes ?? null,
+      })
+      .where(
+        and(
+          eq(accountTransaction.id, id),
+          eq(accountTransaction.userId, userId)
+        )
+      )
+      .returning();
+
+    await db.insert(auditLog).values({
+      createdAt: new Date(),
+      userId,
+      entityType: "account",
+      entityId: existing.accountId,
+      action: "update",
+      changes: {
+        transactionId: id,
+        before: {
+          type: existing.type,
+          amount: existing.amount,
+          currency: existing.currency,
+          occurredAt: existing.occurredAt,
+          notes: existing.notes,
+        },
+        after: {
+          type,
+          amount: amount.toString(),
+          currency: normalizedCurrency,
+          occurredAt,
+          notes: notes ?? null,
+        },
+      },
+      notes: `Edited ${type} transaction: ${normalizedCurrency} ${amount.toFixed(2)}`,
+    });
+
+    return updated ?? null;
+  } catch (error) {
+    if (error instanceof ChatSDKError) {
+      throw error;
+    }
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to update account transaction"
+    );
+  }
+}
+
 /**
  * Delete an account by ID.
  * Only allows deletion if the account has no linked bets or transactions.
@@ -7607,20 +7745,37 @@ export async function listWalletTransactionsWithDetails(walletId: string) {
  * Delete a wallet transaction.
  * If the transaction is linked to an account transaction, that is also deleted.
  */
-export async function deleteWalletTransaction(id: string, userId?: string) {
+export async function deleteWalletTransaction({
+  id,
+  userId,
+}: {
+  id: string;
+  userId: string;
+}) {
   try {
     // First get the transaction to check for linked account transaction
     const [existing] = await db
       .select()
       .from(walletTransaction)
-      .where(eq(walletTransaction.id, id));
+      .where(eq(walletTransaction.id, id))
+      .limit(1);
 
     if (!existing) {
       return null;
     }
 
+    const [owner] = await db
+      .select({ userId: wallet.userId })
+      .from(wallet)
+      .where(eq(wallet.id, existing.walletId))
+      .limit(1);
+
+    if (!owner || owner.userId !== userId) {
+      return null;
+    }
+
     // If there's a linked account transaction, delete it first
-    if (existing.linkedAccountTransactionId && userId) {
+    if (existing.linkedAccountTransactionId) {
       await db
         .delete(accountTransaction)
         .where(
@@ -7632,11 +7787,131 @@ export async function deleteWalletTransaction(id: string, userId?: string) {
     }
 
     await db.delete(walletTransaction).where(eq(walletTransaction.id, id));
+
+    await db.insert(auditLog).values({
+      createdAt: new Date(),
+      userId,
+      entityType: "wallet_transaction",
+      entityId: id,
+      action: "delete",
+      changes: {
+        walletId: existing.walletId,
+        type: existing.type,
+        amount: existing.amount,
+        currency: existing.currency,
+        date: existing.date,
+        relatedAccountId: existing.relatedAccountId,
+        relatedWalletId: existing.relatedWalletId,
+        linkedAccountTransactionId: existing.linkedAccountTransactionId,
+      },
+      notes: `Deleted wallet transaction: ${existing.type} ${existing.currency} ${existing.amount}`,
+    });
+
     return { success: true };
   } catch (_error) {
     throw new ChatSDKError(
       "bad_request:database",
       "Failed to delete wallet transaction"
+    );
+  }
+}
+
+export async function updateWalletTransaction({
+  id,
+  userId,
+  type,
+  amount,
+  currency,
+  date,
+  relatedAccountId,
+  relatedWalletId,
+  externalRef,
+  notes,
+}: {
+  id: string;
+  userId: string;
+  type: WalletTransactionType;
+  amount: number;
+  currency: string;
+  date: Date;
+  relatedAccountId?: string | null;
+  relatedWalletId?: string | null;
+  externalRef?: string | null;
+  notes?: string | null;
+}) {
+  try {
+    const [existing] = await db
+      .select()
+      .from(walletTransaction)
+      .where(eq(walletTransaction.id, id))
+      .limit(1);
+
+    if (!existing) {
+      return null;
+    }
+
+    const [owner] = await db
+      .select({ userId: wallet.userId })
+      .from(wallet)
+      .where(eq(wallet.id, existing.walletId))
+      .limit(1);
+
+    if (!owner || owner.userId !== userId) {
+      return null;
+    }
+
+    const [updated] = await db
+      .update(walletTransaction)
+      .set({
+        type,
+        amount: amount.toString(),
+        currency,
+        date,
+        relatedAccountId: relatedAccountId ?? null,
+        relatedWalletId: relatedWalletId ?? null,
+        externalRef: externalRef ?? null,
+        notes: notes ?? null,
+      })
+      .where(eq(walletTransaction.id, id))
+      .returning();
+
+    await db.insert(auditLog).values({
+      createdAt: new Date(),
+      userId,
+      entityType: "wallet_transaction",
+      entityId: id,
+      action: "update",
+      changes: {
+        walletId: existing.walletId,
+        before: {
+          type: existing.type,
+          amount: existing.amount,
+          currency: existing.currency,
+          date: existing.date,
+          relatedAccountId: existing.relatedAccountId,
+          relatedWalletId: existing.relatedWalletId,
+          externalRef: existing.externalRef,
+          notes: existing.notes,
+        },
+        after: {
+          type,
+          amount: amount.toString(),
+          currency,
+          date,
+          relatedAccountId: relatedAccountId ?? null,
+          relatedWalletId: relatedWalletId ?? null,
+          externalRef: externalRef ?? null,
+          notes: notes ?? null,
+        },
+      },
+      notes: `Edited wallet transaction: ${type} ${currency} ${amount.toFixed(2)}`,
+    });
+
+    return updated ?? null;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to update wallet transaction"
     );
   }
 }
@@ -8333,6 +8608,18 @@ export async function forfeitDepositBonus({
   reason?: string;
 }) {
   try {
+    const bonus = await getDepositBonusById({ id, userId });
+    if (!bonus) {
+      return null;
+    }
+
+    if (bonus.status !== "active") {
+      throw new ChatSDKError(
+        "bad_request:api",
+        "Only active bonuses can be forfeited"
+      );
+    }
+
     const [result] = await db
       .update(depositBonus)
       .set({ status: "forfeited" })
@@ -8346,16 +8633,196 @@ export async function forfeitDepositBonus({
         entityType: "deposit_bonus",
         entityId: id,
         action: "status_change",
-        changes: { status: "forfeited" },
+        changes: {
+          previousStatus: bonus.status,
+          status: "forfeited",
+          previousProgress: Number.parseFloat(bonus.wageringProgress ?? "0"),
+        },
         notes: reason ?? "Bonus forfeited",
       });
     }
 
     return result ?? null;
-  } catch (_error) {
+  } catch (error) {
+    if (error instanceof ChatSDKError) {
+      throw error;
+    }
+
     throw new ChatSDKError(
       "bad_request:database",
       "Failed to forfeit deposit bonus"
+    );
+  }
+}
+
+/**
+ * Mark a deposit bonus as completed early due to account balance loss.
+ * Only allowed when bonus is active, wagering is incomplete, account balance is zero,
+ * and there are no pending bets on the account.
+ */
+export async function completeDepositBonusEarly({
+  id,
+  userId,
+  reason,
+}: {
+  id: string;
+  userId: string;
+  reason?: string;
+}) {
+  try {
+    const bonus = await getDepositBonusById({ id, userId });
+    if (!bonus) {
+      return null;
+    }
+
+    if (bonus.status !== "active") {
+      throw new ChatSDKError(
+        "bad_request:api",
+        "Only active bonuses can be completed early"
+      );
+    }
+
+    const wageringProgress = Number.parseFloat(bonus.wageringProgress ?? "0");
+    const wageringRequirement = Number.parseFloat(
+      bonus.wageringRequirement ?? "0"
+    );
+
+    if (wageringProgress >= wageringRequirement) {
+      throw new ChatSDKError(
+        "bad_request:api",
+        "Bonus wagering is already complete"
+      );
+    }
+
+    const accountBalance = await getAccountBalance({
+      userId,
+      accountId: bonus.accountId,
+    });
+
+    // Treat near-zero values as zero to avoid floating-point noise.
+    if (Math.abs(accountBalance) > 0.000_001) {
+      throw new ChatSDKError(
+        "bad_request:api",
+        "Account balance must be exactly zero to complete early"
+      );
+    }
+
+    const pendingBetCount = await countPendingBetsForAccount({
+      userId,
+      accountId: bonus.accountId,
+    });
+
+    if (pendingBetCount > 0) {
+      throw new ChatSDKError(
+        "bad_request:api",
+        "Account must have no pending bets to complete early"
+      );
+    }
+
+    const [result] = await db
+      .update(depositBonus)
+      .set({
+        status: "completed_early",
+        clearedAt: new Date(),
+      })
+      .where(and(eq(depositBonus.id, id), eq(depositBonus.userId, userId)))
+      .returning();
+
+    if (result) {
+      await db.insert(auditLog).values({
+        createdAt: new Date(),
+        userId,
+        entityType: "deposit_bonus",
+        entityId: id,
+        action: "status_change",
+        changes: {
+          previousStatus: bonus.status,
+          status: "completed_early",
+          previousProgress: wageringProgress,
+          wageringRequirement,
+          accountBalance,
+          pendingBetCount,
+          completedEarly: true,
+        },
+        notes:
+          reason ??
+          "Bonus auto-completed early after balance hit zero with no pending bets",
+      });
+    }
+
+    return result ?? null;
+  } catch (error) {
+    if (error instanceof ChatSDKError) {
+      throw error;
+    }
+
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to complete deposit bonus early"
+    );
+  }
+}
+
+export async function autoCompleteDepositBonusesIfEligible({
+  userId,
+  accountId,
+  reason,
+}: {
+  userId: string;
+  accountId: string;
+  reason?: string;
+}): Promise<{
+  completedCount: number;
+  pendingBetCount: number;
+  accountBalance: number;
+}> {
+  try {
+    const accountBalance = await getAccountBalance({ userId, accountId });
+    const pendingBetCount = await countPendingBetsForAccount({
+      userId,
+      accountId,
+    });
+
+    if (Math.abs(accountBalance) > 0.000_001 || pendingBetCount > 0) {
+      return {
+        completedCount: 0,
+        pendingBetCount,
+        accountBalance,
+      };
+    }
+
+    const bonuses = await listActiveDepositBonusesForAccount({
+      userId,
+      accountId,
+    });
+
+    let completedCount = 0;
+
+    for (const bonus of bonuses) {
+      const completed = await completeDepositBonusEarly({
+        id: bonus.id,
+        userId,
+        reason:
+          reason ??
+          "Auto-completed early after account balance reached zero with no pending bets",
+      });
+      if (completed) {
+        completedCount++;
+      }
+    }
+
+    return {
+      completedCount,
+      pendingBetCount,
+      accountBalance,
+    };
+  } catch (error) {
+    if (error instanceof ChatSDKError) {
+      throw error;
+    }
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to auto-complete eligible deposit bonuses"
     );
   }
 }

@@ -12,6 +12,7 @@ import {
   getScreenshotById,
   listAuditEntriesByEntity,
 } from "@/lib/db/queries";
+import { canUserEditSettledBets } from "@/lib/settled-bet-edit";
 
 export const metadata = {
   title: "Lay bet detail",
@@ -30,6 +31,10 @@ export default async function Page({ params }: PageProps) {
   }
 
   const userId = session.user.id;
+  const canEditSettled = canUserEditSettledBets({
+    userId,
+    email: session.user.email,
+  });
   const bet = await getLayBetById({ id, userId });
 
   if (!bet) {
@@ -90,6 +95,7 @@ export default async function Page({ params }: PageProps) {
       auditEntries={auditEntries}
       bet={bet}
       betKind="lay"
+      canEditSettled={canEditSettled}
       footballMatch={footballMatch}
       matchedBet={matchedBet}
       otherLeg={otherLeg}

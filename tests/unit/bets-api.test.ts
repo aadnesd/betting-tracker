@@ -35,7 +35,7 @@ vi.mock("@/lib/fx-rates", () => ({
   convertAmountToNok: vi.fn(async (amount: number) => amount),
 }));
 
-const user = { id: "user-1" };
+const user = { id: "user-1", email: "user-1@example.com" };
 
 vi.mock("@/app/(auth)/auth", () => ({
   auth: vi.fn(),
@@ -43,11 +43,13 @@ vi.mock("@/app/(auth)/auth", () => ({
 
 // Mock db queries
 vi.mock("@/lib/db/queries", () => ({
+  autoCompleteDepositBonusesIfEligible: vi.fn(),
   saveScreenshotUpload: vi.fn(),
   getScreenshotById: vi.fn(),
   updateScreenshotStatus: vi.fn(),
   getAccountById: vi.fn(),
   getAccountByName: vi.fn(),
+  listAccountsByUser: vi.fn(),
   getOrCreateAccount: vi.fn(),
   getPromoById: vi.fn(),
   getOrCreatePromoByType: vi.fn(),
@@ -63,9 +65,11 @@ vi.mock("@/lib/db/queries", () => ({
   createManualScreenshot: vi.fn(),
   getMatchedBetWithParts: vi.fn(),
   createAccountTransaction: vi.fn(),
+  activateFreeBetWageringOnWin: vi.fn(),
   markFreeBetAsUsed: vi.fn(),
   getBackBetById: vi.fn(),
   getLayBetById: vi.fn(),
+  getFreeBetByMatchedBetId: vi.fn(),
   updateBackBet: vi.fn(),
   updateLayBet: vi.fn(),
   updateBackBetDetails: vi.fn(),
@@ -73,6 +77,8 @@ vi.mock("@/lib/db/queries", () => ({
   deleteBet: vi.fn(),
   deleteMatchedBet: vi.fn(),
   getMatchedBetByLegId: vi.fn(),
+  processFreeBetWageringProgressOnSettle: vi.fn(),
+  processWageringProgressOnSettle: vi.fn(),
   getFootballMatchById: vi.fn(),
 }));
 
@@ -82,7 +88,10 @@ const makeBlob = (content = "stub") =>
 describe("bets API routes (unit)", () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    delete process.env.SETTLED_BET_EDIT_USER_IDS;
+    delete process.env.SETTLED_BET_EDIT_USER_EMAILS;
     (authModule.auth as vi.Mock).mockResolvedValue({ user });
+    (dbQueries.listAccountsByUser as vi.Mock).mockResolvedValue([]);
     (matchLinking.linkBetToMatch as vi.Mock).mockResolvedValue({
       matchId: null,
       matchConfidence: null,
@@ -1996,12 +2005,14 @@ describe("bets API routes (unit)", () => {
       expect(dbQueries.updateMatchedBetRecord).toHaveBeenCalledWith(
         expect.objectContaining({
           id: "44444444-4444-4444-4444-444444444444",
-          netExposure: -48,
+          netExposure: 48,
         })
       );
     });
 
-    it("rejects edits to settled bets", async () => {
+    it("rejects settled-bet edits for users outside an explicit allowlist", async () => {
+      process.env.SETTLED_BET_EDIT_USER_IDS = "another-user-id";
+
       (dbQueries.getBackBetById as vi.Mock).mockResolvedValue({
         id: "66666666-6666-6666-6666-666666666666",
         status: "settled",
@@ -2023,9 +2034,216 @@ describe("bets API routes (unit)", () => {
         })
       );
 
+      expect(res.status).toBe(403);
+      const json = await res.json();
+      expect(json.error).toContain(
+        "Settled bets can only be edited by authorized users"
+      );
+    });
+
+    it("allows settled-bet edits for owners when allowlist is unset", async () => {
+      (dbQueries.getBackBetById as vi.Mock).mockResolvedValue({
+        id: "66666666-6666-6666-6666-666666666666",
+        status: "settled",
+        market: "Old market",
+        selection: "Old selection",
+        odds: "2.50",
+        stake: "120.00",
+        accountId: "77777777-7777-7777-7777-777777777777",
+        currency: "NOK",
+        placedAt: new Date(),
+      });
+
+      const res = await updateIndividualRoute(
+        new Request("http://localhost/api/bets/individual/update", {
+          method: "POST",
+          body: JSON.stringify({
+            betId: "66666666-6666-6666-6666-666666666666",
+            betKind: "back",
+            market: "New market",
+            selection: "New selection",
+            odds: 2.5,
+            stake: 120,
+            accountId: "77777777-7777-7777-7777-777777777777",
+            currency: "NOK",
+          }),
+        })
+      );
+
       expect(res.status).toBe(400);
       const json = await res.json();
-      expect(json.error).toBe("Settled bets cannot be edited");
+      expect(json.error).toBe(
+        "Correction reason is required when editing a settled bet"
+      );
+    });
+
+    it("allows settled-bet edits for users on email allowlist", async () => {
+      process.env.SETTLED_BET_EDIT_USER_EMAILS = user.email;
+
+      (dbQueries.getBackBetById as vi.Mock).mockResolvedValue({
+        id: "66666666-6666-6666-6666-666666666666",
+        status: "settled",
+        market: "Old market",
+        selection: "Old selection",
+        odds: "2.50",
+        stake: "120.00",
+        accountId: "77777777-7777-7777-7777-777777777777",
+        currency: "NOK",
+        placedAt: new Date(),
+      });
+
+      const res = await updateIndividualRoute(
+        new Request("http://localhost/api/bets/individual/update", {
+          method: "POST",
+          body: JSON.stringify({
+            betId: "66666666-6666-6666-6666-666666666666",
+            betKind: "back",
+            market: "New market",
+            selection: "New selection",
+            odds: 2.5,
+            stake: 120,
+            accountId: "77777777-7777-7777-7777-777777777777",
+            currency: "NOK",
+          }),
+        })
+      );
+
+      expect(res.status).toBe(400);
+      const json = await res.json();
+      expect(json.error).toBe(
+        "Correction reason is required when editing a settled bet"
+      );
+    });
+
+    it("requires correction reason when editing a settled bet as an authorized user", async () => {
+      process.env.SETTLED_BET_EDIT_USER_IDS = user.id;
+
+      (dbQueries.getBackBetById as vi.Mock).mockResolvedValue({
+        id: "66666666-6666-6666-6666-666666666666",
+        status: "settled",
+        market: "Old market",
+        selection: "Old selection",
+        odds: "2.50",
+        stake: "120.00",
+        accountId: "77777777-7777-7777-7777-777777777777",
+        currency: "NOK",
+        placedAt: new Date(),
+      });
+
+      const res = await updateIndividualRoute(
+        new Request("http://localhost/api/bets/individual/update", {
+          method: "POST",
+          body: JSON.stringify({
+            betId: "66666666-6666-6666-6666-666666666666",
+            betKind: "back",
+            market: "New market",
+            selection: "New selection",
+            odds: 2.5,
+            stake: 120,
+            accountId: "77777777-7777-7777-7777-777777777777",
+            currency: "NOK",
+          }),
+        })
+      );
+
+      expect(res.status).toBe(400);
+      const json = await res.json();
+      expect(json.error).toBe(
+        "Correction reason is required when editing a settled bet"
+      );
+    });
+
+    it("allows authorized settled-bet corrections and creates delta adjustment transactions", async () => {
+      process.env.SETTLED_BET_EDIT_USER_IDS = user.id;
+
+      const betId = "66666666-6666-6666-6666-666666666666";
+      const accountId = "77777777-7777-7777-7777-777777777777";
+
+      (dbQueries.getBackBetById as vi.Mock).mockResolvedValue({
+        id: betId,
+        status: "settled",
+        market: "Old market",
+        selection: "Old selection",
+        odds: "2.50",
+        stake: "120.00",
+        accountId,
+        currency: "NOK",
+        placedAt: new Date("2025-01-01T00:00:00Z"),
+        profitLoss: "180.00",
+      });
+      (dbQueries.getAccountById as vi.Mock).mockResolvedValue({
+        id: accountId,
+        name: "Bet365",
+        kind: "bookmaker",
+      });
+      (dbQueries.updateBackBetDetails as vi.Mock).mockResolvedValue({
+        id: betId,
+        status: "settled",
+        market: "Corrected market",
+        selection: "Corrected selection",
+        odds: "2.50",
+        stake: "120.00",
+        accountId,
+        currency: "NOK",
+        placedAt: new Date("2025-01-01T00:00:00Z"),
+      });
+      (dbQueries.getMatchedBetByLegId as vi.Mock).mockResolvedValue(null);
+      (dbQueries.updateBackBet as vi.Mock).mockResolvedValue({
+        id: betId,
+        profitLoss: "-120.00",
+      });
+      (dbQueries.createAccountTransaction as vi.Mock).mockResolvedValue({
+        id: "tx-1",
+      });
+      (dbQueries.createAuditEntry as vi.Mock).mockResolvedValue({
+        id: "audit-1",
+      });
+
+      const res = await updateIndividualRoute(
+        new Request("http://localhost/api/bets/individual/update", {
+          method: "POST",
+          body: JSON.stringify({
+            betId,
+            betKind: "back",
+            market: "Corrected market",
+            selection: "Corrected selection",
+            odds: 2.5,
+            stake: 120,
+            accountId,
+            currency: "NOK",
+            settlementOutcome: "lost",
+            notes: "Bookmaker settled this as won by mistake.",
+          }),
+        })
+      );
+
+      expect(res.status).toBe(200);
+      expect(dbQueries.updateBackBet).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: betId,
+          profitLoss: "-120.00",
+        })
+      );
+      expect(dbQueries.createAccountTransaction).toHaveBeenCalledWith(
+        expect.objectContaining({
+          accountId,
+          amount: -300,
+          linkedBackBetId: betId,
+        })
+      );
+      expect(dbQueries.createAuditEntry).toHaveBeenCalledWith(
+        expect.objectContaining({
+          notes: expect.stringContaining("[Settled Bet Correction]"),
+          changes: expect.objectContaining({
+            settledBetEdit: true,
+            settlementCorrection: expect.objectContaining({
+              fromOutcome: "won",
+              toOutcome: "lost",
+              deltaProfitLoss: -300,
+            }),
+          }),
+        })
+      );
     });
 
     it("rejects account kind mismatch", async () => {

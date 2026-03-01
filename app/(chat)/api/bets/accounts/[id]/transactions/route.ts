@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/app/(auth)/auth";
 import {
+  autoCompleteDepositBonusesIfEligible,
   createAccountTransaction,
   createAuditEntry,
   createTransferFromAccount,
@@ -116,6 +117,18 @@ export async function POST(
         occurredAt: body.occurredAt,
         notes: body.notes ?? null,
       });
+    }
+
+    try {
+      await autoCompleteDepositBonusesIfEligible({
+        userId: session.user.id,
+        accountId,
+      });
+    } catch (error) {
+      console.error(
+        "[accounts/transactions] Failed to evaluate deposit bonus auto-completion",
+        error
+      );
     }
 
     // Create audit entry

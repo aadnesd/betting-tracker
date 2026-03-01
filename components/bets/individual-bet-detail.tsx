@@ -47,6 +47,7 @@ interface IndividualBetDetailProps {
     settledAt?: string | null;
     profitLoss?: number | null;
   } | null;
+  canEditSettled: boolean;
 }
 
 function formatCurrency(amount: number, currency: string | null) {
@@ -81,6 +82,7 @@ export function IndividualBetDetail({
   footballMatch,
   auditEntries,
   settlementInfo,
+  canEditSettled,
 }: IndividualBetDetailProps) {
   const odds = Number(bet.odds);
   const stake = Number(bet.stake);
@@ -110,9 +112,11 @@ export function IndividualBetDetail({
           <Button asChild size="sm" variant="outline">
             <Link href="/bets">Dashboard</Link>
           </Button>
-          {bet.status !== "settled" && (
+          {(bet.status !== "settled" || canEditSettled) && (
             <Button asChild size="sm" variant="outline">
-              <Link href={`/bets/${betKind}/${bet.id}/edit`}>Edit</Link>
+              <Link href={`/bets/${betKind}/${bet.id}/edit`}>
+                {bet.status === "settled" ? "Correct" : "Edit"}
+              </Link>
             </Button>
           )}
         </div>
