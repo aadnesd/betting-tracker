@@ -41,7 +41,7 @@ As a matched bettor, I want to:
 | minOdds | Decimal | Yes | Minimum odds for bets to count |
 | maxBetPercent | Decimal | No | Max bet as % of bonus (e.g., 25% = max bet 250 on 1000 bonus) |
 | expiresAt | Timestamp | No | When the bonus expires |
-| status | Enum | Yes | `active`, `cleared`, `forfeited`, `expired` |
+| status | Enum | Yes | `active`, `cleared`, `completed_early`, `forfeited`, `expired` |
 | linkedTransactionId | UUID | No | FK → AccountTransaction (the triggering deposit) |
 | clearedAt | Timestamp | No | When wagering was completed |
 | notes | String | No | Optional notes |
@@ -54,6 +54,7 @@ As a matched bettor, I want to:
 ### Enum: status
 - `active` – Bonus claimed, wagering in progress
 - `cleared` – Wagering complete, bonus is withdrawable
+- `completed_early` – Bonus closed early because balance was lost to zero before wagering completion
 - `forfeited` – User forfeited the bonus (e.g., withdrew early)
 - `expired` – Bonus expired before clearing
 

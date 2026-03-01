@@ -1,12 +1,9 @@
 import {
-  ArrowDownRight,
-  ArrowUpRight,
   Banknote,
   Bitcoin,
   CreditCard,
   Plus,
   Settings,
-  Trash2,
   Wallet,
 } from "lucide-react";
 import Link from "next/link";
@@ -14,6 +11,7 @@ import { notFound, redirect } from "next/navigation";
 import { auth } from "@/app/(auth)/auth";
 import { WalletActions } from "@/components/bets/wallet-actions";
 import { WalletTransactionForm } from "@/components/bets/wallet-transaction-form";
+import { WalletTransactionRow } from "@/components/bets/wallet-transaction-row";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -71,51 +69,6 @@ function WalletTypeBadge({ type }: { type: WalletType }) {
         </span>
       );
   }
-}
-
-function TransactionTypeIcon({ type }: { type: WalletTransactionType }) {
-  switch (type) {
-    case "deposit":
-    case "transfer_from_account":
-    case "transfer_from_wallet":
-      return <ArrowDownRight className="h-4 w-4 text-green-600" />;
-    case "withdrawal":
-    case "transfer_to_account":
-    case "transfer_to_wallet":
-    case "fee":
-      return <ArrowUpRight className="h-4 w-4 text-red-600" />;
-    default:
-      return <Settings className="h-4 w-4 text-gray-600" />;
-  }
-}
-
-function transactionTypeLabel(type: WalletTransactionType): string {
-  switch (type) {
-    case "deposit":
-      return "Deposit";
-    case "withdrawal":
-      return "Withdrawal";
-    case "transfer_to_account":
-      return "Transfer to Account";
-    case "transfer_from_account":
-      return "Transfer from Account";
-    case "transfer_to_wallet":
-      return "Transfer to Wallet";
-    case "transfer_from_wallet":
-      return "Transfer from Wallet";
-    case "fee":
-      return "Fee";
-    case "adjustment":
-      return "Adjustment";
-    default:
-      return type;
-  }
-}
-
-function isInflow(type: WalletTransactionType): boolean {
-  return ["deposit", "transfer_from_account", "transfer_from_wallet"].includes(
-    type
-  );
 }
 
 export default async function WalletDetailPage({
@@ -229,50 +182,23 @@ export default async function WalletDetailPage({
           )}
 
           {transactions.map((tx) => (
-            <div
-              className="flex items-center justify-between rounded-md border p-3"
+            <WalletTransactionRow
               key={tx.id}
-            >
-              <div className="flex items-center gap-3">
-                <TransactionTypeIcon type={tx.type as WalletTransactionType} />
-                <div>
-                  <p className="font-medium">
-                    {transactionTypeLabel(tx.type as WalletTransactionType)}
-                  </p>
-                  <div className="flex items-center gap-2 text-muted-foreground text-xs">
-                    <span>{new Date(tx.date).toLocaleDateString()}</span>
-                    {tx.relatedAccountName && (
-                      <span>• {tx.relatedAccountName}</span>
-                    )}
-                    {tx.relatedWalletName && (
-                      <span>• {tx.relatedWalletName}</span>
-                    )}
-                    {tx.externalRef && (
-                      <span className="max-w-[150px] truncate">
-                        • Ref: {tx.externalRef}
-                      </span>
-                    )}
-                  </div>
-                  {tx.notes && (
-                    <p className="mt-1 text-muted-foreground text-xs">
-                      {tx.notes}
-                    </p>
-                  )}
-                </div>
-              </div>
-              <div className="text-right">
-                <p
-                  className={`font-semibold ${
-                    isInflow(tx.type as WalletTransactionType)
-                      ? "text-green-600"
-                      : "text-red-600"
-                  }`}
-                >
-                  {isInflow(tx.type as WalletTransactionType) ? "+" : "-"}
-                  {formatCurrency(Math.abs(Number(tx.amount)), tx.currency)}
-                </p>
-              </div>
-            </div>
+              transaction={{
+                id: tx.id,
+                type: tx.type as WalletTransactionType,
+                amount: tx.amount,
+                currency: tx.currency,
+                date: tx.date.toISOString(),
+                notes: tx.notes,
+                externalRef: tx.externalRef,
+                relatedAccountId: tx.relatedAccountId,
+                relatedWalletId: tx.relatedWalletId,
+                relatedAccountName: tx.relatedAccountName,
+                relatedWalletName: tx.relatedWalletName,
+              }}
+              walletId={id}
+            />
           ))}
         </CardContent>
       </Card>

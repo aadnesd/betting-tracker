@@ -16,9 +16,13 @@ vi.mock("@/app/(auth)/auth", () => ({
 
 // Mock db queries
 vi.mock("@/lib/db/queries", () => ({
+  autoCompleteDepositBonusesIfEligible: vi.fn(),
   createAccountTransaction: vi.fn(),
   listTransactionsByAccount: vi.fn(),
   getAccountById: vi.fn(),
+  createTransferFromAccount: vi.fn(),
+  createTransferToAccount: vi.fn(),
+  getWalletById: vi.fn(),
   createAuditEntry: vi.fn(),
 }));
 
@@ -95,6 +99,12 @@ describe("transactions API routes (unit)", () => {
           action: "update",
         })
       );
+      expect(
+        dbQueries.autoCompleteDepositBonusesIfEligible
+      ).toHaveBeenCalledWith({
+        userId: user.id,
+        accountId: testAccountId,
+      });
     });
 
     it("creates a withdrawal transaction", async () => {

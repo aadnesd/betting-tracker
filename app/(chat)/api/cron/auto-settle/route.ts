@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import {
   activateFreeBetWageringOnWin,
   applyAutoSettlement,
+  autoCompleteDepositBonusesIfEligible,
   type BetReadyForSettlement,
   findBetsReadyForAutoSettlement,
   flagBetForReview,
@@ -149,6 +150,18 @@ async function processBet(
       odds: backOdds,
       placedAt: bet.backBetPlacedAt,
     });
+
+    try {
+      await autoCompleteDepositBonusesIfEligible({
+        userId: bet.userId,
+        accountId: bet.backAccountId,
+      });
+    } catch (error) {
+      console.error(
+        `[Auto-Settle] Failed deposit bonus auto-completion check for account ${bet.backAccountId}:`,
+        error
+      );
+    }
   }
 
   if (matchedFreeBet && outcomeResult.outcome === "win") {

@@ -2,6 +2,10 @@ import { notFound, redirect } from "next/navigation";
 import { auth } from "@/app/(auth)/auth";
 import { StandaloneBetForm } from "@/components/bets/standalone-bet-form";
 import { getBackBetById, listAccountsByUser } from "@/lib/db/queries";
+import {
+  canUserEditSettledBets,
+  deriveSettlementOutcomeFromProfitLoss,
+} from "@/lib/settled-bet-edit";
 
 export const metadata = {
   title: "Edit back bet",
@@ -23,6 +27,16 @@ export default async function Page({ params }: PageProps) {
 
   if (!bet) {
     notFound();
+  }
+
+  if (
+    bet.status === "settled" &&
+    !canUserEditSettledBets({
+      userId: session.user.id,
+      email: session.user.email,
+    })
+  ) {
+    redirect(`/bets/back/${bet.id}`);
   }
 
   const accounts = await listAccountsByUser({
@@ -73,6 +87,11 @@ export default async function Page({ params }: PageProps) {
         matchId: bet.matchId ?? null,
         placedAt: bet.placedAt ?? bet.createdAt,
         notes: null,
+        status: bet.status,
+        settlementOutcome: deriveSettlementOutcomeFromProfitLoss({
+          kind: "back",
+          profitLoss: bet.profitLoss ? Number(bet.profitLoss) : null,
+        }),
       }}
       mode="edit"
     />

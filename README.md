@@ -72,6 +72,27 @@ GITHUB_CLIENT_ID=
 GITHUB_CLIENT_SECRET=
 ```
 
+### Settled Bet Corrections
+
+By default, authenticated users can edit their own settled bets.
+
+To restrict this, configure an allowlist:
+
+```bash
+SETTLED_BET_EDIT_USER_IDS=uuid-1,uuid-2
+```
+
+Optional email allowlist:
+
+```bash
+SETTLED_BET_EDIT_USER_EMAILS=user1@example.com,user2@example.com
+```
+
+Notes:
+- `*` in either allowlist allows all authenticated users.
+- `SETTLED_BET_EDIT_USER_IDS` also accepts email entries for backward compatibility.
+- If either allowlist variable is set, only listed users can edit settled bets.
+
 1. Install Vercel CLI: `npm i -g vercel`
 2. Link local instance with Vercel and GitHub accounts (creates `.vercel` directory): `vercel link`
 3. Download your environment variables: `vercel env pull`
