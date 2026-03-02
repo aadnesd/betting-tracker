@@ -64,7 +64,14 @@ export function DashboardActions({
         <Link href="/bets/settings/accounts">Accounts</Link>
       </Button>
       <Button asChild className="md:size-default" size="sm" variant="ghost">
-        <Link href="/bets/settings/promos">Free Bets</Link>
+        <Link href="/bets/settings/wallets" prefetch={false}>
+          Wallets
+        </Link>
+      </Button>
+      <Button asChild className="md:size-default" size="sm" variant="ghost">
+        <Link href="/bets/settings/promos" prefetch={false}>
+          Free Bets
+        </Link>
       </Button>
       <Button asChild className="md:size-default" size="sm" variant="ghost">
         <Link href="/bets/settings/competitions">Competitions</Link>

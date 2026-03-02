@@ -11,6 +11,7 @@ import {
   getDateRange,
   groupByMonth,
   groupByWeek,
+  markWalletBankTransactionsOnBalanceData,
   type MatchedBetWithLegs,
 } from "@/lib/reporting";
 
@@ -556,5 +557,77 @@ describe("calculateCumulativeProfitData", () => {
     expect(result[0].cumulative).toBe(10);
     expect(result[1].cumulative).toBe(30);
     expect(result[2].cumulative).toBe(60);
+  });
+});
+
+describe("markWalletBankTransactionsOnBalanceData", () => {
+  test("annotates day points with wallet deposit counts and amounts", () => {
+    const data = [
+      { date: "2025-01-01", label: "1 Jan", net: 0, cumulative: 1000 },
+      { date: "2025-01-02", label: "2 Jan", net: 0, cumulative: 1100 },
+    ];
+
+    const transactions = [
+      { date: new Date("2025-01-02T08:00:00Z"), type: "deposit" as const, amountNok: 500 },
+      { date: new Date("2025-01-02T12:00:00Z"), type: "deposit" as const, amountNok: 250.5 },
+    ];
+
+    const result = markWalletBankTransactionsOnBalanceData(
+      data,
+      transactions,
+      "day"
+    );
+
+    expect(result[0]?.walletDepositCount).toBeUndefined();
+    expect(result[1]?.walletDepositCount).toBe(2);
+    expect(result[1]?.walletDepositAmountNok).toBe(750.5);
+  });
+
+  test("annotates month points with deposits and withdrawals", () => {
+    const data = [
+      {
+        date: "2025-01-01",
+        label: "Jan 2025",
+        net: 0,
+        cumulative: 1000,
+      },
+      {
+        date: "2025-02-01",
+        label: "Feb 2025",
+        net: 0,
+        cumulative: 1200,
+      },
+    ];
+
+    const transactions = [
+      {
+        date: new Date("2025-01-15T10:00:00Z"),
+        type: "deposit" as const,
+        amountNok: 100,
+      },
+      {
+        date: new Date("2025-02-10T10:00:00Z"),
+        type: "deposit" as const,
+        amountNok: 200,
+      },
+      {
+        date: new Date("2025-02-20T10:00:00Z"),
+        type: "withdrawal" as const,
+        amountNok: 80,
+      },
+    ];
+
+    const result = markWalletBankTransactionsOnBalanceData(
+      data,
+      transactions,
+      "month"
+    );
+
+    expect(result[0]?.walletDepositCount).toBe(1);
+    expect(result[0]?.walletDepositAmountNok).toBe(100);
+    expect(result[1]?.walletDepositCount).toBe(1);
+    expect(result[1]?.walletDepositAmountNok).toBe(200);
+    expect(result[1]?.walletWithdrawalCount).toBe(1);
+    expect(result[1]?.walletWithdrawalAmountNok).toBe(80);
   });
 });
