@@ -17,7 +17,6 @@ const USD_STABLECOINS = new Set([
   "GUSD",
   "FRAX",
 ]);
-
 async function fetchRate(fromCurrency: string): Promise<number> {
   const base = fromCurrency.toUpperCase();
 
