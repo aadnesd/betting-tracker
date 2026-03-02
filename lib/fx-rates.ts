@@ -29,16 +29,37 @@ const USD_STABLECOINS = new Set([
 
 type FxFetchError = Error & { retryAfterMs?: number; status?: number };
 
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const sleep = (ms: number) =>
+  new Promise((resolve) =>
+    setTimeout(resolve, Number.isFinite(ms) ? Math.max(1, Math.floor(ms)) : 1)
+  );
+
+function parseRetryAfterMs(header: string | null): number | undefined {
+  if (!header) {
+    return undefined;
+  }
+
+  const asSeconds = Number.parseFloat(header);
+  if (Number.isFinite(asSeconds)) {
+    return Math.max(1, asSeconds * 1000);
+  }
+
+  const asDateMs = Date.parse(header);
+  if (Number.isFinite(asDateMs)) {
+    return Math.max(1, asDateMs - Date.now());
+  }
+
+  return undefined;
+}
 
 function getRetryDelayMs(attempt: number, retryAfterMs?: number) {
-  if (retryAfterMs && retryAfterMs > 0) {
-    return retryAfterMs;
+  if (retryAfterMs && Number.isFinite(retryAfterMs) && retryAfterMs > 0) {
+    return Math.max(1, Math.floor(retryAfterMs));
   }
   // Exponential backoff with a small jitter.
   const baseDelay = BASE_RETRY_DELAY_MS * 2 ** attempt;
   const jitter = Math.floor(Math.random() * 100);
-  return baseDelay + jitter;
+  return Math.max(1, baseDelay + jitter);
 }
 
 async function fetchRateFromApi(base: string): Promise<number> {
@@ -59,15 +80,13 @@ async function fetchRateFromApi(base: string): Promise<number> {
 
   if (!response.ok) {
     const retryAfterHeader = response.headers.get("retry-after");
-    const retryAfterSeconds = retryAfterHeader
-      ? Number.parseInt(retryAfterHeader, 10)
-      : Number.NaN;
     const error = new Error(
       `Failed to fetch FX rate (${response.status} ${response.statusText})`
     ) as FxFetchError;
     error.status = response.status;
-    if (!Number.isNaN(retryAfterSeconds)) {
-      error.retryAfterMs = retryAfterSeconds * 1000;
+    const retryAfterMs = parseRetryAfterMs(retryAfterHeader);
+    if (retryAfterMs) {
+      error.retryAfterMs = retryAfterMs;
     }
     throw error;
   }
