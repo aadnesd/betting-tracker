@@ -16,6 +16,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   getBalanceSnapshots,
   getBookmakerProfitWithBonuses,
+  listWalletBankTransactionsByUser,
   getMatchedBetsForReporting,
   getOpenExposure,
   getProfitByBookmaker,
@@ -23,11 +24,14 @@ import {
   getProfitByPromoType,
   getTotalBonusesForUser,
 } from "@/lib/db/queries";
+import { convertAmountToNok } from "@/lib/fx-rates";
 import {
   calculateCumulativeProfitData,
   calculateReportingSummary,
   enrichWithROI,
+  formatNOK,
   getDateRange,
+  markWalletBankTransactionsOnBalanceData,
   type MatchedBetWithLegs,
   snapshotsToBalanceData,
 } from "@/lib/reporting";
@@ -66,6 +70,9 @@ export default async function Page(props: Props) {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Button asChild size="sm" variant="outline">
+            <Link href="/bets/settings/wallets">Wallets</Link>
+          </Button>
           <Button asChild size="sm" variant="outline">
             <Link href="/bets/import">
               <Upload className="mr-2 h-4 w-4" />
@@ -113,6 +120,7 @@ async function ReportingContent({
     bookmakerWithBonuses,
     totalBonuses,
     balanceSnapshots,
+    walletBankTransactions,
   ] = await Promise.all([
     getMatchedBetsForReporting({
       userId,
@@ -127,6 +135,11 @@ async function ReportingContent({
     getBookmakerProfitWithBonuses({ userId, startDate, endDate }),
     getTotalBonusesForUser({ userId, startDate, endDate }),
     getBalanceSnapshots({ userId, startDate: startDate ?? undefined, endDate }),
+    listWalletBankTransactionsByUser({
+      userId,
+      startDate: startDate ?? undefined,
+      endDate,
+    }),
   ]);
 
   // Transform matched bets to the format expected by calculateReportingSummary
@@ -150,10 +163,47 @@ async function ReportingContent({
     ]);
 
   // Generate balance chart data from snapshots (grouped by day/week/month)
-  const balanceDayChartData = snapshotsToBalanceData(balanceSnapshots, "day");
-  const balanceWeekChartData = snapshotsToBalanceData(balanceSnapshots, "week");
-  const balanceMonthChartData = snapshotsToBalanceData(
-    balanceSnapshots,
+  const walletBankTransactionsForChart = await Promise.all(
+    walletBankTransactions.map(async (transaction) => ({
+      date: new Date(transaction.date),
+      type: transaction.type,
+      amountNok: await convertAmountToNok(
+        Number.parseFloat(transaction.amount ?? "0"),
+        transaction.currency ?? "NOK"
+      ),
+    }))
+  );
+
+  const totalBankDeposits =
+    Math.round(
+      walletBankTransactionsForChart
+        .filter((transaction) => transaction.type === "deposit")
+        .reduce((sum, transaction) => sum + transaction.amountNok, 0) * 100
+    ) / 100;
+
+  const totalBankWithdrawals =
+    Math.round(
+      walletBankTransactionsForChart
+        .filter((transaction) => transaction.type === "withdrawal")
+        .reduce((sum, transaction) => sum + transaction.amountNok, 0) * 100
+    ) / 100;
+
+  const netBankFlow =
+    Math.round((totalBankDeposits - totalBankWithdrawals) * 100) / 100;
+
+  const balanceDayChartData = markWalletBankTransactionsOnBalanceData(
+    snapshotsToBalanceData(balanceSnapshots, "day"),
+    walletBankTransactionsForChart,
+    "day"
+  );
+  const balanceWeekChartData = markWalletBankTransactionsOnBalanceData(
+    snapshotsToBalanceData(balanceSnapshots, "week"),
+    walletBankTransactionsForChart,
+    "week"
+  );
+  const balanceMonthChartData = markWalletBankTransactionsOnBalanceData(
+    snapshotsToBalanceData(balanceSnapshots, "month"),
+    walletBankTransactionsForChart,
     "month"
   );
 
@@ -188,6 +238,46 @@ async function ReportingContent({
   return (
     <div className="space-y-6">
       <ReportingSummaryCard summary={summary} />
+
+      <div className="grid gap-4 md:grid-cols-3">
+        <div className="rounded-lg border bg-card p-4">
+          <p className="font-medium text-muted-foreground text-sm">
+            Bank Deposits
+          </p>
+          <p className="mt-1 font-bold text-2xl text-emerald-600">
+            {formatNOK(totalBankDeposits)}
+          </p>
+          <p className="mt-1 text-muted-foreground text-xs">
+            Wallet transactions marked as deposit (from bank)
+          </p>
+        </div>
+        <div className="rounded-lg border bg-card p-4">
+          <p className="font-medium text-muted-foreground text-sm">
+            Bank Withdrawals
+          </p>
+          <p className="mt-1 font-bold text-2xl text-rose-600">
+            {formatNOK(totalBankWithdrawals)}
+          </p>
+          <p className="mt-1 text-muted-foreground text-xs">
+            Wallet transactions marked as withdrawal (to bank)
+          </p>
+        </div>
+        <div className="rounded-lg border bg-card p-4">
+          <p className="font-medium text-muted-foreground text-sm">
+            Net Bank Flow
+          </p>
+          <p
+            className={`mt-1 font-bold text-2xl ${
+              netBankFlow >= 0 ? "text-emerald-600" : "text-rose-600"
+            }`}
+          >
+            {formatNOK(netBankFlow)}
+          </p>
+          <p className="mt-1 text-muted-foreground text-xs">
+            Deposits minus withdrawals for selected period
+          </p>
+        </div>
+      </div>
 
       <ProfitChartWithControls
         dayData={dayChartData}

@@ -3765,6 +3765,16 @@ export type BookmakerProfitWithBonuses = {
   totalProfit: number;
   /** ROI percentage based on total profit and stake */
   roi: number;
+  /** Betting-only ROI (excludes bonuses) */
+  bettingRoi: number;
+  /** Average betting P/L per matched set (excludes bonuses) */
+  avgBettingProfitPerSet: number;
+  /** Total pre-settlement net exposure across matched sets (NOK at calculation time) */
+  totalNetExposure: number;
+  /** Average pre-settlement net exposure per matched set */
+  avgNetExposurePerSet: number;
+  /** Retention percentage based on net exposure (e.g. 99% = -1% exposure vs stake) */
+  retentionPct: number;
 };
 
 /**
@@ -3814,6 +3824,7 @@ export async function getBookmakerProfitWithBonuses({
         layStake: layBet.stake,
         layStakeNok: layBet.stakeNok,
         layCurrency: layBet.currency,
+        netExposure: matchedBet.netExposure,
       })
       .from(matchedBet)
       .leftJoin(backBet, eq(matchedBet.backBetId, backBet.id))
@@ -3857,6 +3868,7 @@ export async function getBookmakerProfitWithBonuses({
         bettingProfit: number;
         totalStake: number;
         bonusTotal: number;
+        totalNetExposure: number;
       }
     >();
 
@@ -3870,6 +3882,7 @@ export async function getBookmakerProfitWithBonuses({
           bettingProfit: 0,
           totalStake: 0,
           bonusTotal: 0,
+          totalNetExposure: 0,
         };
 
         // Back bet P/L
@@ -3898,6 +3911,9 @@ export async function getBookmakerProfitWithBonuses({
         existing.betCount += 1;
         existing.bettingProfit += backPLNok + layPLNok; // FULL matched set profit
         existing.totalStake += stakeNok;
+        existing.totalNetExposure += row.netExposure
+          ? Number.parseFloat(row.netExposure)
+          : 0;
 
         accountMap.set(row.accountId, existing);
       }
@@ -3927,6 +3943,7 @@ export async function getBookmakerProfitWithBonuses({
           bettingProfit: 0,
           totalStake: 0,
           bonusTotal: amountNok,
+          totalNetExposure: 0,
         });
       }
     }
@@ -3938,6 +3955,15 @@ export async function getBookmakerProfitWithBonuses({
         Math.round((data.bettingProfit + data.bonusTotal) * 100) / 100;
       const roi =
         data.totalStake > 0 ? (totalProfit / data.totalStake) * 100 : 0;
+      const bettingRoi =
+        data.totalStake > 0 ? (data.bettingProfit / data.totalStake) * 100 : 0;
+      const avgBettingProfitPerSet =
+        data.betCount > 0 ? data.bettingProfit / data.betCount : 0;
+      const avgNetExposurePerSet =
+        data.betCount > 0 ? data.totalNetExposure / data.betCount : 0;
+      const exposureRoi =
+        data.totalStake > 0 ? (data.totalNetExposure / data.totalStake) * 100 : 0;
+      const retentionPct = 100 + exposureRoi;
       results.push({
         accountId: data.accountId,
         accountName: data.accountName,
@@ -3947,6 +3973,11 @@ export async function getBookmakerProfitWithBonuses({
         bonusTotal: Math.round(data.bonusTotal * 100) / 100,
         totalProfit,
         roi: Math.round(roi * 100) / 100,
+        bettingRoi: Math.round(bettingRoi * 100) / 100,
+        avgBettingProfitPerSet: Math.round(avgBettingProfitPerSet * 100) / 100,
+        totalNetExposure: Math.round(data.totalNetExposure * 100) / 100,
+        avgNetExposurePerSet: Math.round(avgNetExposurePerSet * 100) / 100,
+        retentionPct: Math.round(retentionPct * 100) / 100,
       });
     }
 
@@ -7737,6 +7768,65 @@ export async function listWalletTransactionsWithDetails(walletId: string) {
     throw new ChatSDKError(
       "bad_request:database",
       "Failed to list wallet transactions"
+    );
+  }
+}
+
+/**
+ * List wallet bank-flow transactions for a user.
+ * Includes only external flows: deposits (from bank) and withdrawals (to bank).
+ */
+export async function listWalletBankTransactionsByUser({
+  userId,
+  startDate,
+  endDate,
+}: {
+  userId: string;
+  startDate?: Date;
+  endDate?: Date;
+}): Promise<
+  Array<{
+    date: Date;
+    type: "deposit" | "withdrawal";
+    amount: string | null;
+    currency: string;
+  }>
+> {
+  try {
+    const conditions: SQL[] = [
+      eq(wallet.userId, userId),
+      inArray(walletTransaction.type, ["deposit", "withdrawal"]),
+    ];
+
+    if (startDate) {
+      conditions.push(gte(walletTransaction.date, startDate));
+    }
+    if (endDate) {
+      conditions.push(lte(walletTransaction.date, endDate));
+    }
+
+    const rows = await db
+      .select({
+        date: walletTransaction.date,
+        type: walletTransaction.type,
+        amount: walletTransaction.amount,
+        currency: walletTransaction.currency,
+      })
+      .from(walletTransaction)
+      .innerJoin(wallet, eq(walletTransaction.walletId, wallet.id))
+      .where(and(...conditions))
+      .orderBy(asc(walletTransaction.date));
+
+    return rows as Array<{
+      date: Date;
+      type: "deposit" | "withdrawal";
+      amount: string | null;
+      currency: string;
+    }>;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to list wallet bank transactions"
     );
   }
 }
