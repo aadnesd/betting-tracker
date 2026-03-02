@@ -415,6 +415,14 @@ export type BalanceDataPoint = {
   net: number;
   /** Cumulative balance up to and including this period */
   cumulative: number;
+  /** Number of wallet deposit transactions in this period */
+  walletDepositCount?: number;
+  /** Total wallet deposit amount (NOK) in this period */
+  walletDepositAmountNok?: number;
+  /** Number of wallet withdrawal transactions in this period */
+  walletWithdrawalCount?: number;
+  /** Total wallet withdrawal amount (NOK) in this period */
+  walletWithdrawalAmountNok?: number;
 };
 
 /**
@@ -638,6 +646,92 @@ export function snapshotsToBalanceData(
       label: point.label,
       net: Math.round(net * 100) / 100,
       cumulative: Math.round(point.value * 100) / 100,
+    };
+  });
+}
+
+/**
+ * Add wallet bank-flow markers onto existing balance chart points.
+ * Marker counts/amounts are grouped to match the chart granularity.
+ */
+export function markWalletBankTransactionsOnBalanceData(
+  data: BalanceDataPoint[],
+  bankTransactions: Array<{
+    date: Date;
+    type: "deposit" | "withdrawal";
+    amountNok: number;
+  }>,
+  grouping: "day" | "week" | "month" = "day"
+): BalanceDataPoint[] {
+  if (data.length === 0 || bankTransactions.length === 0) {
+    return data;
+  }
+
+  const getKey = (date: Date): string => {
+    switch (grouping) {
+      case "week": {
+        const day = date.getDay();
+        const diff = date.getDate() - day + (day === 0 ? -6 : 1);
+        const monday = new Date(date);
+        monday.setDate(diff);
+        return monday.toISOString().split("T")[0];
+      }
+      case "month":
+        return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-01`;
+      case "day":
+      default:
+        return date.toISOString().split("T")[0];
+    }
+  };
+
+  const txByPeriod = new Map<
+    string,
+    {
+      walletDepositCount: number;
+      walletDepositAmountNok: number;
+      walletWithdrawalCount: number;
+      walletWithdrawalAmountNok: number;
+    }
+  >();
+
+  for (const transaction of bankTransactions) {
+    const key = getKey(transaction.date);
+    const existing = txByPeriod.get(key) ?? {
+      walletDepositCount: 0,
+      walletDepositAmountNok: 0,
+      walletWithdrawalCount: 0,
+      walletWithdrawalAmountNok: 0,
+    };
+
+    if (transaction.type === "deposit") {
+      existing.walletDepositCount += 1;
+      existing.walletDepositAmountNok += transaction.amountNok;
+    } else {
+      existing.walletWithdrawalCount += 1;
+      existing.walletWithdrawalAmountNok += transaction.amountNok;
+    }
+
+    txByPeriod.set(key, existing);
+  }
+
+  return data.map((point) => {
+    const bucket = txByPeriod.get(point.date);
+    if (!bucket) {
+      return point;
+    }
+
+    return {
+      ...point,
+      walletDepositCount: bucket.walletDepositCount || undefined,
+      walletDepositAmountNok:
+        bucket.walletDepositAmountNok > 0
+          ? Math.round(bucket.walletDepositAmountNok * 100) / 100
+          : undefined,
+      walletWithdrawalCount: bucket.walletWithdrawalCount || undefined,
+      walletWithdrawalAmountNok:
+        bucket.walletWithdrawalAmountNok > 0
+          ? Math.round(bucket.walletWithdrawalAmountNok * 100) / 100
+          : undefined,
     };
   });
 }

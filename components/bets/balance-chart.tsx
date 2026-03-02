@@ -5,6 +5,7 @@ import {
   Area,
   AreaChart,
   CartesianGrid,
+  ReferenceDot,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -49,6 +50,20 @@ function CustomTooltip({
             {formatNOK(dataPoint.cumulative)}
           </span>
         </p>
+        {dataPoint.walletDepositCount ? (
+          <p className="text-muted-foreground">
+            Wallet deposits: <span>{dataPoint.walletDepositCount}</span>
+            {" · "}
+            <span>{formatNOK(dataPoint.walletDepositAmountNok ?? 0)}</span>
+          </p>
+        ) : null}
+        {dataPoint.walletWithdrawalCount ? (
+          <p className="text-muted-foreground">
+            Wallet withdrawals: <span>{dataPoint.walletWithdrawalCount}</span>
+            {" · "}
+            <span>{formatNOK(dataPoint.walletWithdrawalAmountNok ?? 0)}</span>
+          </p>
+        ) : null}
       </div>
     </div>
   );
@@ -145,6 +160,23 @@ export function BalanceChart({
                 strokeWidth={2}
                 type="monotone"
               />
+              {data
+                .filter(
+                  (point) =>
+                    (point.walletDepositCount ?? 0) > 0 ||
+                    (point.walletWithdrawalCount ?? 0) > 0
+                )
+                .map((point) => (
+                  <ReferenceDot
+                    fill={strokeColor}
+                    key={`${point.date}-wallet-bank-flow`}
+                    r={4}
+                    stroke="hsl(var(--background))"
+                    strokeWidth={2}
+                    x={point.label}
+                    y={point.cumulative}
+                  />
+                ))}
             </AreaChart>
           </ResponsiveContainer>
         </div>
@@ -274,6 +306,23 @@ export function BalanceChartWithControls({
                 strokeWidth={2}
                 type="monotone"
               />
+              {data
+                .filter(
+                  (point) =>
+                    (point.walletDepositCount ?? 0) > 0 ||
+                    (point.walletWithdrawalCount ?? 0) > 0
+                )
+                .map((point) => (
+                  <ReferenceDot
+                    fill={strokeColor}
+                    key={`${point.date}-wallet-bank-flow`}
+                    r={4}
+                    stroke="hsl(var(--background))"
+                    strokeWidth={2}
+                    x={point.label}
+                    y={point.cumulative}
+                  />
+                ))}
             </AreaChart>
           </ResponsiveContainer>
         </div>

@@ -35,7 +35,7 @@ export function BookmakerProfitWithBonusesTable({
       <div className="border-b px-4 py-3">
         <h3 className="font-semibold text-lg">Bookmaker Performance</h3>
         <p className="text-muted-foreground text-sm">
-          Net profit per bookmaker including matched set results and bonuses
+          Matched-betting efficiency from pre-settlement exposure plus bonus impact
         </p>
       </div>
       {sorted.length === 0 ? (
@@ -51,6 +51,8 @@ export function BookmakerProfitWithBonusesTable({
                 <TableHead className="text-right">Matched Sets</TableHead>
                 <TableHead className="text-right">Stake</TableHead>
                 <TableHead className="text-right">Net P/L</TableHead>
+                <TableHead className="text-right">Match ROI</TableHead>
+                <TableHead className="text-right">Retention</TableHead>
                 <TableHead className="text-right">
                   <span className="inline-flex items-center gap-1">
                     <Gift className="h-3.5 w-3.5" />
@@ -58,7 +60,8 @@ export function BookmakerProfitWithBonusesTable({
                   </span>
                 </TableHead>
                 <TableHead className="text-right">Total Profit</TableHead>
-                <TableHead className="text-right">ROI</TableHead>
+                <TableHead className="text-right">Avg Exposure / Set</TableHead>
+                <TableHead className="text-right">ROI incl. Bonus</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -84,6 +87,26 @@ export function BookmakerProfitWithBonusesTable({
                   <TableCell
                     className={cn(
                       "text-right",
+                      row.bettingRoi >= 0 ? "text-emerald-600" : "text-rose-600"
+                    )}
+                  >
+                    {formatPercentage(row.bettingRoi)}
+                  </TableCell>
+                  <TableCell
+                    className={cn(
+                      "text-right font-medium",
+                      row.retentionPct >= 99
+                        ? "text-emerald-600"
+                        : row.retentionPct >= 98
+                          ? "text-amber-600"
+                          : "text-rose-600"
+                    )}
+                  >
+                    {`${row.retentionPct.toFixed(2)}%`}
+                  </TableCell>
+                  <TableCell
+                    className={cn(
+                      "text-right",
                       row.bonusTotal > 0
                         ? "text-blue-600"
                         : "text-muted-foreground"
@@ -100,6 +123,18 @@ export function BookmakerProfitWithBonusesTable({
                     )}
                   >
                     {formatNOK(row.totalProfit)}
+                  </TableCell>
+                  <TableCell
+                    className={cn(
+                      "text-right",
+                      row.avgNetExposurePerSet >= 0
+                        ? "text-emerald-600"
+                        : "text-rose-600"
+                    )}
+                  >
+                    {row.betCount > 0
+                      ? formatNOK(row.avgNetExposurePerSet)
+                      : "—"}
                   </TableCell>
                   <TableCell
                     className={cn(
