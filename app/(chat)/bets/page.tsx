@@ -21,11 +21,16 @@ import {
   getExposureByEvent,
   getBalanceSnapshots,
   getPendingSettlementBets,
+  listWalletBankTransactionsByUser,
   listAccountsWithBalances,
   listActiveWalletsByUser,
   listMatchedBetsByUser,
 } from "@/lib/db/queries";
-import { snapshotsToBalanceData } from "@/lib/reporting";
+import { convertAmountToNok } from "@/lib/fx-rates";
+import {
+  markWalletBankTransactionsOnBalanceData,
+  snapshotsToBalanceData,
+} from "@/lib/reporting";
 
 async function cacheDashboard<T>(
   userId: string,
@@ -68,6 +73,7 @@ export default async function Page() {
     pendingSettlementCount,
     accountsWithBalances,
     activeWallets,
+    walletBankTransactions,
   ] = await Promise.all([
     cacheDashboard(userId, "recent-matched-bets", () =>
       listMatchedBetsByUser({
@@ -101,12 +107,42 @@ export default async function Page() {
     cacheDashboard(userId, "active-wallets", () =>
       listActiveWalletsByUser(userId)
     ),
+    cacheDashboard(
+      userId,
+      `wallet-bank-transactions:${startDateIso}:${endDateIso}`,
+      () =>
+        listWalletBankTransactionsByUser({
+          userId,
+          startDate,
+          endDate,
+        })
+    ),
   ]);
 
-  const balanceDayChartData = snapshotsToBalanceData(balanceSnapshots, "day");
-  const balanceWeekChartData = snapshotsToBalanceData(balanceSnapshots, "week");
-  const balanceMonthChartData = snapshotsToBalanceData(
-    balanceSnapshots,
+  const walletBankTransactionsForChart = await Promise.all(
+    walletBankTransactions.map(async (transaction) => ({
+      date: new Date(transaction.date),
+      type: transaction.type,
+      amountNok: await convertAmountToNok(
+        Number.parseFloat(transaction.amount ?? "0"),
+        transaction.currency ?? "NOK"
+      ),
+    }))
+  );
+
+  const balanceDayChartData = markWalletBankTransactionsOnBalanceData(
+    snapshotsToBalanceData(balanceSnapshots, "day"),
+    walletBankTransactionsForChart,
+    "day"
+  );
+  const balanceWeekChartData = markWalletBankTransactionsOnBalanceData(
+    snapshotsToBalanceData(balanceSnapshots, "week"),
+    walletBankTransactionsForChart,
+    "week"
+  );
+  const balanceMonthChartData = markWalletBankTransactionsOnBalanceData(
+    snapshotsToBalanceData(balanceSnapshots, "month"),
+    walletBankTransactionsForChart,
     "month"
   );
 
