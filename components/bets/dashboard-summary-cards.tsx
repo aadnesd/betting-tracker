@@ -136,7 +136,7 @@ export function DashboardSummaryCards({
       </Card>
 
       {/* Pending Reviews */}
-      <Link href="/bets/review">
+      <Link href="/bets/review" prefetch={false}>
         <Card
           className={cn(
             "transition-colors hover:bg-muted/50",

@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/app/(auth)/auth";
+import { revalidateDashboard } from "@/lib/cache";
 import {
   completeDepositBonusEarly,
   deleteDepositBonus,
@@ -113,6 +114,8 @@ export async function PATCH(
         | undefined,
     });
 
+    revalidateDashboard(userId);
+
     return NextResponse.json(updated);
   } catch (error) {
     console.error("Error updating deposit bonus:", error);
@@ -147,6 +150,8 @@ export async function DELETE(
     }
 
     await deleteDepositBonus({ id, userId });
+
+    revalidateDashboard(userId);
 
     return NextResponse.json({ success: true });
   } catch (error) {
@@ -186,6 +191,8 @@ export async function POST(
           { status: 404 }
         );
       }
+
+      revalidateDashboard(userId);
 
       return NextResponse.json(result);
     }

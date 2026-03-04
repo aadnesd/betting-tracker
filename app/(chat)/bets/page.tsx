@@ -8,44 +8,40 @@ import { DashboardActions } from "@/components/bets/dashboard-actions";
 import { DashboardSummaryCards } from "@/components/bets/dashboard-summary-cards";
 import { ExposureAlertBanner } from "@/components/bets/exposure-alert-banner";
 import { ExposureByEventCard } from "@/components/bets/exposure-by-event-card";
-import { ExposureTimelineWithControls } from "@/components/bets/exposure-timeline-chart";
+import { BalanceChartWithControls } from "@/components/bets/balance-chart";
 import { FreeBetExpiryBanner } from "@/components/bets/free-bet-expiry-banner";
 import { PendingSettlementCard } from "@/components/bets/pending-settlement-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { dashboardTag } from "@/lib/cache";
 import {
   countExpiringFreeBets,
   countPendingSettlementBets,
-  type ExposureDataPoint,
   getDashboardSummary,
   getExposureByEvent,
-  getExposureTimeline,
+  getBalanceSnapshots,
   getPendingSettlementBets,
+  listWalletBankTransactionsByUser,
   listAccountsWithBalances,
   listActiveWalletsByUser,
   listMatchedBetsByUser,
 } from "@/lib/db/queries";
+import { convertAmountToNok } from "@/lib/fx-rates";
+import {
+  markWalletBankTransactionsOnBalanceData,
+  snapshotsToBalanceData,
+} from "@/lib/reporting";
 
-const getExposureTimelineCached = unstable_cache(
-  async (userId: string) => getExposureTimeline({ userId, daysBack: 90 }),
-  ["bets-exposure-timeline"],
-  { revalidate: 60 }
-);
-
-const getDashboardSummaryCached = unstable_cache(
-  async (userId: string) => getDashboardSummary({ userId }),
-  ["bets-dashboard-summary"],
-  { revalidate: 60 }
-);
-
-const listAccountsWithBalancesCached = unstable_cache(
-  async (userId: string) => listAccountsWithBalances({ userId }),
-  ["bets-accounts-with-balances"],
-  { revalidate: 60 }
-);
-
-const deriveExposureRange = (data: ExposureDataPoint[], days: number) =>
-  data.slice(-days);
+async function cacheDashboard<T>(
+  userId: string,
+  key: string,
+  loader: () => Promise<T>
+) {
+  return unstable_cache(loader, ["dashboard", userId, key], {
+    tags: [dashboardTag(userId)],
+    revalidate: false,
+  })();
+}
 
 export const metadata = {
   title: "Matched bets",
@@ -60,34 +56,95 @@ export default async function Page() {
 
   const userId = session.user.id;
 
+  const endDate = new Date();
+  const startDate = new Date(endDate);
+  startDate.setDate(startDate.getDate() - 90);
+
+  const startDateIso = startDate.toISOString();
+  const endDateIso = endDate.toISOString();
+
   const [
     bets,
     summary,
     expiringFreeBetsCount,
-    exposureData90,
+    balanceSnapshots,
     exposureByEvent,
     pendingSettlementBets,
     pendingSettlementCount,
     accountsWithBalances,
     activeWallets,
+    walletBankTransactions,
   ] = await Promise.all([
-    listMatchedBetsByUser({
+    cacheDashboard(userId, "recent-matched-bets", () =>
+      listMatchedBetsByUser({
+        userId,
+        limit: 50,
+      })
+    ),
+    cacheDashboard(userId, "summary", () => getDashboardSummary({ userId })),
+    cacheDashboard(userId, "expiring-free-bets", () =>
+      countExpiringFreeBets({ userId, daysUntilExpiry: 7 })
+    ),
+    cacheDashboard(userId, `balance-snapshots:${startDateIso}:${endDateIso}`, () =>
+      getBalanceSnapshots({
+        userId,
+        startDate,
+        endDate,
+      })
+    ),
+    cacheDashboard(userId, "exposure-by-event", () =>
+      getExposureByEvent({ userId })
+    ),
+    cacheDashboard(userId, "pending-settlement-list", () =>
+      getPendingSettlementBets({ userId, filter: "all", limit: 10 })
+    ),
+    cacheDashboard(userId, "pending-settlement-count", () =>
+      countPendingSettlementBets({ userId })
+    ),
+    cacheDashboard(userId, "accounts-with-balances", () =>
+      listAccountsWithBalances({ userId })
+    ),
+    cacheDashboard(userId, "active-wallets", () =>
+      listActiveWalletsByUser(userId)
+    ),
+    cacheDashboard(
       userId,
-      limit: 50,
-    }),
-    getDashboardSummaryCached(userId),
-    countExpiringFreeBets({ userId, daysUntilExpiry: 7 }),
-    getExposureTimelineCached(userId),
-    getExposureByEvent({ userId }),
-    getPendingSettlementBets({ userId, filter: "all", limit: 10 }),
-    countPendingSettlementBets({ userId }),
-    listAccountsWithBalancesCached(userId),
-    listActiveWalletsByUser(userId),
+      `wallet-bank-transactions:${startDateIso}:${endDateIso}`,
+      () =>
+        listWalletBankTransactionsByUser({
+          userId,
+          startDate,
+          endDate,
+        })
+    ),
   ]);
 
-  const exposureData7 = deriveExposureRange(exposureData90, 7);
-  const exposureData14 = deriveExposureRange(exposureData90, 14);
-  const exposureData30 = deriveExposureRange(exposureData90, 30);
+  const walletBankTransactionsForChart = await Promise.all(
+    walletBankTransactions.map(async (transaction) => ({
+      date: new Date(transaction.date),
+      type: transaction.type,
+      amountNok: await convertAmountToNok(
+        Number.parseFloat(transaction.amount ?? "0"),
+        transaction.currency ?? "NOK"
+      ),
+    }))
+  );
+
+  const balanceDayChartData = markWalletBankTransactionsOnBalanceData(
+    snapshotsToBalanceData(balanceSnapshots, "day"),
+    walletBankTransactionsForChart,
+    "day"
+  );
+  const balanceWeekChartData = markWalletBankTransactionsOnBalanceData(
+    snapshotsToBalanceData(balanceSnapshots, "week"),
+    walletBankTransactionsForChart,
+    "week"
+  );
+  const balanceMonthChartData = markWalletBankTransactionsOnBalanceData(
+    snapshotsToBalanceData(balanceSnapshots, "month"),
+    walletBankTransactionsForChart,
+    "month"
+  );
 
   // Helper to check if an account is active (treats null/undefined as active for backwards compatibility)
   const isActive = (status: string | null | undefined) =>
@@ -152,12 +209,11 @@ export default async function Page() {
         totalProfit={summary.totalProfit}
       />
 
-      <ExposureTimelineWithControls
-        currentExposure={summary.openExposure}
-        data7={exposureData7}
-        data14={exposureData14}
-        data30={exposureData30}
-        data90={exposureData90}
+      <BalanceChartWithControls
+        dayData={balanceDayChartData}
+        monthData={balanceMonthChartData}
+        title="Total Balance"
+        weekData={balanceWeekChartData}
       />
 
       <PendingSettlementCard

@@ -5,9 +5,9 @@ Prioritized implementation tasks. Check off when complete with tests passing.
 ---
 ## Status
 
-**Last updated**: 24 January 2026
-**Build**: ✅ Passing
-**Tests**: ✅ `pnpm exec vitest run` (573 tests passing)
+**Last updated**: 21 February 2026
+**Build**: ❌ Failed (sandbox: tsx IPC EPERM, unchanged)
+**Tests**: ✅ `pnpm exec vitest run tests/unit/matches-api.test.ts tests/unit/football-match.test.ts` + `pnpm exec vitest run tests/unit/wallet-queries.test.ts`
 **Tag**: v0.0.60
 
 Remaining blocker: Rerun Playwright route tests in an environment that permits binding the dev server.
@@ -15,6 +15,12 @@ Remaining blocker: Rerun Playwright route tests in an environment that permits b
 ---
 
 ## Bugs — Active Issues
+
+- [ ] **Performance issues in APIs**: The apis take 1-2 seconds each, is there any caching that could be improved on the DB side perhaps? **Progress:** added caching for `/api/bets/matches` (search/upcoming), `/api/bets/matches/:id`, `/api/bets/wallets`, and the recent deposits endpoint using `lib/db/cached-queries.ts` with `revalidate` set to 60-300s. Moved wallet balance aggregation into SQL to remove N+1 scans, added indexes for `Account`, `AccountTransaction`, `MatchedBet`, `FreeBet`, `DepositBonus`, `FootballMatch`, `Wallet`, and `WalletTransaction` (migration `0032_remarkable_krista_starr.sql`). Test run: `pnpm exec vitest run tests/unit/wallet-queries.test.ts`. Perf verification still pending.
+  Findings: `listWalletsByUser` previously performed N+1 wallet balance queries because `calculateWalletBalance` fetched all transactions per wallet. Schema was missing indexes for common filters on `userId`, `status`, and `date` across `accounts`, `transactions`, `matched_bets`, and `wallet_transactions` (now addressed by SQL aggregation + indexes).
+  Todos: confirm perf improvements under load and run broader profiling to catch remaining hotspots.
+- [x] **Account list API mismatch in WalletTransactionForm**: `WalletTransactionForm` fetches `/api/bets/accounts` expecting a list, but `GET /api/bets/accounts` requires an id and returns 400, so the account transfer dropdowns stay empty. Implementation: added a list response for `GET /api/bets/accounts` when no id is provided; no `WalletTransactionForm` change needed. Tests: `pnpm exec vitest run tests/unit/accounts-api.test.ts` (why: validates account list responses and error handling for the accounts API).
+- [x] **Matches API performance (listUpcomingMatches ignores limit)**: `listUpcomingMatches` returns all upcoming matches when no search term is provided, ignoring the intended limit. This causes large responses and slow `/api/bets/matches` calls. Implementation: added a `limit` parameter to `listUpcomingMatches`, enforced it in the `/api/bets/matches` no-search path, and added coverage to ensure the limit is respected. Tests: `pnpm exec vitest run tests/unit/matches-api.test.ts tests/unit/football-match.test.ts`. Why: guards against oversized match payloads and slow responses.
 
 - [x] **Autoparse review locks lay currency to NOK**: The screenshot review form disables the lay currency input by forcing `readOnlyCurrency="NOK"`, which violates the "manual override on any field" requirement in `specs/ai-autoparse.md`. DoD: allow editing lay currency in the review form (default to NOK only when missing), keep account selection syncing currency, and ensure saved payloads can carry non-NOK exchange currencies.
 
@@ -347,26 +353,7 @@ Remaining blocker: Rerun Playwright route tests in an environment that permits b
 
 - [x] **Promo progress tracking**: For recurring promos (e.g., "Bet £50 to unlock £10 free bet"), track progress toward unlock. DoD: promo detail shows progress bar and linked qualifying bets. Why: Helps complete multi-step promos. Implementation: Extended FreeBet schema with `locked` status and unlock requirement fields (unlockType: stake|bets, unlockTarget, unlockMinOdds, unlockProgress). Created QualifyingBet table to link bets that contribute to unlocking a promo. Added queries: `createLockedPromo` for creating promos with unlock requirements, `addQualifyingBet` and `removeQualifyingBet` for managing qualifying bets with automatic progress updates, `listFreeBetsWithProgress` for displaying promos with progress info, `listQualifyingBetsForPromo` for listing linked bets. Updated FreeBetForm with collapsible "Unlock Requirements" section for creating locked promos. Updated promo detail page with progress card showing progress bar (percentage, current vs target), unlock requirements summary, and qualifying bets list with links to matched bets. Updated promos list page to show locked promos in a separate section with progress bars. Tests: 9 new tests in free-bet-queries.test.ts covering new query functions and types (179 total tests passing).
 
-- [ ] **Deposit bonus tracking**: Add `DepositBonus` table for bonuses with wagering requirements (e.g., "Deposit 1000 NOK, get 100% bonus with 6x wagering at 1.80+ odds"). Unlike free bets which are immediately usable, deposit bonuses require wagering to clear.
-
-  **Spec:** See `specs/deposit-bonuses.md` for full requirements.
-
-  **Data Model:**
-  - `DepositBonus` table: id, userId, accountId, name, depositAmount, bonusAmount, currency, wageringMultiplier (e.g., 6), wageringBase (deposit/bonus/deposit_plus_bonus), wageringRequirement (computed), wageringProgress (default 0), minOdds, maxBetPercent (optional), expiresAt, status (active/cleared/forfeited/expired), linkedTransactionId (FK → AccountTransaction), clearedAt, notes.
-  - `BonusQualifyingBet` table: id, depositBonusId, betId, betType (back/matched), stake, odds, qualified (bool).
-
-  **Implementation Steps:**
-  1. Add schema tables to `lib/db/schema.ts` + generate migration
-  2. Add CRUD queries: `createDepositBonus`, `getDepositBonusById`, `listDepositBonusesByUser`, `listActiveDepositBonuses`, `updateDepositBonusProgress`, `markBonusCleared`, `addBonusQualifyingBet`, `listBonusQualifyingBets`
-  3. Create API routes: `GET/POST /api/bets/deposit-bonuses`, `GET/PATCH/DELETE /api/bets/deposit-bonuses/[id]`, `POST /api/bets/deposit-bonuses/[id]/qualifying-bets`
-  4. Extend promos settings page with "Deposit Bonuses" tab/section showing active bonuses with progress bars
-  5. Create deposit bonus form: account selector, deposit/bonus amounts, wagering multiplier, wagering base radio, min odds, expiry, link to recent deposit dropdown
-  6. Create detail page with progress card (wagered X / Y, remaining, %) and qualifying bets list
-  7. Hook into bet settlement: when settling a bet on an account with active bonus, check if odds >= minOdds, add stake to progress, create BonusQualifyingBet record, auto-mark cleared when progress >= requirement
-
-  **DoD:** Users can create deposit bonuses with wagering requirements, see progress update as bets settle, view qualifying bets, and bonus auto-marks as cleared when wagering complete. Tests cover schema, queries, API, and progress tracking.
-
-  **Why:** Deposit bonuses are a major profit source in matched betting but require careful wagering tracking. Currently users must track this manually in spreadsheets.
+- [x] **Deposit bonus tracking**: Add `DepositBonus` table for bonuses with wagering requirements (e.g., "Deposit 1000 NOK, get 100% bonus with 6x wagering at 1.80+ odds"). Unlike free bets which are immediately usable, deposit bonuses require wagering to clear. Implementation: Added `DepositBonus`/`BonusQualifyingBet` schema and migration, completed CRUD/progress queries in `lib/db/queries.ts`, shipped deposit bonus API routes (`/api/bets/deposit-bonuses`, `/api/bets/deposit-bonuses/[id]`, `/api/bets/deposit-bonuses/[id]/qualifying-bets`), and wired settlement to append qualifying bets, advance wagering progress, and auto-mark bonuses as cleared when requirements are met. Tests: added `tests/unit/deposit-bonus-queries.test.ts` for schema/query/progress coverage.
 
 ## P7 — Match Data & Auto-Settlement
 

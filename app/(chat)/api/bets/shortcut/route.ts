@@ -3,6 +3,7 @@ import { put } from "@vercel/blob";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { computeNetExposureInputs } from "@/lib/bet-calculations";
+import { revalidateDashboard } from "@/lib/cache";
 import {
   isOcrConfigured,
   parseMatchedBetFromScreenshots,
@@ -578,6 +579,8 @@ export async function POST(request: Request) {
         notes: mergedNotes || null,
       }),
     ]);
+
+    revalidateDashboard(userId);
 
     // 14. Return success response
     return NextResponse.json({

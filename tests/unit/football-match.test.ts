@@ -36,15 +36,34 @@ vi.mock("drizzle-orm/postgres-js", () => ({
         where: vi.fn(() => ({
           limit: vi.fn().mockImplementation(() => mockSelectRows()),
           orderBy: vi.fn().mockImplementation(() => {
-            // Return an object that can be called or has the array result
             const result = mockSelectRows();
-            // If result is a promise, return it directly (for functions that don't chain .limit())
-            return result instanceof Promise ? result : mockSelectRows();
+            if (result && typeof (result as Promise<unknown>).then === "function") {
+              (result as { limit?: () => unknown }).limit = vi
+                .fn()
+                .mockImplementation(() => mockSelectRows());
+              return result;
+            }
+            const wrapped = Promise.resolve(result);
+            (wrapped as { limit?: () => unknown }).limit = vi
+              .fn()
+              .mockImplementation(() => mockSelectRows());
+            return wrapped;
           }),
         })),
-        orderBy: vi.fn(() => ({
-          limit: mockSelectRows,
-        })),
+        orderBy: vi.fn().mockImplementation(() => {
+          const result = mockSelectRows();
+          if (result && typeof (result as Promise<unknown>).then === "function") {
+            (result as { limit?: () => unknown }).limit = vi
+              .fn()
+              .mockImplementation(() => mockSelectRows());
+            return result;
+          }
+          const wrapped = Promise.resolve(result);
+          (wrapped as { limit?: () => unknown }).limit = vi
+            .fn()
+            .mockImplementation(() => mockSelectRows());
+          return wrapped;
+        }),
       })),
     })),
     update: vi.fn(() => ({

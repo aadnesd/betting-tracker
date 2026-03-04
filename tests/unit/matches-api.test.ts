@@ -9,7 +9,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as authModule from "@/app/(auth)/auth";
 import { GET as getMatchByIdRoute } from "@/app/(chat)/api/bets/matches/[id]/route";
 import { GET as listMatchesRoute } from "@/app/(chat)/api/bets/matches/route";
-import * as dbQueries from "@/lib/db/queries";
+import * as cachedQueries from "@/lib/db/cached-queries";
 
 // Mock auth to return a test user
 vi.mock("@/app/(auth)/auth", () => ({
@@ -17,10 +17,10 @@ vi.mock("@/app/(auth)/auth", () => ({
 }));
 
 // Mock the queries module
-vi.mock("@/lib/db/queries", () => ({
-  searchFootballMatches: vi.fn(),
-  listUpcomingMatches: vi.fn(),
-  getFootballMatchById: vi.fn(),
+vi.mock("@/lib/db/cached-queries", () => ({
+  searchFootballMatchesCached: vi.fn(),
+  listUpcomingMatchesCached: vi.fn(),
+  getFootballMatchByIdCached: vi.fn(),
 }));
 
 describe("/api/bets/matches", () => {
@@ -215,13 +215,54 @@ describe("/api/bets/matches", () => {
 
   describe("GET /api/bets/matches route", () => {
     it("returns upcoming matches when no search term provided", async () => {
-      (dbQueries.listUpcomingMatches as vi.Mock).mockResolvedValueOnce([]);
+      (cachedQueries.listUpcomingMatchesCached as vi.Mock).mockResolvedValueOnce(
+        []
+      );
       const res = await listMatchesRoute(
         new Request("http://localhost/api/bets/matches")
       );
       const json = await res.json();
       expect(res.status).toBe(200);
       expect(Array.isArray(json.matches)).toBe(true);
+    });
+
+    it("uses listUpcomingMatches when search term is too short", async () => {
+      (cachedQueries.listUpcomingMatchesCached as vi.Mock).mockResolvedValueOnce(
+        []
+      );
+      await listMatchesRoute(
+        new Request("http://localhost/api/bets/matches?search=a&limit=10")
+      );
+
+      expect(cachedQueries.listUpcomingMatchesCached).toHaveBeenCalledWith(10);
+      expect(cachedQueries.searchFootballMatchesCached).not.toHaveBeenCalled();
+    });
+
+    it("uses searchFootballMatches when search term length is at least 2", async () => {
+      (
+        cachedQueries.searchFootballMatchesCached as vi.Mock
+      ).mockResolvedValueOnce([]);
+      await listMatchesRoute(
+        new Request("http://localhost/api/bets/matches?search=Ma&limit=5")
+      );
+
+      expect(cachedQueries.searchFootballMatchesCached).toHaveBeenCalledWith(
+        "ma",
+        5,
+        expect.any(String)
+      );
+      expect(cachedQueries.listUpcomingMatchesCached).not.toHaveBeenCalled();
+    });
+
+    it("caps limit at 50 for upcoming matches", async () => {
+      (cachedQueries.listUpcomingMatchesCached as vi.Mock).mockResolvedValueOnce(
+        []
+      );
+      await listMatchesRoute(
+        new Request("http://localhost/api/bets/matches?limit=500")
+      );
+
+      expect(cachedQueries.listUpcomingMatchesCached).toHaveBeenCalledWith(50);
     });
   });
 });
@@ -244,7 +285,9 @@ describe("/api/bets/matches/:id", () => {
   });
 
   it("returns 404 when match not found", async () => {
-    (dbQueries.getFootballMatchById as vi.Mock).mockResolvedValueOnce(null);
+    (cachedQueries.getFootballMatchByIdCached as vi.Mock).mockResolvedValueOnce(
+      null
+    );
     const res = await getMatchByIdRoute(
       new Request("http://localhost/api/bets/matches/match-1"),
       { params: Promise.resolve({ id: "match-1" }) }
@@ -255,7 +298,7 @@ describe("/api/bets/matches/:id", () => {
   });
 
   it("returns formatted match details", async () => {
-    (dbQueries.getFootballMatchById as vi.Mock).mockResolvedValueOnce({
+    (cachedQueries.getFootballMatchByIdCached as vi.Mock).mockResolvedValueOnce({
       id: "match-1",
       externalId: "ext-123",
       homeTeam: "Arsenal",

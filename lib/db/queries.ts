@@ -20,11 +20,10 @@ import {
   sql,
   sum,
 } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/postgres-js";
-import postgres from "postgres";
 import { ChatSDKError } from "../errors";
-import { convertAmountToNok } from "../fx-rates";
+import { convertAmountToNok, convertAmountToNokStrict } from "../fx-rates";
 import { generateUUID } from "../utils";
+import { db } from "./connection";
 import {
   account,
   accountTransaction,
@@ -55,14 +54,6 @@ import {
   walletTransaction,
 } from "./schema";
 import { generateHashedPassword } from "./utils";
-
-// Optionally, if not using email/pass login, you can
-// use the Drizzle adapter for Auth.js / NextAuth
-// https://authjs.dev/reference/adapter/drizzle
-
-// biome-ignore lint: Forbidden non-null assertion.
-const client = postgres(process.env.POSTGRES_URL!);
-const db = drizzle(client);
 
 const normalizeAccountName = (name: string) => name.trim().toLowerCase();
 const normalizePromoType = (type: string) => type.trim().toLowerCase();
@@ -1271,7 +1262,7 @@ export async function createAccountTransaction({
   try {
     // Pre-compute NOK equivalent at write time to avoid FX API calls on read
     const normalizedCurrency = currency.toUpperCase();
-    const amountNok = await convertAmountToNok(amount, normalizedCurrency);
+    const amountNok = await convertAmountToNokStrict(amount, normalizedCurrency);
 
     const values: typeof accountTransaction.$inferInsert = {
       createdAt: new Date(),
@@ -1461,11 +1452,14 @@ export async function saveBackBet({
   ...bet
 }: BetInputBase & { userId: string; screenshotId: string }) {
   try {
-    const stakeNok = await convertAmountToNok(bet.stake, bet.currency ?? "NOK");
+    const stakeNok = await convertAmountToNokStrict(
+      bet.stake,
+      bet.currency ?? "NOK"
+    );
     const profitLossNok =
       bet.profitLoss === undefined || bet.profitLoss === null
         ? null
-        : await convertAmountToNok(bet.profitLoss, bet.currency ?? "NOK");
+        : await convertAmountToNokStrict(bet.profitLoss, bet.currency ?? "NOK");
 
     const values: typeof backBet.$inferInsert = {
       createdAt: new Date(),
@@ -1506,11 +1500,14 @@ export async function saveLayBet({
   ...bet
 }: BetInputBase & { userId: string; screenshotId: string }) {
   try {
-    const stakeNok = await convertAmountToNok(bet.stake, bet.currency ?? "NOK");
+    const stakeNok = await convertAmountToNokStrict(
+      bet.stake,
+      bet.currency ?? "NOK"
+    );
     const profitLossNok =
       bet.profitLoss === undefined || bet.profitLoss === null
         ? null
-        : await convertAmountToNok(bet.profitLoss, bet.currency ?? "NOK");
+        : await convertAmountToNokStrict(bet.profitLoss, bet.currency ?? "NOK");
 
     const values: typeof layBet.$inferInsert = {
       createdAt: new Date(),
@@ -1658,7 +1655,7 @@ export async function updateBackBetDetails({
   placedAt: Date | null;
 }) {
   try {
-    const stakeNok = await convertAmountToNok(stake, currency ?? "NOK");
+    const stakeNok = await convertAmountToNokStrict(stake, currency ?? "NOK");
     const updates: Partial<typeof backBet.$inferInsert> = {
       market,
       selection,
@@ -1757,7 +1754,7 @@ export async function updateLayBetDetails({
   placedAt: Date | null;
 }) {
   try {
-    const stakeNok = await convertAmountToNok(stake, currency ?? "NOK");
+    const stakeNok = await convertAmountToNokStrict(stake, currency ?? "NOK");
     const updates: Partial<typeof layBet.$inferInsert> = {
       market,
       selection,
@@ -2133,6 +2130,11 @@ export type IndividualBetListItem = {
   matchedBetStatus: "draft" | "matched" | "settled" | "needs_review" | null;
 };
 
+export type PaginatedIndividualBetList = {
+  bets: IndividualBetListItem[];
+  hasMore: boolean;
+};
+
 export async function listAllBetsByUser({
   userId,
   status,
@@ -2141,6 +2143,7 @@ export async function listAllBetsByUser({
   toDate,
   search,
   limit = 50,
+  offset = 0,
 }: {
   userId: string;
   status?: "placed" | "settled";
@@ -2149,8 +2152,12 @@ export async function listAllBetsByUser({
   toDate?: Date;
   search?: string;
   limit?: number;
-}): Promise<IndividualBetListItem[]> {
+  offset?: number;
+}): Promise<PaginatedIndividualBetList> {
   try {
+    const safeLimit = Math.max(1, limit);
+    const safeOffset = Math.max(0, offset);
+    const queryLimit = safeLimit + safeOffset + 1;
     const normalizedSearch = search?.trim().toLowerCase();
     const backConditions: SQL<unknown>[] = [eq(backBet.userId, userId)];
     const layConditions: SQL<unknown>[] = [eq(layBet.userId, userId)];
@@ -2218,7 +2225,7 @@ export async function listAllBetsByUser({
         .leftJoin(matchedBet, eq(matchedBet.backBetId, backBet.id))
         .where(and(...backConditions))
         .orderBy(desc(sql`COALESCE(${backBet.placedAt}, ${backBet.createdAt})`))
-        .limit(limit),
+        .limit(queryLimit),
       db
         .select({
           id: layBet.id,
@@ -2245,7 +2252,7 @@ export async function listAllBetsByUser({
         .leftJoin(matchedBet, eq(matchedBet.layBetId, layBet.id))
         .where(and(...layConditions))
         .orderBy(desc(sql`COALESCE(${layBet.placedAt}, ${layBet.createdAt})`))
-        .limit(limit),
+        .limit(queryLimit),
     ]);
 
     const combined: IndividualBetListItem[] = [
@@ -2305,7 +2312,12 @@ export async function listAllBetsByUser({
       return dateB - dateA;
     });
 
-    return combined.slice(0, limit);
+    const pagedBets = combined.slice(safeOffset, safeOffset + safeLimit + 1);
+
+    return {
+      bets: pagedBets.slice(0, safeLimit),
+      hasMore: pagedBets.length > safeLimit,
+    };
   } catch (error) {
     console.error("[listAllBetsByUser] Database error:", error);
     throw new ChatSDKError(
@@ -2719,8 +2731,8 @@ export type BetReadyForSettlement = {
   backOdds: string | null;
   backStake: string | null;
   backAccountId: string | null;
-  backBetPlacedAt: Date | null;
   backCurrency: string | null;
+  backBetPlacedAt: Date | null;
   // Lay bet info
   layBetId: string | null;
   layOdds: string | null;
@@ -2779,8 +2791,8 @@ export async function findBetsReadyForAutoSettlement({
         backOdds: backBet.odds,
         backStake: backBet.stake,
         backAccountId: backBet.accountId,
-        backBetPlacedAt: backBet.placedAt,
         backCurrency: backBet.currency,
+        backBetPlacedAt: backBet.placedAt,
         // Lay bet
         layBetId: layBet.id,
         layOdds: layBet.odds,
@@ -2842,8 +2854,8 @@ export async function findBetsReadyForAutoSettlement({
         backOdds: row.backOdds,
         backStake: row.backStake,
         backAccountId: row.backAccountId,
-        backBetPlacedAt: row.backBetPlacedAt,
         backCurrency: row.backCurrency,
+        backBetPlacedAt: row.backBetPlacedAt,
         layBetId: row.layBetId,
         layOdds: row.layOdds,
         layStake: row.layStake,
@@ -2959,11 +2971,11 @@ export async function applyAutoSettlement(
   let transactionsCreated = 0;
 
   try {
-    const backProfitLossNok = await convertAmountToNok(
+    const backProfitLossNok = await convertAmountToNokStrict(
       params.backProfitLoss,
       params.backCurrency ?? "NOK"
     );
-    const layProfitLossNok = await convertAmountToNok(
+    const layProfitLossNok = await convertAmountToNokStrict(
       params.layProfitLoss,
       params.layCurrency ?? "NOK"
     );
@@ -2999,7 +3011,8 @@ export async function applyAutoSettlement(
           accountId: params.backAccountId,
           type: "adjustment",
           amount: params.backProfitLoss.toFixed(2),
-          currency: params.backCurrency ?? "NOK",
+          currency: (params.backCurrency ?? "NOK").toUpperCase(),
+          amountNok: backProfitLossNok.toFixed(2),
           occurredAt: now,
           notes: `Auto-settlement: ${params.market} - ${params.selection} (${params.matchResult})`,
           linkedBackBetId: params.backBetId,
@@ -3028,7 +3041,8 @@ export async function applyAutoSettlement(
           accountId: params.layAccountId,
           type: "adjustment",
           amount: params.layProfitLoss.toFixed(2),
-          currency: params.layCurrency ?? "NOK",
+          currency: (params.layCurrency ?? "NOK").toUpperCase(),
+          amountNok: layProfitLossNok.toFixed(2),
           occurredAt: now,
           notes: `Auto-settlement: ${params.market} - ${params.selection} (${params.matchResult})`,
           linkedLayBetId: params.layBetId,
@@ -6118,17 +6132,22 @@ export async function listFootballMatches({
 export async function listUpcomingMatches({
   daysAhead = 14,
   competitionCode,
+  fromDate,
+  limit = 50,
 }: {
   daysAhead?: number;
   competitionCode?: string;
+  fromDate?: Date;
+  limit?: number;
 } = {}) {
   try {
-    const now = new Date();
-    const futureDate = new Date();
+    const startDate = fromDate ?? new Date();
+    const futureDate = new Date(startDate);
     futureDate.setDate(futureDate.getDate() + daysAhead);
+    const cappedLimit = Math.min(Math.max(limit, 1), 200);
 
     const conditions: SQL<unknown>[] = [
-      gte(footballMatch.matchDate, now),
+      gte(footballMatch.matchDate, startDate),
       lte(footballMatch.matchDate, futureDate),
       inArray(footballMatch.status, ["SCHEDULED", "TIMED"]),
     ];
@@ -6141,7 +6160,8 @@ export async function listUpcomingMatches({
       .select()
       .from(footballMatch)
       .where(and(...conditions))
-      .orderBy(asc(footballMatch.matchDate));
+      .orderBy(asc(footballMatch.matchDate))
+      .limit(cappedLimit);
 
     return rows;
   } catch (_error) {
@@ -7509,30 +7529,49 @@ export async function listWalletsByUser(
   userId: string
 ): Promise<WalletWithBalance[]> {
   try {
-    const wallets = await db
-      .select()
+    const balanceExpression = sql<string>`COALESCE(
+      SUM(
+        CASE
+          WHEN ${walletTransaction.type} IN ('withdrawal', 'transfer_to_account', 'transfer_to_wallet', 'fee')
+            THEN -1 * ${walletTransaction.amount}::numeric
+          ELSE ${walletTransaction.amount}::numeric
+        END
+      ),
+      0
+    )`;
+
+    const balanceSubquery = db
+      .select({
+        walletId: walletTransaction.walletId,
+        balance: balanceExpression.as("balance"),
+      })
+      .from(walletTransaction)
+      .groupBy(walletTransaction.walletId)
+      .as("wallet_balance");
+
+    const rows = await db
+      .select({
+        id: wallet.id,
+        createdAt: wallet.createdAt,
+        userId: wallet.userId,
+        name: wallet.name,
+        type: wallet.type,
+        currency: wallet.currency,
+        notes: wallet.notes,
+        status: wallet.status,
+        balance: sql<string>`COALESCE(${balanceSubquery.balance}, '0')`,
+      })
       .from(wallet)
+      .leftJoin(balanceSubquery, eq(wallet.id, balanceSubquery.walletId))
       .where(eq(wallet.userId, userId))
       .orderBy(desc(wallet.createdAt));
 
-    // Calculate balance for each wallet
-    const walletsWithBalance: WalletWithBalance[] = [];
-    for (const w of wallets) {
-      const balance = await calculateWalletBalance(w.id);
-      walletsWithBalance.push({
-        id: w.id,
-        createdAt: w.createdAt,
-        userId: w.userId,
-        name: w.name,
-        type: w.type as WalletType,
-        currency: w.currency,
-        notes: w.notes,
-        status: w.status as WalletStatus,
-        balance,
-      });
-    }
-
-    return walletsWithBalance;
+    return rows.map((row) => ({
+      ...row,
+      type: row.type as WalletType,
+      status: row.status as WalletStatus,
+      balance: Number.parseFloat(String(row.balance) || "0"),
+    }));
   } catch (_error) {
     throw new ChatSDKError("bad_request:database", "Failed to list wallets");
   }
@@ -7604,36 +7643,23 @@ export async function calculateWalletBalance(
   walletId: string
 ): Promise<number> {
   try {
-    const transactions = await db
+    const [result] = await db
       .select({
-        type: walletTransaction.type,
-        amount: walletTransaction.amount,
+        balance: sql<string>`COALESCE(
+          SUM(
+            CASE
+              WHEN ${walletTransaction.type} IN ('withdrawal', 'transfer_to_account', 'transfer_to_wallet', 'fee')
+                THEN -1 * ${walletTransaction.amount}::numeric
+              ELSE ${walletTransaction.amount}::numeric
+            END
+          ),
+          0
+        )`,
       })
       .from(walletTransaction)
       .where(eq(walletTransaction.walletId, walletId));
 
-    let balance = 0;
-    for (const tx of transactions) {
-      const amount = Number(tx.amount);
-      switch (tx.type) {
-        case "deposit":
-        case "transfer_from_account":
-        case "transfer_from_wallet":
-          balance += amount;
-          break;
-        case "withdrawal":
-        case "transfer_to_account":
-        case "transfer_to_wallet":
-        case "fee":
-          balance -= amount;
-          break;
-        case "adjustment":
-          balance += amount; // Can be positive or negative
-          break;
-      }
-    }
-
-    return balance;
+    return Number.parseFloat(result?.balance ?? "0");
   } catch (_error) {
     throw new ChatSDKError(
       "bad_request:database",

@@ -108,7 +108,7 @@ export function ExposureTimelineChart({
 
   // Get the current exposure value (last data point or provided value)
   const displayedCurrentExposure =
-    currentExposure ?? data[data.length - 1]?.exposure ?? 0;
+    currentExposure ?? data.at(-1)?.exposure ?? 0;
 
   return (
     <Card>
@@ -190,23 +190,21 @@ export function ExposureTimelineChart({
 type DaysOption = 7 | 14 | 30 | 90;
 
 type ExposureTimelineWithControlsProps = {
-  data7: ExposureDataPoint[];
-  data14: ExposureDataPoint[];
-  data30: ExposureDataPoint[];
   data90: ExposureDataPoint[];
   title?: string;
   currentExposure?: number;
 };
 
 export function ExposureTimelineWithControls({
-  data7,
-  data14,
-  data30,
   data90,
   title = "Exposure Timeline",
   currentExposure,
 }: ExposureTimelineWithControlsProps) {
   const [days, setDays] = useState<DaysOption>(30);
+
+  const data7 = data90.slice(-7);
+  const data14 = data90.slice(-14);
+  const data30 = data90.slice(-30);
 
   const dataMap: Record<DaysOption, ExposureDataPoint[]> = {
     7: data7,
@@ -216,11 +214,7 @@ export function ExposureTimelineWithControls({
   };
 
   const data = dataMap[days];
-  const hasData =
-    data7.length > 0 ||
-    data14.length > 0 ||
-    data30.length > 0 ||
-    data90.length > 0;
+  const hasData = data90.length > 0;
 
   if (!hasData) {
     return (
@@ -251,7 +245,7 @@ export function ExposureTimelineWithControls({
 
   // Get the current exposure value
   const displayedCurrentExposure =
-    currentExposure ?? data[data.length - 1]?.exposure ?? 0;
+    currentExposure ?? data.at(-1)?.exposure ?? 0;
 
   const daysOptions: { value: DaysOption; label: string }[] = [
     { value: 7, label: "7d" },
