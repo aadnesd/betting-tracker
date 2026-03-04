@@ -125,7 +125,7 @@ export function WalletTransactionRow({
   const [type, setType] = useState<WalletTransactionType>(transaction.type);
   const [amount, setAmount] = useState(transaction.amount);
   const [currency, setCurrency] = useState(transaction.currency);
-  const [date, setDate] = useState(transaction.date.slice(0, 10));
+  const [date, setDate] = useState(transaction.date.slice(0, 16));
   const [notes, setNotes] = useState(transaction.notes ?? "");
   const [externalRef, setExternalRef] = useState(transaction.externalRef ?? "");
   const [relatedAccountId, setRelatedAccountId] = useState(
@@ -169,7 +169,7 @@ export function WalletTransactionRow({
     setType(transaction.type);
     setAmount(transaction.amount);
     setCurrency(transaction.currency);
-    setDate(transaction.date.slice(0, 10));
+    setDate(transaction.date.slice(0, 16));
     setNotes(transaction.notes ?? "");
     setExternalRef(transaction.externalRef ?? "");
     setRelatedAccountId(transaction.relatedAccountId ?? "");
@@ -183,7 +183,7 @@ export function WalletTransactionRow({
       return;
     }
     if (!date) {
-      toast.error("Date is required");
+      toast.error("Date and time are required");
       return;
     }
     if (needsAccount && !relatedAccountId) {
@@ -269,7 +269,15 @@ export function WalletTransactionRow({
             {transactionTypeLabel(transaction.type)}
           </p>
           <div className="flex items-center gap-2 text-muted-foreground text-xs">
-            <span>{new Date(transaction.date).toLocaleDateString()}</span>
+            <span>
+              {new Date(transaction.date).toLocaleString([], {
+                year: "numeric",
+                month: "2-digit",
+                day: "2-digit",
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </span>
             {transaction.relatedAccountName && (
               <span>• {transaction.relatedAccountName}</span>
             )}
@@ -369,11 +377,13 @@ export function WalletTransactionRow({
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor={`wallet-tx-date-${transaction.id}`}>Date</Label>
+                <Label htmlFor={`wallet-tx-date-${transaction.id}`}>
+                  Date & time
+                </Label>
                 <Input
                   id={`wallet-tx-date-${transaction.id}`}
                   onChange={(event) => setDate(event.target.value)}
-                  type="date"
+                  type="datetime-local"
                   value={date}
                 />
               </div>
