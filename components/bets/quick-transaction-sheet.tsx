@@ -53,6 +53,8 @@ interface QuickTransactionSheetProps {
   wallets?: WalletOption[];
   /** Trigger button element (default: "Quick Transaction" button) */
   trigger?: React.ReactNode;
+  /** Whether the sheet should open on first mount */
+  defaultOpen?: boolean;
   /** Called after successful transaction creation */
   onSuccess?: () => void;
 }
@@ -108,10 +110,11 @@ export function QuickTransactionSheet({
   accounts,
   wallets = [],
   trigger,
+  defaultOpen = false,
   onSuccess,
 }: QuickTransactionSheetProps) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const [formData, setFormData] = useState<FormData>({
     accountId: "",
     type: "bonus",
