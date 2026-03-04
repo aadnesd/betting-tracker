@@ -34,19 +34,15 @@ export async function GET(request: Request) {
   searchFromDate.setDate(searchFromDate.getDate() - 7);
 
   try {
-    let matches: Awaited<ReturnType<typeof searchFootballMatchesCached>> = [];
-
-    if (shouldSearch) {
-      // Search for matches by team name
-      matches = await searchFootballMatchesCached(
-        search.trim().toLowerCase(),
-        limit,
-        searchFromDate.toISOString()
-      );
-    } else {
-      // List upcoming matches
-      matches = await listUpcomingMatchesCached(limit);
-    }
+    const matches = shouldSearch
+      ? // Search for matches by team name
+        await searchFootballMatchesCached(
+          search.trim().toLowerCase(),
+          limit,
+          searchFromDate.toISOString()
+        )
+      : // List upcoming matches
+        await listUpcomingMatchesCached(limit);
 
     // Map to a simpler format for the frontend
     const formattedMatches = matches.map((m) => ({
