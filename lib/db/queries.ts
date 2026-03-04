@@ -2733,7 +2733,6 @@ export type BetReadyForSettlement = {
   backAccountId: string | null;
   backCurrency: string | null;
   backBetPlacedAt: Date | null;
-  backCurrency: string | null;
   // Lay bet info
   layBetId: string | null;
   layOdds: string | null;
@@ -2794,7 +2793,6 @@ export async function findBetsReadyForAutoSettlement({
         backAccountId: backBet.accountId,
         backCurrency: backBet.currency,
         backBetPlacedAt: backBet.placedAt,
-        backCurrency: backBet.currency,
         // Lay bet
         layBetId: layBet.id,
         layOdds: layBet.odds,
@@ -2858,7 +2856,6 @@ export async function findBetsReadyForAutoSettlement({
         backAccountId: row.backAccountId,
         backCurrency: row.backCurrency,
         backBetPlacedAt: row.backBetPlacedAt,
-        backCurrency: row.backCurrency,
         layBetId: row.layBetId,
         layOdds: row.layOdds,
         layStake: row.layStake,
