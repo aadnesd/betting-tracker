@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/app/(auth)/auth";
+import { revalidateDashboard } from "@/lib/cache";
 import {
   createAuditEntry,
   createManualScreenshot,
@@ -147,6 +148,8 @@ export async function POST(request: Request) {
         ? `[Standalone Bet] ${body.notes}`
         : "[Standalone Bet] Created without matched pair",
     });
+
+    revalidateDashboard(session.user.id);
 
     return NextResponse.json({
       success: true,

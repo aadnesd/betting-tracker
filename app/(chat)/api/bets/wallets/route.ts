@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/app/(auth)/auth";
-import { createWallet, listWalletsByUser } from "@/lib/db/queries";
+import { revalidateDashboard } from "@/lib/cache";
+import { createWallet } from "@/lib/db/queries";
+import { listWalletsByUserCached } from "@/lib/db/cached-queries";
 
 const createWalletSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -17,7 +19,7 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const wallets = await listWalletsByUser(session.user.id);
+    const wallets = await listWalletsByUserCached(session.user.id);
     return NextResponse.json(wallets);
   } catch (error) {
     console.error("Error listing wallets:", error);
@@ -52,6 +54,8 @@ export async function POST(request: Request) {
       currency: parsed.data.currency,
       notes: parsed.data.notes ?? null,
     });
+
+    revalidateDashboard(session.user.id);
 
     return NextResponse.json(wallet, { status: 201 });
   } catch (error) {

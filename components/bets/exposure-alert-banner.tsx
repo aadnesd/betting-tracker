@@ -54,7 +54,9 @@ export function ExposureAlertBanner({
           {isHighExposure && " Consider settling or reducing your positions."}
         </span>
         <Button asChild size="sm" variant="outline">
-          <Link href="/bets/reports">View reports</Link>
+          <Link href="/bets/reports" prefetch={false}>
+            View reports
+          </Link>
         </Button>
       </AlertDescription>
     </Alert>

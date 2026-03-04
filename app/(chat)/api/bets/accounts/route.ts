@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/app/(auth)/auth";
+import { revalidateDashboard } from "@/lib/cache";
 import {
   createAccount,
   createAuditEntry,
   getAccountById,
+  listAccountsByUser,
   updateAccount,
 } from "@/lib/db/queries";
 
@@ -71,6 +73,8 @@ export async function POST(request: Request) {
       },
       notes: `Created ${body.kind} account: ${body.name}`,
     });
+
+    revalidateDashboard(session.user.id);
 
     return NextResponse.json({
       success: true,
@@ -166,6 +170,8 @@ export async function PATCH(request: Request) {
       });
     }
 
+    revalidateDashboard(session.user.id);
+
     return NextResponse.json({
       success: true,
       account: updated,
@@ -189,11 +195,20 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const id = searchParams.get("id");
 
-  if (!id) {
-    return NextResponse.json({ error: "Account ID required" }, { status: 400 });
-  }
-
   try {
+    if (!id) {
+      const limit = Math.min(
+        Math.max(Number(searchParams.get("limit")) || 200, 1),
+        500
+      );
+      const accounts = await listAccountsByUser({
+        userId: session.user.id,
+        limit,
+      });
+
+      return NextResponse.json(accounts);
+    }
+
     const account = await getAccountById({
       id,
       userId: session.user.id,

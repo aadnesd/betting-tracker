@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidateDashboard } from "@/lib/cache";
 import {
   createBalanceSnapshot,
   getAllUserIds,
@@ -75,6 +76,8 @@ export async function POST(request: Request) {
           accountsNok,
           walletsNok,
         });
+
+        revalidateDashboard(userId);
 
         result.succeeded++;
         result.details.push({

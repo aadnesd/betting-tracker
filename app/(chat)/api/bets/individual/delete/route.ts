@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/app/(auth)/auth";
+import { revalidateDashboard } from "@/lib/cache";
 import {
   deleteBet,
   deleteMatchedBet,
@@ -48,6 +49,8 @@ export async function POST(request: Request) {
           cascade: true,
         });
 
+        revalidateDashboard(session.user.id);
+
         return NextResponse.json({
           success: true,
           cascade: true,
@@ -65,6 +68,8 @@ export async function POST(request: Request) {
     if (!result) {
       return NextResponse.json({ error: "Bet not found" }, { status: 404 });
     }
+
+    revalidateDashboard(session.user.id);
 
     return NextResponse.json({ success: true, cascade: false });
   } catch (error) {

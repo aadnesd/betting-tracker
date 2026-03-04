@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/app/(auth)/auth";
-import { getFootballMatchById } from "@/lib/db/queries";
+import { getFootballMatchByIdCached } from "@/lib/db/cached-queries";
 
 /**
  * GET /api/bets/matches/:id - Fetch a single football match by ID
@@ -20,7 +20,7 @@ export async function GET(
   const { id } = await params;
 
   try {
-    const match = await getFootballMatchById({ id });
+    const match = await getFootballMatchByIdCached(id);
 
     if (!match) {
       return NextResponse.json({ error: "Match not found" }, { status: 404 });

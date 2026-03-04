@@ -30,8 +30,11 @@ type PageProps = {
     query?: string;
     from?: string;
     to?: string;
+    page?: string;
   }>;
 };
+
+const PAGE_SIZE = 25;
 
 const rangeOptions = [
   { value: "7d", label: "Last 7 days" },
@@ -111,6 +114,10 @@ export default async function Page(props: PageProps) {
       : undefined;
   const range = searchParams.range ?? "30d";
   const searchQuery = searchParams.query?.trim() || undefined;
+  const pageParam = Number.parseInt(searchParams.page ?? "", 10);
+  const currentPage =
+    Number.isFinite(pageParam) && pageParam > 0 ? pageParam : 1;
+  const offset = (currentPage - 1) * PAGE_SIZE;
 
   const { fromDate, toDate } = resolveDateRange({
     range,
@@ -118,7 +125,7 @@ export default async function Page(props: PageProps) {
     to: searchParams.to,
   });
 
-  const [bets, accounts] = await Promise.all([
+  const [{ bets, hasMore }, accounts] = await Promise.all([
     listAllBetsByUser({
       userId: session.user.id,
       status,
@@ -126,10 +133,43 @@ export default async function Page(props: PageProps) {
       fromDate,
       toDate,
       search: searchQuery,
-      limit: 50,
+      limit: PAGE_SIZE,
+      offset,
     }),
     listAccountsByUser({ userId: session.user.id, limit: 200 }),
   ]);
+
+  const buildPageHref = (page: number) => {
+    const params = new URLSearchParams();
+
+    if (searchParams.status) {
+      params.set("status", searchParams.status);
+    }
+    if (searchParams.account) {
+      params.set("account", searchParams.account);
+    }
+    if (searchParams.range) {
+      params.set("range", searchParams.range);
+    }
+    if (searchParams.query) {
+      params.set("query", searchParams.query);
+    }
+    if (searchParams.from) {
+      params.set("from", searchParams.from);
+    }
+    if (searchParams.to) {
+      params.set("to", searchParams.to);
+    }
+
+    if (page > 1) {
+      params.set("page", String(page));
+    }
+
+    const queryString = params.toString();
+    return queryString ? `/bets/all?${queryString}` : "/bets/all";
+  };
+
+  const showPagination = currentPage > 1 || hasMore;
 
   return (
     <div className="space-y-6 p-4 md:p-8">
@@ -281,7 +321,8 @@ export default async function Page(props: PageProps) {
         <CardHeader className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
           <CardTitle>Results</CardTitle>
           <p className="text-muted-foreground text-sm">
-            Showing {bets.length} bet{bets.length === 1 ? "" : "s"}
+            Showing {bets.length} bet{bets.length === 1 ? "" : "s"} on page{" "}
+            {currentPage}
           </p>
         </CardHeader>
         <CardContent>
@@ -295,124 +336,155 @@ export default async function Page(props: PageProps) {
               </Button>
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Account</TableHead>
-                  <TableHead>Market / Selection</TableHead>
-                  <TableHead>Odds / Stake</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>P/L</TableHead>
-                  <TableHead>Placed</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {bets.map((bet) => {
-                  const displayDate = bet.placedAt ?? bet.createdAt;
-                  const accountLabel = bet.accountName ?? bet.exchange;
-                  const accountKind =
-                    bet.accountKind ??
-                    (bet.kind === "back" ? "bookmaker" : "exchange");
-                  const profitClassName = bet.profitLoss
-                    ? bet.profitLoss >= 0
-                      ? "text-emerald-600"
-                      : "text-rose-600"
-                    : "text-muted-foreground";
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Account</TableHead>
+                    <TableHead>Market / Selection</TableHead>
+                    <TableHead>Odds / Stake</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>P/L</TableHead>
+                    <TableHead>Placed</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {bets.map((bet) => {
+                    const displayDate = bet.placedAt ?? bet.createdAt;
+                    const accountLabel = bet.accountName ?? bet.exchange;
+                    const accountKind =
+                      bet.accountKind ??
+                      (bet.kind === "back" ? "bookmaker" : "exchange");
+                    const profitClassName = bet.profitLoss
+                      ? bet.profitLoss >= 0
+                        ? "text-emerald-600"
+                        : "text-rose-600"
+                      : "text-muted-foreground";
 
-                  return (
-                    <TableRow key={`${bet.kind}-${bet.id}`}>
-                      <TableCell>
-                        <Badge
-                          className={cn(
-                            "border px-2 py-0.5 text-xs",
-                            bet.kind === "back"
-                              ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                              : "border-rose-200 bg-rose-50 text-rose-700"
-                          )}
-                          variant="outline"
-                        >
-                          {bet.kind === "back" ? "Back" : "Lay"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="space-y-1">
-                          <div className="font-medium text-sm">
-                            {accountLabel}
+                    return (
+                      <TableRow key={`${bet.kind}-${bet.id}`}>
+                        <TableCell>
+                          <Badge
+                            className={cn(
+                              "border px-2 py-0.5 text-xs",
+                              bet.kind === "back"
+                                ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                                : "border-rose-200 bg-rose-50 text-rose-700"
+                            )}
+                            variant="outline"
+                          >
+                            {bet.kind === "back" ? "Back" : "Lay"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="space-y-1">
+                            <div className="font-medium text-sm">
+                              {accountLabel}
+                            </div>
+                            <div className="text-muted-foreground text-xs">
+                              {accountKind}
+                            </div>
                           </div>
-                          <div className="text-muted-foreground text-xs">
-                            {accountKind}
+                        </TableCell>
+                        <TableCell>
+                          <div className="space-y-1">
+                            <div className="font-medium text-sm">
+                              {bet.selection}
+                            </div>
+                            <div className="text-muted-foreground text-xs">
+                              {bet.market}
+                            </div>
                           </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="space-y-1">
-                          <div className="font-medium text-sm">
-                            {bet.selection}
+                        </TableCell>
+                        <TableCell>
+                          <div className="space-y-1 text-sm">
+                            <div className="font-medium">
+                              {formatOdds(bet.odds)}
+                            </div>
+                            <div className="text-muted-foreground text-xs">
+                              {formatAmount(bet.stake, bet.currency)}
+                            </div>
                           </div>
-                          <div className="text-muted-foreground text-xs">
-                            {bet.market}
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="space-y-1 text-sm">
-                          <div className="font-medium">
-                            {formatOdds(bet.odds)}
-                          </div>
-                          <div className="text-muted-foreground text-xs">
-                            {formatAmount(bet.stake, bet.currency)}
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <BetStatusBadge status={bet.status} />
-                      </TableCell>
-                      <TableCell className={cn("text-sm", profitClassName)}>
-                        {bet.status === "settled"
-                          ? formatAmount(bet.profitLoss ?? 0, bet.currency)
-                          : "—"}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-sm">
-                        {format(displayDate, "dd MMM yyyy, HH:mm")}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <Button asChild size="sm" variant="ghost">
-                            <Link href={`/bets/${bet.kind}/${bet.id}`}>
-                              View
-                            </Link>
-                          </Button>
-                          {bet.status !== "settled" && (
-                            <BetSettlementDropdown
-                              betId={bet.id}
-                              betKind={bet.kind}
-                              commissionRate={
-                                bet.kind === "lay"
-                                  ? (bet.accountCommission ?? 0)
-                                  : 0
-                              }
-                              currency={bet.currency ?? "NOK"}
-                              odds={bet.odds}
-                              selection={bet.selection}
-                              stake={bet.stake}
-                            />
-                          )}
-                          {bet.matchedBetId && (
+                        </TableCell>
+                        <TableCell>
+                          <BetStatusBadge status={bet.status} />
+                        </TableCell>
+                        <TableCell className={cn("text-sm", profitClassName)}>
+                          {bet.status === "settled"
+                            ? formatAmount(bet.profitLoss ?? 0, bet.currency)
+                            : "—"}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-sm">
+                          {format(displayDate, "dd MMM yyyy, HH:mm")}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-2">
                             <Button asChild size="sm" variant="ghost">
-                              <Link href={`/bets/${bet.matchedBetId}`}>
-                                Matched
+                              <Link href={`/bets/${bet.kind}/${bet.id}`}>
+                                View
                               </Link>
                             </Button>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+                            {bet.status !== "settled" && (
+                              <BetSettlementDropdown
+                                betId={bet.id}
+                                betKind={bet.kind}
+                                commissionRate={
+                                  bet.kind === "lay"
+                                    ? (bet.accountCommission ?? 0)
+                                    : 0
+                                }
+                                currency={bet.currency ?? "NOK"}
+                                odds={bet.odds}
+                                selection={bet.selection}
+                                stake={bet.stake}
+                              />
+                            )}
+                            {bet.matchedBetId && (
+                              <Button asChild size="sm" variant="ghost">
+                                <Link href={`/bets/${bet.matchedBetId}`}>
+                                  Matched
+                                </Link>
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+              {showPagination && (
+                <div className="mt-4 flex items-center justify-between">
+                  <p className="text-muted-foreground text-sm">
+                    Page {currentPage}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    {currentPage > 1 ? (
+                      <Button asChild size="sm" variant="outline">
+                        <Link href={buildPageHref(currentPage - 1)}>
+                          Previous
+                        </Link>
+                      </Button>
+                    ) : (
+                      <Button disabled size="sm" variant="outline">
+                        Previous
+                      </Button>
+                    )}
+                    {hasMore ? (
+                      <Button asChild size="sm" variant="outline">
+                        <Link href={buildPageHref(currentPage + 1)}>Next</Link>
+                      </Button>
+                    ) : (
+                      <Button disabled size="sm" variant="outline">
+                        Next
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/app/(auth)/auth";
+import { revalidateDashboard } from "@/lib/cache";
 import {
   createAccountTransaction,
   createAuditEntry,
@@ -233,6 +234,8 @@ export async function PATCH(request: Request) {
         notes: body.notes ?? null,
       });
     }
+
+    revalidateDashboard(session.user.id);
 
     return NextResponse.json({ matched: updated });
   } catch (error) {

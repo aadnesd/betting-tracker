@@ -20,6 +20,7 @@ vi.mock("@/lib/db/queries", () => ({
   createAccount: vi.fn(),
   updateAccount: vi.fn(),
   getAccountById: vi.fn(),
+  listAccountsByUser: vi.fn(),
   createAuditEntry: vi.fn(),
 }));
 
@@ -354,16 +355,44 @@ describe("accounts API routes (unit)", () => {
       expect(json.account.name).toBe("bet365");
     });
 
-    it("returns 400 when ID is missing", async () => {
+    it("returns account list when ID is missing", async () => {
+      const mockAccounts = [
+        {
+          id: "acc-1",
+          name: "bet365",
+          kind: "bookmaker",
+          currency: "GBP",
+          commission: null,
+          status: "active",
+        },
+        {
+          id: "acc-2",
+          name: "betfair",
+          kind: "exchange",
+          currency: "GBP",
+          commission: 0.05,
+          status: "active",
+        },
+      ];
+
+      (dbQueries.listAccountsByUser as vi.Mock).mockResolvedValueOnce(
+        mockAccounts
+      );
+
       const res = await getAccountRoute(
         new Request("http://localhost/api/bets/accounts", {
           method: "GET",
         })
       );
 
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(200);
       const json = await res.json();
-      expect(json.error).toBe("Account ID required");
+      expect(Array.isArray(json)).toBe(true);
+      expect(json).toHaveLength(2);
+      expect(dbQueries.listAccountsByUser).toHaveBeenCalledWith({
+        userId: user.id,
+        limit: 200,
+      });
     });
 
     it("returns 404 for non-existent account", async () => {
