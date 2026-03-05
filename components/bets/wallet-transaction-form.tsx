@@ -53,7 +53,7 @@ export function WalletTransactionForm({
   const [type, setType] = useState<WalletTransactionType>("deposit");
   const [amount, setAmount] = useState("");
   const [currency] = useState(walletCurrency);
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(new Date().toISOString().slice(0, 16));
   const [relatedAccountId, setRelatedAccountId] = useState<string>("");
   const [relatedWalletId, setRelatedWalletId] = useState<string>("");
   const [externalRef, setExternalRef] = useState("");
@@ -116,7 +116,7 @@ export function WalletTransactionForm({
           type,
           amount: amountNum,
           currency,
-          date,
+          date: new Date(date).toISOString(),
           relatedAccountId: needsAccount ? relatedAccountId : null,
           relatedWalletId: needsWallet ? relatedWalletId : null,
           externalRef: externalRef.trim() || null,
@@ -191,12 +191,12 @@ export function WalletTransactionForm({
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="date">Date *</Label>
+          <Label htmlFor="date">Date & time *</Label>
           <Input
             id="date"
             onChange={(e) => setDate(e.target.value)}
             required
-            type="date"
+            type="datetime-local"
             value={date}
           />
         </div>

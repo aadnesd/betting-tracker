@@ -36,12 +36,13 @@ export async function middleware(request: NextRequest) {
   }
 
   // Allow login and register pages for unauthenticated users
+  const token = await getToken({
+    req: request,
+    secret: process.env.AUTH_SECRET,
+    secureCookie: !isDevelopmentEnvironment,
+  });
+
   if (["/login", "/register"].includes(pathname)) {
-    const token = await getToken({
-      req: request,
-      secret: process.env.AUTH_SECRET,
-      secureCookie: !isDevelopmentEnvironment,
-    });
 
     // If already authenticated, redirect away from auth pages
     if (token) {
@@ -51,12 +52,6 @@ export async function middleware(request: NextRequest) {
     // Allow unauthenticated access to login/register
     return NextResponse.next();
   }
-
-  const token = await getToken({
-    req: request,
-    secret: process.env.AUTH_SECRET,
-    secureCookie: !isDevelopmentEnvironment,
-  });
 
   if (!token) {
     // For API routes, return 401 instead of redirect
