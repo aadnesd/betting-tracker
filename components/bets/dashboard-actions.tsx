@@ -1,13 +1,23 @@
 "use client";
 
+import { Gift } from "lucide-react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   type AccountOption,
-  QuickTransactionSheet,
   type WalletOption,
 } from "@/components/bets/quick-transaction-sheet";
 import { Button } from "@/components/ui/button";
+import { useState } from "react";
+
+const QuickTransactionSheet = dynamic(
+  () =>
+    import("@/components/bets/quick-transaction-sheet").then(
+      (module) => module.QuickTransactionSheet
+    ),
+  { ssr: false }
+);
 
 interface DashboardActionsProps {
   pendingReviewCount: number;
@@ -24,6 +34,7 @@ export function DashboardActions({
   accounts,
   wallets = [],
 }: DashboardActionsProps) {
+  const [showQuickTransaction, setShowQuickTransaction] = useState(false);
   const router = useRouter();
 
   const handleTransactionSuccess = () => {
@@ -97,11 +108,25 @@ export function DashboardActions({
           API Keys
         </Link>
       </Button>
-      <QuickTransactionSheet
-        accounts={accounts}
-        onSuccess={handleTransactionSuccess}
-        wallets={wallets}
-      />
+      {showQuickTransaction ? (
+        <QuickTransactionSheet
+          accounts={accounts}
+          defaultOpen
+          onSuccess={handleTransactionSuccess}
+          wallets={wallets}
+        />
+      ) : (
+        <Button
+          className="md:size-default"
+          onClick={() => setShowQuickTransaction(true)}
+          size="sm"
+          variant="outline"
+        >
+          <Gift className="mr-2 h-4 w-4" />
+          <span className="hidden sm:inline">Quick Transaction</span>
+          <span className="sm:hidden">Txn</span>
+        </Button>
+      )}
       <Button asChild className="md:size-default" size="sm" variant="outline">
         <Link href="/bets/quick-add" prefetch={false}>
           Quick Add

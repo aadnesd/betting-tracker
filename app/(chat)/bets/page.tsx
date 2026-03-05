@@ -1,5 +1,6 @@
 import { format } from "date-fns";
 import { unstable_cache } from "next/cache";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/app/(auth)/auth";
@@ -7,10 +8,7 @@ import { BetStatusBadge } from "@/components/bets/bet-status-badge";
 import { DashboardActions } from "@/components/bets/dashboard-actions";
 import { DashboardSummaryCards } from "@/components/bets/dashboard-summary-cards";
 import { ExposureAlertBanner } from "@/components/bets/exposure-alert-banner";
-import { ExposureByEventCard } from "@/components/bets/exposure-by-event-card";
-import { BalanceChartWithControls } from "@/components/bets/balance-chart";
 import { FreeBetExpiryBanner } from "@/components/bets/free-bet-expiry-banner";
-import { PendingSettlementCard } from "@/components/bets/pending-settlement-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { dashboardTag } from "@/lib/cache";
@@ -46,6 +44,63 @@ async function cacheDashboard<T>(
 export const metadata = {
   title: "Matched bets",
 };
+
+const BalanceChartWithControls = dynamic(
+  () =>
+    import("@/components/bets/balance-chart").then(
+      (module) => module.BalanceChartWithControls
+    ),
+  {
+    loading: () => (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Total Balance</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="h-64 animate-pulse rounded-md bg-muted" />
+        </CardContent>
+      </Card>
+    ),
+  }
+);
+
+const PendingSettlementCard = dynamic(
+  () =>
+    import("@/components/bets/pending-settlement-card").then(
+      (module) => module.PendingSettlementCard
+    ),
+  {
+    loading: () => (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Pending Settlement</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="h-36 animate-pulse rounded-md bg-muted" />
+        </CardContent>
+      </Card>
+    ),
+  }
+);
+
+const ExposureByEventCard = dynamic(
+  () =>
+    import("@/components/bets/exposure-by-event-card").then(
+      (module) => module.ExposureByEventCard
+    ),
+  {
+    loading: () => (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Exposure by Event</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="h-36 animate-pulse rounded-md bg-muted" />
+        </CardContent>
+      </Card>
+    ),
+  }
+);
 
 export default async function Page() {
   const session = await auth();
@@ -119,16 +174,36 @@ export default async function Page() {
     ),
   ]);
 
-  const walletBankTransactionsForChart = await Promise.all(
-    walletBankTransactions.map(async (transaction) => ({
-      date: new Date(transaction.date),
-      type: transaction.type,
-      amountNok: await convertAmountToNok(
-        Number.parseFloat(transaction.amount ?? "0"),
-        transaction.currency ?? "NOK"
-      ),
-    }))
-  );
+  const walletBankTransactionsForChart = await (async () => {
+    const distinctCurrencies = Array.from(
+      new Set(
+        walletBankTransactions
+          .map((transaction) => transaction.currency ?? "NOK")
+          .map((currency) => currency.toUpperCase())
+      )
+    );
+
+    // Resolve each currency conversion rate once per request.
+    const rateEntries: Array<[string, number]> = await Promise.all(
+      distinctCurrencies.map(async (currency): Promise<[string, number]> => [
+        currency,
+        currency === "NOK" ? 1 : await convertAmountToNok(1, currency),
+      ])
+    );
+    const rateByCurrency = new Map(rateEntries);
+
+    return walletBankTransactions.map((transaction) => {
+      const amount = Number.parseFloat(transaction.amount ?? "0") || 0;
+      const currency = (transaction.currency ?? "NOK").toUpperCase();
+      const rate = rateByCurrency.get(currency) ?? 1;
+
+      return {
+        date: new Date(transaction.date),
+        type: transaction.type,
+        amountNok: amount * rate,
+      };
+    });
+  })();
 
   const balanceDayChartData = markWalletBankTransactionsOnBalanceData(
     snapshotsToBalanceData(balanceSnapshots, "day"),
