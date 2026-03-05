@@ -1,106 +1,112 @@
-<a href="https://chat.vercel.ai/">
-  <img alt="Next.js 14 and App Router-ready AI chatbot." src="app/(chat)/opengraph-image.png">
-  <h1 align="center">Chat SDK</h1>
-</a>
+# Matched Betting Tracker
 
-<p align="center">
-    Chat SDK is a free, open-source template built with Next.js and the AI SDK that helps you quickly build powerful chatbot applications.
-</p>
+A single-user matched betting tracker built with Next.js, Drizzle, and the Vercel AI SDK.
 
-<p align="center">
-  <a href="https://chat-sdk.dev"><strong>Read Docs</strong></a> ·
-  <a href="#features"><strong>Features</strong></a> ·
-  <a href="#model-providers"><strong>Model Providers</strong></a> ·
-  <a href="#deploy-your-own"><strong>Deploy Your Own</strong></a> ·
-  <a href="#running-locally"><strong>Running locally</strong></a>
-</p>
-<br/>
+This project focuses on making matched betting workflows fast, transparent, and auditable: capture bets quickly, reconcile outcomes reliably, and track profitability over time.
 
-## Features
+## Product scope
 
-- [Next.js](https://nextjs.org) App Router
-  - Advanced routing for seamless navigation and performance
-  - React Server Components (RSCs) and Server Actions for server-side rendering and increased performance
-- [AI SDK](https://ai-sdk.dev/docs/introduction)
-  - Unified API for generating text, structured objects, and tool calls with LLMs
-  - Hooks for building dynamic chat and generative user interfaces
-  - Supports xAI (default), OpenAI, Fireworks, and other model providers
-- [shadcn/ui](https://ui.shadcn.com)
-  - Styling with [Tailwind CSS](https://tailwindcss.com)
-  - Component primitives from [Radix UI](https://radix-ui.com) for accessibility and flexibility
-- Data Persistence
-  - [Neon Serverless Postgres](https://vercel.com/marketplace/neon) for saving chat history and user data
-  - [Vercel Blob](https://vercel.com/storage/blob) for efficient file storage
-- [Auth.js](https://authjs.dev)
-  - Simple and secure authentication
+From `specs/product.md`, the current in-scope capabilities are:
 
-## Model Providers
+- Matched sets (back + lay) with promo metadata
+- AI screenshot intake: upload -> parse -> review -> save
+- Reconciliation workflow
+- Reporting and exposure tracking
+- CSV import/export
 
-This template uses the [Vercel AI Gateway](https://vercel.com/docs/ai-gateway) to access multiple AI models through a unified interface. The default configuration includes [xAI](https://x.ai) models (`grok-2-vision-1212`, `grok-3-mini`) routed through the gateway.
+Core domain entities are documented in `specs/data-model.md` (Accounts, Bets, MatchedSets, Promos, FreeBets, DepositBonuses, Transactions, Screenshots).
 
-### AI Gateway Authentication
+## Key API routes (existing)
 
-**For Vercel deployments**: Authentication is handled automatically via OIDC tokens.
+These routes are part of the current screenshot intake flow:
 
-**For non-Vercel deployments**: You need to provide an AI Gateway API key by setting the `AI_GATEWAY_API_KEY` environment variable in your `.env.local` file.
+- `app/(chat)/api/bets/screenshots/route.ts` - upload screenshots
+- `app/(chat)/api/bets/autoparse/route.ts` - AI parse screenshots
+- `app/(chat)/api/bets/create-matched/route.ts` - save matched bet
 
-With the [AI SDK](https://ai-sdk.dev/docs/introduction), you can also switch to direct LLM providers like [OpenAI](https://openai.com), [Anthropic](https://anthropic.com), [Cohere](https://cohere.com/), and [many more](https://ai-sdk.dev/providers/ai-sdk-providers) with just a few lines of code.
+## Tech stack
 
-## Deploy Your Own
-
-You can deploy your own version of the Next.js AI Chatbot to Vercel with one click:
-
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/templates/next.js/nextjs-ai-chatbot)
+- Next.js App Router + React 19
+- Vercel AI SDK / AI Gateway
+- Drizzle ORM + Postgres
+- Auth.js (Google + GitHub OAuth)
+- Tailwind CSS + shadcn/ui
+- Playwright + Vitest
 
 ## Running locally
 
-You will need to use the environment variables [defined in `.env.example`](.env.example) to run Next.js AI Chatbot. It's recommended you use [Vercel Environment Variables](https://vercel.com/docs/projects/environment-variables) for this, but a `.env` file is all that is necessary.
+1. Install dependencies:
 
-> Note: You should not commit your `.env` file or it will expose secrets that will allow others to control access to your various AI and authentication provider accounts.
+   ```bash
+   pnpm install
+   ```
 
-### Authentication (OAuth)
+2. Create local env file:
 
-This app uses Auth.js with Google and GitHub OAuth. These providers are required for sign-in (email/password is disabled), which keeps onboarding simple and avoids password storage.
+   ```bash
+   cp .env.example .env.local
+   ```
 
-Set these variables in `.env.local`:
+3. Fill required values in `.env.local` (see `.env.example`):
 
-```bash
-AUTH_SECRET=
-GOOGLE_CLIENT_ID=
-GOOGLE_CLIENT_SECRET=
-GITHUB_CLIENT_ID=
-GITHUB_CLIENT_SECRET=
-```
+   ```bash
+   POSTGRES_URL=
+   BLOB_READ_WRITE_TOKEN=
+   AI_GATEWAY_API_KEY=
+   FXRATES_API_KEY=
+   FOOTBALL_DATA_API_TOKEN=
+   AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT=
+   AZURE_DOCUMENT_INTELLIGENCE_KEY=
+   AUTH_SECRET=
+   GOOGLE_CLIENT_ID=
+   GOOGLE_CLIENT_SECRET=
+   GITHUB_CLIENT_ID=
+   GITHUB_CLIENT_SECRET=
+   ```
 
-### Settled Bet Corrections
+   Optional settled-bet edit allowlists:
 
-By default, authenticated users can edit their own settled bets.
+   ```bash
+   SETTLED_BET_EDIT_USER_IDS=
+   SETTLED_BET_EDIT_USER_EMAILS=
+   ```
 
-To restrict this, configure an allowlist:
+4. Apply database migrations:
 
-```bash
-SETTLED_BET_EDIT_USER_IDS=uuid-1,uuid-2
-```
+   ```bash
+   pnpm db:migrate
+   ```
 
-Optional email allowlist:
+5. Start the app:
 
-```bash
-SETTLED_BET_EDIT_USER_EMAILS=user1@example.com,user2@example.com
-```
+   ```bash
+   pnpm dev
+   ```
 
-Notes:
-- `*` in either allowlist allows all authenticated users.
-- `SETTLED_BET_EDIT_USER_IDS` also accepts email entries for backward compatibility.
-- If either allowlist variable is set, only listed users can edit settled bets.
+Then open [http://localhost:3000](http://localhost:3000).
 
-1. Install Vercel CLI: `npm i -g vercel`
-2. Link local instance with Vercel and GitHub accounts (creates `.vercel` directory): `vercel link`
-3. Download your environment variables: `vercel env pull`
+## Useful scripts
 
-```bash
-pnpm install
-pnpm db:migrate # Setup database or apply latest database changes
-pnpm dev
-```
+- `pnpm dev` - run local Next.js dev server
+- `pnpm build` - run DB migration then production build
+- `pnpm start` - start production server
+- `pnpm lint` - run Ultracite checks
+- `pnpm format` - auto-fix formatting
+- `pnpm db:generate` - generate Drizzle SQL
+- `pnpm db:migrate` - apply latest DB migrations
+- `pnpm db:studio` - open Drizzle Studio
+- `pnpm test` - run Playwright tests
+- `pnpm test:unit` - run unit tests
+- `pnpm test:integration` - run integration tests with `REAL_AI=true`
 
-Your app template should now be running on [localhost:3000](http://localhost:3000).
+## Specs
+
+See `specs/README.md` for the full spec index, including:
+
+- `product.md`
+- `data-model.md`
+- `ai-autoparse.md`
+- `lifecycle.md`
+- `reporting.md`
+- `import-export.md`
+- `ui-ux.md`
