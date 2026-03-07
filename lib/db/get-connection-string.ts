@@ -9,3 +9,19 @@ export function getMigrationPostgresUrl() {
     process.env.APP_POSTGRES_URL
   );
 }
+
+export function getMigrationPostgresSource() {
+  if (process.env.POSTGRES_URL_NON_POOLING) {
+    return "POSTGRES_URL_NON_POOLING";
+  }
+
+  if (process.env.POSTGRES_URL) {
+    return "POSTGRES_URL";
+  }
+
+  if (process.env.APP_POSTGRES_URL) {
+    return "APP_POSTGRES_URL";
+  }
+
+  return null;
+}
