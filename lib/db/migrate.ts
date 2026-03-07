@@ -7,9 +7,11 @@ import {
   getMigrationPostgresUrl,
 } from "./get-connection-string";
 
-config({
-  path: ".env.local",
-});
+if (!process.env.VERCEL) {
+  config({
+    path: ".env.local",
+  });
+}
 
 const runMigrate = async () => {
   const connectionString = getMigrationPostgresUrl();
