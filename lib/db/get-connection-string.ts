@@ -1,10 +1,14 @@
 export function getPostgresUrl() {
+  if (process.env.VERCEL) {
+    return process.env.APP_POSTGRES_URL ?? process.env.POSTGRES_URL;
+  }
+
   return process.env.POSTGRES_URL ?? process.env.APP_POSTGRES_URL;
 }
 
 export function getMigrationPostgresUrl() {
   if (process.env.VERCEL) {
-    return process.env.POSTGRES_URL ?? process.env.APP_POSTGRES_URL;
+    return process.env.APP_POSTGRES_URL ?? process.env.POSTGRES_URL;
   }
 
   return (
@@ -16,12 +20,12 @@ export function getMigrationPostgresUrl() {
 
 export function getMigrationPostgresSource() {
   if (process.env.VERCEL) {
-    if (process.env.POSTGRES_URL) {
-      return "POSTGRES_URL";
-    }
-
     if (process.env.APP_POSTGRES_URL) {
       return "APP_POSTGRES_URL";
+    }
+
+    if (process.env.POSTGRES_URL) {
+      return "POSTGRES_URL";
     }
 
     return null;
