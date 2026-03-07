@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  ArrowUpDown,
   BarChart3,
   Gift,
   LayoutDashboard,
@@ -34,6 +35,7 @@ const navigation = [
   { name: "Quick Add", href: "/bets/quick-add", icon: PlusSquare },
   { name: "Reports", href: "/bets/reports", icon: BarChart3 },
   { name: "Bankroll", href: "/bets/bankroll", icon: Wallet },
+  { name: "Transactions", href: "/bets/transactions", icon: ArrowUpDown },
   { name: "Free Bets", href: "/bets/settings/promos", icon: Gift },
 ];
 

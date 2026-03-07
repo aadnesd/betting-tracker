@@ -1321,6 +1321,134 @@ export async function listTransactionsByAccount({
   }
 }
 
+export type UnifiedTransactionListItem = {
+  id: string;
+  source: "account" | "wallet";
+  entityId: string;
+  entityName: string;
+  entityPath: string;
+  entityCategory: string | null;
+  type: string;
+  amount: number;
+  amountNok: number | null;
+  currency: string;
+  occurredAt: Date;
+  createdAt: Date;
+  notes: string | null;
+  externalRef: string | null;
+  relatedAccountName: string | null;
+  relatedWalletName: string | null;
+  linkedTransfer: boolean;
+};
+
+export async function listUnifiedTransactionsByUser({
+  userId,
+}: {
+  userId: string;
+}): Promise<UnifiedTransactionListItem[]> {
+  try {
+    const relatedAccount = aliasedTable(account, "unifiedRelatedAccount");
+    const relatedWallet = aliasedTable(wallet, "unifiedRelatedWallet");
+
+    const [accountRows, walletRows] = await Promise.all([
+      db
+        .select({
+          id: accountTransaction.id,
+          source: sql<"account">`'account'`,
+          entityId: account.id,
+          entityName: account.name,
+          entityCategory: account.kind,
+          type: accountTransaction.type,
+          amount: accountTransaction.amount,
+          amountNok: accountTransaction.amountNok,
+          currency: accountTransaction.currency,
+          occurredAt: accountTransaction.occurredAt,
+          createdAt: accountTransaction.createdAt,
+          notes: accountTransaction.notes,
+          externalRef: sql<string | null>`NULL`,
+          relatedAccountName: sql<string | null>`NULL`,
+          relatedWalletName: sql<string | null>`NULL`,
+          linkedTransfer: isNotNull(accountTransaction.linkedWalletTransactionId),
+        })
+        .from(accountTransaction)
+        .innerJoin(account, eq(accountTransaction.accountId, account.id))
+        .where(eq(accountTransaction.userId, userId)),
+      db
+        .select({
+          id: walletTransaction.id,
+          source: sql<"wallet">`'wallet'`,
+          entityId: wallet.id,
+          entityName: wallet.name,
+          entityCategory: wallet.type,
+          type: walletTransaction.type,
+          amount: walletTransaction.amount,
+          amountNok: sql<string | null>`NULL`,
+          currency: walletTransaction.currency,
+          occurredAt: walletTransaction.date,
+          createdAt: walletTransaction.createdAt,
+          notes: walletTransaction.notes,
+          externalRef: walletTransaction.externalRef,
+          relatedAccountName: relatedAccount.name,
+          relatedWalletName: relatedWallet.name,
+          linkedTransfer: isNotNull(walletTransaction.linkedAccountTransactionId),
+        })
+        .from(walletTransaction)
+        .innerJoin(wallet, eq(walletTransaction.walletId, wallet.id))
+        .leftJoin(
+          relatedAccount,
+          eq(walletTransaction.relatedAccountId, relatedAccount.id)
+        )
+        .leftJoin(
+          relatedWallet,
+          eq(walletTransaction.relatedWalletId, relatedWallet.id)
+        )
+        .where(eq(wallet.userId, userId)),
+    ]);
+
+    const combined = [...accountRows, ...walletRows]
+      .map((row) => ({
+        id: row.id,
+        source: row.source,
+        entityId: row.entityId,
+        entityName: row.entityName,
+        entityPath:
+          row.source === "account"
+            ? `/bets/settings/accounts/${row.entityId}`
+            : `/bets/settings/wallets/${row.entityId}`,
+        entityCategory: row.entityCategory ?? null,
+        type: row.type,
+        amount: Number(row.amount),
+        amountNok:
+          row.amountNok === null ? null : Number.parseFloat(row.amountNok),
+        currency: row.currency,
+        occurredAt: row.occurredAt,
+        createdAt: row.createdAt,
+        notes: row.notes ?? null,
+        externalRef: row.externalRef ?? null,
+        relatedAccountName: row.relatedAccountName ?? null,
+        relatedWalletName: row.relatedWalletName ?? null,
+        linkedTransfer: Boolean(row.linkedTransfer),
+      }))
+      .sort((left, right) => {
+        const occurredDelta =
+          right.occurredAt.getTime() - left.occurredAt.getTime();
+
+        if (occurredDelta !== 0) {
+          return occurredDelta;
+        }
+
+        return right.createdAt.getTime() - left.createdAt.getTime();
+      });
+
+    return combined;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to list unified transactions"
+    );
+  }
+}
+
 type BetInputBase = {
   market: string;
   selection: string;
