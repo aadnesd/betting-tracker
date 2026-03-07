@@ -19,11 +19,11 @@ const QuickTransactionSheet = dynamic(
   { ssr: false }
 );
 
-interface DashboardActionsProps {
+type DashboardActionsProps = {
   pendingReviewCount: number;
   accounts: AccountOption[];
   wallets?: WalletOption[];
-}
+};
 
 /**
  * Client component for dashboard action buttons including QuickTransactionSheet.
@@ -53,6 +53,9 @@ export function DashboardActions({
         <Link href="/bets/bankroll" prefetch={false}>
           Bankroll
         </Link>
+      </Button>
+      <Button asChild className="md:size-default" size="sm" variant="outline">
+        <Link href="/bets/transactions">Transactions</Link>
       </Button>
       <Button
         asChild
