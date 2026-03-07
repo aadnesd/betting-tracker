@@ -2,17 +2,19 @@ import { config } from "dotenv";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import postgres from "postgres";
+import { getMigrationPostgresUrl } from "./get-connection-string";
 
 config({
   path: ".env.local",
 });
 
 const runMigrate = async () => {
-  const connectionString =
-    process.env.POSTGRES_URL_NON_POOLING ?? process.env.POSTGRES_URL;
+  const connectionString = getMigrationPostgresUrl();
 
   if (!connectionString) {
-    throw new Error("POSTGRES_URL_NON_POOLING or POSTGRES_URL must be defined");
+    throw new Error(
+      "POSTGRES_URL_NON_POOLING, POSTGRES_URL, or APP_POSTGRES_URL must be defined"
+    );
   }
 
   const connection = postgres(connectionString, { max: 1 });
