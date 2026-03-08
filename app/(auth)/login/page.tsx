@@ -1,22 +1,23 @@
-"use client";
-
-import { useRouter, useSearchParams } from "next/navigation";
-import { signIn, useSession } from "next-auth/react";
-import { Suspense, useEffect } from "react";
+import { redirect } from "next/navigation";
 import { LogoGoogle } from "@/components/icons";
 import { Button } from "@/components/ui/button";
+import { auth, signIn } from "../auth";
 
-function LoginContent() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const { data, status } = useSession();
-  const callbackUrl = searchParams.get("callbackUrl") || "/";
+type LoginPageProps = {
+  searchParams: Promise<{
+    callbackUrl?: string;
+  }>;
+};
 
-  useEffect(() => {
-    if (status === "authenticated" && data?.user) {
-      router.replace(callbackUrl);
-    }
-  }, [data?.user, router, status, callbackUrl]);
+export default async function Page({ searchParams }: LoginPageProps) {
+  const [{ callbackUrl = "/" }, session] = await Promise.all([
+    searchParams,
+    auth(),
+  ]);
+
+  if (session?.user) {
+    redirect(callbackUrl);
+  }
 
   return (
     <div className="flex h-dvh w-screen items-start justify-center bg-background pt-12 md:items-center md:pt-0">
@@ -27,32 +28,23 @@ function LoginContent() {
             Sign in with your account to access your matched betting data.
           </p>
         </div>
-        <div className="flex flex-col gap-3">
+        <form
+          action={async () => {
+            "use server";
+
+            await signIn("google", { redirectTo: callbackUrl });
+          }}
+        >
           <Button
             className="w-full justify-center gap-2"
-            onClick={() => signIn("google", { redirectTo: callbackUrl })}
-            type="button"
+            type="submit"
             variant="outline"
           >
             <LogoGoogle />
             Continue with Google
           </Button>
-        </div>
+        </form>
       </div>
     </div>
-  );
-}
-
-export default function Page() {
-  return (
-    <Suspense
-      fallback={
-        <div className="flex h-dvh w-screen items-center justify-center">
-          Loading...
-        </div>
-      }
-    >
-      <LoginContent />
-    </Suspense>
   );
 }
