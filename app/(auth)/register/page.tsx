@@ -1,22 +1,24 @@
-"use client";
-
-import { useRouter, useSearchParams } from "next/navigation";
-import { signIn, useSession } from "next-auth/react";
-import { Suspense, useEffect } from "react";
+import Link from "next/link";
+import { redirect } from "next/navigation";
 import { LogoGoogle } from "@/components/icons";
 import { Button } from "@/components/ui/button";
+import { auth, signIn } from "../auth";
 
-function RegisterContent() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const { data, status } = useSession();
-  const callbackUrl = searchParams.get("callbackUrl") || "/";
+type RegisterPageProps = {
+  searchParams: Promise<{
+    callbackUrl?: string;
+  }>;
+};
 
-  useEffect(() => {
-    if (status === "authenticated" && data?.user) {
-      router.replace(callbackUrl);
-    }
-  }, [data?.user, router, status, callbackUrl]);
+export default async function Page({ searchParams }: RegisterPageProps) {
+  const [{ callbackUrl = "/" }, session] = await Promise.all([
+    searchParams,
+    auth(),
+  ]);
+
+  if (session?.user) {
+    redirect(callbackUrl);
+  }
 
   return (
     <div className="flex h-dvh w-screen items-start justify-center bg-background pt-12 md:items-center md:pt-0">
@@ -26,45 +28,35 @@ function RegisterContent() {
             Create Account
           </h3>
           <p className="text-muted-foreground text-sm">
-            Use Google or GitHub to create your matched betting workspace.
+            Use Google to create your matched betting workspace.
           </p>
         </div>
-        <div className="flex flex-col gap-3">
+        <form
+          action={async () => {
+            "use server";
+
+            await signIn("google", { redirectTo: callbackUrl });
+          }}
+        >
           <Button
             className="w-full justify-center gap-2"
-            onClick={() => signIn("google", { redirectTo: callbackUrl })}
-            type="button"
+            type="submit"
             variant="outline"
           >
             <LogoGoogle />
             Sign up with Google
           </Button>
-        </div>
+        </form>
         <p className="text-center text-muted-foreground text-xs">
           Already have an account?{" "}
-          <button
+          <Link
             className="font-semibold text-foreground underline-offset-4 hover:underline"
-            onClick={() => router.push("/login")}
-            type="button"
+            href="/login"
           >
             Sign in
-          </button>
+          </Link>
         </p>
       </div>
     </div>
-  );
-}
-
-export default function Page() {
-  return (
-    <Suspense
-      fallback={
-        <div className="flex h-dvh w-screen items-center justify-center">
-          Loading...
-        </div>
-      }
-    >
-      <RegisterContent />
-    </Suspense>
   );
 }
