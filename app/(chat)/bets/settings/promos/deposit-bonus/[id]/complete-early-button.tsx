@@ -70,9 +70,9 @@ export function DepositBonusCompleteEarlyButton({
         <AlertDialogHeader>
           <AlertDialogTitle>Complete Bonus Early?</AlertDialogTitle>
           <AlertDialogDescription>
-            Mark &quot;{bonusName}&quot; as completed early because the account
-            balance is now zero. This keeps the wagering audit trail but closes
-            the bonus before full wagering completion.
+            Mark &quot;{bonusName}&quot; as completed early to stop tracking
+            wagering on it. This keeps the wagering audit trail but closes the
+            bonus before full wagering completion.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

@@ -198,9 +198,7 @@ export async function POST(
     }
 
     if (action === "complete_early") {
-      const reason =
-        body.reason ||
-        "User completed bonus early due to zero balance and no pending bets";
+      const reason = body.reason || "User manually completed bonus early";
       const result = await completeDepositBonusEarly({ id, userId, reason });
 
       if (!result) {
