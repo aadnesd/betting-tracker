@@ -56,9 +56,7 @@ export default async function DepositBonusDetailPage({
       : 0;
   const remaining = Math.max(0, wageringRequirement - wageringProgress);
   const canCompleteEarly =
-    bonus.status === "active" &&
-    wageringProgress < wageringRequirement &&
-    accountBalance <= 0;
+    bonus.status === "active" && wageringProgress < wageringRequirement;
 
   const getStatusBadge = () => {
     switch (bonus.status) {
@@ -239,7 +237,7 @@ export default async function DepositBonusDetailPage({
                 <CheckCircle className="mb-2 h-12 w-12 text-amber-500" />
                 <p className="font-medium text-amber-700">Completed Early</p>
                 <p className="text-muted-foreground text-sm">
-                  Closed when account balance reached zero before full wagering.
+                  Closed before full wagering was completed.
                 </p>
               </div>
             ) : (

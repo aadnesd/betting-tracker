@@ -54,7 +54,7 @@ As a matched bettor, I want to:
 ### Enum: status
 - `active` – Bonus claimed, wagering in progress
 - `cleared` – Wagering complete, bonus is withdrawable
-- `completed_early` – Bonus closed early because balance was lost to zero before wagering completion
+- `completed_early` – Bonus closed early before full wagering completion
 - `forfeited` – User forfeited the bonus (e.g., withdrew early)
 - `expired` – Bonus expired before clearing
 
@@ -211,6 +211,7 @@ Add/update summary cards:
 
 **Actions:**
 - Edit bonus details
+- Mark as completed early (manual override)
 - Mark as forfeited (with confirmation)
 - Manually adjust progress
 - Delete (with confirmation)
