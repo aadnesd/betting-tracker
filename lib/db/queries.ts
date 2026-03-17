@@ -8900,9 +8900,8 @@ export async function forfeitDepositBonus({
 }
 
 /**
- * Mark a deposit bonus as completed early due to account balance loss.
- * Only allowed when bonus is active, wagering is incomplete, account balance is zero,
- * and there are no pending bets on the account.
+ * Mark a deposit bonus as completed early.
+ * Manual completion only requires the bonus to still be active with incomplete wagering.
  */
 export async function completeDepositBonusEarly({
   id,
@@ -8938,31 +8937,6 @@ export async function completeDepositBonusEarly({
       );
     }
 
-    const accountBalance = await getAccountBalance({
-      userId,
-      accountId: bonus.accountId,
-    });
-
-    // Treat near-zero values as zero to avoid floating-point noise.
-    if (Math.abs(accountBalance) > 0.000_001) {
-      throw new ChatSDKError(
-        "bad_request:api",
-        "Account balance must be exactly zero to complete early"
-      );
-    }
-
-    const pendingBetCount = await countPendingBetsForAccount({
-      userId,
-      accountId: bonus.accountId,
-    });
-
-    if (pendingBetCount > 0) {
-      throw new ChatSDKError(
-        "bad_request:api",
-        "Account must have no pending bets to complete early"
-      );
-    }
-
     const [result] = await db
       .update(depositBonus)
       .set({
@@ -8984,13 +8958,9 @@ export async function completeDepositBonusEarly({
           status: "completed_early",
           previousProgress: wageringProgress,
           wageringRequirement,
-          accountBalance,
-          pendingBetCount,
           completedEarly: true,
         },
-        notes:
-          reason ??
-          "Bonus auto-completed early after balance hit zero with no pending bets",
+        notes: reason ?? "Bonus manually completed early",
       });
     }
 

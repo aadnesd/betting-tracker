@@ -17,6 +17,10 @@ vi.mock("@/app/(auth)/auth", () => ({
   auth: vi.fn(),
 }));
 
+vi.mock("@/lib/cache", () => ({
+  revalidateDashboard: vi.fn(),
+}));
+
 vi.mock("@/lib/db/queries", () => ({
   completeDepositBonusEarly: vi.fn(),
   deleteDepositBonus: vi.fn(),
@@ -68,17 +72,13 @@ describe("deposit bonuses action API route (unit)", () => {
     expect(dbQueries.completeDepositBonusEarly).toHaveBeenCalledWith({
       id: testBonusId,
       userId: user.id,
-      reason:
-        "User completed bonus early due to zero balance and no pending bets",
+      reason: "User manually completed bonus early",
     });
   });
 
-  it("returns 400 when complete_early rule checks fail", async () => {
+  it("returns 400 when complete_early is already complete", async () => {
     (dbQueries.completeDepositBonusEarly as vi.Mock).mockRejectedValueOnce(
-      new ChatSDKError(
-        "bad_request:api",
-        "Account balance must be exactly zero to complete early"
-      )
+      new ChatSDKError("bad_request:api", "Bonus wagering is already complete")
     );
 
     const res = await depositBonusActionRoute(
@@ -88,16 +88,14 @@ describe("deposit bonuses action API route (unit)", () => {
 
     expect(res.status).toBe(400);
     const json = await res.json();
-    expect(json.error).toBe(
-      "Account balance must be exactly zero to complete early"
-    );
+    expect(json.error).toBe("Bonus wagering is already complete");
   });
 
-  it("returns 400 when complete_early has pending bets", async () => {
+  it("returns 400 when complete_early bonus is not active", async () => {
     (dbQueries.completeDepositBonusEarly as vi.Mock).mockRejectedValueOnce(
       new ChatSDKError(
         "bad_request:api",
-        "Account must have no pending bets to complete early"
+        "Only active bonuses can be completed early"
       )
     );
 
@@ -108,9 +106,7 @@ describe("deposit bonuses action API route (unit)", () => {
 
     expect(res.status).toBe(400);
     const json = await res.json();
-    expect(json.error).toBe(
-      "Account must have no pending bets to complete early"
-    );
+    expect(json.error).toBe("Only active bonuses can be completed early");
   });
 
   it("returns 404 when action target bonus is missing", async () => {
