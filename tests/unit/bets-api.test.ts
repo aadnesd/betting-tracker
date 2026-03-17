@@ -33,6 +33,11 @@ vi.mock("@/lib/match-linking", () => ({
 
 vi.mock("@/lib/fx-rates", () => ({
   convertAmountToNok: vi.fn(async (amount: number) => amount),
+  convertAmountToNokStrict: vi.fn(async (amount: number) => amount),
+}));
+
+vi.mock("@/lib/cache", () => ({
+  revalidateDashboard: vi.fn(),
 }));
 
 const user = { id: "user-1", email: "user-1@example.com" };
@@ -1870,10 +1875,184 @@ describe("bets API routes (unit)", () => {
       );
     });
 
+    it("creates a promo wrapper for standalone back bets with promo metadata", async () => {
+      const accountId = "11111111-1111-1111-1111-111111111111";
+
+      (dbQueries.createManualScreenshot as vi.Mock).mockResolvedValue({
+        id: "screenshot-3",
+      });
+      (dbQueries.getAccountById as vi.Mock).mockResolvedValue({
+        id: accountId,
+        name: "bet365",
+        kind: "bookmaker",
+      });
+      (dbQueries.getOrCreatePromoByType as vi.Mock).mockResolvedValue({
+        id: "promo-1",
+        type: "Free Bet",
+      });
+      (dbQueries.saveBackBet as vi.Mock).mockResolvedValue({
+        id: "bet-3",
+        market: "Man Utd v Liverpool",
+        selection: "Man Utd",
+        odds: "2.50",
+        stake: "100.00",
+        status: "placed",
+        currency: "NOK",
+        placedAt: new Date(),
+        createdAt: new Date(),
+        accountId,
+      });
+      (dbQueries.createMatchedBetRecord as vi.Mock).mockResolvedValue({
+        id: "matched-standalone-1",
+        status: "draft",
+      });
+      (dbQueries.createAuditEntry as vi.Mock).mockResolvedValue({
+        id: "audit-3",
+      });
+
+      const res = await standaloneRoute(
+        new Request("http://localhost/api/bets/standalone", {
+          method: "POST",
+          body: JSON.stringify({
+            kind: "back",
+            market: "Man Utd v Liverpool",
+            selection: "Man Utd",
+            odds: 2.5,
+            stake: 100,
+            accountId,
+            currency: "NOK",
+            promoType: "Free Bet",
+          }),
+        })
+      );
+
+      expect(res.status).toBe(200);
+      expect(dbQueries.getOrCreatePromoByType).toHaveBeenCalledWith({
+        userId: user.id,
+        type: "Free Bet",
+      });
+      expect(dbQueries.createMatchedBetRecord).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: user.id,
+          backBetId: "bet-3",
+          layBetId: null,
+          promoId: "promo-1",
+          promoType: "Free Bet",
+          status: "draft",
+        })
+      );
+      expect(dbQueries.createAuditEntry).toHaveBeenCalledWith(
+        expect.objectContaining({
+          entityType: "back_bet",
+          changes: expect.objectContaining({
+            promoType: "Free Bet",
+            matchedBetId: "matched-standalone-1",
+          }),
+        })
+      );
+    });
+
+    it("marks free bet as used for standalone back bets", async () => {
+      const accountId = "11111111-1111-1111-1111-111111111111";
+      const freeBetId = "123e4567-e89b-12d3-a456-426614174000";
+
+      (dbQueries.createManualScreenshot as vi.Mock).mockResolvedValue({
+        id: "screenshot-4",
+      });
+      (dbQueries.getAccountById as vi.Mock).mockResolvedValue({
+        id: accountId,
+        name: "bet365",
+        kind: "bookmaker",
+      });
+      (dbQueries.getOrCreatePromoByType as vi.Mock).mockResolvedValue({
+        id: "promo-2",
+        type: "Free Bet",
+      });
+      (dbQueries.saveBackBet as vi.Mock).mockResolvedValue({
+        id: "bet-4",
+        market: "Man Utd v Liverpool",
+        selection: "Man Utd",
+        odds: "2.50",
+        stake: "100.00",
+        status: "placed",
+        currency: "NOK",
+        placedAt: new Date(),
+        createdAt: new Date(),
+        accountId,
+      });
+      (dbQueries.createMatchedBetRecord as vi.Mock).mockResolvedValue({
+        id: "matched-standalone-2",
+        status: "draft",
+      });
+      (dbQueries.markFreeBetAsUsed as vi.Mock).mockResolvedValue({
+        id: freeBetId,
+        status: "used",
+      });
+      (dbQueries.createAuditEntry as vi.Mock).mockResolvedValue({
+        id: "audit-4",
+      });
+
+      const res = await standaloneRoute(
+        new Request("http://localhost/api/bets/standalone", {
+          method: "POST",
+          body: JSON.stringify({
+            kind: "back",
+            market: "Man Utd v Liverpool",
+            selection: "Man Utd",
+            odds: 2.5,
+            stake: 100,
+            accountId,
+            currency: "NOK",
+            promoType: "Free Bet",
+            freeBetId,
+          }),
+        })
+      );
+
+      expect(res.status).toBe(200);
+      expect(dbQueries.markFreeBetAsUsed).toHaveBeenCalledWith({
+        id: freeBetId,
+        userId: user.id,
+        matchedBetId: "matched-standalone-2",
+      });
+      expect(dbQueries.createAuditEntry).toHaveBeenCalledWith(
+        expect.objectContaining({
+          changes: expect.objectContaining({
+            freeBetId,
+          }),
+        })
+      );
+    });
+
     it("rejects invalid payload (missing required fields)", async () => {
       const payload = {
         kind: "back",
         // Missing market, selection, odds, stake, account
+      };
+
+      const res = await standaloneRoute(
+        new Request("http://localhost/api/bets/standalone", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        })
+      );
+
+      expect(res.status).toBe(400);
+      const json = await res.json();
+      expect(json.error).toBe("Invalid payload");
+    });
+
+    it("rejects promo metadata for standalone lay bets", async () => {
+      const payload = {
+        kind: "lay",
+        market: "Man Utd v Liverpool",
+        selection: "Man Utd",
+        odds: 2.5,
+        stake: 100,
+        account: "bfb247",
+        currency: "NOK",
+        promoType: "Free Bet",
+        freeBetId: "123e4567-e89b-12d3-a456-426614174000",
       };
 
       const res = await standaloneRoute(

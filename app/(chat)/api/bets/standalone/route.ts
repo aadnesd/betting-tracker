@@ -5,9 +5,12 @@ import { revalidateDashboard } from "@/lib/cache";
 import {
   createAuditEntry,
   createManualScreenshot,
+  createMatchedBetRecord,
   getAccountById,
   getFootballMatchById,
   getOrCreateAccount,
+  getOrCreatePromoByType,
+  markFreeBetAsUsed,
   saveBackBet,
   saveLayBet,
 } from "@/lib/db/queries";
@@ -23,6 +26,8 @@ const standaloneBetSchema = z
     account: z.string().min(1, "Account is required").optional(),
     currency: z.string().length(3).default("NOK"),
     matchId: z.string().uuid().optional().nullable(),
+    promoType: z.string().optional(),
+    freeBetId: z.string().uuid().optional(),
     placedAt: z.string().optional(), // ISO date string
     notes: z.string().optional(),
   })
@@ -32,6 +37,14 @@ const standaloneBetSchema = z
         code: z.ZodIssueCode.custom,
         message: "Account is required",
         path: ["account"],
+      });
+    }
+
+    if (value.kind === "lay" && (value.promoType || value.freeBetId)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Promo metadata is only supported for standalone back bets",
+        path: value.freeBetId ? ["freeBetId"] : ["promoType"],
       });
     }
   });
@@ -58,6 +71,11 @@ export async function POST(request: Request) {
   }
 
   try {
+    const effectivePromoType =
+      body.kind === "back"
+        ? (body.promoType ?? (body.freeBetId ? "Free Bet" : undefined))
+        : undefined;
+
     // Create placeholder screenshot for standalone bet
     const screenshot = await createManualScreenshot({
       userId: session.user.id,
@@ -66,7 +84,11 @@ export async function POST(request: Request) {
 
     // Resolve or create the account
     const expectedKind = body.kind === "back" ? "bookmaker" : "exchange";
-    let account = null;
+    let account: {
+      id: string;
+      name: string | null;
+      kind: "bookmaker" | "exchange";
+    } | null = null;
 
     if (body.accountId) {
       account = await getAccountById({
@@ -105,6 +127,13 @@ export async function POST(request: Request) {
       }
     }
 
+    const promo = effectivePromoType
+      ? await getOrCreatePromoByType({
+          userId: session.user.id,
+          type: effectivePromoType,
+        })
+      : null;
+
     const betData = {
       userId: session.user.id,
       screenshotId: screenshot.id,
@@ -129,6 +158,33 @@ export async function POST(request: Request) {
         ? await saveBackBet(betData)
         : await saveLayBet(betData);
 
+    let standalonePromoWrapperId: string | null = null;
+    if (body.kind === "back" && effectivePromoType) {
+      const matchedBet = await createMatchedBetRecord({
+        userId: session.user.id,
+        backBetId: bet.id,
+        layBetId: null,
+        matchId: body.matchId ?? null,
+        market: body.market,
+        selection: body.selection,
+        promoId: promo?.id ?? null,
+        promoType: effectivePromoType,
+        status: "draft",
+        notes: body.notes
+          ? `[Standalone Bet] Promo wrapper for single-leg bet. ${body.notes}`
+          : "[Standalone Bet] Promo wrapper for single-leg bet",
+      });
+      standalonePromoWrapperId = matchedBet.id;
+
+      if (body.freeBetId) {
+        await markFreeBetAsUsed({
+          id: body.freeBetId,
+          userId: session.user.id,
+          matchedBetId: matchedBet.id,
+        });
+      }
+    }
+
     // Create audit entry
     await createAuditEntry({
       userId: session.user.id,
@@ -143,10 +199,15 @@ export async function POST(request: Request) {
         account: account.name ?? body.account,
         currency: body.currency,
         source: "standalone",
+        promoType: effectivePromoType ?? null,
+        freeBetId: body.freeBetId ?? null,
+        matchedBetId: standalonePromoWrapperId,
       },
       notes: body.notes
         ? `[Standalone Bet] ${body.notes}`
-        : "[Standalone Bet] Created without matched pair",
+        : effectivePromoType
+          ? "[Standalone Bet] Created with promo metadata"
+          : "[Standalone Bet] Created without matched pair",
     });
 
     revalidateDashboard(session.user.id);

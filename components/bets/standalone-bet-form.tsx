@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, Gift, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -26,16 +26,40 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import type { SettlementOutcome } from "@/lib/settled-bet-edit";
 
-export interface AccountOption {
+const PROMO_TYPES = [
+  "Free Bet",
+  "Risk-Free Bet",
+  "Deposit Bonus",
+  "Odds Boost",
+  "Profit Boost",
+  "Reload Offer",
+  "Qualifying Bet",
+  "Other",
+] as const;
+
+export type AccountOption = {
   id: string;
   name: string;
   kind: "bookmaker" | "exchange";
   currency: string | null;
-}
+};
 
-interface StandaloneBetFormProps {
+export type FreeBetOption = {
+  id: string;
+  name: string;
+  value: number;
+  currency: string;
+  accountId: string | null;
+  accountName: string | null;
+  expiresAt: string | null;
+  minOdds: number | null;
+  stakeReturned?: boolean;
+};
+
+type StandaloneBetFormProps = {
   bookmakers: AccountOption[];
   exchanges: AccountOption[];
+  freeBets?: FreeBetOption[];
   mode?: "create" | "edit";
   initialData?: {
     id: string;
@@ -58,9 +82,9 @@ interface StandaloneBetFormProps {
     settlementOutcome?: SettlementOutcome | null;
     notes?: string | null;
   };
-}
+};
 
-interface FormData {
+type FormData = {
   kind: "back" | "lay";
   market: string;
   selection: string;
@@ -70,13 +94,16 @@ interface FormData {
   currency: string;
   placedAt: string;
   matchId: string;
+  promoType: string;
+  freeBetId: string;
   settlementOutcome: SettlementOutcome | "";
   notes: string;
-}
+};
 
 export function StandaloneBetForm({
   bookmakers,
   exchanges,
+  freeBets = [],
   mode = "create",
   initialData,
 }: StandaloneBetFormProps) {
@@ -102,6 +129,8 @@ export function StandaloneBetForm({
     currency: initialData?.currency ?? fallbackCurrency,
     placedAt: initialPlacedAt, // datetime-local format
     matchId: initialData?.matchId ?? "",
+    promoType: "",
+    freeBetId: "",
     settlementOutcome: initialData?.settlementOutcome ?? "",
     notes: initialData?.notes ?? "",
   });
@@ -119,6 +148,19 @@ export function StandaloneBetForm({
 
   // Get the accounts for the currently selected bet type
   const accounts = formData.kind === "back" ? bookmakers : exchanges;
+  const selectedAccount = accounts.find(
+    (account) => account.id === formData.accountId
+  );
+  const availableFreeBets =
+    formData.kind !== "back"
+      ? []
+      : freeBets.filter(
+          (freeBet) =>
+            freeBet.accountId === formData.accountId || !freeBet.accountId
+        );
+  const selectedFreeBet =
+    freeBets.find((freeBet) => freeBet.id === formData.freeBetId) ?? null;
+  const showPromoFields = !isEdit && formData.kind === "back";
 
   // When bet type changes, reset account to first available of that type
   const handleKindChange = (kind: "back" | "lay") => {
@@ -132,16 +174,52 @@ export function StandaloneBetForm({
       kind,
       accountId: newAccountId,
       currency: newCurrency,
+      promoType: kind === "back" ? prev.promoType : "",
+      freeBetId: kind === "back" ? prev.freeBetId : "",
     }));
   };
 
   // When account changes, update currency
   const handleAccountChange = (accountId: string) => {
-    const selectedAccount = accounts.find((a) => a.id === accountId);
+    const nextAccount = accounts.find((account) => account.id === accountId);
     setFormData((prev) => ({
       ...prev,
       accountId,
-      currency: selectedAccount?.currency ?? prev.currency,
+      currency: nextAccount?.currency ?? prev.currency,
+      freeBetId:
+        prev.freeBetId &&
+        selectedFreeBet &&
+        selectedFreeBet.accountId &&
+        selectedFreeBet.accountId !== accountId
+          ? ""
+          : prev.freeBetId,
+    }));
+  };
+
+  const handlePromoTypeChange = (promoType: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      promoType,
+      freeBetId:
+        promoType === "Free Bet" || promoType === "Risk-Free Bet"
+          ? prev.freeBetId
+          : "",
+    }));
+  };
+
+  const handleFreeBetChange = (freeBetId: string) => {
+    const freeBet = freeBets.find((option) => option.id === freeBetId);
+    if (!freeBet) {
+      updateField("freeBetId", "");
+      return;
+    }
+
+    setFormData((prev) => ({
+      ...prev,
+      freeBetId,
+      stake: freeBet.value.toString(),
+      currency: freeBet.currency,
+      accountId: freeBet.accountId ?? prev.accountId,
     }));
   };
 
@@ -177,7 +255,9 @@ export function StandaloneBetForm({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!validate()) return;
+    if (!validate()) {
+      return;
+    }
 
     setIsSubmitting(true);
 
@@ -200,6 +280,14 @@ export function StandaloneBetForm({
           accountId: formData.accountId,
           currency: formData.currency,
           matchId: formData.matchId ? formData.matchId : null,
+          promoType:
+            showPromoFields && formData.promoType
+              ? formData.promoType
+              : undefined,
+          freeBetId:
+            showPromoFields && formData.freeBetId
+              ? formData.freeBetId
+              : undefined,
           placedAt: formData.placedAt
             ? new Date(formData.placedAt).toISOString()
             : undefined,
@@ -433,6 +521,117 @@ export function StandaloneBetForm({
                   )}
                 </div>
               </div>
+
+              {showPromoFields && (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="promoType">Promo Type (optional)</Label>
+                    <Select
+                      onValueChange={handlePromoTypeChange}
+                      value={formData.promoType}
+                    >
+                      <SelectTrigger id="promoType">
+                        <SelectValue placeholder="Select promo type..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {PROMO_TYPES.map((promoType) => (
+                          <SelectItem key={promoType} value={promoType}>
+                            {promoType}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {(formData.promoType === "Free Bet" ||
+                    formData.promoType === "Risk-Free Bet") && (
+                    <div className="space-y-2">
+                      <Label
+                        className="flex items-center gap-2"
+                        htmlFor="freeBet"
+                      >
+                        <Gift className="h-4 w-4 text-emerald-600" />
+                        Use a Free Bet (optional)
+                      </Label>
+                      {availableFreeBets.length > 0 ? (
+                        <>
+                          <Select
+                            onValueChange={handleFreeBetChange}
+                            value={formData.freeBetId}
+                          >
+                            <SelectTrigger id="freeBet">
+                              <SelectValue placeholder="Select a free bet to use..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {availableFreeBets.map((freeBet) => (
+                                <SelectItem key={freeBet.id} value={freeBet.id}>
+                                  <span className="flex items-center gap-2">
+                                    {freeBet.name}
+                                    <span className="font-medium text-emerald-600">
+                                      {freeBet.currency}{" "}
+                                      {freeBet.value.toFixed(2)}
+                                    </span>
+                                    {freeBet.accountName && (
+                                      <span className="text-muted-foreground text-xs">
+                                        @ {freeBet.accountName}
+                                      </span>
+                                    )}
+                                  </span>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          {selectedFreeBet && (
+                            <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm">
+                              <div className="flex items-center gap-2 font-medium text-emerald-900">
+                                <Gift className="h-4 w-4" />
+                                Using: {selectedFreeBet.name}
+                              </div>
+                              <div className="mt-1 text-emerald-700">
+                                Value: {selectedFreeBet.currency}{" "}
+                                {selectedFreeBet.value.toFixed(2)}
+                                {selectedFreeBet.minOdds && (
+                                  <span className="ml-3">
+                                    Min odds:{" "}
+                                    {selectedFreeBet.minOdds.toFixed(2)}
+                                  </span>
+                                )}
+                                <span className="ml-3">
+                                  {selectedFreeBet.stakeReturned
+                                    ? "Stake returned"
+                                    : "Stake not returned"}
+                                </span>
+                                {selectedFreeBet.expiresAt && (
+                                  <span className="ml-3">
+                                    Expires:{" "}
+                                    {new Date(
+                                      selectedFreeBet.expiresAt
+                                    ).toLocaleDateString()}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <div className="rounded-md border border-muted bg-muted/50 p-3 text-muted-foreground text-sm">
+                          No active free bets available
+                          {selectedAccount && (
+                            <span> for {selectedAccount.name}</span>
+                          )}
+                          .{" "}
+                          <Link
+                            className="text-primary hover:underline"
+                            href="/bets/settings/promos/new"
+                          >
+                            Add one
+                          </Link>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
 
               {/* Odds & Stake */}
               <div className="grid gap-4 sm:grid-cols-2">
