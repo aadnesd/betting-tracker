@@ -353,7 +353,11 @@ export async function listAccountsByUser({
       .select()
       .from(account)
       .where(eq(account.userId, userId))
-      .orderBy(desc(account.createdAt))
+      .orderBy(
+        asc(account.nameNormalized),
+        asc(account.name),
+        asc(account.createdAt)
+      )
       .limit(limit);
   } catch (_error) {
     throw new ChatSDKError("bad_request:database", "Failed to list accounts");
@@ -533,7 +537,12 @@ export async function listAccountsWithBalances({
       .from(account)
       .leftJoin(balanceSubquery, eq(account.id, balanceSubquery.accountId))
       .where(and(...conditions))
-      .orderBy(asc(account.kind), asc(account.name))
+      .orderBy(
+        asc(account.kind),
+        asc(account.nameNormalized),
+        asc(account.name),
+        asc(account.createdAt)
+      )
       .limit(limit);
 
     return rows.map((row) => ({
