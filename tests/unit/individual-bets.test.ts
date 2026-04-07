@@ -31,28 +31,32 @@ vi.mock("postgres", () => ({
   default: vi.fn(() => ({})),
 }));
 
-import * as dbQueries from "@/lib/db/queries";
+import {
+  type IndividualBetListItem,
+  listAllBetsByUser,
+  type PaginatedIndividualBetList,
+} from "@/lib/db/queries";
 
 describe("listAllBetsByUser", () => {
   it("is a function that accepts filters and returns list items", () => {
-    expect(typeof dbQueries.listAllBetsByUser).toBe("function");
+    expect(typeof listAllBetsByUser).toBe("function");
 
     const fn: (args: {
       userId: string;
-      status?: "placed" | "settled";
+      status?: "active" | "settled";
       accountId?: string;
       fromDate?: Date;
       toDate?: Date;
       search?: string;
       limit?: number;
-    }) => Promise<dbQueries.IndividualBetListItem[]> =
-      dbQueries.listAllBetsByUser;
+      offset?: number;
+    }) => Promise<PaginatedIndividualBetList> = listAllBetsByUser;
 
     expect(fn).toBeDefined();
   });
 
   it("exposes the fields required for the all bets list", () => {
-    const mockItem: dbQueries.IndividualBetListItem = {
+    const mockItem: IndividualBetListItem = {
       id: "bet-1",
       kind: "back",
       market: "Match Odds",
@@ -69,6 +73,7 @@ describe("listAllBetsByUser", () => {
       accountId: "acct-1",
       accountName: "Bet365",
       accountKind: "bookmaker",
+      accountCommission: null,
       matchedBetId: null,
       matchedBetStatus: null,
     };
