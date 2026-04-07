@@ -2283,7 +2283,7 @@ export async function listAllBetsByUser({
   offset = 0,
 }: {
   userId: string;
-  status?: "placed" | "settled";
+  status?: "active" | "settled";
   accountId?: string;
   fromDate?: Date;
   toDate?: Date;
@@ -2299,7 +2299,10 @@ export async function listAllBetsByUser({
     const backConditions: SQL<unknown>[] = [eq(backBet.userId, userId)];
     const layConditions: SQL<unknown>[] = [eq(layBet.userId, userId)];
 
-    if (status) {
+    if (status === "active") {
+      backConditions.push(ne(backBet.status, "settled"));
+      layConditions.push(ne(layBet.status, "settled"));
+    } else if (status === "settled") {
       backConditions.push(eq(backBet.status, status));
       layConditions.push(eq(layBet.status, status));
     }
