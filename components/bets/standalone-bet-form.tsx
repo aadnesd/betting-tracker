@@ -2,7 +2,7 @@
 
 import { ArrowLeft, Gift, Loader2 } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 import { type MatchOption, MatchPicker } from "@/components/bets/match-picker";
@@ -36,7 +36,6 @@ const PROMO_TYPES = [
   "Qualifying Bet",
   "Other",
 ] as const;
-
 export type AccountOption = {
   id: string;
   name: string;
@@ -55,7 +54,6 @@ export type FreeBetOption = {
   minOdds: number | null;
   stakeReturned?: boolean;
 };
-
 type StandaloneBetFormProps = {
   bookmakers: AccountOption[];
   exchanges: AccountOption[];
@@ -108,8 +106,10 @@ export function StandaloneBetForm({
   initialData,
 }: StandaloneBetFormProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const isEdit = Boolean(mode === "edit" && initialData);
   const isSettledEdit = isEdit && initialData?.status === "settled";
+  const returnTo = getSafeReturnPath(searchParams.get("returnTo"));
 
   const initialKind = initialData?.kind ?? "back";
   const initialAccounts = initialKind === "back" ? bookmakers : exchanges;
@@ -315,7 +315,7 @@ export function StandaloneBetForm({
       );
 
       if (mode === "edit" && initialData) {
-        router.push(`/bets/${initialData.kind}/${initialData.id}`);
+        router.push(returnTo ?? `/bets/${initialData.kind}/${initialData.id}`);
       } else {
         router.push("/bets/all");
       }
@@ -357,7 +357,7 @@ export function StandaloneBetForm({
           className="inline-flex items-center text-muted-foreground text-sm hover:text-foreground"
           href={
             isEdit && initialData
-              ? `/bets/${initialData.kind}/${initialData.id}`
+              ? (returnTo ?? `/bets/${initialData.kind}/${initialData.id}`)
               : "/bets/all"
           }
         >
@@ -778,4 +778,12 @@ export function StandaloneBetForm({
       </Card>
     </div>
   );
+}
+
+function getSafeReturnPath(value: string | null) {
+  if (!value || !value.startsWith("/") || value.startsWith("//")) {
+    return null;
+  }
+
+  return value;
 }

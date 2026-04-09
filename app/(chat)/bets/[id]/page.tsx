@@ -15,7 +15,6 @@ import { ValueWithTooltip } from "@/components/bets/calculation-tooltip";
 import { MatchedBetDetailActions } from "@/components/bets/matched-bet-detail-actions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 import { computeMatchedBetOutcomes } from "@/lib/bet-calculations";
 import {
   getMatchedBetWithParts,
@@ -33,9 +32,12 @@ export const metadata = {
   title: "Matched bet detail",
 };
 
-interface PageProps {
+const FREE_BET_PROMO_PATTERN = /free[\s_-]?bet/i;
+const HTTP_URL_PATTERN = /^https?:\/\//;
+
+type PageProps = {
   params: Promise<{ id: string }>;
-}
+};
 
 export default async function Page({ params }: PageProps) {
   const { id } = await params;
@@ -78,7 +80,7 @@ export default async function Page({ params }: PageProps) {
   const isFreeBet = freeBet
     ? true
     : matched.promoType
-      ? /free[\s_-]?bet/i.test(matched.promoType)
+      ? FREE_BET_PROMO_PATTERN.test(matched.promoType)
       : false;
   const freeBetStakeReturned = freeBet?.stakeReturned ?? false;
 
@@ -184,8 +186,11 @@ export default async function Page({ params }: PageProps) {
         <div className="rounded-md border border-amber-200 bg-amber-50 p-4">
           <p className="mb-2 font-medium text-amber-800">⚠️ Issues detected</p>
           <ul className="space-y-1">
-            {mismatches.map((issue, i) => (
-              <li className="text-amber-700 text-sm" key={i}>
+            {mismatches.map((issue) => (
+              <li
+                className="text-amber-700 text-sm"
+                key={`${issue.type}:${issue.label}`}
+              >
                 • {issue.label}
               </li>
             ))}
@@ -196,7 +201,7 @@ export default async function Page({ params }: PageProps) {
       {/* Summary row */}
       <div className="flex flex-wrap gap-4">
         {/* Show both outcomes for free bets, otherwise just net exposure */}
-        {betOutcomes && betOutcomes.isFreeBet ? (
+        {betOutcomes?.isFreeBet ? (
           <>
             <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3">
               <p className="flex items-center gap-1 text-muted-foreground text-xs uppercase tracking-wide">
@@ -270,12 +275,14 @@ export default async function Page({ params }: PageProps) {
         <BetCard
           bet={back}
           label="Back bet"
+          matchedBetId={matched.id}
           screenshot={backScreenshot}
           type="back"
         />
         <BetCard
           bet={lay}
           label="Lay bet"
+          matchedBetId={matched.id}
           screenshot={layScreenshot}
           type="lay"
         />
@@ -357,11 +364,13 @@ function BetCard({
   type,
   bet,
   screenshot,
+  matchedBetId,
 }: {
   label: string;
   type: "back" | "lay";
   bet: BackBet | LayBet | null;
   screenshot: ScreenshotUpload | null;
+  matchedBetId: string;
 }) {
   const borderColor = type === "back" ? "border-sky-200" : "border-emerald-200";
   const bgColor = type === "back" ? "bg-sky-50/50" : "bg-emerald-50/50";
@@ -390,13 +399,22 @@ function BetCard({
     <Card className={borderColor}>
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
-          {label}
-          <BetStatusBadge status={bet.status} />
+          <div className="flex items-center gap-3">
+            <span>{label}</span>
+            <BetStatusBadge status={bet.status} />
+          </div>
+          <Button asChild size="sm" variant="outline">
+            <Link
+              href={`/bets/${type}/${bet.id}/edit?returnTo=${encodeURIComponent(`/bets/${matchedBetId}`)}`}
+            >
+              Edit bet
+            </Link>
+          </Button>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Screenshot - only show if URL is a valid http(s) URL */}
-        {screenshot?.url && /^https?:\/\//.test(screenshot.url) && (
+        {screenshot?.url && HTTP_URL_PATTERN.test(screenshot.url) && (
           <div className="overflow-hidden rounded-md border">
             <Image
               alt={`${label} screenshot`}
