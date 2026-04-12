@@ -52,10 +52,10 @@ export function WalletTransactionForm({
 
   const [type, setType] = useState<WalletTransactionType>("deposit");
   const [amount, setAmount] = useState("");
-  const [currency] = useState(walletCurrency);
   const [date, setDate] = useState(new Date().toISOString().slice(0, 16));
   const [relatedAccountId, setRelatedAccountId] = useState<string>("");
   const [relatedWalletId, setRelatedWalletId] = useState<string>("");
+  const [relatedWalletAmount, setRelatedWalletAmount] = useState("");
   const [externalRef, setExternalRef] = useState("");
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
@@ -86,6 +86,11 @@ export function WalletTransactionForm({
     type === "transfer_to_account" || type === "transfer_from_account";
   const needsWallet =
     type === "transfer_to_wallet" || type === "transfer_from_wallet";
+  const selectedWallet = wallets.find((wallet) => wallet.id === relatedWalletId);
+  const showRelatedWalletAmount =
+    needsWallet &&
+    selectedWallet &&
+    selectedWallet.currency !== walletCurrency;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -106,6 +111,18 @@ export function WalletTransactionForm({
       return;
     }
 
+    const relatedWalletAmountNum = Number.parseFloat(relatedWalletAmount);
+    if (showRelatedWalletAmount) {
+      if (
+        !relatedWalletAmount ||
+        Number.isNaN(relatedWalletAmountNum) ||
+        relatedWalletAmountNum <= 0
+      ) {
+        toast.error("Please enter a valid amount in the related wallet currency");
+        return;
+      }
+    }
+
     setSaving(true);
 
     try {
@@ -115,10 +132,13 @@ export function WalletTransactionForm({
         body: JSON.stringify({
           type,
           amount: amountNum,
-          currency,
+          currency: walletCurrency,
           date: new Date(date).toISOString(),
           relatedAccountId: needsAccount ? relatedAccountId : null,
           relatedWalletId: needsWallet ? relatedWalletId : null,
+          relatedWalletAmount: showRelatedWalletAmount
+            ? relatedWalletAmountNum
+            : null,
           externalRef: externalRef.trim() || null,
           notes: notes.trim() || null,
         }),
@@ -126,7 +146,9 @@ export function WalletTransactionForm({
 
       if (!res.ok) {
         const error = await res.json();
-        throw new Error(error.message ?? "Failed to create transaction");
+        throw new Error(
+          error.error ?? error.message ?? "Failed to create transaction"
+        );
       }
 
       toast.success("Transaction added");
@@ -136,6 +158,7 @@ export function WalletTransactionForm({
       setType("deposit");
       setRelatedAccountId("");
       setRelatedWalletId("");
+      setRelatedWalletAmount("");
       setExternalRef("");
       setNotes("");
 
@@ -185,7 +208,7 @@ export function WalletTransactionForm({
               value={amount}
             />
             <span className="flex items-center rounded-md border bg-muted px-3 text-muted-foreground text-sm">
-              {currency}
+              {walletCurrency}
             </span>
           </div>
         </div>
@@ -225,7 +248,13 @@ export function WalletTransactionForm({
         {needsWallet && (
           <div className="space-y-2">
             <Label htmlFor="relatedWallet">Wallet *</Label>
-            <Select onValueChange={setRelatedWalletId} value={relatedWalletId}>
+            <Select
+              onValueChange={(value) => {
+                setRelatedWalletId(value);
+                setRelatedWalletAmount("");
+              }}
+              value={relatedWalletId}
+            >
               <SelectTrigger id="relatedWallet">
                 <SelectValue placeholder="Select wallet" />
               </SelectTrigger>
@@ -237,6 +266,36 @@ export function WalletTransactionForm({
                 ))}
               </SelectContent>
             </Select>
+          </div>
+        )}
+
+        {showRelatedWalletAmount && selectedWallet && (
+          <div className="space-y-2">
+            <Label htmlFor="relatedWalletAmount">
+              {type === "transfer_to_wallet"
+                ? `Amount received in ${selectedWallet.currency} *`
+                : `Amount sent from ${selectedWallet.currency} *`}
+            </Label>
+            <div className="flex gap-2">
+              <Input
+                id="relatedWalletAmount"
+                min="0"
+                onChange={(e) => setRelatedWalletAmount(e.target.value)}
+                placeholder="0.00"
+                required
+                step="any"
+                type="number"
+                value={relatedWalletAmount}
+              />
+              <span className="flex items-center rounded-md border bg-muted px-3 text-muted-foreground text-sm">
+                {selectedWallet.currency}
+              </span>
+            </div>
+            <p className="text-muted-foreground text-xs">
+              {type === "transfer_to_wallet"
+                ? `This wallet sends ${walletCurrency}, ${selectedWallet.name} receives ${selectedWallet.currency}.`
+                : `${selectedWallet.name} sends ${selectedWallet.currency}, this wallet receives ${walletCurrency}.`}
+            </p>
           </div>
         )}
 

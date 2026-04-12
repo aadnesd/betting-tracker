@@ -27,6 +27,7 @@ const createTransactionSchema = z.object({
   date: z.string().transform((s) => new Date(s)),
   relatedAccountId: z.string().uuid().nullish(),
   relatedWalletId: z.string().uuid().nullish(),
+  relatedWalletAmount: z.number().positive().nullish(),
   externalRef: z.string().nullish(),
   notes: z.string().nullish(),
 });
@@ -101,6 +102,7 @@ export async function POST(
       date,
       relatedAccountId,
       relatedWalletId,
+      relatedWalletAmount,
       externalRef,
       notes,
     } = parsed.data;
@@ -129,20 +131,66 @@ export async function POST(
         userId: session.user.id,
       });
     } else if (type === "transfer_to_wallet" && relatedWalletId) {
+      const relatedWallet = await getWalletById(relatedWalletId);
+      if (!relatedWallet || relatedWallet.userId !== session.user.id) {
+        return NextResponse.json(
+          { error: "Related wallet not found" },
+          { status: 404 }
+        );
+      }
+
+      if (
+        relatedWallet.currency !== wallet.currency &&
+        relatedWalletAmount == null
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              "Related wallet amount is required for cross-currency transfers",
+          },
+          { status: 400 }
+        );
+      }
+
       result = await createTransferBetweenWallets({
         fromWalletId: walletId,
         toWalletId: relatedWalletId,
-        amount,
-        currency,
+        fromAmount: amount,
+        fromCurrency: currency,
+        toAmount: relatedWalletAmount ?? amount,
+        toCurrency: relatedWallet.currency,
         date,
         notes,
       });
     } else if (type === "transfer_from_wallet" && relatedWalletId) {
+      const relatedWallet = await getWalletById(relatedWalletId);
+      if (!relatedWallet || relatedWallet.userId !== session.user.id) {
+        return NextResponse.json(
+          { error: "Related wallet not found" },
+          { status: 404 }
+        );
+      }
+
+      if (
+        relatedWallet.currency !== wallet.currency &&
+        relatedWalletAmount == null
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              "Related wallet amount is required for cross-currency transfers",
+          },
+          { status: 400 }
+        );
+      }
+
       result = await createTransferBetweenWallets({
         fromWalletId: relatedWalletId,
         toWalletId: walletId,
-        amount,
-        currency,
+        fromAmount: relatedWalletAmount ?? amount,
+        fromCurrency: relatedWallet.currency,
+        toAmount: amount,
+        toCurrency: currency,
         date,
         notes,
       });
