@@ -1399,10 +1399,7 @@ export async function listUnifiedTransactionsByUser({
           externalRef: walletTransaction.externalRef,
           relatedAccountName: relatedAccount.name,
           relatedWalletName: relatedWallet.name,
-          linkedTransfer: or(
-            isNotNull(walletTransaction.linkedAccountTransactionId),
-            isNotNull(walletTransaction.linkedWalletTransactionId)
-          ),
+          linkedTransfer: sql<boolean>`(${walletTransaction.linkedAccountTransactionId} IS NOT NULL OR ${walletTransaction.linkedWalletTransactionId} IS NOT NULL)`,
         })
         .from(walletTransaction)
         .innerJoin(wallet, eq(walletTransaction.walletId, wallet.id))
