@@ -8094,6 +8094,13 @@ export async function deleteWalletTransaction({
     }
 
     if (linkedWalletTransactionId) {
+      // Break the self-referencing FK cycle before deleting the mirrored
+      // wallet transaction.
+      await db
+        .update(walletTransaction)
+        .set({ linkedWalletTransactionId: null })
+        .where(eq(walletTransaction.id, id));
+
       await db
         .delete(walletTransaction)
         .where(eq(walletTransaction.id, linkedWalletTransactionId));
