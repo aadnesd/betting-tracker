@@ -2,8 +2,8 @@ import type { InferSelectModel } from "drizzle-orm";
 import {
   boolean,
   foreignKey,
-  integer,
   index,
+  integer,
   jsonb,
   numeric,
   pgTable,
@@ -25,9 +25,7 @@ export type User = InferSelectModel<typeof user>;
 export const fxRate = pgTable(
   "FxRate",
   {
-    baseCurrency: varchar("baseCurrency", { length: 8 })
-      .primaryKey()
-      .notNull(),
+    baseCurrency: varchar("baseCurrency", { length: 8 }).primaryKey().notNull(),
     rateToNok: numeric("rateToNok", { precision: 18, scale: 8 }).notNull(),
     updatedAt: timestamp("updatedAt").notNull(),
   },
@@ -541,6 +539,8 @@ export const AVAILABLE_COMPETITIONS = [
   { code: "EFL", name: "EFL Cup", country: "England" },
   { code: "WC", name: "World Cup", country: "International" },
   { code: "CLI", name: "Copa Libertadores", country: "South America" },
+  { code: "TIP", name: "Eliteserien", country: "Norway" },
+  { code: "ALL", name: "Allsvenskan", country: "Sweden" },
 ] as const;
 
 export const DEFAULT_COMPETITION_CODES = [

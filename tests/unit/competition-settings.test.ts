@@ -195,6 +195,20 @@ describe("competition settings queries", () => {
       expect(codes).toContain("PD"); // La Liga
     });
 
+    it("includes Scandinavian leagues", () => {
+      const codes = AVAILABLE_COMPETITIONS.map((c) => c.code);
+      expect(codes).toContain("TIP"); // Eliteserien (Norway)
+      expect(codes).toContain("ALL"); // Allsvenskan (Sweden)
+
+      const eliteserien = AVAILABLE_COMPETITIONS.find((c) => c.code === "TIP");
+      expect(eliteserien?.name).toBe("Eliteserien");
+      expect(eliteserien?.country).toBe("Norway");
+
+      const allsvenskan = AVAILABLE_COMPETITIONS.find((c) => c.code === "ALL");
+      expect(allsvenskan?.name).toBe("Allsvenskan");
+      expect(allsvenskan?.country).toBe("Sweden");
+    });
+
     it("includes all default competitions", () => {
       const availableCodes = AVAILABLE_COMPETITIONS.map((c) => c.code);
       for (const defaultCode of DEFAULT_COMPETITION_CODES) {
