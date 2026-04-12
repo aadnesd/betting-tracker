@@ -8372,18 +8372,23 @@ export async function createTransferFromAccount(params: {
 export async function createTransferBetweenWallets(params: {
   fromWalletId: string;
   toWalletId: string;
-  amount: number;
-  currency: string;
+  fromAmount: number;
+  fromCurrency: string;
+  toAmount?: number;
+  toCurrency?: string;
   date: Date;
   notes?: string | null;
 }) {
+  const toAmount = params.toAmount ?? params.fromAmount;
+  const toCurrency = params.toCurrency ?? params.fromCurrency;
+
   try {
     // Create outgoing transaction on source wallet
     const fromTx = await createWalletTransaction({
       walletId: params.fromWalletId,
       type: "transfer_to_wallet",
-      amount: params.amount,
-      currency: params.currency,
+      amount: params.fromAmount,
+      currency: params.fromCurrency,
       date: params.date,
       relatedWalletId: params.toWalletId,
       notes: params.notes,
@@ -8393,8 +8398,8 @@ export async function createTransferBetweenWallets(params: {
     const toTx = await createWalletTransaction({
       walletId: params.toWalletId,
       type: "transfer_from_wallet",
-      amount: params.amount,
-      currency: params.currency,
+      amount: toAmount,
+      currency: toCurrency,
       date: params.date,
       relatedWalletId: params.fromWalletId,
       notes: params.notes,
