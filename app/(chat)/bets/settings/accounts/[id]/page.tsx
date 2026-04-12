@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/app/(auth)/auth";
 import { AccountEditForm } from "@/components/bets/account-edit-form";
+import { MonthDivider, monthKey } from "@/components/bets/month-divider";
 import { TransactionRow } from "@/components/bets/transaction-row";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -149,24 +150,36 @@ export default async function AccountDetailPage({
             </div>
           ) : (
             <div className="space-y-2">
-              {transactions.map((tx) => (
-                <TransactionRow
-                  accountId={id}
-                  key={tx.id}
-                  transaction={{
-                    id: tx.id,
-                    type: tx.type as
-                      | "deposit"
-                      | "withdrawal"
-                      | "bonus"
-                      | "adjustment",
-                    amount: tx.amount,
-                    currency: tx.currency,
-                    occurredAt: tx.occurredAt.toISOString(),
-                    notes: tx.notes,
-                  }}
-                />
-              ))}
+              {transactions.map((tx, idx) => {
+                const iso = tx.occurredAt.toISOString();
+                const month = monthKey(iso);
+                const prevMonth =
+                  idx > 0
+                    ? monthKey(transactions[idx - 1].occurredAt.toISOString())
+                    : null;
+                const showDivider = idx === 0 || month !== prevMonth;
+
+                return (
+                  <div key={tx.id}>
+                    {showDivider && <MonthDivider label={month} />}
+                    <TransactionRow
+                      accountId={id}
+                      transaction={{
+                        id: tx.id,
+                        type: tx.type as
+                          | "deposit"
+                          | "withdrawal"
+                          | "bonus"
+                          | "adjustment",
+                        amount: tx.amount,
+                        currency: tx.currency,
+                        occurredAt: iso,
+                        notes: tx.notes,
+                      }}
+                    />
+                  </div>
+                );
+              })}
             </div>
           )}
         </CardContent>

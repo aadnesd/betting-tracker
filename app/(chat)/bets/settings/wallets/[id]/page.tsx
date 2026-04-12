@@ -9,6 +9,7 @@ import {
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/app/(auth)/auth";
+import { MonthDivider, monthKey } from "@/components/bets/month-divider";
 import { WalletActions } from "@/components/bets/wallet-actions";
 import { WalletTransactionForm } from "@/components/bets/wallet-transaction-form";
 import { WalletTransactionRow } from "@/components/bets/wallet-transaction-row";
@@ -181,25 +182,37 @@ export default async function WalletDetailPage({
             </div>
           )}
 
-          {transactions.map((tx) => (
-            <WalletTransactionRow
-              key={tx.id}
-              transaction={{
-                id: tx.id,
-                type: tx.type as WalletTransactionType,
-                amount: tx.amount,
-                currency: tx.currency,
-                date: tx.date.toISOString(),
-                notes: tx.notes,
-                externalRef: tx.externalRef,
-                relatedAccountId: tx.relatedAccountId,
-                relatedWalletId: tx.relatedWalletId,
-                relatedAccountName: tx.relatedAccountName,
-                relatedWalletName: tx.relatedWalletName,
-              }}
-              walletId={id}
-            />
-          ))}
+          {transactions.map((tx, idx) => {
+            const iso = tx.date.toISOString();
+            const month = monthKey(iso);
+            const prevMonth =
+              idx > 0
+                ? monthKey(transactions[idx - 1].date.toISOString())
+                : null;
+            const showDivider = idx === 0 || month !== prevMonth;
+
+            return (
+              <div key={tx.id}>
+                {showDivider && <MonthDivider label={month} />}
+                <WalletTransactionRow
+                  transaction={{
+                    id: tx.id,
+                    type: tx.type as WalletTransactionType,
+                    amount: tx.amount,
+                    currency: tx.currency,
+                    date: iso,
+                    notes: tx.notes,
+                    externalRef: tx.externalRef,
+                    relatedAccountId: tx.relatedAccountId,
+                    relatedWalletId: tx.relatedWalletId,
+                    relatedAccountName: tx.relatedAccountName,
+                    relatedWalletName: tx.relatedWalletName,
+                  }}
+                  walletId={id}
+                />
+              </div>
+            );
+          })}
         </CardContent>
       </Card>
     </div>
