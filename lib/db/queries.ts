@@ -1399,7 +1399,10 @@ export async function listUnifiedTransactionsByUser({
           externalRef: walletTransaction.externalRef,
           relatedAccountName: relatedAccount.name,
           relatedWalletName: relatedWallet.name,
-          linkedTransfer: isNotNull(walletTransaction.linkedAccountTransactionId),
+          linkedTransfer: or(
+            isNotNull(walletTransaction.linkedAccountTransactionId),
+            isNotNull(walletTransaction.linkedWalletTransactionId)
+          ),
         })
         .from(walletTransaction)
         .innerJoin(wallet, eq(walletTransaction.walletId, wallet.id))
@@ -7821,6 +7824,7 @@ export interface CreateWalletTransactionParams {
   relatedAccountId?: string | null;
   relatedWalletId?: string | null;
   linkedAccountTransactionId?: string | null;
+  linkedWalletTransactionId?: string | null;
   externalRef?: string | null;
   notes?: string | null;
 }
@@ -7843,6 +7847,7 @@ export async function createWalletTransaction(
         relatedAccountId: params.relatedAccountId ?? null,
         relatedWalletId: params.relatedWalletId ?? null,
         linkedAccountTransactionId: params.linkedAccountTransactionId ?? null,
+        linkedWalletTransactionId: params.linkedWalletTransactionId ?? null,
         externalRef: params.externalRef ?? null,
         notes: params.notes ?? null,
         createdAt: new Date(),
@@ -8030,6 +8035,55 @@ export async function deleteWalletTransaction({
       return null;
     }
 
+    let linkedWalletTransactionId =
+      existing.linkedWalletTransactionId ?? null;
+
+    // Legacy wallet-to-wallet transfers do not have an explicit backlink, so
+    // fall back to locating the mirrored row heuristically.
+    if (
+      !linkedWalletTransactionId &&
+      existing.relatedWalletId &&
+      (existing.type === "transfer_to_wallet" ||
+        existing.type === "transfer_from_wallet")
+    ) {
+      const counterpartType =
+        existing.type === "transfer_to_wallet"
+          ? "transfer_from_wallet"
+          : "transfer_to_wallet";
+
+      const counterpartConditions: SQL[] = [
+        eq(wallet.userId, userId),
+        eq(walletTransaction.walletId, existing.relatedWalletId),
+        eq(walletTransaction.type, counterpartType),
+        eq(walletTransaction.relatedWalletId, existing.walletId),
+        eq(walletTransaction.amount, existing.amount),
+        eq(walletTransaction.currency, existing.currency),
+        eq(walletTransaction.date, existing.date),
+      ];
+
+      if (existing.notes === null) {
+        counterpartConditions.push(isNull(walletTransaction.notes));
+      } else {
+        counterpartConditions.push(eq(walletTransaction.notes, existing.notes));
+      }
+
+      const [linkedWalletTransaction] = await db
+        .select({
+          id: walletTransaction.id,
+        })
+        .from(walletTransaction)
+        .innerJoin(wallet, eq(walletTransaction.walletId, wallet.id))
+        .where(and(...counterpartConditions))
+        .orderBy(
+          asc(
+            sql`ABS(EXTRACT(EPOCH FROM ${walletTransaction.createdAt} - ${existing.createdAt}))`
+          )
+        )
+        .limit(1);
+
+      linkedWalletTransactionId = linkedWalletTransaction?.id ?? null;
+    }
+
     // If there's a linked account transaction, delete it first
     if (existing.linkedAccountTransactionId) {
       await db
@@ -8040,6 +8094,12 @@ export async function deleteWalletTransaction({
             eq(accountTransaction.userId, userId)
           )
         );
+    }
+
+    if (linkedWalletTransactionId) {
+      await db
+        .delete(walletTransaction)
+        .where(eq(walletTransaction.id, linkedWalletTransactionId));
     }
 
     await db.delete(walletTransaction).where(eq(walletTransaction.id, id));
@@ -8059,8 +8119,11 @@ export async function deleteWalletTransaction({
         relatedAccountId: existing.relatedAccountId,
         relatedWalletId: existing.relatedWalletId,
         linkedAccountTransactionId: existing.linkedAccountTransactionId,
+        linkedWalletTransactionId,
       },
-      notes: `Deleted wallet transaction: ${existing.type} ${existing.currency} ${existing.amount}`,
+      notes: linkedWalletTransactionId
+        ? `Deleted wallet transaction: ${existing.type} ${existing.currency} ${existing.amount} (and linked wallet transaction)`
+        : `Deleted wallet transaction: ${existing.type} ${existing.currency} ${existing.amount}`,
     });
 
     return { success: true };
@@ -8331,9 +8394,18 @@ export async function createTransferBetweenWallets(params: {
       date: params.date,
       relatedWalletId: params.fromWalletId,
       notes: params.notes,
+      linkedWalletTransactionId: fromTx.id,
     });
 
-    return { fromTx, toTx };
+    await db
+      .update(walletTransaction)
+      .set({ linkedWalletTransactionId: toTx.id })
+      .where(eq(walletTransaction.id, fromTx.id));
+
+    return {
+      fromTx: { ...fromTx, linkedWalletTransactionId: toTx.id },
+      toTx,
+    };
   } catch (_error) {
     throw new ChatSDKError(
       "bad_request:database",

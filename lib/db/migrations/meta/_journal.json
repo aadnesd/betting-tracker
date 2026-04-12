@@ -239,6 +239,13 @@
       "when": 1772613000000,
       "tag": "0033_fx_rates",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1775941638232,
+      "tag": "0034_fluffy_cerise",
+      "breakpoints": true
     }
   ]
 }

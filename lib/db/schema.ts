@@ -618,6 +618,8 @@ export const walletTransaction = pgTable(
     relatedWalletId: uuid("relatedWalletId").references(() => wallet.id),
     // Link to corresponding account transaction (for transfers to/from accounts)
     linkedAccountTransactionId: uuid("linkedAccountTransactionId"),
+    // Link to corresponding wallet transaction (for wallet-to-wallet transfers)
+    linkedWalletTransactionId: uuid("linkedWalletTransactionId"),
     // External reference (e.g., blockchain tx hash)
     externalRef: text("externalRef"),
     // When the transaction occurred
@@ -629,6 +631,14 @@ export const walletTransaction = pgTable(
       table.walletId,
       table.date
     ),
+    walletTxLinkedWalletIdx: index("wallet_tx_linked_wallet_idx").on(
+      table.linkedWalletTransactionId
+    ),
+    walletTxLinkedWalletFk: foreignKey({
+      columns: [table.linkedWalletTransactionId],
+      foreignColumns: [table.id],
+      name: "wallet_tx_linked_wallet_fk",
+    }),
   })
 );
 
