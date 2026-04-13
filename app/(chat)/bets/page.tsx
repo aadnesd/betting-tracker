@@ -15,14 +15,14 @@ import { dashboardTag } from "@/lib/cache";
 import {
   countExpiringFreeBets,
   countPendingSettlementBets,
+  getBalanceSnapshots,
   getDashboardSummary,
   getExposureByEvent,
-  getBalanceSnapshots,
   getPendingSettlementBets,
-  listWalletBankTransactionsByUser,
   listAccountsWithBalances,
-  listActiveWalletsByUser,
   listMatchedBetsByUser,
+  listWalletBankTransactionsByUser,
+  listWalletsByUser,
 } from "@/lib/db/queries";
 import { convertAmountToNok } from "@/lib/fx-rates";
 import {
@@ -140,12 +140,15 @@ export default async function Page() {
     cacheDashboard(userId, "expiring-free-bets", () =>
       countExpiringFreeBets({ userId, daysUntilExpiry: 7 })
     ),
-    cacheDashboard(userId, `balance-snapshots:${startDateIso}:${endDateIso}`, () =>
-      getBalanceSnapshots({
-        userId,
-        startDate,
-        endDate,
-      })
+    cacheDashboard(
+      userId,
+      `balance-snapshots:${startDateIso}:${endDateIso}`,
+      () =>
+        getBalanceSnapshots({
+          userId,
+          startDate,
+          endDate,
+        })
     ),
     cacheDashboard(userId, "exposure-by-event", () =>
       getExposureByEvent({ userId })
@@ -159,9 +162,7 @@ export default async function Page() {
     cacheDashboard(userId, "accounts-with-balances", () =>
       listAccountsWithBalances({ userId })
     ),
-    cacheDashboard(userId, "active-wallets", () =>
-      listActiveWalletsByUser(userId)
-    ),
+    cacheDashboard(userId, "active-wallets", () => listWalletsByUser(userId)),
     cacheDashboard(
       userId,
       `wallet-bank-transactions:${startDateIso}:${endDateIso}`,
@@ -185,10 +186,12 @@ export default async function Page() {
 
     // Resolve each currency conversion rate once per request.
     const rateEntries: Array<[string, number]> = await Promise.all(
-      distinctCurrencies.map(async (currency): Promise<[string, number]> => [
-        currency,
-        currency === "NOK" ? 1 : await convertAmountToNok(1, currency),
-      ])
+      distinctCurrencies.map(
+        async (currency): Promise<[string, number]> => [
+          currency,
+          currency === "NOK" ? 1 : await convertAmountToNok(1, currency),
+        ]
+      )
     );
     const rateByCurrency = new Map(rateEntries);
 
@@ -237,12 +240,15 @@ export default async function Page() {
     }));
 
   // Transform wallets for QuickTransactionSheet
-  const wallets = activeWallets.map((w) => ({
-    id: w.id,
-    name: w.name,
-    type: w.type as "fiat" | "crypto" | "hybrid",
-    currency: w.currency,
-  }));
+  const wallets = activeWallets
+    .filter((w) => w.status === "active")
+    .map((w) => ({
+      id: w.id,
+      name: w.name,
+      type: w.type as "fiat" | "crypto" | "hybrid",
+      currency: w.currency,
+      currentBalance: String(w.balance),
+    }));
 
   return (
     <div className="space-y-6 p-4 md:p-8">
