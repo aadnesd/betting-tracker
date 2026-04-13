@@ -16,6 +16,7 @@ This is a matched-betting tracker. Read `specs/*` for product requirements befor
 - `lib/` – Domain logic (`lib/ai`, `lib/db`, `lib/editor`, utilities). Drizzle schema, queries, and migrations live in `lib/db/`.
 - `hooks/` – Reusable React hooks (`use*` naming).
 - `public/` – Static assets; `public/fonts` and images referenced by routes.
+- `docs/solutions/` – Searchable learnings and documented solutions to past problems (bugs, best practices, workflow patterns), organized by category with frontmatter like `module`, `tags`, and `problem_type`; relevant when implementing or debugging in documented areas.
 - `tests/` – Playwright suites (`tests/e2e`, `tests/routes`).
 - `artifacts/` – Generated assets (e.g., compiled prompts or exports); avoid hand edits.
 
