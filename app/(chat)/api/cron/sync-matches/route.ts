@@ -202,77 +202,95 @@ export async function GET(request: Request) {
     finished: { synced: 0, errors: 0 },
     betsReadyForSettlement: 0,
     competitions: competitionsToSync,
+    competitionBreakdown: {} as Record<
+      string,
+      { upcoming: number; finished: number }
+    >,
+    skippedCompetitions: [] as string[],
     startedAt: new Date().toISOString(),
     completedAt: "",
     errors: [] as string[],
   };
 
   try {
-    // Sync upcoming matches (next 10 days - API limit)
     const now = new Date();
     const tenDaysAhead = new Date();
     tenDaysAhead.setDate(tenDaysAhead.getDate() + 10);
-
-    console.log(
-      `[Match Sync] Fetching upcoming matches from ${formatDate(now)} to ${formatDate(tenDaysAhead)} for competitions: ${competitionsToSync.join(", ")}`
-    );
-
-    const upcomingMatches = await fetchMatchesFromApi({
-      dateFrom: now,
-      dateTo: tenDaysAhead,
-      competitions: competitionsToSync,
-      status: ["SCHEDULED", "TIMED"],
-    });
-
-    console.log(
-      `[Match Sync] Found ${upcomingMatches.length} upcoming matches`
-    );
-
-    // Parse all matches and batch upsert
-    const upcomingParams = upcomingMatches.map(parseFootballDataMatch);
-    console.log(
-      `[Match Sync] Batch upserting ${upcomingParams.length} upcoming matches...`
-    );
-    const upcomingResult = await batchUpsertFootballMatches(upcomingParams);
-    syncResults.upcoming.synced = upcomingResult.synced;
-    syncResults.upcoming.errors = upcomingResult.errors;
-    console.log(
-      `[Match Sync] Upcoming matches: ${upcomingResult.synced} synced, ${upcomingResult.errors} errors`
-    );
-
-    // Sync recently finished matches (last 3 days)
     const threeDaysAgo = new Date();
     threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
 
+    // Fetch each competition individually so that tier-restricted or
+    // invalid codes don't silently suppress other competitions' matches.
+    const allUpcomingMatches: FootballDataMatch[] = [];
+    const allFinishedMatches: FootballDataMatch[] = [];
+
+    for (const code of competitionsToSync) {
+      try {
+        console.log(`[Match Sync] Fetching matches for ${code}...`);
+
+        const upcoming = await fetchMatchesFromApi({
+          dateFrom: now,
+          dateTo: tenDaysAhead,
+          competitions: [code],
+          status: ["SCHEDULED", "TIMED"],
+        });
+
+        const finished = await fetchMatchesFromApi({
+          dateFrom: threeDaysAgo,
+          dateTo: now,
+          competitions: [code],
+          status: ["FINISHED"],
+        });
+
+        allUpcomingMatches.push(...upcoming);
+        allFinishedMatches.push(...finished);
+
+        syncResults.competitionBreakdown[code] = {
+          upcoming: upcoming.length,
+          finished: finished.length,
+        };
+
+        console.log(
+          `[Match Sync] ${code}: ${upcoming.length} upcoming, ${finished.length} finished`
+        );
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "Unknown error";
+        console.warn(
+          `[Match Sync] Failed to fetch ${code} (may require higher API tier): ${message}`
+        );
+        syncResults.skippedCompetitions.push(code);
+        syncResults.errors.push(`${code}: ${message}`);
+      }
+    }
+
     console.log(
-      `[Match Sync] Fetching finished matches from ${formatDate(threeDaysAgo)} to ${formatDate(now)}`
+      `[Match Sync] Total: ${allUpcomingMatches.length} upcoming, ${allFinishedMatches.length} finished across ${Object.keys(syncResults.competitionBreakdown).length}/${competitionsToSync.length} competitions`
     );
 
-    const finishedMatches = await fetchMatchesFromApi({
-      dateFrom: threeDaysAgo,
-      dateTo: now,
-      competitions: competitionsToSync,
-      status: ["FINISHED"],
-    });
+    // Parse and batch upsert upcoming matches
+    if (allUpcomingMatches.length > 0) {
+      const upcomingParams = allUpcomingMatches.map(parseFootballDataMatch);
+      const upcomingResult = await batchUpsertFootballMatches(upcomingParams);
+      syncResults.upcoming.synced = upcomingResult.synced;
+      syncResults.upcoming.errors = upcomingResult.errors;
+      console.log(
+        `[Match Sync] Upcoming: ${upcomingResult.synced} synced, ${upcomingResult.errors} errors`
+      );
+    }
 
-    console.log(
-      `[Match Sync] Found ${finishedMatches.length} finished matches`
-    );
-
-    // Parse all matches and batch upsert
-    const finishedParams = finishedMatches.map(parseFootballDataMatch);
-    console.log(
-      `[Match Sync] Batch upserting ${finishedParams.length} finished matches...`
-    );
-    const finishedResult = await batchUpsertFootballMatches(finishedParams);
-    syncResults.finished.synced = finishedResult.synced;
-    syncResults.finished.errors = finishedResult.errors;
-    console.log(
-      `[Match Sync] Finished matches: ${finishedResult.synced} synced, ${finishedResult.errors} errors`
-    );
+    // Parse and batch upsert finished matches
+    if (allFinishedMatches.length > 0) {
+      const finishedParams = allFinishedMatches.map(parseFootballDataMatch);
+      const finishedResult = await batchUpsertFootballMatches(finishedParams);
+      syncResults.finished.synced = finishedResult.synced;
+      syncResults.finished.errors = finishedResult.errors;
+      console.log(
+        `[Match Sync] Finished: ${finishedResult.synced} synced, ${finishedResult.errors} errors`
+      );
+    }
 
     // After syncing finished matches, check for bets ready for auto-settlement
-    // These are matched bets linked to FINISHED matches with scores available
     try {
       syncResults.betsReadyForSettlement =
         await countBetsReadyForAutoSettlement();
@@ -289,6 +307,12 @@ export async function GET(request: Request) {
     }
 
     syncResults.completedAt = new Date().toISOString();
+
+    if (syncResults.skippedCompetitions.length > 0) {
+      console.warn(
+        `[Match Sync] Skipped competitions (API tier or invalid code): ${syncResults.skippedCompetitions.join(", ")}`
+      );
+    }
 
     console.log(
       `[Match Sync] Complete. Upcoming: ${syncResults.upcoming.synced} synced, ${syncResults.upcoming.errors} errors. Finished: ${syncResults.finished.synced} synced, ${syncResults.finished.errors} errors.`
