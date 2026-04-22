@@ -545,6 +545,7 @@ export const AVAILABLE_COMPETITIONS = [
 
 export const DEFAULT_COMPETITION_CODES = [
   "PL",
+  "ELC",
   "CL",
   "EL",
   "FL1",

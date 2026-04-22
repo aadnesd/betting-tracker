@@ -156,6 +156,7 @@ describe("competition settings queries", () => {
   describe("DEFAULT_COMPETITION_CODES", () => {
     it("contains expected default competitions", () => {
       expect(DEFAULT_COMPETITION_CODES).toContain("PL"); // Premier League
+      expect(DEFAULT_COMPETITION_CODES).toContain("ELC"); // Championship
       expect(DEFAULT_COMPETITION_CODES).toContain("CL"); // Champions League
       expect(DEFAULT_COMPETITION_CODES).toContain("EL"); // Europa League
       expect(DEFAULT_COMPETITION_CODES).toContain("BL1"); // Bundesliga
@@ -207,6 +208,16 @@ describe("competition settings queries", () => {
       const allsvenskan = AVAILABLE_COMPETITIONS.find((c) => c.code === "ALL");
       expect(allsvenskan?.name).toBe("Allsvenskan");
       expect(allsvenskan?.country).toBe("Sweden");
+    });
+
+    it("includes England Championship with football-data.org code ELC", () => {
+      const championship = AVAILABLE_COMPETITIONS.find((c) => c.code === "ELC");
+
+      expect(championship).toEqual({
+        code: "ELC",
+        name: "Championship",
+        country: "England",
+      });
     });
 
     it("includes all default competitions", () => {
