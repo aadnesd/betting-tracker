@@ -599,6 +599,7 @@ describe("Football-data.org API Integration", () => {
 
         // Verify DEFAULT_COMPETITION_CODES is what we expect
         expect(DEFAULT_COMPETITION_CODES).toContain("PL");
+        expect(DEFAULT_COMPETITION_CODES).toContain("ELC");
         expect(DEFAULT_COMPETITION_CODES).toContain("CL");
       }
     );
