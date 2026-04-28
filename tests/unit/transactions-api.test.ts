@@ -199,6 +199,58 @@ describe("transactions API routes (unit)", () => {
       expect(json.transaction.type).toBe("bonus");
     });
 
+    it("creates a negative adjustment transaction", async () => {
+      const mockAccount = {
+        id: testAccountId,
+        name: "bet365",
+        kind: "bookmaker",
+        userId: user.id,
+      };
+
+      const mockTransaction = {
+        id: "tx-4",
+        accountId: testAccountId,
+        type: "adjustment",
+        amount: "-25.00",
+        currency: "NOK",
+        occurredAt: new Date(),
+        notes: "Manual balance reduction",
+        createdAt: new Date(),
+      };
+
+      (dbQueries.getAccountById as vi.Mock).mockResolvedValueOnce(mockAccount);
+      (dbQueries.createAccountTransaction as vi.Mock).mockResolvedValueOnce(
+        mockTransaction
+      );
+
+      const res = await createTransactionRoute(
+        new Request(
+          `http://localhost/api/bets/accounts/${testAccountId}/transactions`,
+          {
+            method: "POST",
+            body: JSON.stringify({
+              type: "adjustment",
+              amount: -25,
+              currency: "NOK",
+              occurredAt: new Date().toISOString(),
+              notes: "Manual balance reduction",
+            }),
+          }
+        ),
+        { params: Promise.resolve({ id: testAccountId }) }
+      );
+
+      expect(res.status).toBe(200);
+      const json = await res.json();
+      expect(json.transaction.type).toBe("adjustment");
+      expect(dbQueries.createAccountTransaction).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: "adjustment",
+          amount: -25,
+        })
+      );
+    });
+
     it("rejects negative amount", async () => {
       const mockAccount = {
         id: testAccountId,
@@ -248,6 +300,37 @@ describe("transactions API routes (unit)", () => {
             body: JSON.stringify({
               type: "invalid_type",
               amount: 100,
+              currency: "NOK",
+              occurredAt: new Date().toISOString(),
+            }),
+          }
+        ),
+        { params: Promise.resolve({ id: testAccountId }) }
+      );
+
+      expect(res.status).toBe(400);
+      const json = await res.json();
+      expect(json.error).toBe("Invalid payload");
+    });
+
+    it("rejects zero adjustment amount", async () => {
+      const mockAccount = {
+        id: testAccountId,
+        name: "bet365",
+        kind: "bookmaker",
+        userId: user.id,
+      };
+
+      (dbQueries.getAccountById as vi.Mock).mockResolvedValueOnce(mockAccount);
+
+      const res = await createTransactionRoute(
+        new Request(
+          `http://localhost/api/bets/accounts/${testAccountId}/transactions`,
+          {
+            method: "POST",
+            body: JSON.stringify({
+              type: "adjustment",
+              amount: 0,
               currency: "NOK",
               occurredAt: new Date().toISOString(),
             }),
