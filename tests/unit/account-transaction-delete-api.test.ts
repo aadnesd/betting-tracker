@@ -139,4 +139,65 @@ describe("DELETE /api/bets/accounts/[id]/transactions/[txId] (unit)", () => {
       }
     );
   });
+
+  it("updates transaction with negative adjustment amount", async () => {
+    (dbQueries.getAccountById as vi.Mock).mockResolvedValueOnce({
+      id: testAccountId,
+      userId: user.id,
+    });
+    (dbQueries.updateAccountTransaction as vi.Mock).mockResolvedValueOnce({
+      id: testTxId,
+      accountId: testAccountId,
+      type: "adjustment",
+      amount: "-15.00",
+      currency: "NOK",
+      occurredAt: new Date("2025-02-01"),
+      notes: "Manual reduction",
+    });
+
+    const res = await patchTransactionRoute(
+      new Request(
+        `http://localhost/api/bets/accounts/${testAccountId}/transactions/${testTxId}`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({
+            type: "adjustment",
+            amount: -15,
+            currency: "NOK",
+            occurredAt: "2025-02-01T00:00:00.000Z",
+            notes: "Manual reduction",
+          }),
+        }
+      ),
+      { params: Promise.resolve({ id: testAccountId, txId: testTxId }) }
+    );
+
+    expect(res.status).toBe(200);
+    expect(dbQueries.updateAccountTransaction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "adjustment",
+        amount: -15,
+      })
+    );
+  });
+
+  it("rejects PATCH for zero adjustment amount", async () => {
+    const res = await patchTransactionRoute(
+      new Request(
+        `http://localhost/api/bets/accounts/${testAccountId}/transactions/${testTxId}`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({
+            type: "adjustment",
+            amount: 0,
+            currency: "NOK",
+            occurredAt: "2025-02-01T00:00:00.000Z",
+          }),
+        }
+      ),
+      { params: Promise.resolve({ id: testAccountId, txId: testTxId }) }
+    );
+
+    expect(res.status).toBe(400);
+  });
 });

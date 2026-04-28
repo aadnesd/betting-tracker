@@ -56,7 +56,7 @@ const TRANSACTION_TYPES: {
   {
     value: "adjustment",
     label: "Adjustment",
-    description: "Manual balance correction",
+    description: "Manual balance correction (+ increase, - reduction)",
   },
 ];
 
@@ -103,8 +103,11 @@ export function TransactionForm({
     const amount = Number.parseFloat(formData.amount);
     if (!formData.amount || Number.isNaN(amount)) {
       newErrors.amount = "Amount is required";
-    } else if (amount <= 0) {
-      newErrors.amount = "Amount must be positive";
+    } else if (formData.type === "adjustment" ? amount === 0 : amount <= 0) {
+      newErrors.amount =
+        formData.type === "adjustment"
+          ? "Adjustment amount must be non-zero"
+          : "Amount must be positive";
     }
 
     if (!formData.currency) {
@@ -314,7 +317,7 @@ export function TransactionForm({
           <Input
             className={errors.amount ? "border-destructive" : ""}
             id="amount"
-            min="0.01"
+            min={formData.type === "adjustment" ? undefined : "0.01"}
             onChange={(e) => updateField("amount", e.target.value)}
             placeholder="0.00"
             step="0.01"

@@ -13,13 +13,34 @@ interface RouteParams {
   params: Promise<{ id: string; txId: string }>;
 }
 
-const updateTransactionSchema = z.object({
-  type: z.enum(["deposit", "withdrawal", "bonus", "adjustment"]),
-  amount: z.number().positive("Amount must be positive"),
-  currency: z.string().length(3, "Currency must be 3 characters"),
-  occurredAt: z.string().transform((val) => new Date(val)),
-  notes: z.string().nullable().optional(),
-});
+const updateTransactionSchema = z
+  .object({
+    type: z.enum(["deposit", "withdrawal", "bonus", "adjustment"]),
+    amount: z.number().finite(),
+    currency: z.string().length(3, "Currency must be 3 characters"),
+    occurredAt: z.string().transform((val) => new Date(val)),
+    notes: z.string().nullable().optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.type === "adjustment") {
+      if (data.amount === 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["amount"],
+          message: "Adjustment amount must be non-zero",
+        });
+      }
+      return;
+    }
+
+    if (data.amount <= 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["amount"],
+        message: "Amount must be positive",
+      });
+    }
+  });
 
 export async function PATCH(request: Request, { params }: RouteParams) {
   const session = await auth();
