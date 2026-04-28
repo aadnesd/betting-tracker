@@ -13,17 +13,38 @@ import {
   listTransactionsByAccount,
 } from "@/lib/db/queries";
 
-const createTransactionSchema = z.object({
-  type: z.enum(["deposit", "withdrawal", "bonus", "adjustment"]),
-  amount: z.number().positive("Amount must be positive"),
-  currency: z.string().length(3, "Currency must be 3 characters"),
-  occurredAt: z.string().transform((val) => new Date(val)),
-  notes: z.string().nullable().optional(),
-  walletId: z.string().uuid().nullable().optional(),
-  // Amount in wallet currency (for cross-currency transfers)
-  walletAmount: z.number().positive().nullable().optional(),
-  walletCurrency: z.string().min(2).max(10).nullable().optional(),
-});
+const createTransactionSchema = z
+  .object({
+    type: z.enum(["deposit", "withdrawal", "bonus", "adjustment"]),
+    amount: z.number().finite(),
+    currency: z.string().length(3, "Currency must be 3 characters"),
+    occurredAt: z.string().transform((val) => new Date(val)),
+    notes: z.string().nullable().optional(),
+    walletId: z.string().uuid().nullable().optional(),
+    // Amount in wallet currency (for cross-currency transfers)
+    walletAmount: z.number().positive().nullable().optional(),
+    walletCurrency: z.string().min(2).max(10).nullable().optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.type === "adjustment") {
+      if (data.amount === 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["amount"],
+          message: "Adjustment amount must be non-zero",
+        });
+      }
+      return;
+    }
+
+    if (data.amount <= 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["amount"],
+        message: "Amount must be positive",
+      });
+    }
+  });
 
 export async function POST(
   request: Request,

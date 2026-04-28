@@ -90,7 +90,15 @@ function getTypeBadgeClassName(type: string) {
 
 function isPositiveAmount(transaction: UnifiedTransactionListItem) {
   if (transaction.source === "account") {
-    return transaction.type !== "withdrawal";
+    if (transaction.type === "withdrawal") {
+      return false;
+    }
+
+    if (transaction.type === "adjustment") {
+      return transaction.amount >= 0;
+    }
+
+    return true;
   }
 
   return (
