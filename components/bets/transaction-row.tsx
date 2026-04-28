@@ -76,8 +76,14 @@ export function TransactionRow({
   );
   const [notes, setNotes] = useState(transaction.notes ?? "");
 
-  const displayAmount = Number.parseFloat(transaction.amount);
-  const isPositive = transaction.type !== "withdrawal";
+  const transactionAmount = Number.parseFloat(transaction.amount);
+  const displayAmount = Math.abs(transactionAmount);
+  const isPositive =
+    transaction.type === "withdrawal"
+      ? false
+      : transaction.type === "adjustment"
+        ? transactionAmount >= 0
+        : true;
   const occurredAt = new Date(transaction.occurredAt);
 
   const icon = {
@@ -115,8 +121,15 @@ export function TransactionRow({
 
   const handleEdit = async () => {
     const parsedAmount = Number.parseFloat(amount);
-    if (Number.isNaN(parsedAmount) || parsedAmount <= 0) {
-      toast.error("Amount must be a positive number");
+    if (
+      Number.isNaN(parsedAmount) ||
+      (type === "adjustment" ? parsedAmount === 0 : parsedAmount <= 0)
+    ) {
+      toast.error(
+        type === "adjustment"
+          ? "Adjustment amount must be non-zero"
+          : "Amount must be a positive number"
+      );
       return;
     }
 
@@ -244,7 +257,7 @@ export function TransactionRow({
                 <Label htmlFor={`tx-amount-${transaction.id}`}>Amount</Label>
                 <Input
                   id={`tx-amount-${transaction.id}`}
-                  min="0.01"
+                  min={type === "adjustment" ? undefined : "0.01"}
                   onChange={(e) => setAmount(e.target.value)}
                   step="0.01"
                   type="number"
