@@ -18,6 +18,28 @@ export const metadata = {
   title: "Account Details",
 };
 
+type AccountTransactionType = "deposit" | "withdrawal" | "bonus" | "adjustment";
+
+function getTransactionBalanceImpact({
+  amount,
+  type,
+}: {
+  amount: string;
+  type: string;
+}) {
+  const value = Number.parseFloat(amount);
+
+  if (type === "withdrawal") {
+    return -value;
+  }
+
+  if (type === "adjustment") {
+    return value;
+  }
+
+  return value;
+}
+
 export default async function AccountDetailPage({
   params,
 }: {
@@ -48,6 +70,16 @@ export default async function AccountDetailPage({
     userId: session.user.id,
     accountId: id,
     limit: 50,
+  });
+  let balanceCursor = balance;
+  const transactionsWithRunningBalance = transactions.map((tx) => {
+    const runningBalance = balanceCursor;
+    balanceCursor -= getTransactionBalanceImpact({
+      amount: tx.amount,
+      type: tx.type,
+    });
+
+    return { ...tx, runningBalance };
   });
 
   const commission = account.commission
@@ -150,12 +182,22 @@ export default async function AccountDetailPage({
             </div>
           ) : (
             <div className="space-y-2">
-              {transactions.map((tx, idx) => {
+              <div className="hidden grid-cols-[minmax(0,1fr)_8rem_8rem_auto] gap-3 px-3 text-muted-foreground text-xs sm:grid">
+                <span>Transaction</span>
+                <span className="text-right">Amount</span>
+                <span className="text-right">Balance</span>
+                <span className="w-16" />
+              </div>
+              {transactionsWithRunningBalance.map((tx, idx) => {
                 const iso = tx.occurredAt.toISOString();
                 const month = monthKey(iso);
                 const prevMonth =
                   idx > 0
-                    ? monthKey(transactions[idx - 1].occurredAt.toISOString())
+                    ? monthKey(
+                        transactionsWithRunningBalance[
+                          idx - 1
+                        ].occurredAt.toISOString()
+                      )
                     : null;
                 const showDivider = idx === 0 || month !== prevMonth;
 
@@ -166,15 +208,13 @@ export default async function AccountDetailPage({
                       accountId={id}
                       transaction={{
                         id: tx.id,
-                        type: tx.type as
-                          | "deposit"
-                          | "withdrawal"
-                          | "bonus"
-                          | "adjustment",
+                        type: tx.type as AccountTransactionType,
                         amount: tx.amount,
                         currency: tx.currency,
                         occurredAt: iso,
                         notes: tx.notes,
+                        runningBalance: tx.runningBalance,
+                        runningBalanceCurrency: account.currency ?? tx.currency,
                       }}
                     />
                   </div>

@@ -41,7 +41,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 
-interface TransactionRowProps {
+type TransactionRowProps = {
   transaction: {
     id: string;
     type: "deposit" | "withdrawal" | "bonus" | "adjustment";
@@ -49,9 +49,11 @@ interface TransactionRowProps {
     currency: string;
     occurredAt: string;
     notes: string | null;
+    runningBalance?: number;
+    runningBalanceCurrency?: string;
   };
   accountId: string;
-}
+};
 
 /**
  * TransactionRow - A single transaction row with delete capability.
@@ -179,12 +181,12 @@ export function TransactionRow({
   };
 
   return (
-    <div className="group flex items-center justify-between rounded-md border p-3 transition-colors hover:bg-muted/30">
+    <div className="group grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-md border p-3 transition-colors hover:bg-muted/30 sm:grid-cols-[minmax(0,1fr)_8rem_8rem_auto]">
       <div className="flex items-center gap-3">
         {icon}
-        <div>
+        <div className="min-w-0">
           <p className="font-medium capitalize">{transaction.type}</p>
-          <p className="text-muted-foreground text-xs">
+          <p className="truncate text-muted-foreground text-xs">
             {occurredAt.toLocaleDateString("en-GB", {
               day: "numeric",
               month: "short",
@@ -194,16 +196,26 @@ export function TransactionRow({
           </p>
         </div>
       </div>
-      <div className="flex items-center gap-3">
-        <p
-          className={`font-semibold ${
-            isPositive ? "text-green-600" : "text-red-600"
-          }`}
-        >
-          {isPositive ? "+" : "-"}
-          {transaction.currency} {displayAmount.toFixed(2)}
-        </p>
-
+      <p
+        className={`text-right font-semibold ${
+          isPositive ? "text-green-600" : "text-red-600"
+        }`}
+      >
+        {isPositive ? "+" : "-"}
+        {transaction.currency} {displayAmount.toFixed(2)}
+      </p>
+      <div className="col-span-2 text-right sm:col-span-1">
+        {typeof transaction.runningBalance === "number" && (
+          <>
+            <p className="font-semibold text-sm">
+              {transaction.runningBalanceCurrency ?? transaction.currency}{" "}
+              {transaction.runningBalance.toFixed(2)}
+            </p>
+            <p className="text-muted-foreground text-xs">Balance</p>
+          </>
+        )}
+      </div>
+      <div className="col-start-2 flex items-center justify-end gap-1 sm:col-start-auto">
         <Dialog
           onOpenChange={(nextOpen) => {
             if (nextOpen) {
