@@ -73,6 +73,24 @@ function resolveNokValue({
   return 0;
 }
 
+function resolveSettledProfitNok(bet: MatchedBetWithLegs): number {
+  if (bet.matched.settledProfitNok !== null) {
+    return Number.parseFloat(bet.matched.settledProfitNok);
+  }
+
+  const backPLNok = resolveNokValue({
+    nokValue: bet.back?.profitLossNok,
+    rawValue: bet.back?.profitLoss,
+    currency: bet.back?.currency,
+  });
+  const layPLNok = resolveNokValue({
+    nokValue: bet.lay?.profitLossNok,
+    rawValue: bet.lay?.profitLoss,
+    currency: bet.lay?.currency,
+  });
+  return backPLNok + layPLNok;
+}
+
 /**
  * Calculate the qualifying loss for a matched bet.
  * Qualifying bets are typically promos like "free_bet" or "sign_up" that
@@ -125,18 +143,7 @@ export async function calculateReportingSummary(
 
     settledCount++;
 
-    // Sum profit/loss from both legs using stored NOK values
-    const backPLNok = resolveNokValue({
-      nokValue: bet.back?.profitLossNok,
-      rawValue: bet.back?.profitLoss,
-      currency: bet.back?.currency,
-    });
-    const layPLNok = resolveNokValue({
-      nokValue: bet.lay?.profitLossNok,
-      rawValue: bet.lay?.profitLoss,
-      currency: bet.lay?.currency,
-    });
-    totalProfit += backPLNok + layPLNok;
+    totalProfit += resolveSettledProfitNok(bet);
 
     // Sum stakes from both legs using stored NOK values
     const backStakeNok = resolveNokValue({
@@ -486,18 +493,7 @@ export async function calculateCumulativeProfitData(
       }
     }
 
-    // Calculate profit for this bet using stored NOK values
-    const backPLNok = resolveNokValue({
-      nokValue: bet.back?.profitLossNok,
-      rawValue: bet.back?.profitLoss,
-      currency: bet.back?.currency,
-    });
-    const layPLNok = resolveNokValue({
-      nokValue: bet.lay?.profitLossNok,
-      rawValue: bet.lay?.profitLoss,
-      currency: bet.lay?.currency,
-    });
-    const betProfit = backPLNok + layPLNok;
+    const betProfit = resolveSettledProfitNok(bet);
 
     const existing = groups.get(key) ?? { profit: 0, count: 0 };
     existing.profit += betProfit;

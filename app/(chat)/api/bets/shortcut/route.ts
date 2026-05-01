@@ -2,7 +2,10 @@ import { Buffer } from "node:buffer";
 import { put } from "@vercel/blob";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { computeNetExposureInputs } from "@/lib/bet-calculations";
+import {
+  computeMatchedNetExposure,
+  computeNetExposureInputs,
+} from "@/lib/bet-calculations";
 import { revalidateDashboard } from "@/lib/cache";
 import {
   isOcrConfigured,
@@ -27,6 +30,7 @@ import {
 } from "@/lib/db/queries";
 import { convertAmountToNok } from "@/lib/fx-rates";
 import { linkBetToMatch } from "@/lib/match-linking";
+import { isFreeBetPromoType } from "@/lib/settlement";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB per spec
 const ALLOWED_TYPES = ["image/jpeg", "image/png"];
@@ -380,6 +384,7 @@ export async function POST(request: Request) {
     // Validate matched accounts exist - use account's currency when matched
     let backAccountId: string | null = null;
     let layAccountId: string | null = null;
+    let layAccountCommission = 0;
 
     if (parsed.back.accountId) {
       const backAccount = await getAccountById({
@@ -411,6 +416,9 @@ export async function POST(request: Request) {
       });
       if (layAccount) {
         layAccountId = layAccount.id;
+        layAccountCommission = layAccount.commission
+          ? Number.parseFloat(layAccount.commission)
+          : 0;
         // Use account's currency - trust the account config over OCR
         if (layAccount.currency) {
           if (layAccount.currency.toUpperCase() !== layCurrency) {
@@ -435,6 +443,9 @@ export async function POST(request: Request) {
         `[shortcut] Single-exchange fallback: auto-assigning ${singleExchange.name} (${singleExchange.id})`
       );
       layAccountId = singleExchange.id;
+      layAccountCommission = singleExchange.commission
+        ? Number.parseFloat(singleExchange.commission)
+        : 0;
       layExchange = singleExchange.name;
       if (singleExchange.currency) {
         layCurrency = singleExchange.currency.toUpperCase();
@@ -501,18 +512,29 @@ export async function POST(request: Request) {
       layLiabilityProvided: parsed.lay.liability,
     });
 
-    const [backProfitNok, layLiabilityNok] = await Promise.all([
-      convertAmountToNok(backProfit, backCurrency),
-      convertAmountToNok(layLiability, layCurrency),
-    ]);
+    const [backStakeNok, backProfitNok, layStakeNok, layLiabilityNok] =
+      await Promise.all([
+        convertAmountToNok(parsed.back.stake, backCurrency),
+        convertAmountToNok(backProfit, backCurrency),
+        convertAmountToNok(parsed.lay.stake, layCurrency),
+        convertAmountToNok(layLiability, layCurrency),
+      ]);
 
-    const netExposure = backProfitNok - layLiabilityNok;
-
-    // 12. Create matched bet record
     const promoTypeValue =
       typeof promoType === "string" && promoType.trim()
         ? promoType.trim()
         : "None";
+
+    const { netExposure } = computeMatchedNetExposure({
+      backStake: backStakeNok,
+      backProfit: backProfitNok,
+      layStake: layStakeNok,
+      layLiability: layLiabilityNok,
+      isFreeBet: isFreeBetPromoType(promoTypeValue),
+      commissionRate: layAccountCommission,
+    });
+
+    // 12. Create matched bet record
     const notesValue =
       typeof notes === "string" && notes.trim() ? notes.trim() : null;
 

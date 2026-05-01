@@ -26,6 +26,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { type AccountOption, applyAccountSelection } from "@/lib/bet-accounts";
+import { computeMatchedNetExposure } from "@/lib/bet-calculations";
 import type { ParsedPair } from "@/lib/bet-parser";
 import { cn } from "@/lib/utils";
 
@@ -100,7 +101,13 @@ export function BetReviewForm({
   const netExposure = useMemo(() => {
     const backProfit = parsed.back.stake * (parsed.back.odds - 1);
     const layLiability = parsed.lay.stake * (parsed.lay.odds - 1);
-    return Number((backProfit - layLiability).toFixed(2));
+    const exposure = computeMatchedNetExposure({
+      backStake: parsed.back.stake,
+      backProfit,
+      layStake: parsed.lay.stake,
+      layLiability,
+    });
+    return Number(exposure.netExposure.toFixed(2));
   }, [parsed]);
 
   const handleSave = async () => {
