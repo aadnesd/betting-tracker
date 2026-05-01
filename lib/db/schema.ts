@@ -273,6 +273,10 @@ export const matchedBet = pgTable(
       .notNull()
       .default("draft"),
     netExposure: numeric("netExposure", { precision: 14, scale: 2 }),
+    settledProfitNok: numeric("settledProfitNok", {
+      precision: 14,
+      scale: 2,
+    }),
     notes: text("notes"),
     confirmedAt: timestamp("confirmedAt"),
     lastError: text("lastError"),

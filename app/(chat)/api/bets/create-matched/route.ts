@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getTestAwareSession } from "@/lib/auth";
-import { computeNetExposureInputs } from "@/lib/bet-calculations";
+import {
+  computeMatchedNetExposure,
+  computeNetExposureInputs,
+} from "@/lib/bet-calculations";
 import { evaluateNeedsReview, formatNeedsReviewNote } from "@/lib/bet-review";
 import { revalidateDashboard } from "@/lib/cache";
 import {
@@ -17,6 +20,7 @@ import {
 } from "@/lib/db/queries";
 import type { NormalizedSelection } from "@/lib/db/schema";
 import { convertAmountToNok } from "@/lib/fx-rates";
+import { isFreeBetPromoType } from "@/lib/settlement";
 
 const betPartSchema = z.object({
   market: z.string().min(1),
@@ -347,15 +351,33 @@ export async function POST(request: Request) {
         `[NET EXPOSURE] backProfit=${backProfit}, layLiability=${layLiability}`
       );
 
-      const [backProfitNok, layLiabilityNok] = await Promise.all([
-        convertAmountToNok(backProfit, backCurrency ?? "NOK"),
-        convertAmountToNok(layLiability, layCurrency ?? "NOK"),
-      ]);
+      const [backStakeNok, backProfitNok, layStakeNok, layLiabilityNok] =
+        await Promise.all([
+          convertAmountToNok(body.back.stake, backCurrency ?? "NOK"),
+          convertAmountToNok(backProfit, backCurrency ?? "NOK"),
+          convertAmountToNok(body.lay.stake, layCurrency ?? "NOK"),
+          convertAmountToNok(layLiability, layCurrency ?? "NOK"),
+        ]);
+
+      const layAccount = layAccountId
+        ? await getAccountById({ id: layAccountId, userId: session.user.id })
+        : null;
+
+      const outcomes = computeMatchedNetExposure({
+        backStake: backStakeNok,
+        backProfit: backProfitNok,
+        layStake: layStakeNok,
+        layLiability: layLiabilityNok,
+        isFreeBet: isFreeBetPromoType(body.promoType ?? null),
+        commissionRate: layAccount?.commission
+          ? Number.parseFloat(layAccount.commission)
+          : 0,
+      });
 
       console.log(
         `[NET EXPOSURE] backProfitNok=${backProfitNok}, layLiabilityNok=${layLiabilityNok}`
       );
-      netExposure = backProfitNok - layLiabilityNok;
+      netExposure = outcomes.netExposure;
       console.log(`[NET EXPOSURE] Final netExposure=${netExposure}`);
     }
 

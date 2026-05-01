@@ -39,7 +39,7 @@ export function DashboardSummaryCards({
   roi,
 }: DashboardSummaryProps) {
   const isProfitable = totalProfit >= 0;
-  const hasExposure = openExposure > 0;
+  const hasExposure = openPositions > 0 && openExposure !== 0;
   const hasPending = pendingReviewCount > 0;
 
   return (

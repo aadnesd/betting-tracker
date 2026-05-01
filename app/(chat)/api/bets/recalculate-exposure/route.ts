@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/app/(auth)/auth";
-import { computeNetExposureInputs } from "@/lib/bet-calculations";
+import {
+  computeMatchedNetExposure,
+  computeNetExposureInputs,
+} from "@/lib/bet-calculations";
 import { revalidateDashboard } from "@/lib/cache";
 import {
   createAuditEntry,
@@ -9,6 +12,7 @@ import {
   updateMatchedBetRecord,
 } from "@/lib/db/queries";
 import { convertAmountToNok } from "@/lib/fx-rates";
+import { isFreeBetPromoType } from "@/lib/settlement";
 
 const payloadSchema = z.object({
   id: z.string().uuid(),
@@ -87,12 +91,24 @@ export async function POST(request: Request) {
     );
 
     // Convert to NOK
-    const [backProfitNok, layLiabilityNok] = await Promise.all([
-      convertAmountToNok(backProfit, backCurrency),
-      convertAmountToNok(layLiability, layCurrency),
-    ]);
+    const [backStakeNok, backProfitNok, layStakeNok, layLiabilityNok] =
+      await Promise.all([
+        convertAmountToNok(backStake, backCurrency),
+        convertAmountToNok(backProfit, backCurrency),
+        convertAmountToNok(layStake, layCurrency),
+        convertAmountToNok(layLiability, layCurrency),
+      ]);
 
-    const newNetExposure = backProfitNok - layLiabilityNok;
+    const { netExposure: newNetExposure } = computeMatchedNetExposure({
+      backStake: backStakeNok,
+      backProfit: backProfitNok,
+      layStake: layStakeNok,
+      layLiability: layLiabilityNok,
+      isFreeBet:
+        !!fullBet.freeBet || isFreeBetPromoType(matched.promoType ?? null),
+      freeBetStakeReturned: fullBet.freeBet?.stakeReturned ?? false,
+      commissionRate: fullBet.layAccountCommission ?? 0,
+    });
 
     console.log(
       `[RECALC] backProfitNok=${backProfitNok}, layLiabilityNok=${layLiabilityNok}, newNetExposure=${newNetExposure}`

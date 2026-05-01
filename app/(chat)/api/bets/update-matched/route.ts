@@ -164,10 +164,15 @@ export async function PATCH(request: Request) {
       if (fullBet) {
         const transactionPromises: Promise<unknown>[] = [];
         const now = new Date();
+        let backProfitLossNok: number | null = null;
+        let layProfitLossNok: number | null = null;
 
         // Create adjustment for back bet account if profitLoss and accountId exist
         if (fullBet.back?.accountId && fullBet.back.profitLoss !== null) {
           const backProfitLoss = Number.parseFloat(fullBet.back.profitLoss);
+          if (fullBet.back.profitLossNok !== null) {
+            backProfitLossNok = Number.parseFloat(fullBet.back.profitLossNok);
+          }
           if (!Number.isNaN(backProfitLoss)) {
             transactionPromises.push(
               createAccountTransaction({
@@ -187,6 +192,9 @@ export async function PATCH(request: Request) {
         // Create adjustment for lay bet account if profitLoss and accountId exist
         if (fullBet.lay?.accountId && fullBet.lay.profitLoss !== null) {
           const layProfitLoss = Number.parseFloat(fullBet.lay.profitLoss);
+          if (fullBet.lay.profitLossNok !== null) {
+            layProfitLossNok = Number.parseFloat(fullBet.lay.profitLossNok);
+          }
           if (!Number.isNaN(layProfitLoss)) {
             transactionPromises.push(
               createAccountTransaction({
@@ -206,6 +214,14 @@ export async function PATCH(request: Request) {
         // Execute all transaction creations in parallel
         if (transactionPromises.length > 0) {
           await Promise.allSettled(transactionPromises);
+        }
+
+        if (backProfitLossNok !== null && layProfitLossNok !== null) {
+          await updateMatchedBetRecord({
+            id: updated.id,
+            userId: session.user.id,
+            settledProfitNok: backProfitLossNok + layProfitLossNok,
+          });
         }
       }
     }
