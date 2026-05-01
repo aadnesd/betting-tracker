@@ -42,12 +42,15 @@ function createMockMatchedBet(
     userId: "user-1",
     backBetId: "back-1",
     layBetId: "lay-1",
+    matchId: null,
     market: "Match Odds",
     selection: "Team A",
+    normalizedSelection: null,
     promoId: null,
     promoType: null,
     status: "settled",
     netExposure: null,
+    settledProfitNok: null,
     notes: null,
     confirmedAt: null,
     lastError: null,
@@ -66,6 +69,7 @@ function createMockMatchedBet(
           screenshotId: "screenshot-1",
           market: "Match Odds",
           selection: "Team A",
+          normalizedSelection: null,
           odds: "2.0",
           stake: "100.00",
           stakeNok: backOverrides.stakeNok ?? backOverrides.stake ?? "100.00",
@@ -80,6 +84,7 @@ function createMockMatchedBet(
           status: "settled",
           error: null,
           ...backOverrides,
+          matchId: backOverrides.matchId ?? null,
         };
 
   const layOverrides = overrides.lay ?? {};
@@ -94,6 +99,7 @@ function createMockMatchedBet(
           screenshotId: "screenshot-2",
           market: "Match Odds",
           selection: "Team A",
+          normalizedSelection: null,
           odds: "2.1",
           stake: "95.24",
           stakeNok: layOverrides.stakeNok ?? layOverrides.stake ?? "95.24",
@@ -108,6 +114,7 @@ function createMockMatchedBet(
           status: "settled",
           error: null,
           ...layOverrides,
+          matchId: layOverrides.matchId ?? null,
         };
 
   return { matched, back, lay };
@@ -189,6 +196,21 @@ describe("calculateReportingSummary", () => {
     expect(summary.netProfit).toBe(5); // No bonuses, so same as totalProfit
     expect(summary.totalStake).toBeCloseTo(195.24); // 100 + 95.24
     expect(summary.settledCount).toBe(1);
+  });
+
+  test("prefers matched-level settled profit when present", async () => {
+    const bets: MatchedBetWithLegs[] = [
+      createMockMatchedBet({
+        matched: { status: "settled", settledProfitNok: "12.50" },
+        back: { profitLossNok: "50.00", stake: "100.00" },
+        lay: { profitLossNok: "-45.00", stake: "100.00" },
+      }),
+    ];
+
+    const summary = await calculateReportingSummary(bets);
+
+    expect(summary.totalProfit).toBe(12.5);
+    expect(summary.bettingProfit).toBe(12.5);
   });
 
   test("includes open exposure from parameter", async () => {
@@ -568,8 +590,16 @@ describe("markWalletBankTransactionsOnBalanceData", () => {
     ];
 
     const transactions = [
-      { date: new Date("2025-01-02T08:00:00Z"), type: "deposit" as const, amountNok: 500 },
-      { date: new Date("2025-01-02T12:00:00Z"), type: "deposit" as const, amountNok: 250.5 },
+      {
+        date: new Date("2025-01-02T08:00:00Z"),
+        type: "deposit" as const,
+        amountNok: 500,
+      },
+      {
+        date: new Date("2025-01-02T12:00:00Z"),
+        type: "deposit" as const,
+        amountNok: 250.5,
+      },
     ];
 
     const result = markWalletBankTransactionsOnBalanceData(

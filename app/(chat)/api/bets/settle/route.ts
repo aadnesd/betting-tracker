@@ -267,10 +267,16 @@ export async function POST(request: Request) {
             : await getBackBetById({ id: otherBetId, userId: session.user.id });
 
         if (otherBet?.status === "settled") {
+          const otherProfitLossNok = otherBet.profitLossNok
+            ? Number.parseFloat(otherBet.profitLossNok)
+            : 0;
+          const settledProfitNok = profitLossNok + otherProfitLossNok;
+
           await updateMatchedBetRecord({
             id: matchedBet.id,
             userId: session.user.id,
             status: "settled",
+            settledProfitNok,
           });
 
           await createAuditEntry({
@@ -280,6 +286,7 @@ export async function POST(request: Request) {
             action: "status_change",
             changes: {
               status: { from: matchedBet.status, to: "settled" },
+              settledProfitNok,
             },
             notes:
               "Marked matched bet settled after both legs were manually settled.",
