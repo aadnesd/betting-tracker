@@ -1,11 +1,16 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/app/(auth)/auth";
+import {
+  computeMatchedNetExposure,
+  computeNetExposureInputs,
+} from "@/lib/bet-calculations";
 import { revalidateDashboard } from "@/lib/cache";
 import {
   createAuditEntry,
   createManualScreenshot,
   createMatchedBetRecord,
+  getFreeBetById,
   getOrCreateAccount,
   getOrCreatePromoByType,
   markFreeBetAsUsed,
@@ -13,6 +18,7 @@ import {
   saveLayBet,
 } from "@/lib/db/queries";
 import { convertAmountToNok } from "@/lib/fx-rates";
+import { isFreeBetPromoType } from "@/lib/settlement";
 
 const quickAddSchema = z.object({
   market: z.string().min(1, "Market is required"),
@@ -35,22 +41,6 @@ const quickAddSchema = z.object({
   }),
   notes: z.string().optional(),
 });
-
-function computeNetExposure({
-  backStake,
-  backOdds,
-  layStake,
-  layOdds,
-}: {
-  backStake: number;
-  backOdds: number;
-  layStake: number;
-  layOdds: number;
-}) {
-  const backProfit = backStake * (backOdds - 1);
-  const layLiability = layStake * (layOdds - 1);
-  return { backProfit, layLiability };
-}
 
 export async function POST(request: Request) {
   const session = await auth();
@@ -151,19 +141,40 @@ export async function POST(request: Request) {
     ]);
 
     // Calculate net exposure in NOK
-    const { backProfit, layLiability } = computeNetExposure({
+    const { backProfit, layLiability } = computeNetExposureInputs({
       backStake: body.back.stake,
       backOdds: body.back.odds,
       layStake: body.lay.stake,
       layOdds: body.lay.odds,
     });
 
-    const [backProfitNok, layLiabilityNok] = await Promise.all([
-      convertAmountToNok(backProfit, body.back.currency),
-      convertAmountToNok(layLiability, body.lay.currency),
-    ]);
+    const [backStakeNok, backProfitNok, layStakeNok, layLiabilityNok] =
+      await Promise.all([
+        convertAmountToNok(body.back.stake, body.back.currency),
+        convertAmountToNok(backProfit, body.back.currency),
+        convertAmountToNok(body.lay.stake, body.lay.currency),
+        convertAmountToNok(layLiability, body.lay.currency),
+      ]);
 
-    const netExposure = backProfitNok - layLiabilityNok;
+    const selectedFreeBet = body.freeBetId
+      ? await getFreeBetById({
+          id: body.freeBetId,
+          userId: session.user.id,
+        })
+      : null;
+
+    const { netExposure } = computeMatchedNetExposure({
+      backStake: backStakeNok,
+      backProfit: backProfitNok,
+      layStake: layStakeNok,
+      layLiability: layLiabilityNok,
+      isFreeBet:
+        !!selectedFreeBet || isFreeBetPromoType(body.promoType ?? null),
+      freeBetStakeReturned: selectedFreeBet?.stakeReturned ?? false,
+      commissionRate: layAccount.commission
+        ? Number.parseFloat(layAccount.commission)
+        : 0,
+    });
 
     // Create the matched bet record
     const matched = await createMatchedBetRecord({

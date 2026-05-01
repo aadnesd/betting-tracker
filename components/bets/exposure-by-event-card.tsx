@@ -32,7 +32,7 @@ export function ExposureByEventCard({
     0
   );
   const highExposureEvents = exposureData.filter(
-    (e) => e.totalExposure >= warningThreshold
+    (e) => Math.abs(e.totalExposure) >= warningThreshold
   );
 
   // Separate linked and unlinked bets
@@ -91,7 +91,9 @@ export function ExposureByEventCard({
                 {linkedEvents.map((event) => (
                   <EventRow
                     event={event}
-                    isHighExposure={event.totalExposure >= warningThreshold}
+                    isHighExposure={
+                      Math.abs(event.totalExposure) >= warningThreshold
+                    }
                     key={event.matchId}
                   />
                 ))}
@@ -121,7 +123,7 @@ export function ExposureByEventCard({
                     <span
                       className={cn(
                         "font-semibold text-sm",
-                        unlinkedBets.totalExposure >= warningThreshold
+                        Math.abs(unlinkedBets.totalExposure) >= warningThreshold
                           ? "text-amber-600"
                           : "text-gray-600"
                       )}

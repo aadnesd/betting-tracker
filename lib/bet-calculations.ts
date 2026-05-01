@@ -20,6 +20,46 @@ export function computeNetExposureInputs({
   return { backProfit, layLiability };
 }
 
+export function computeMatchedNetExposure({
+  backStake,
+  backProfit,
+  layStake,
+  layLiability,
+  isFreeBet = false,
+  freeBetStakeReturned = false,
+  commissionRate = 0,
+}: {
+  /** Back stake, already converted to the reporting currency. */
+  backStake: number;
+  /** Back profit if the selection wins, already converted to the reporting currency. */
+  backProfit: number;
+  /** Lay stake, already converted to the reporting currency. */
+  layStake: number;
+  /** Lay liability if the selection wins, already converted to the reporting currency. */
+  layLiability: number;
+  isFreeBet?: boolean;
+  freeBetStakeReturned?: boolean;
+  /** Exchange commission rate as a decimal (e.g. 0.025 for 2.5%). Defaults to 0. */
+  commissionRate?: number;
+}) {
+  const safeCommissionRate = Math.min(Math.max(commissionRate, 0), 1);
+
+  const profitIfBackWins =
+    isFreeBet && freeBetStakeReturned
+      ? backProfit + backStake - layLiability
+      : backProfit - layLiability;
+
+  const layWinNet = layStake * (1 - safeCommissionRate);
+  const profitIfLayWins = isFreeBet ? layWinNet : layWinNet - backStake;
+  const netExposure = Math.min(profitIfBackWins, profitIfLayWins);
+
+  return {
+    profitIfBackWins,
+    profitIfLayWins,
+    netExposure,
+  };
+}
+
 /**
  * Calculate profit for both outcomes of a matched bet.
  *

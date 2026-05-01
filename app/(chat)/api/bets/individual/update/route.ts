@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/app/(auth)/auth";
-import { computeNetExposureInputs } from "@/lib/bet-calculations";
+import {
+  computeMatchedNetExposure,
+  computeNetExposureInputs,
+} from "@/lib/bet-calculations";
 import { revalidateDashboard } from "@/lib/cache";
 import {
   createAccountTransaction,
@@ -238,6 +241,7 @@ export async function POST(request: Request) {
       toProfitLoss: number;
       deltaProfitLoss: number;
     } | null = null;
+    let correctedProfitLossNok: number | null = null;
 
     if (isSettled && payload.settlementOutcome) {
       const oldProfitLoss = Number(bet.profitLoss ?? 0);
@@ -312,6 +316,7 @@ export async function POST(request: Request) {
       if (deltaProfitLoss !== 0 || oldOutcome !== payload.settlementOutcome) {
         const currency = updated.currency ?? "NOK";
         const profitLossNok = await convertAmountToNok(newProfitLoss, currency);
+        correctedProfitLossNok = profitLossNok;
 
         if (payload.betKind === "back") {
           await updateBackBet({
@@ -419,19 +424,71 @@ export async function POST(request: Request) {
       let nextNetExposure: number | null = null;
 
       if (back && lay) {
+        const backStake = Number(back.stake);
+        const layStake = Number(lay.stake);
         const { backProfit, layLiability } = computeNetExposureInputs({
-          backStake: Number(back.stake),
+          backStake,
           backOdds: Number(back.odds),
-          layStake: Number(lay.stake),
+          layStake,
           layOdds: Number(lay.odds),
         });
 
-        const [backProfitNok, layLiabilityNok] = await Promise.all([
-          convertAmountToNok(backProfit, back.currency ?? "NOK"),
-          convertAmountToNok(layLiability, lay.currency ?? "NOK"),
+        const [backStakeNok, backProfitNok, layStakeNok, layLiabilityNok] =
+          await Promise.all([
+            convertAmountToNok(backStake, back.currency ?? "NOK"),
+            convertAmountToNok(backProfit, back.currency ?? "NOK"),
+            convertAmountToNok(layStake, lay.currency ?? "NOK"),
+            convertAmountToNok(layLiability, lay.currency ?? "NOK"),
+          ]);
+
+        const [matchedFreeBet, exchangeAccount] = await Promise.all([
+          getFreeBetByMatchedBetId({ matchedBetId: matchedBet.id, userId }),
+          lay.accountId ? getAccountById({ id: lay.accountId, userId }) : null,
         ]);
 
-        nextNetExposure = Number((backProfitNok - layLiabilityNok).toFixed(2));
+        const { netExposure } = computeMatchedNetExposure({
+          backStake: backStakeNok,
+          backProfit: backProfitNok,
+          layStake: layStakeNok,
+          layLiability: layLiabilityNok,
+          isFreeBet:
+            !!matchedFreeBet || isFreeBetPromoType(matchedBet.promoType),
+          freeBetStakeReturned: matchedFreeBet?.stakeReturned ?? false,
+          commissionRate: exchangeAccount?.commission
+            ? Number.parseFloat(exchangeAccount.commission)
+            : 0,
+        });
+
+        nextNetExposure = Number(netExposure.toFixed(2));
+
+        if (matchedBet.status === "settled") {
+          const backProfitLossNok =
+            payload.betKind === "back" && correctedProfitLossNok !== null
+              ? correctedProfitLossNok
+              : back.profitLossNok
+                ? Number.parseFloat(back.profitLossNok)
+                : 0;
+          const layProfitLossNok =
+            payload.betKind === "lay" && correctedProfitLossNok !== null
+              ? correctedProfitLossNok
+              : lay.profitLossNok
+                ? Number.parseFloat(lay.profitLossNok)
+                : 0;
+          const nextSettledProfitNok = Number(
+            (backProfitLossNok + layProfitLossNok).toFixed(2)
+          );
+          const currentSettledProfitNok = matchedBet.settledProfitNok
+            ? Number.parseFloat(matchedBet.settledProfitNok)
+            : null;
+
+          if (currentSettledProfitNok !== nextSettledProfitNok) {
+            await updateMatchedBetRecord({
+              id: matchedBet.id,
+              userId,
+              settledProfitNok: nextSettledProfitNok,
+            });
+          }
+        }
       }
 
       const currentExposure =

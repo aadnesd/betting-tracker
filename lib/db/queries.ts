@@ -1271,7 +1271,10 @@ export async function createAccountTransaction({
   try {
     // Pre-compute NOK equivalent at write time to avoid FX API calls on read
     const normalizedCurrency = currency.toUpperCase();
-    const amountNok = await convertAmountToNokStrict(amount, normalizedCurrency);
+    const amountNok = await convertAmountToNokStrict(
+      amount,
+      normalizedCurrency
+    );
 
     const values: typeof accountTransaction.$inferInsert = {
       createdAt: new Date(),
@@ -1377,7 +1380,9 @@ export async function listUnifiedTransactionsByUser({
           externalRef: sql<string | null>`NULL`,
           relatedAccountName: sql<string | null>`NULL`,
           relatedWalletName: sql<string | null>`NULL`,
-          linkedTransfer: isNotNull(accountTransaction.linkedWalletTransactionId),
+          linkedTransfer: isNotNull(
+            accountTransaction.linkedWalletTransactionId
+          ),
         })
         .from(accountTransaction)
         .innerJoin(account, eq(accountTransaction.accountId, account.id))
@@ -1931,6 +1936,7 @@ export async function createMatchedBetRecord({
   promoType,
   status,
   netExposure,
+  settledProfitNok,
   notes,
   lastError,
 }: {
@@ -1946,6 +1952,7 @@ export async function createMatchedBetRecord({
   promoType?: string | null;
   status?: "draft" | "matched" | "settled" | "needs_review";
   netExposure?: number | null;
+  settledProfitNok?: number | null;
   notes?: string | null;
   lastError?: string | null;
 }) {
@@ -1966,6 +1973,10 @@ export async function createMatchedBetRecord({
         netExposure === undefined || netExposure === null
           ? null
           : netExposure.toString(),
+      settledProfitNok:
+        settledProfitNok === undefined || settledProfitNok === null
+          ? null
+          : settledProfitNok.toFixed(2),
       notes: notes ?? null,
       lastError: lastError ?? null,
     };
@@ -2521,6 +2532,7 @@ export async function updateMatchedBetRecord({
   status,
   notes,
   netExposure,
+  settledProfitNok,
   backBetId,
   layBetId,
   matchId,
@@ -2534,6 +2546,7 @@ export async function updateMatchedBetRecord({
   status?: "draft" | "matched" | "settled" | "needs_review";
   notes?: string | null;
   netExposure?: number | null;
+  settledProfitNok?: number | null;
   backBetId?: string | null;
   layBetId?: string | null;
   matchId?: string | null;
@@ -2553,6 +2566,10 @@ export async function updateMatchedBetRecord({
     }
     if (netExposure !== undefined) {
       values.netExposure = netExposure === null ? null : netExposure.toString();
+    }
+    if (settledProfitNok !== undefined) {
+      values.settledProfitNok =
+        settledProfitNok === null ? null : settledProfitNok.toFixed(2);
     }
     if (backBetId !== undefined) {
       values.backBetId = backBetId;
@@ -3120,10 +3137,15 @@ export async function applyAutoSettlement(
       params.layCurrency ?? "NOK"
     );
 
-    // 1. Update matched bet status to settled
+    const settledProfitNok = backProfitLossNok + layProfitLossNok;
+
+    // 1. Update matched bet status and realized profit
     await db
       .update(matchedBet)
-      .set({ status: "settled" })
+      .set({
+        status: "settled",
+        settledProfitNok: settledProfitNok.toFixed(2),
+      })
       .where(
         and(
           eq(matchedBet.id, params.matchedBetId),
@@ -3202,6 +3224,7 @@ export async function applyAutoSettlement(
         outcome: params.outcome,
         backProfitLoss: params.backProfitLoss,
         layProfitLoss: params.layProfitLoss,
+        settledProfitNok,
         matchResult: params.matchResult,
       },
       notes: `Auto-settled: ${params.outcome} on ${params.market} - ${params.selection}`,
@@ -3641,13 +3664,15 @@ export async function getProfitByPromoType({
       conditions.push(lte(matchedBet.createdAt, endDate));
     }
 
-    // Sum profitLoss from back and lay bets grouped by promo type (using NOK-converted values)
+    // Prefer matched-level realized profit, falling back to leg sums for legacy rows.
     const rows = await db
       .select({
         promoType: matchedBet.promoType,
         count: count(matchedBet.id),
-        totalBackProfitLossNok: sum(backBet.profitLossNok),
-        totalLayProfitLossNok: sum(layBet.profitLossNok),
+        totalSettledProfitNok: sql<string>`COALESCE(SUM(COALESCE(
+          ${matchedBet.settledProfitNok},
+          COALESCE(${backBet.profitLossNok}, 0) + COALESCE(${layBet.profitLossNok}, 0)
+        )), 0)`,
         totalBackStakeNok: sum(backBet.stakeNok),
         totalLayStakeNok: sum(layBet.stakeNok),
       })
@@ -3660,13 +3685,9 @@ export async function getProfitByPromoType({
     return rows.map((row) => ({
       promoType: row.promoType ?? "Unspecified",
       count: row.count,
-      totalProfitLoss:
-        (row.totalBackProfitLossNok
-          ? Number.parseFloat(row.totalBackProfitLossNok)
-          : 0) +
-        (row.totalLayProfitLossNok
-          ? Number.parseFloat(row.totalLayProfitLossNok)
-          : 0),
+      totalProfitLoss: row.totalSettledProfitNok
+        ? Number.parseFloat(row.totalSettledProfitNok)
+        : 0,
       totalStake:
         (row.totalBackStakeNok ? Number.parseFloat(row.totalBackStakeNok) : 0) +
         (row.totalLayStakeNok ? Number.parseFloat(row.totalLayStakeNok) : 0),
@@ -3714,6 +3735,7 @@ export async function getProfitByBookmaker({
       .select({
         accountId: backBet.accountId,
         accountName: account.name,
+        settledProfitNok: matchedBet.settledProfitNok,
         // Back bet values
         backProfitLoss: backBet.profitLoss,
         backProfitLossNok: backBet.profitLossNok,
@@ -3756,7 +3778,7 @@ export async function getProfitByBookmaker({
         totalStake: 0,
       };
 
-      // Calculate matched set P/L (back + lay combined) using NOK values
+      // Calculate matched set P/L using matched-level realized profit first.
       const backPLNok = row.backProfitLossNok
         ? Number.parseFloat(row.backProfitLossNok)
         : row.backCurrency === "NOK" && row.backProfitLoss
@@ -3776,7 +3798,9 @@ export async function getProfitByBookmaker({
           : 0;
 
       existing.count += 1;
-      existing.totalProfitLoss += backPLNok + layPLNok; // Full matched set profit
+      existing.totalProfitLoss += row.settledProfitNok
+        ? Number.parseFloat(row.settledProfitNok)
+        : backPLNok + layPLNok;
       existing.totalStake += stakeNok;
 
       accountMap.set(row.accountId, existing);
@@ -3829,6 +3853,7 @@ export async function getProfitByExchange({
       .select({
         accountId: layBet.accountId,
         accountName: layAccount.name,
+        settledProfitNok: matchedBet.settledProfitNok,
         // Back bet values
         backProfitLoss: backBet.profitLoss,
         backProfitLossNok: backBet.profitLossNok,
@@ -3869,7 +3894,7 @@ export async function getProfitByExchange({
         totalStake: 0,
       };
 
-      // Calculate matched set P/L (back + lay combined) using NOK values
+      // Calculate matched set P/L using matched-level realized profit first.
       const backPLNok = row.backProfitLossNok
         ? Number.parseFloat(row.backProfitLossNok)
         : row.backCurrency === "NOK" && row.backProfitLoss
@@ -3889,7 +3914,9 @@ export async function getProfitByExchange({
           : 0;
 
       existing.count += 1;
-      existing.totalProfitLoss += backPLNok + layPLNok; // Full matched set profit
+      existing.totalProfitLoss += row.settledProfitNok
+        ? Number.parseFloat(row.settledProfitNok)
+        : backPLNok + layPLNok;
       existing.totalStake += stakeNok;
 
       accountMap.set(row.accountId, existing);
@@ -3966,6 +3993,7 @@ export async function getBookmakerProfitWithBonuses({
       .select({
         accountId: backBet.accountId,
         accountName: account.name,
+        settledProfitNok: matchedBet.settledProfitNok,
         // Back bet
         backProfitLoss: backBet.profitLoss,
         backProfitLossNok: backBet.profitLossNok,
@@ -4063,7 +4091,9 @@ export async function getBookmakerProfitWithBonuses({
             : 0;
 
         existing.betCount += 1;
-        existing.bettingProfit += backPLNok + layPLNok; // FULL matched set profit
+        existing.bettingProfit += row.settledProfitNok
+          ? Number.parseFloat(row.settledProfitNok)
+          : backPLNok + layPLNok;
         existing.totalStake += stakeNok;
         existing.totalNetExposure += row.netExposure
           ? Number.parseFloat(row.netExposure)
@@ -4116,7 +4146,9 @@ export async function getBookmakerProfitWithBonuses({
       const avgNetExposurePerSet =
         data.betCount > 0 ? data.totalNetExposure / data.betCount : 0;
       const exposureRoi =
-        data.totalStake > 0 ? (data.totalNetExposure / data.totalStake) * 100 : 0;
+        data.totalStake > 0
+          ? (data.totalNetExposure / data.totalStake) * 100
+          : 0;
       const retentionPct = 100 + exposureRoi;
       results.push({
         accountId: data.accountId,
@@ -4540,7 +4572,7 @@ export async function getExposureByEvent({
       }
     }
 
-    // Convert map to array and sort by exposure (highest first)
+    // Convert map to array and sort by exposure magnitude (highest risk first)
     const result: ExposureByEvent[] = Array.from(exposureMap.entries())
       .map(([matchId, data]) => ({
         matchId,
@@ -4550,7 +4582,7 @@ export async function getExposureByEvent({
         betIds: data.betIds,
         promoTypes: Array.from(data.promoTypes),
       }))
-      .sort((a, b) => b.totalExposure - a.totalExposure);
+      .sort((a, b) => Math.abs(b.totalExposure) - Math.abs(a.totalExposure));
 
     return result;
   } catch (_error) {
@@ -4809,8 +4841,10 @@ export async function getDashboardSummary({
         // Aggregate settled bets using stored NOK values
         db
           .select({
-            totalBackProfitLossNok: sql<string>`COALESCE(${sum(backBet.profitLossNok)}, 0)`,
-            totalLayProfitLossNok: sql<string>`COALESCE(${sum(layBet.profitLossNok)}, 0)`,
+            totalSettledProfitNok: sql<string>`COALESCE(SUM(COALESCE(
+              ${matchedBet.settledProfitNok},
+              COALESCE(${backBet.profitLossNok}, 0) + COALESCE(${layBet.profitLossNok}, 0)
+            )), 0)`,
             totalBackStakeNok: sql<string>`COALESCE(${sum(backBet.stakeNok)}, 0)`,
             settledCount: count(matchedBet.id),
           })
@@ -4848,13 +4882,9 @@ export async function getDashboardSummary({
       ]);
 
     const totals = settledAggregates[0];
-    const backProfitNok = totals?.totalBackProfitLossNok
-      ? Number.parseFloat(totals.totalBackProfitLossNok)
+    const totalProfit = totals?.totalSettledProfitNok
+      ? Number.parseFloat(totals.totalSettledProfitNok)
       : 0;
-    const layProfitNok = totals?.totalLayProfitLossNok
-      ? Number.parseFloat(totals.totalLayProfitLossNok)
-      : 0;
-    const totalProfit = backProfitNok + layProfitNok;
     const totalStake = totals?.totalBackStakeNok
       ? Number.parseFloat(totals.totalBackStakeNok)
       : 0;
@@ -8032,8 +8062,7 @@ export async function deleteWalletTransaction({
       return null;
     }
 
-    let linkedWalletTransactionId =
-      existing.linkedWalletTransactionId ?? null;
+    let linkedWalletTransactionId = existing.linkedWalletTransactionId ?? null;
 
     // Legacy wallet-to-wallet transfers do not have an explicit backlink, so
     // fall back to locating the mirrored row heuristically.

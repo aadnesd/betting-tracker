@@ -28,9 +28,9 @@ const CALCULATION_EXPLANATIONS: Record<
   },
   netExposure: {
     title: "Net Exposure",
-    formula: "Lay Liability − Back Profit Potential",
+    formula: "Min(Back-win P/L, Lay-win P/L after commission)",
     description:
-      "Your net risk exposure after accounting for both the back and lay positions. Displayed in NOK as the base currency.",
+      "Your worst signed outcome after accounting for both the back and lay positions. Lay-win profit is reduced by exchange commission. Displayed in NOK as the base currency.",
   },
   qualifyingLoss: {
     title: "Qualifying Loss",
