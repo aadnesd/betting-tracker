@@ -1,4 +1,4 @@
-import { Download, Upload } from "lucide-react";
+import { Upload } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
@@ -15,14 +15,19 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   getBalanceSnapshots,
+  getBonusProfitEvents,
   getBookmakerProfitWithBonuses,
-  listWalletBankTransactionsByUser,
   getMatchedBetsForReporting,
   getOpenExposure,
   getProfitByBookmaker,
   getProfitByExchange,
   getProfitByPromoType,
+  getStandaloneSettledProfitEvents,
+  getStandaloneSettledProfitSummary,
   getTotalBonusesForUser,
+  getWalletFeeProfitEvents,
+  getWalletFeeSummary,
+  listWalletBankTransactionsByUser,
 } from "@/lib/db/queries";
 import { convertAmountToNok } from "@/lib/fx-rates";
 import {
@@ -31,8 +36,8 @@ import {
   enrichWithROI,
   formatNOK,
   getDateRange,
-  markWalletBankTransactionsOnBalanceData,
   type MatchedBetWithLegs,
+  markWalletBankTransactionsOnBalanceData,
   snapshotsToBalanceData,
 } from "@/lib/reporting";
 
@@ -119,6 +124,11 @@ async function ReportingContent({
     promoData,
     bookmakerWithBonuses,
     totalBonuses,
+    standaloneProfitSummary,
+    standaloneProfitEvents,
+    bonusProfitEvents,
+    walletFeeSummary,
+    walletFeeEvents,
     balanceSnapshots,
     walletBankTransactions,
   ] = await Promise.all([
@@ -134,6 +144,11 @@ async function ReportingContent({
     getProfitByPromoType({ userId, startDate, endDate }),
     getBookmakerProfitWithBonuses({ userId, startDate, endDate }),
     getTotalBonusesForUser({ userId, startDate, endDate }),
+    getStandaloneSettledProfitSummary({ userId, startDate, endDate }),
+    getStandaloneSettledProfitEvents({ userId, startDate, endDate }),
+    getBonusProfitEvents({ userId, startDate, endDate }),
+    getWalletFeeSummary({ userId, startDate, endDate }),
+    getWalletFeeProfitEvents({ userId, startDate, endDate }),
     getBalanceSnapshots({ userId, startDate: startDate ?? undefined, endDate }),
     listWalletBankTransactionsByUser({
       userId,
@@ -152,14 +167,29 @@ async function ReportingContent({
   // Calculate summary and cumulative profit data (all async for FX conversion)
   const [summary, dayChartData, weekChartData, monthChartData] =
     await Promise.all([
-      calculateReportingSummary(
-        betsWithLegs,
-        openExposureData.totalExposure,
-        totalBonuses
-      ),
-      calculateCumulativeProfitData(betsWithLegs, "day"),
-      calculateCumulativeProfitData(betsWithLegs, "week"),
-      calculateCumulativeProfitData(betsWithLegs, "month"),
+      calculateReportingSummary(betsWithLegs, {
+        openExposure: openExposureData.totalExposure,
+        bonusTotal: totalBonuses,
+        standaloneProfit: standaloneProfitSummary.profit,
+        standaloneStake: standaloneProfitSummary.stake,
+        standaloneCount: standaloneProfitSummary.count,
+        walletFeeTotal: walletFeeSummary.total,
+      }),
+      calculateCumulativeProfitData(betsWithLegs, "day", [
+        ...standaloneProfitEvents,
+        ...bonusProfitEvents,
+        ...walletFeeEvents,
+      ]),
+      calculateCumulativeProfitData(betsWithLegs, "week", [
+        ...standaloneProfitEvents,
+        ...bonusProfitEvents,
+        ...walletFeeEvents,
+      ]),
+      calculateCumulativeProfitData(betsWithLegs, "month", [
+        ...standaloneProfitEvents,
+        ...bonusProfitEvents,
+        ...walletFeeEvents,
+      ]),
     ]);
 
   // Generate balance chart data from snapshots (grouped by day/week/month)
