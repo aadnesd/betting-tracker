@@ -11,26 +11,47 @@ import {
   listWalletTransactionsWithDetails,
 } from "@/lib/db/queries";
 
-const createTransactionSchema = z.object({
-  type: z.enum([
-    "deposit",
-    "withdrawal",
-    "transfer_to_account",
-    "transfer_from_account",
-    "transfer_to_wallet",
-    "transfer_from_wallet",
-    "fee",
-    "adjustment",
-  ]),
-  amount: z.number().positive("Amount must be positive"),
-  currency: z.string().min(1).max(10),
-  date: z.string().transform((s) => new Date(s)),
-  relatedAccountId: z.string().uuid().nullish(),
-  relatedWalletId: z.string().uuid().nullish(),
-  relatedWalletAmount: z.number().positive().nullish(),
-  externalRef: z.string().nullish(),
-  notes: z.string().nullish(),
-});
+const createTransactionSchema = z
+  .object({
+    type: z.enum([
+      "deposit",
+      "withdrawal",
+      "transfer_to_account",
+      "transfer_from_account",
+      "transfer_to_wallet",
+      "transfer_from_wallet",
+      "fee",
+      "adjustment",
+    ]),
+    amount: z.number(),
+    currency: z.string().min(1).max(10),
+    date: z.string().transform((s) => new Date(s)),
+    relatedAccountId: z.string().uuid().nullish(),
+    relatedWalletId: z.string().uuid().nullish(),
+    relatedWalletAmount: z.number().positive().nullish(),
+    externalRef: z.string().nullish(),
+    notes: z.string().nullish(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.type === "adjustment") {
+      if (data.amount === 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Adjustment amount must be non-zero",
+          path: ["amount"],
+        });
+      }
+      return;
+    }
+
+    if (data.amount <= 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Amount must be positive",
+        path: ["amount"],
+      });
+    }
+  });
 
 export async function GET(
   _request: Request,

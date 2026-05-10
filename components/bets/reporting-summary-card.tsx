@@ -89,12 +89,34 @@ function NetProfitCard({
               {formatNOK(summary.bettingProfit)}
             </span>
           </div>
+          {summary.standaloneCount > 0 && (
+            <div className="flex justify-between">
+              <span>Standalone P/L:</span>
+              <span
+                className={cn(
+                  summary.standaloneProfit >= 0
+                    ? "text-emerald-600"
+                    : "text-rose-600"
+                )}
+              >
+                {formatNOK(summary.standaloneProfit)}
+              </span>
+            </div>
+          )}
           <div className="flex justify-between">
             <span>Bonuses:</span>
             <span className="text-emerald-600">
               +{formatNOK(summary.bonusTotal)}
             </span>
           </div>
+          {summary.walletFeeTotal > 0 && (
+            <div className="flex justify-between">
+              <span>Wallet fees:</span>
+              <span className="text-rose-600">
+                -{formatNOK(summary.walletFeeTotal)}
+              </span>
+            </div>
+          )}
         </div>
       ) : (
         <p className="mt-1 text-muted-foreground text-xs">

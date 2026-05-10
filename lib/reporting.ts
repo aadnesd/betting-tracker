@@ -33,7 +33,13 @@ export type ReportingSummary = {
   openExposure: number;
   /** Total bonus/reward transactions (optional, 0 if not provided) */
   bonusTotal: number;
-  /** Betting profit/loss only (before bonuses) - same as totalProfit */
+  /** Wallet transaction fees that reduce net profit */
+  walletFeeTotal: number;
+  /** Standalone settled bet profit/loss not attached to a matched set */
+  standaloneProfit: number;
+  /** Number of standalone settled bets included in profit */
+  standaloneCount: number;
+  /** Betting profit/loss only (before bonuses) */
   bettingProfit: number;
 };
 
@@ -128,9 +134,25 @@ export function calculateQualifyingLoss(bet: MatchedBetWithLegs): number {
  */
 export async function calculateReportingSummary(
   bets: MatchedBetWithLegs[],
-  openExposure = 0,
-  bonusTotal = 0
+  optionsOrOpenExposure: ReportingSummaryOptions | number = {},
+  legacyBonusTotal = 0
 ): Promise<ReportingSummary> {
+  const options =
+    typeof optionsOrOpenExposure === "number"
+      ? {
+          openExposure: optionsOrOpenExposure,
+          bonusTotal: legacyBonusTotal,
+        }
+      : optionsOrOpenExposure;
+  const {
+    openExposure = 0,
+    bonusTotal = 0,
+    standaloneProfit = 0,
+    standaloneStake = 0,
+    standaloneCount = 0,
+    walletFeeTotal = 0,
+  } = options;
+
   let totalProfit = 0;
   let qualifyingLoss = 0;
   let totalStake = 0;
@@ -162,11 +184,13 @@ export async function calculateReportingSummary(
     qualifyingLoss += await calculateQualifyingLossInNok(bet);
   }
 
-  // Betting profit is the raw profit from bets only
-  const bettingProfit = totalProfit;
+  // Betting profit is all realized bet P/L before bonuses.
+  const bettingProfit = totalProfit + standaloneProfit;
+  totalStake += standaloneStake;
+  settledCount += standaloneCount;
 
-  // Net profit includes bonuses: betting profit + bonus transactions
-  const netProfit = totalProfit + bonusTotal;
+  // Net profit includes bonuses and subtracts wallet transaction fees.
+  const netProfit = bettingProfit + bonusTotal - walletFeeTotal;
 
   // ROI = net profit / total stake * 100
   const roi = totalStake > 0 ? (netProfit / totalStake) * 100 : 0;
@@ -180,6 +204,9 @@ export async function calculateReportingSummary(
     settledCount,
     openExposure,
     bonusTotal,
+    walletFeeTotal,
+    standaloneProfit,
+    standaloneCount,
     bettingProfit,
   };
 }
@@ -410,6 +437,21 @@ export type ProfitDataPoint = {
   count: number;
 };
 
+export type ProfitEvent = {
+  occurredAt: Date;
+  profit: number;
+  count?: number;
+};
+
+export type ReportingSummaryOptions = {
+  openExposure?: number;
+  bonusTotal?: number;
+  standaloneProfit?: number;
+  standaloneStake?: number;
+  standaloneCount?: number;
+  walletFeeTotal?: number;
+};
+
 /**
  * Data point for total balance chart visualization.
  */
@@ -439,7 +481,8 @@ export type BalanceDataPoint = {
  */
 export async function calculateCumulativeProfitData(
   bets: MatchedBetWithLegs[],
-  grouping: "day" | "week" | "month" = "day"
+  grouping: "day" | "week" | "month" = "day",
+  events: ProfitEvent[] = []
 ): Promise<ProfitDataPoint[]> {
   // Filter to only settled bets and sort by settled date
   const settledBets = bets
@@ -451,7 +494,7 @@ export async function calculateCumulativeProfitData(
       return new Date(dateA).getTime() - new Date(dateB).getTime();
     });
 
-  if (settledBets.length === 0) {
+  if (settledBets.length === 0 && events.length === 0) {
     return [];
   }
 
@@ -462,7 +505,6 @@ export async function calculateCumulativeProfitData(
     // Use back bet's settledAt, or matched createdAt as fallback
     const date = new Date(bet.back?.settledAt ?? bet.matched.createdAt);
     let key: string;
-    let label: string;
 
     switch (grouping) {
       case "week": {
@@ -472,24 +514,15 @@ export async function calculateCumulativeProfitData(
         const monday = new Date(date);
         monday.setDate(diff);
         key = monday.toISOString().split("T")[0];
-        label = `Week of ${monday.toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`;
         break;
       }
       case "month": {
         key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-01`;
-        label = date.toLocaleDateString("en-GB", {
-          month: "short",
-          year: "numeric",
-        });
         break;
       }
       default: {
         // day
         key = date.toISOString().split("T")[0];
-        label = date.toLocaleDateString("en-GB", {
-          day: "numeric",
-          month: "short",
-        });
       }
     }
 
@@ -498,6 +531,34 @@ export async function calculateCumulativeProfitData(
     const existing = groups.get(key) ?? { profit: 0, count: 0 };
     existing.profit += betProfit;
     existing.count += 1;
+    groups.set(key, existing);
+  }
+
+  for (const event of events) {
+    const date = new Date(event.occurredAt);
+    let key: string;
+
+    switch (grouping) {
+      case "week": {
+        const day = date.getDay();
+        const diff = date.getDate() - day + (day === 0 ? -6 : 1);
+        const monday = new Date(date);
+        monday.setDate(diff);
+        key = monday.toISOString().split("T")[0];
+        break;
+      }
+      case "month": {
+        key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-01`;
+        break;
+      }
+      default: {
+        key = date.toISOString().split("T")[0];
+      }
+    }
+
+    const existing = groups.get(key) ?? { profit: 0, count: 0 };
+    existing.profit += event.profit;
+    existing.count += event.count ?? 0;
     groups.set(key, existing);
   }
 

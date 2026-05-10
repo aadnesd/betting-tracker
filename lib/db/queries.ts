@@ -20,8 +20,13 @@ import {
   sql,
   sum,
 } from "drizzle-orm";
+import {
+  computeMatchedNetExposure,
+  computeNetExposureInputs,
+} from "../bet-calculations";
 import { ChatSDKError } from "../errors";
 import { convertAmountToNok, convertAmountToNokStrict } from "../fx-rates";
+import { isFreeBetPromoType } from "../settlement";
 import { generateUUID } from "../utils";
 import { db } from "./connection";
 import {
@@ -3545,10 +3550,20 @@ export async function getMatchedBetsForReporting({
     const conditions: SQL<unknown>[] = [eq(matchedBet.userId, userId)];
 
     if (startDate) {
-      conditions.push(gte(matchedBet.createdAt, startDate));
+      conditions.push(sql`COALESCE(
+        ${backBet.settledAt},
+        ${layBet.settledAt},
+        ${matchedBet.confirmedAt},
+        ${matchedBet.createdAt}
+      ) >= ${startDate.toISOString()}`);
     }
     if (endDate) {
-      conditions.push(lte(matchedBet.createdAt, endDate));
+      conditions.push(sql`COALESCE(
+        ${backBet.settledAt},
+        ${layBet.settledAt},
+        ${matchedBet.confirmedAt},
+        ${matchedBet.createdAt}
+      ) <= ${endDate.toISOString()}`);
     }
     if (statuses && statuses.length > 0) {
       conditions.push(inArray(matchedBet.status, statuses));
@@ -3658,10 +3673,20 @@ export async function getProfitByPromoType({
     ];
 
     if (startDate) {
-      conditions.push(gte(matchedBet.createdAt, startDate));
+      conditions.push(sql`COALESCE(
+        ${backBet.settledAt},
+        ${layBet.settledAt},
+        ${matchedBet.confirmedAt},
+        ${matchedBet.createdAt}
+      ) >= ${startDate.toISOString()}`);
     }
     if (endDate) {
-      conditions.push(lte(matchedBet.createdAt, endDate));
+      conditions.push(sql`COALESCE(
+        ${backBet.settledAt},
+        ${layBet.settledAt},
+        ${matchedBet.confirmedAt},
+        ${matchedBet.createdAt}
+      ) <= ${endDate.toISOString()}`);
     }
 
     // Prefer matched-level realized profit, falling back to leg sums for legacy rows.
@@ -3724,10 +3749,20 @@ export async function getProfitByBookmaker({
     ];
 
     if (startDate) {
-      conditions.push(gte(matchedBet.createdAt, startDate));
+      conditions.push(sql`COALESCE(
+        ${backBet.settledAt},
+        ${layBet.settledAt},
+        ${matchedBet.confirmedAt},
+        ${matchedBet.createdAt}
+      ) >= ${startDate.toISOString()}`);
     }
     if (endDate) {
-      conditions.push(lte(matchedBet.createdAt, endDate));
+      conditions.push(sql`COALESCE(
+        ${backBet.settledAt},
+        ${layBet.settledAt},
+        ${matchedBet.confirmedAt},
+        ${matchedBet.createdAt}
+      ) <= ${endDate.toISOString()}`);
     }
 
     // Fetch individual matched bets with both legs for proper P/L calculation
@@ -3839,10 +3874,20 @@ export async function getProfitByExchange({
     ];
 
     if (startDate) {
-      conditions.push(gte(matchedBet.createdAt, startDate));
+      conditions.push(sql`COALESCE(
+        ${backBet.settledAt},
+        ${layBet.settledAt},
+        ${matchedBet.confirmedAt},
+        ${matchedBet.createdAt}
+      ) >= ${startDate.toISOString()}`);
     }
     if (endDate) {
-      conditions.push(lte(matchedBet.createdAt, endDate));
+      conditions.push(sql`COALESCE(
+        ${backBet.settledAt},
+        ${layBet.settledAt},
+        ${matchedBet.confirmedAt},
+        ${matchedBet.createdAt}
+      ) <= ${endDate.toISOString()}`);
     }
 
     // Alias for lay account
@@ -3870,6 +3915,37 @@ export async function getProfitByExchange({
       .leftJoin(layBet, eq(matchedBet.layBetId, layBet.id))
       .leftJoin(layAccount, eq(layBet.accountId, layAccount.id))
       .where(and(...conditions));
+
+    const standaloneConditions: SQL<unknown>[] = [
+      eq(layBet.userId, userId),
+      eq(layBet.status, "settled"),
+      eq(layAccount.kind, "exchange"),
+      sql`NOT EXISTS (
+        SELECT 1 FROM "MatchedBet" mb
+        WHERE mb."layBetId" = ${layBet.id}
+      )`,
+    ];
+
+    if (startDate) {
+      standaloneConditions.push(gte(layBet.settledAt, startDate));
+    }
+    if (endDate) {
+      standaloneConditions.push(lte(layBet.settledAt, endDate));
+    }
+
+    const standaloneRows = await db
+      .select({
+        accountId: layBet.accountId,
+        accountName: layAccount.name,
+        profitLoss: layBet.profitLoss,
+        profitLossNok: layBet.profitLossNok,
+        stake: layBet.stake,
+        stakeNok: layBet.stakeNok,
+        currency: layBet.currency,
+      })
+      .from(layBet)
+      .innerJoin(layAccount, eq(layBet.accountId, layAccount.id))
+      .where(and(...standaloneConditions));
 
     // Aggregate matched set profit by exchange
     const accountMap = new Map<
@@ -3922,6 +3998,38 @@ export async function getProfitByExchange({
       accountMap.set(row.accountId, existing);
     }
 
+    for (const row of standaloneRows) {
+      if (!row.accountId) {
+        continue;
+      }
+
+      const existing = accountMap.get(row.accountId) ?? {
+        accountId: row.accountId,
+        accountName: row.accountName ?? "Unknown Exchange",
+        count: 0,
+        totalProfitLoss: 0,
+        totalStake: 0,
+      };
+
+      const currency = row.currency ?? "NOK";
+      const profitNok = row.profitLossNok
+        ? Number.parseFloat(row.profitLossNok)
+        : currency === "NOK" && row.profitLoss
+          ? Number.parseFloat(row.profitLoss)
+          : 0;
+      const stakeNok = row.stakeNok
+        ? Number.parseFloat(row.stakeNok)
+        : currency === "NOK" && row.stake
+          ? Number.parseFloat(row.stake)
+          : 0;
+
+      existing.count += 1;
+      existing.totalProfitLoss += profitNok;
+      existing.totalStake += stakeNok;
+
+      accountMap.set(row.accountId, existing);
+    }
+
     return Array.from(accountMap.values());
   } catch (_error) {
     throw new ChatSDKError(
@@ -3938,11 +4046,19 @@ export type BookmakerProfitWithBonuses = {
   betCount: number;
   /** Net profit/loss from matched sets (back P/L + lay P/L combined) */
   bettingProfit: number;
+  /** Number of matched sets that used a free bet */
+  freeBetCount?: number;
+  /** Profit/loss from matched sets that used a free bet */
+  freeBetProfit?: number;
+  /** Number of settled standalone bets not attached to a matched set */
+  standaloneBetCount?: number;
+  /** Profit/loss from standalone bets not attached to a matched set */
+  standaloneProfit?: number;
   /** Total back stake wagered */
   totalStake: number;
   /** Total bonus/reward transaction amounts */
   bonusTotal: number;
-  /** Combined total (bettingProfit + bonusTotal) */
+  /** Combined total (bettingProfit + standaloneProfit + bonusTotal) */
   totalProfit: number;
   /** ROI percentage based on total profit and stake */
   roi: number;
@@ -3957,6 +4073,185 @@ export type BookmakerProfitWithBonuses = {
   /** Retention percentage based on net exposure (e.g. 99% = -1% exposure vs stake) */
   retentionPct: number;
 };
+
+export type StandaloneSettledProfitSummary = {
+  count: number;
+  profit: number;
+  stake: number;
+};
+
+export type WalletFeeSummary = {
+  count: number;
+  total: number;
+};
+
+export type ReportingProfitEvent = {
+  occurredAt: Date;
+  profit: number;
+  count?: number;
+};
+
+/**
+ * Get settled standalone bet P/L that is not already represented by a matched set.
+ * Why: account-closure and seized-funds losses are often entered as standalone
+ * settled bets. Matched-set reporting deliberately excludes those rows, so net
+ * profit must include them separately without double-counting matched legs.
+ */
+export async function getStandaloneSettledProfitSummary({
+  userId,
+  startDate,
+  endDate,
+}: {
+  userId: string;
+  startDate?: Date | null;
+  endDate?: Date | null;
+}): Promise<StandaloneSettledProfitSummary> {
+  try {
+    const backConditions: SQL<unknown>[] = [
+      eq(backBet.userId, userId),
+      eq(backBet.status, "settled"),
+      sql`NOT EXISTS (
+        SELECT 1 FROM "MatchedBet" mb
+        WHERE mb."backBetId" = ${backBet.id}
+      )`,
+    ];
+    const layConditions: SQL<unknown>[] = [
+      eq(layBet.userId, userId),
+      eq(layBet.status, "settled"),
+      sql`NOT EXISTS (
+        SELECT 1 FROM "MatchedBet" mb
+        WHERE mb."layBetId" = ${layBet.id}
+      )`,
+    ];
+
+    if (startDate) {
+      backConditions.push(gte(backBet.settledAt, startDate));
+      layConditions.push(gte(layBet.settledAt, startDate));
+    }
+    if (endDate) {
+      backConditions.push(lte(backBet.settledAt, endDate));
+      layConditions.push(lte(layBet.settledAt, endDate));
+    }
+
+    const [backRows, layRows] = await Promise.all([
+      db
+        .select({
+          count: count(backBet.id),
+          profit: sql<string>`COALESCE(SUM(COALESCE(${backBet.profitLossNok}, ${backBet.profitLoss}, 0)), 0)`,
+          stake: sql<string>`COALESCE(SUM(COALESCE(${backBet.stakeNok}, ${backBet.stake}, 0)), 0)`,
+        })
+        .from(backBet)
+        .where(and(...backConditions)),
+      db
+        .select({
+          count: count(layBet.id),
+          profit: sql<string>`COALESCE(SUM(COALESCE(${layBet.profitLossNok}, ${layBet.profitLoss}, 0)), 0)`,
+          stake: sql<string>`COALESCE(SUM(COALESCE(${layBet.stakeNok}, ${layBet.stake}, 0)), 0)`,
+        })
+        .from(layBet)
+        .where(and(...layConditions)),
+    ]);
+
+    const back = backRows[0];
+    const lay = layRows[0];
+
+    return {
+      count: (back?.count ?? 0) + (lay?.count ?? 0),
+      profit:
+        Number.parseFloat(back?.profit ?? "0") +
+        Number.parseFloat(lay?.profit ?? "0"),
+      stake:
+        Number.parseFloat(back?.stake ?? "0") +
+        Number.parseFloat(lay?.stake ?? "0"),
+    };
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get standalone settled profit summary"
+    );
+  }
+}
+
+export async function getStandaloneSettledProfitEvents({
+  userId,
+  startDate,
+  endDate,
+}: {
+  userId: string;
+  startDate?: Date | null;
+  endDate?: Date | null;
+}): Promise<ReportingProfitEvent[]> {
+  try {
+    const backConditions: SQL<unknown>[] = [
+      eq(backBet.userId, userId),
+      eq(backBet.status, "settled"),
+      sql`NOT EXISTS (
+        SELECT 1 FROM "MatchedBet" mb
+        WHERE mb."backBetId" = ${backBet.id}
+      )`,
+    ];
+    const layConditions: SQL<unknown>[] = [
+      eq(layBet.userId, userId),
+      eq(layBet.status, "settled"),
+      sql`NOT EXISTS (
+        SELECT 1 FROM "MatchedBet" mb
+        WHERE mb."layBetId" = ${layBet.id}
+      )`,
+    ];
+
+    if (startDate) {
+      backConditions.push(gte(backBet.settledAt, startDate));
+      layConditions.push(gte(layBet.settledAt, startDate));
+    }
+    if (endDate) {
+      backConditions.push(lte(backBet.settledAt, endDate));
+      layConditions.push(lte(layBet.settledAt, endDate));
+    }
+
+    const [backRows, layRows] = await Promise.all([
+      db
+        .select({
+          occurredAt: backBet.settledAt,
+          profitLoss: backBet.profitLoss,
+          profitLossNok: backBet.profitLossNok,
+          currency: backBet.currency,
+        })
+        .from(backBet)
+        .where(and(...backConditions)),
+      db
+        .select({
+          occurredAt: layBet.settledAt,
+          profitLoss: layBet.profitLoss,
+          profitLossNok: layBet.profitLossNok,
+          currency: layBet.currency,
+        })
+        .from(layBet)
+        .where(and(...layConditions)),
+    ]);
+
+    const events: ReportingProfitEvent[] = [];
+    for (const row of [...backRows, ...layRows]) {
+      if (!row.occurredAt) {
+        continue;
+      }
+
+      const profit = row.profitLossNok
+        ? Number.parseFloat(row.profitLossNok)
+        : row.currency === "NOK" && row.profitLoss
+          ? Number.parseFloat(row.profitLoss)
+          : 0;
+
+      events.push({ occurredAt: row.occurredAt, profit, count: 1 });
+    }
+
+    return events;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get standalone settled profit events"
+    );
+  }
+}
 
 /**
  * Get bookmaker profit/loss including bonus/reward transactions.
@@ -3982,10 +4277,20 @@ export async function getBookmakerProfitWithBonuses({
     ];
 
     if (startDate) {
-      bettingConditions.push(gte(matchedBet.createdAt, startDate));
+      bettingConditions.push(sql`COALESCE(
+        ${backBet.settledAt},
+        ${layBet.settledAt},
+        ${matchedBet.confirmedAt},
+        ${matchedBet.createdAt}
+      ) >= ${startDate.toISOString()}`);
     }
     if (endDate) {
-      bettingConditions.push(lte(matchedBet.createdAt, endDate));
+      bettingConditions.push(sql`COALESCE(
+        ${backBet.settledAt},
+        ${layBet.settledAt},
+        ${matchedBet.confirmedAt},
+        ${matchedBet.createdAt}
+      ) <= ${endDate.toISOString()}`);
     }
 
     // Fetch individual matched bets with BOTH legs for full P/L calculation
@@ -4007,11 +4312,14 @@ export async function getBookmakerProfitWithBonuses({
         layStakeNok: layBet.stakeNok,
         layCurrency: layBet.currency,
         netExposure: matchedBet.netExposure,
+        promoType: matchedBet.promoType,
+        freeBetId: freeBet.id,
       })
       .from(matchedBet)
       .leftJoin(backBet, eq(matchedBet.backBetId, backBet.id))
       .leftJoin(layBet, eq(matchedBet.layBetId, layBet.id))
       .leftJoin(account, eq(backBet.accountId, account.id))
+      .leftJoin(freeBet, eq(freeBet.usedInMatchedBetId, matchedBet.id))
       .where(and(...bettingConditions));
 
     // Get bonus transactions per bookmaker account (with currency)
@@ -4040,6 +4348,37 @@ export async function getBookmakerProfitWithBonuses({
       .innerJoin(account, eq(accountTransaction.accountId, account.id))
       .where(and(...bonusConditions));
 
+    const standaloneConditions: SQL<unknown>[] = [
+      eq(backBet.userId, userId),
+      eq(backBet.status, "settled"),
+      eq(account.kind, "bookmaker"),
+      sql`NOT EXISTS (
+        SELECT 1 FROM "MatchedBet" mb
+        WHERE mb."backBetId" = ${backBet.id}
+      )`,
+    ];
+
+    if (startDate) {
+      standaloneConditions.push(gte(backBet.settledAt, startDate));
+    }
+    if (endDate) {
+      standaloneConditions.push(lte(backBet.settledAt, endDate));
+    }
+
+    const standaloneRows = await db
+      .select({
+        accountId: backBet.accountId,
+        accountName: account.name,
+        profitLoss: backBet.profitLoss,
+        profitLossNok: backBet.profitLossNok,
+        stake: backBet.stake,
+        stakeNok: backBet.stakeNok,
+        currency: backBet.currency,
+      })
+      .from(backBet)
+      .innerJoin(account, eq(backBet.accountId, account.id))
+      .where(and(...standaloneConditions));
+
     // Combine betting and bonus data with FX conversion
     const accountMap = new Map<
       string,
@@ -4048,6 +4387,10 @@ export async function getBookmakerProfitWithBonuses({
         accountName: string;
         betCount: number;
         bettingProfit: number;
+        freeBetCount: number;
+        freeBetProfit: number;
+        standaloneBetCount: number;
+        standaloneProfit: number;
         totalStake: number;
         bonusTotal: number;
         totalNetExposure: number;
@@ -4062,6 +4405,10 @@ export async function getBookmakerProfitWithBonuses({
           accountName: row.accountName ?? "Unknown Bookmaker",
           betCount: 0,
           bettingProfit: 0,
+          freeBetCount: 0,
+          freeBetProfit: 0,
+          standaloneBetCount: 0,
+          standaloneProfit: 0,
           totalStake: 0,
           bonusTotal: 0,
           totalNetExposure: 0,
@@ -4090,10 +4437,18 @@ export async function getBookmakerProfitWithBonuses({
             ? Number.parseFloat(row.backStake)
             : 0;
 
-        existing.betCount += 1;
-        existing.bettingProfit += row.settledProfitNok
+        const matchedProfit = row.settledProfitNok
           ? Number.parseFloat(row.settledProfitNok)
           : backPLNok + layPLNok;
+        const usedFreeBet =
+          Boolean(row.freeBetId) || isFreeBetPromoType(row.promoType);
+
+        existing.betCount += 1;
+        existing.bettingProfit += matchedProfit;
+        if (usedFreeBet) {
+          existing.freeBetCount += 1;
+          existing.freeBetProfit += matchedProfit;
+        }
         existing.totalStake += stakeNok;
         existing.totalNetExposure += row.netExposure
           ? Number.parseFloat(row.netExposure)
@@ -4101,6 +4456,47 @@ export async function getBookmakerProfitWithBonuses({
 
         accountMap.set(row.accountId, existing);
       }
+    }
+
+    // Process standalone settled bets that are not part of a matched set.
+    // This captures seized-funds/account-closure losses without double-counting
+    // normal matched-set settlement adjustments.
+    for (const row of standaloneRows) {
+      if (!row.accountId) {
+        continue;
+      }
+
+      const existing = accountMap.get(row.accountId) ?? {
+        accountId: row.accountId,
+        accountName: row.accountName ?? "Unknown Bookmaker",
+        betCount: 0,
+        bettingProfit: 0,
+        freeBetCount: 0,
+        freeBetProfit: 0,
+        standaloneBetCount: 0,
+        standaloneProfit: 0,
+        totalStake: 0,
+        bonusTotal: 0,
+        totalNetExposure: 0,
+      };
+
+      const currency = row.currency ?? "NOK";
+      const profitNok = row.profitLossNok
+        ? Number.parseFloat(row.profitLossNok)
+        : currency === "NOK" && row.profitLoss
+          ? Number.parseFloat(row.profitLoss)
+          : 0;
+      const stakeNok = row.stakeNok
+        ? Number.parseFloat(row.stakeNok)
+        : currency === "NOK" && row.stake
+          ? Number.parseFloat(row.stake)
+          : 0;
+
+      existing.standaloneBetCount += 1;
+      existing.standaloneProfit += profitNok;
+      existing.totalStake += stakeNok;
+
+      accountMap.set(row.accountId, existing);
     }
 
     // Process bonus data using pre-computed amountNok (with fallback for legacy rows)
@@ -4125,6 +4521,10 @@ export async function getBookmakerProfitWithBonuses({
           accountName: row.accountName ?? "Unknown Bookmaker",
           betCount: 0,
           bettingProfit: 0,
+          freeBetCount: 0,
+          freeBetProfit: 0,
+          standaloneBetCount: 0,
+          standaloneProfit: 0,
           totalStake: 0,
           bonusTotal: amountNok,
           totalNetExposure: 0,
@@ -4136,11 +4536,16 @@ export async function getBookmakerProfitWithBonuses({
     const results: BookmakerProfitWithBonuses[] = [];
     for (const data of accountMap.values()) {
       const totalProfit =
-        Math.round((data.bettingProfit + data.bonusTotal) * 100) / 100;
+        Math.round(
+          (data.bettingProfit + data.standaloneProfit + data.bonusTotal) * 100
+        ) / 100;
       const roi =
         data.totalStake > 0 ? (totalProfit / data.totalStake) * 100 : 0;
       const bettingRoi =
-        data.totalStake > 0 ? (data.bettingProfit / data.totalStake) * 100 : 0;
+        data.totalStake > 0
+          ? ((data.bettingProfit + data.standaloneProfit) / data.totalStake) *
+            100
+          : 0;
       const avgBettingProfitPerSet =
         data.betCount > 0 ? data.bettingProfit / data.betCount : 0;
       const avgNetExposurePerSet =
@@ -4155,6 +4560,10 @@ export async function getBookmakerProfitWithBonuses({
         accountName: data.accountName,
         betCount: data.betCount,
         bettingProfit: Math.round(data.bettingProfit * 100) / 100,
+        freeBetCount: data.freeBetCount,
+        freeBetProfit: Math.round(data.freeBetProfit * 100) / 100,
+        standaloneBetCount: data.standaloneBetCount,
+        standaloneProfit: Math.round(data.standaloneProfit * 100) / 100,
         totalStake: Math.round(data.totalStake * 100) / 100,
         bonusTotal: Math.round(data.bonusTotal * 100) / 100,
         totalProfit,
@@ -4240,17 +4649,197 @@ export async function getTotalBonusesForUser({
   }
 }
 
+export async function getBonusProfitEvents({
+  userId,
+  startDate,
+  endDate,
+}: {
+  userId: string;
+  startDate?: Date | null;
+  endDate?: Date | null;
+}): Promise<ReportingProfitEvent[]> {
+  try {
+    const conditions: SQL<unknown>[] = [
+      eq(accountTransaction.userId, userId),
+      eq(accountTransaction.type, "bonus"),
+    ];
+
+    if (startDate) {
+      conditions.push(gte(accountTransaction.occurredAt, startDate));
+    }
+    if (endDate) {
+      conditions.push(lte(accountTransaction.occurredAt, endDate));
+    }
+
+    const transactions = await db
+      .select({
+        occurredAt: accountTransaction.occurredAt,
+        amount: accountTransaction.amount,
+        amountNok: accountTransaction.amountNok,
+        currency: accountTransaction.currency,
+      })
+      .from(accountTransaction)
+      .where(and(...conditions));
+
+    const events: ReportingProfitEvent[] = [];
+    for (const transaction of transactions) {
+      const amountNok =
+        transaction.amountNok != null
+          ? Number.parseFloat(transaction.amountNok)
+          : await convertAmountToNok(
+              Number.parseFloat(transaction.amount ?? "0"),
+              transaction.currency ?? "NOK"
+            );
+
+      events.push({
+        occurredAt: transaction.occurredAt,
+        profit: amountNok,
+        count: 0,
+      });
+    }
+
+    return events;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get bonus profit events"
+    );
+  }
+}
+
+export async function getWalletFeeSummary({
+  userId,
+  startDate,
+  endDate,
+}: {
+  userId: string;
+  startDate?: Date | null;
+  endDate?: Date | null;
+}): Promise<WalletFeeSummary> {
+  try {
+    const conditions: SQL<unknown>[] = [
+      eq(wallet.userId, userId),
+      eq(walletTransaction.type, "fee"),
+    ];
+
+    if (startDate) {
+      conditions.push(gte(walletTransaction.date, startDate));
+    }
+    if (endDate) {
+      conditions.push(lte(walletTransaction.date, endDate));
+    }
+
+    const rows = await db
+      .select({
+        amount: walletTransaction.amount,
+        currency: walletTransaction.currency,
+      })
+      .from(walletTransaction)
+      .innerJoin(wallet, eq(walletTransaction.walletId, wallet.id))
+      .where(and(...conditions));
+
+    let total = 0;
+    for (const row of rows) {
+      total += await convertAmountToNok(
+        Number.parseFloat(row.amount),
+        row.currency ?? "NOK"
+      );
+    }
+
+    return {
+      count: rows.length,
+      total: Math.round(total * 100) / 100,
+    };
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get wallet fee summary"
+    );
+  }
+}
+
+export async function getWalletFeeProfitEvents({
+  userId,
+  startDate,
+  endDate,
+}: {
+  userId: string;
+  startDate?: Date | null;
+  endDate?: Date | null;
+}): Promise<ReportingProfitEvent[]> {
+  try {
+    const conditions: SQL<unknown>[] = [
+      eq(wallet.userId, userId),
+      eq(walletTransaction.type, "fee"),
+    ];
+
+    if (startDate) {
+      conditions.push(gte(walletTransaction.date, startDate));
+    }
+    if (endDate) {
+      conditions.push(lte(walletTransaction.date, endDate));
+    }
+
+    const rows = await db
+      .select({
+        occurredAt: walletTransaction.date,
+        amount: walletTransaction.amount,
+        currency: walletTransaction.currency,
+      })
+      .from(walletTransaction)
+      .innerJoin(wallet, eq(walletTransaction.walletId, wallet.id))
+      .where(and(...conditions));
+
+    const events: ReportingProfitEvent[] = [];
+    for (const row of rows) {
+      const feeNok = await convertAmountToNok(
+        Number.parseFloat(row.amount),
+        row.currency ?? "NOK"
+      );
+
+      events.push({
+        occurredAt: row.occurredAt,
+        profit: -feeNok,
+        count: 0,
+      });
+    }
+
+    return events;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get wallet fee profit events"
+    );
+  }
+}
+
 /**
  * Get total open exposure (non-settled matched bets).
  */
 export async function getOpenExposure({ userId }: { userId: string }) {
   try {
-    const [result] = await db
+    const openBets = await db
       .select({
-        totalExposure: sum(matchedBet.netExposure),
-        count: count(matchedBet.id),
+        id: matchedBet.id,
+        storedNetExposure: matchedBet.netExposure,
+        promoType: matchedBet.promoType,
+        backStake: backBet.stake,
+        backStakeNok: backBet.stakeNok,
+        backOdds: backBet.odds,
+        backCurrency: backBet.currency,
+        layStake: layBet.stake,
+        layStakeNok: layBet.stakeNok,
+        layOdds: layBet.odds,
+        layCurrency: layBet.currency,
+        layAccountCommission: account.commission,
+        freeBetId: freeBet.id,
+        freeBetStakeReturned: freeBet.stakeReturned,
       })
       .from(matchedBet)
+      .leftJoin(backBet, eq(matchedBet.backBetId, backBet.id))
+      .leftJoin(layBet, eq(matchedBet.layBetId, layBet.id))
+      .leftJoin(account, eq(layBet.accountId, account.id))
+      .leftJoin(freeBet, eq(freeBet.usedInMatchedBetId, matchedBet.id))
       .where(
         and(
           eq(matchedBet.userId, userId),
@@ -4258,11 +4847,50 @@ export async function getOpenExposure({ userId }: { userId: string }) {
         )
       );
 
+    let totalExposure = 0;
+
+    for (const bet of openBets) {
+      const backStake = Number.parseFloat(bet.backStakeNok ?? "");
+      const backOdds = Number.parseFloat(bet.backOdds ?? "");
+      const layStake = Number.parseFloat(bet.layStakeNok ?? "");
+      const layOdds = Number.parseFloat(bet.layOdds ?? "");
+
+      if (
+        Number.isFinite(backStake) &&
+        Number.isFinite(backOdds) &&
+        Number.isFinite(layStake) &&
+        Number.isFinite(layOdds)
+      ) {
+        const { backProfit, layLiability } = computeNetExposureInputs({
+          backStake,
+          backOdds,
+          layStake,
+          layOdds,
+        });
+        const { netExposure } = computeMatchedNetExposure({
+          backStake,
+          backProfit,
+          layStake,
+          layLiability,
+          isFreeBet: !!bet.freeBetId || isFreeBetPromoType(bet.promoType),
+          freeBetStakeReturned: bet.freeBetStakeReturned ?? false,
+          commissionRate: bet.layAccountCommission
+            ? Number.parseFloat(bet.layAccountCommission)
+            : 0,
+        });
+
+        totalExposure += netExposure;
+        continue;
+      }
+
+      totalExposure += bet.storedNetExposure
+        ? Number.parseFloat(bet.storedNetExposure)
+        : 0;
+    }
+
     return {
-      totalExposure: result?.totalExposure
-        ? Number.parseFloat(result.totalExposure)
-        : 0,
-      count: result?.count ?? 0,
+      totalExposure: Math.round(totalExposure * 100) / 100,
+      count: openBets.length,
     };
   } catch (_error) {
     throw new ChatSDKError(
@@ -4836,59 +5464,82 @@ export async function getDashboardSummary({
     const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
     // Run all queries in parallel for performance
-    const [settledAggregates, openExposureData, pendingReview, recentActivity] =
-      await Promise.all([
-        // Aggregate settled bets using stored NOK values
-        db
-          .select({
-            totalSettledProfitNok: sql<string>`COALESCE(SUM(COALESCE(
+    const [
+      settledAggregates,
+      standaloneProfitSummary,
+      bonusTotal,
+      walletFeeSummary,
+      openExposureData,
+      pendingReview,
+      recentActivity,
+    ] = await Promise.all([
+      // Aggregate settled bets using stored NOK values
+      db
+        .select({
+          totalSettledProfitNok: sql<string>`COALESCE(SUM(COALESCE(
               ${matchedBet.settledProfitNok},
               COALESCE(${backBet.profitLossNok}, 0) + COALESCE(${layBet.profitLossNok}, 0)
             )), 0)`,
-            totalBackStakeNok: sql<string>`COALESCE(${sum(backBet.stakeNok)}, 0)`,
-            settledCount: count(matchedBet.id),
-          })
-          .from(matchedBet)
-          .leftJoin(backBet, eq(matchedBet.backBetId, backBet.id))
-          .leftJoin(layBet, eq(matchedBet.layBetId, layBet.id))
-          .where(
-            and(eq(matchedBet.userId, userId), eq(matchedBet.status, "settled"))
-          ),
+          totalBackStakeNok: sql<string>`COALESCE(${sum(backBet.stakeNok)}, 0)`,
+          settledCount: count(matchedBet.id),
+        })
+        .from(matchedBet)
+        .leftJoin(backBet, eq(matchedBet.backBetId, backBet.id))
+        .leftJoin(layBet, eq(matchedBet.layBetId, layBet.id))
+        .where(
+          and(eq(matchedBet.userId, userId), eq(matchedBet.status, "settled"))
+        ),
 
-        // Open exposure
-        getOpenExposure({ userId }),
+      // Standalone settled bets capture seized funds/account closures.
+      getStandaloneSettledProfitSummary({ userId }),
 
-        // Pending review count
-        db
-          .select({ count: count(matchedBet.id) })
-          .from(matchedBet)
-          .where(
-            and(
-              eq(matchedBet.userId, userId),
-              inArray(matchedBet.status, ["needs_review", "draft"])
-            )
-          ),
+      // Bonuses count toward net profit.
+      getTotalBonusesForUser({ userId }),
 
-        // Recent activity (last 7 days)
-        db
-          .select({ count: count(matchedBet.id) })
-          .from(matchedBet)
-          .where(
-            and(
-              eq(matchedBet.userId, userId),
-              gte(matchedBet.createdAt, sevenDaysAgo)
-            )
-          ),
-      ]);
+      // Wallet fees reduce net profit.
+      getWalletFeeSummary({ userId }),
+
+      // Open exposure
+      getOpenExposure({ userId }),
+
+      // Pending review count
+      db
+        .select({ count: count(matchedBet.id) })
+        .from(matchedBet)
+        .where(
+          and(
+            eq(matchedBet.userId, userId),
+            inArray(matchedBet.status, ["needs_review", "draft"])
+          )
+        ),
+
+      // Recent activity (last 7 days)
+      db
+        .select({ count: count(matchedBet.id) })
+        .from(matchedBet)
+        .where(
+          and(
+            eq(matchedBet.userId, userId),
+            gte(matchedBet.createdAt, sevenDaysAgo)
+          )
+        ),
+    ]);
 
     const totals = settledAggregates[0];
-    const totalProfit = totals?.totalSettledProfitNok
+    const matchedProfit = totals?.totalSettledProfitNok
       ? Number.parseFloat(totals.totalSettledProfitNok)
       : 0;
-    const totalStake = totals?.totalBackStakeNok
+    const matchedStake = totals?.totalBackStakeNok
       ? Number.parseFloat(totals.totalBackStakeNok)
       : 0;
-    const settledCount = totals?.settledCount ?? 0;
+    const totalProfit =
+      matchedProfit +
+      standaloneProfitSummary.profit +
+      bonusTotal -
+      walletFeeSummary.total;
+    const totalStake = matchedStake + standaloneProfitSummary.stake;
+    const settledCount =
+      (totals?.settledCount ?? 0) + standaloneProfitSummary.count;
     const roi = totalStake > 0 ? (totalProfit / totalStake) * 100 : 0;
 
     return {
