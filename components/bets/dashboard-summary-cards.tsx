@@ -12,15 +12,17 @@ import { Card, CardContent } from "@/components/ui/card";
 import { formatNOK, formatPercentage } from "@/lib/reporting";
 import { cn } from "@/lib/utils";
 
-export interface DashboardSummaryProps {
+export type DashboardSummaryProps = {
   totalProfit: number;
   settledCount: number;
   openExposure: number;
+  openProfitIfBackWins: number;
+  openProfitIfLayWins: number;
   openPositions: number;
   pendingReviewCount: number;
   recentActivityCount: number;
   roi: number;
-}
+};
 
 /**
  * Dashboard summary cards showing key metrics at a glance:
@@ -33,13 +35,19 @@ export function DashboardSummaryCards({
   totalProfit,
   settledCount,
   openExposure,
+  openProfitIfBackWins,
+  openProfitIfLayWins,
   openPositions,
   pendingReviewCount,
   recentActivityCount,
   roi,
 }: DashboardSummaryProps) {
   const isProfitable = totalProfit >= 0;
-  const hasExposure = openPositions > 0 && openExposure !== 0;
+  const hasExposure =
+    openPositions > 0 &&
+    (openExposure !== 0 ||
+      openProfitIfBackWins !== 0 ||
+      openProfitIfLayWins !== 0);
   const hasPending = pendingReviewCount > 0;
 
   return (
@@ -120,16 +128,35 @@ export function DashboardSummaryCards({
             </div>
           </div>
           <div className="mt-3">
-            <p
-              className={cn(
-                "font-bold text-2xl",
-                hasExposure ? "text-amber-600" : "text-muted-foreground"
-              )}
-            >
-              {formatNOK(openExposure)}
-            </p>
+            <div className="space-y-1 text-sm">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-muted-foreground">If back bet wins</span>
+                <span
+                  className={cn(
+                    "font-semibold",
+                    openProfitIfBackWins >= 0
+                      ? "text-green-600"
+                      : "text-red-600"
+                  )}
+                >
+                  {formatNOK(openProfitIfBackWins)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-muted-foreground">If lay bet wins</span>
+                <span
+                  className={cn(
+                    "font-semibold",
+                    openProfitIfLayWins >= 0 ? "text-green-600" : "text-red-600"
+                  )}
+                >
+                  {formatNOK(openProfitIfLayWins)}
+                </span>
+              </div>
+            </div>
             <p className="mt-1 text-muted-foreground text-xs">
-              {openPositions} open position{openPositions !== 1 ? "s" : ""}
+              {openPositions} open position{openPositions !== 1 ? "s" : ""} -
+              Worst case {formatNOK(openExposure)}
             </p>
           </div>
         </CardContent>
