@@ -63,6 +63,99 @@ import { generateHashedPassword } from "./utils";
 const normalizeAccountName = (name: string) => name.trim().toLowerCase();
 const normalizePromoType = (type: string) => type.trim().toLowerCase();
 
+export type MatchedOutcomePreview = {
+  profitIfBackWins: number;
+  profitIfLayWins: number;
+  netExposure: number;
+};
+
+function parseNumeric(
+  value: string | number | null | undefined
+): number | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  const parsed =
+    typeof value === "number" ? value : Number.parseFloat(value.toString());
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function roundCurrency(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+function calculateMatchedOutcomePreview({
+  storedNetExposure,
+  promoType,
+  backStake,
+  backStakeNok,
+  backOdds,
+  layStake,
+  layStakeNok,
+  layOdds,
+  layAccountCommission,
+  freeBetId,
+  freeBetStakeReturned,
+}: {
+  storedNetExposure?: string | number | null;
+  promoType?: string | null;
+  backStake?: string | number | null;
+  backStakeNok?: string | number | null;
+  backOdds?: string | number | null;
+  layStake?: string | number | null;
+  layStakeNok?: string | number | null;
+  layOdds?: string | number | null;
+  layAccountCommission?: string | number | null;
+  freeBetId?: string | null;
+  freeBetStakeReturned?: boolean | null;
+}): MatchedOutcomePreview | null {
+  const backStakeValue = parseNumeric(backStakeNok) ?? parseNumeric(backStake);
+  const backOddsValue = parseNumeric(backOdds);
+  const layStakeValue = parseNumeric(layStakeNok) ?? parseNumeric(layStake);
+  const layOddsValue = parseNumeric(layOdds);
+
+  if (
+    backStakeValue !== null &&
+    backOddsValue !== null &&
+    layStakeValue !== null &&
+    layOddsValue !== null
+  ) {
+    const { backProfit, layLiability } = computeNetExposureInputs({
+      backStake: backStakeValue,
+      backOdds: backOddsValue,
+      layStake: layStakeValue,
+      layOdds: layOddsValue,
+    });
+    const outcomes = computeMatchedNetExposure({
+      backStake: backStakeValue,
+      backProfit,
+      layStake: layStakeValue,
+      layLiability,
+      isFreeBet: !!freeBetId || isFreeBetPromoType(promoType ?? null),
+      freeBetStakeReturned: freeBetStakeReturned ?? false,
+      commissionRate: parseNumeric(layAccountCommission) ?? 0,
+    });
+
+    return {
+      profitIfBackWins: roundCurrency(outcomes.profitIfBackWins),
+      profitIfLayWins: roundCurrency(outcomes.profitIfLayWins),
+      netExposure: roundCurrency(outcomes.netExposure),
+    };
+  }
+
+  const fallbackExposure = parseNumeric(storedNetExposure);
+  if (fallbackExposure === null) {
+    return null;
+  }
+
+  return {
+    profitIfBackWins: roundCurrency(fallbackExposure),
+    profitIfLayWins: roundCurrency(fallbackExposure),
+    netExposure: roundCurrency(fallbackExposure),
+  };
+}
+
 export async function getUser(email: string): Promise<User[]> {
   try {
     return await db.select().from(user).where(eq(user.email, email));
@@ -2004,22 +2097,64 @@ export async function listMatchedBetsByUser({
   limit?: number;
 }) {
   try {
-    return await db
+    const layAccount = aliasedTable(account, "layAccount");
+
+    const rows = await db
       .select({
         id: matchedBet.id,
         market: matchedBet.market,
         selection: matchedBet.selection,
         status: matchedBet.status,
+        promoType: matchedBet.promoType,
         netExposure: matchedBet.netExposure,
         createdAt: matchedBet.createdAt,
         backBetId: matchedBet.backBetId,
         layBetId: matchedBet.layBetId,
         promoId: matchedBet.promoId,
+        backStake: backBet.stake,
+        backStakeNok: backBet.stakeNok,
+        backOdds: backBet.odds,
+        layStake: layBet.stake,
+        layStakeNok: layBet.stakeNok,
+        layOdds: layBet.odds,
+        layAccountCommission: layAccount.commission,
+        freeBetId: freeBet.id,
+        freeBetStakeReturned: freeBet.stakeReturned,
       })
       .from(matchedBet)
+      .leftJoin(backBet, eq(matchedBet.backBetId, backBet.id))
+      .leftJoin(layBet, eq(matchedBet.layBetId, layBet.id))
+      .leftJoin(layAccount, eq(layBet.accountId, layAccount.id))
+      .leftJoin(freeBet, eq(freeBet.usedInMatchedBetId, matchedBet.id))
       .where(eq(matchedBet.userId, userId))
       .orderBy(desc(matchedBet.createdAt))
       .limit(limit);
+
+    return rows.map((row) => ({
+      id: row.id,
+      market: row.market,
+      selection: row.selection,
+      status: row.status,
+      promoType: row.promoType,
+      netExposure: row.netExposure,
+      createdAt: row.createdAt,
+      backBetId: row.backBetId,
+      layBetId: row.layBetId,
+      promoId: row.promoId,
+      outcomePreview: calculateMatchedOutcomePreview({
+        storedNetExposure: row.netExposure,
+        promoType: row.promoType,
+        backStake: row.backStake,
+        backStakeNok: row.backStakeNok,
+        backOdds: row.backOdds,
+        layStake: row.layStake,
+        layStakeNok: row.layStakeNok,
+        layOdds: row.layOdds,
+        layAccountCommission: row.layAccountCommission,
+        freeBetId: row.freeBetId,
+        freeBetStakeReturned: row.freeBetStakeReturned,
+      }),
+    }));
   } catch (_error) {
     throw new ChatSDKError(
       "bad_request:database",
@@ -2035,12 +2170,14 @@ export type MatchedBetListItem = {
   status: "draft" | "matched" | "settled" | "needs_review";
   promoType: string | null;
   netExposure: number | null;
+  outcomePreview: MatchedOutcomePreview | null;
   createdAt: Date;
   notes: string | null;
   back: {
     id: string;
     odds: number;
     stake: number;
+    stakeNok: number | null;
     exchange: string;
     currency: string | null;
     status:
@@ -2059,6 +2196,7 @@ export type MatchedBetListItem = {
     id: string;
     odds: number;
     stake: number;
+    stakeNok: number | null;
     exchange: string;
     currency: string | null;
     status:
@@ -2133,10 +2271,14 @@ export async function listMatchedBetsForList({
         netExposure: matchedBet.netExposure,
         createdAt: matchedBet.createdAt,
         notes: matchedBet.notes,
+        freeBetId: freeBet.id,
+        freeBetStakeReturned: freeBet.stakeReturned,
+        layAccountCommission: layAccount.commission,
         back: {
           id: backBet.id,
           odds: backBet.odds,
           stake: backBet.stake,
+          stakeNok: backBet.stakeNok,
           exchange: backBet.exchange,
           currency: backBet.currency,
           status: backBet.status,
@@ -2149,6 +2291,7 @@ export async function listMatchedBetsForList({
           id: layBet.id,
           odds: layBet.odds,
           stake: layBet.stake,
+          stakeNok: layBet.stakeNok,
           exchange: layBet.exchange,
           currency: layBet.currency,
           status: layBet.status,
@@ -2174,6 +2317,7 @@ export async function listMatchedBetsForList({
       .leftJoin(backAccount, eq(backBet.accountId, backAccount.id))
       .leftJoin(layAccount, eq(layBet.accountId, layAccount.id))
       .leftJoin(footballMatch, eq(matchedBet.matchId, footballMatch.id))
+      .leftJoin(freeBet, eq(freeBet.usedInMatchedBetId, matchedBet.id))
       .where(and(...conditions))
       .orderBy(desc(matchedBet.createdAt))
       .limit(limit);
@@ -2190,6 +2334,7 @@ export async function listMatchedBetsForList({
               id: row.back.id,
               odds: Number.parseFloat((row.back.odds ?? 0).toString()),
               stake: Number.parseFloat((row.back.stake ?? 0).toString()),
+              stakeNok: parseNumber(row.back.stakeNok),
               exchange: row.back.exchange ?? "",
               currency: row.back.currency ?? null,
               status: row.back.status ?? ("draft" as const),
@@ -2206,6 +2351,7 @@ export async function listMatchedBetsForList({
               id: row.lay.id,
               odds: Number.parseFloat((row.lay.odds ?? 0).toString()),
               stake: Number.parseFloat((row.lay.stake ?? 0).toString()),
+              stakeNok: parseNumber(row.lay.stakeNok),
               exchange: row.lay.exchange ?? "",
               currency: row.lay.currency ?? null,
               status: row.lay.status ?? ("draft" as const),
@@ -2245,6 +2391,19 @@ export async function listMatchedBetsForList({
         status: row.status,
         promoType: row.promoType ?? null,
         netExposure: parseNumber(row.netExposure),
+        outcomePreview: calculateMatchedOutcomePreview({
+          storedNetExposure: row.netExposure,
+          promoType: row.promoType,
+          backStake: row.back?.stake,
+          backStakeNok: row.back?.stakeNok,
+          backOdds: row.back?.odds,
+          layStake: row.lay?.stake,
+          layStakeNok: row.lay?.stakeNok,
+          layOdds: row.lay?.odds,
+          layAccountCommission: row.layAccountCommission,
+          freeBetId: row.freeBetId,
+          freeBetStakeReturned: row.freeBetStakeReturned,
+        }),
         createdAt: row.createdAt,
         notes: row.notes ?? null,
         back,
@@ -2696,6 +2855,7 @@ export type PendingSettlementBet = {
   selection: string;
   status: string;
   netExposure: string | null;
+  outcomePreview: MatchedOutcomePreview | null;
   createdAt: Date;
   promoType: string | null;
   matchId: string | null;
@@ -2789,6 +2949,8 @@ export async function getPendingSettlementBets({
       );
     }
 
+    const layAccount = aliasedTable(account, "pendingLayAccount");
+
     const rows = await db
       .select({
         id: matchedBet.id,
@@ -2796,6 +2958,15 @@ export async function getPendingSettlementBets({
         selection: matchedBet.selection,
         status: matchedBet.status,
         netExposure: matchedBet.netExposure,
+        backStake: backBet.stake,
+        backStakeNok: backBet.stakeNok,
+        backOdds: backBet.odds,
+        layStake: layBet.stake,
+        layStakeNok: layBet.stakeNok,
+        layOdds: layBet.odds,
+        layAccountCommission: layAccount.commission,
+        freeBetId: freeBet.id,
+        freeBetStakeReturned: freeBet.stakeReturned,
         createdAt: matchedBet.createdAt,
         promoType: matchedBet.promoType,
         matchId: matchedBet.matchId,
@@ -2809,6 +2980,10 @@ export async function getPendingSettlementBets({
         awayScore: footballMatch.awayScore,
       })
       .from(matchedBet)
+      .leftJoin(backBet, eq(matchedBet.backBetId, backBet.id))
+      .leftJoin(layBet, eq(matchedBet.layBetId, layBet.id))
+      .leftJoin(layAccount, eq(layBet.accountId, layAccount.id))
+      .leftJoin(freeBet, eq(freeBet.usedInMatchedBetId, matchedBet.id))
       .leftJoin(footballMatch, eq(matchedBet.matchId, footballMatch.id))
       .where(and(...conditions))
       .orderBy(
@@ -2825,6 +3000,19 @@ export async function getPendingSettlementBets({
       selection: row.selection,
       status: row.status,
       netExposure: row.netExposure,
+      outcomePreview: calculateMatchedOutcomePreview({
+        storedNetExposure: row.netExposure,
+        promoType: row.promoType,
+        backStake: row.backStake,
+        backStakeNok: row.backStakeNok,
+        backOdds: row.backOdds,
+        layStake: row.layStake,
+        layStakeNok: row.layStakeNok,
+        layOdds: row.layOdds,
+        layAccountCommission: row.layAccountCommission,
+        freeBetId: row.freeBetId,
+        freeBetStakeReturned: row.freeBetStakeReturned,
+      }),
       createdAt: row.createdAt,
       promoType: row.promoType,
       matchId: row.matchId,
@@ -4848,48 +5036,36 @@ export async function getOpenExposure({ userId }: { userId: string }) {
       );
 
     let totalExposure = 0;
+    let profitIfBackWins = 0;
+    let profitIfLayWins = 0;
 
     for (const bet of openBets) {
-      const backStake = Number.parseFloat(bet.backStakeNok ?? "");
-      const backOdds = Number.parseFloat(bet.backOdds ?? "");
-      const layStake = Number.parseFloat(bet.layStakeNok ?? "");
-      const layOdds = Number.parseFloat(bet.layOdds ?? "");
+      const preview = calculateMatchedOutcomePreview({
+        storedNetExposure: bet.storedNetExposure,
+        promoType: bet.promoType,
+        backStake: bet.backStake,
+        backStakeNok: bet.backStakeNok,
+        backOdds: bet.backOdds,
+        layStake: bet.layStake,
+        layStakeNok: bet.layStakeNok,
+        layOdds: bet.layOdds,
+        layAccountCommission: bet.layAccountCommission,
+        freeBetId: bet.freeBetId,
+        freeBetStakeReturned: bet.freeBetStakeReturned,
+      });
 
-      if (
-        Number.isFinite(backStake) &&
-        Number.isFinite(backOdds) &&
-        Number.isFinite(layStake) &&
-        Number.isFinite(layOdds)
-      ) {
-        const { backProfit, layLiability } = computeNetExposureInputs({
-          backStake,
-          backOdds,
-          layStake,
-          layOdds,
-        });
-        const { netExposure } = computeMatchedNetExposure({
-          backStake,
-          backProfit,
-          layStake,
-          layLiability,
-          isFreeBet: !!bet.freeBetId || isFreeBetPromoType(bet.promoType),
-          freeBetStakeReturned: bet.freeBetStakeReturned ?? false,
-          commissionRate: bet.layAccountCommission
-            ? Number.parseFloat(bet.layAccountCommission)
-            : 0,
-        });
-
-        totalExposure += netExposure;
+      if (preview) {
+        totalExposure += preview.netExposure;
+        profitIfBackWins += preview.profitIfBackWins;
+        profitIfLayWins += preview.profitIfLayWins;
         continue;
       }
-
-      totalExposure += bet.storedNetExposure
-        ? Number.parseFloat(bet.storedNetExposure)
-        : 0;
     }
 
     return {
       totalExposure: Math.round(totalExposure * 100) / 100,
+      profitIfBackWins: Math.round(profitIfBackWins * 100) / 100,
+      profitIfLayWins: Math.round(profitIfLayWins * 100) / 100,
       count: openBets.length,
     };
   } catch (_error) {
@@ -5110,6 +5286,10 @@ export type ExposureByEvent = {
   } | null;
   /** Total exposure for this event */
   totalExposure: number;
+  /** Combined outcome if the back side wins */
+  profitIfBackWins?: number;
+  /** Combined outcome if the lay side wins */
+  profitIfLayWins?: number;
   /** Number of bets on this event */
   betCount: number;
   /** List of bet IDs for this event */
@@ -5131,13 +5311,24 @@ export async function getExposureByEvent({
   userId: string;
 }): Promise<ExposureByEvent[]> {
   try {
-    // Get all open matched bets with their exposure and match info
+    const layAccount = aliasedTable(account, "layAccount");
+
+    // Get all open matched bets with their outcome inputs and match info
     const openBets = await db
       .select({
         betId: matchedBet.id,
         matchId: matchedBet.matchId,
         netExposure: matchedBet.netExposure,
         promoType: matchedBet.promoType,
+        backStake: backBet.stake,
+        backStakeNok: backBet.stakeNok,
+        backOdds: backBet.odds,
+        layStake: layBet.stake,
+        layStakeNok: layBet.stakeNok,
+        layOdds: layBet.odds,
+        layAccountCommission: layAccount.commission,
+        freeBetId: freeBet.id,
+        freeBetStakeReturned: freeBet.stakeReturned,
         homeTeam: footballMatch.homeTeam,
         awayTeam: footballMatch.awayTeam,
         competition: footballMatch.competition,
@@ -5145,6 +5336,10 @@ export async function getExposureByEvent({
         matchStatus: footballMatch.status,
       })
       .from(matchedBet)
+      .leftJoin(backBet, eq(matchedBet.backBetId, backBet.id))
+      .leftJoin(layBet, eq(matchedBet.layBetId, layBet.id))
+      .leftJoin(layAccount, eq(layBet.accountId, layAccount.id))
+      .leftJoin(freeBet, eq(freeBet.usedInMatchedBetId, matchedBet.id))
       .leftJoin(footballMatch, eq(matchedBet.matchId, footballMatch.id))
       .where(
         and(
@@ -5164,6 +5359,8 @@ export async function getExposureByEvent({
       {
         matchInfo: ExposureByEvent["match"];
         totalExposure: number;
+        profitIfBackWins: number;
+        profitIfLayWins: number;
         betIds: string[];
         promoTypes: Set<string>;
       }
@@ -5171,11 +5368,28 @@ export async function getExposureByEvent({
 
     for (const bet of openBets) {
       const key = bet.matchId;
-      const exposure = bet.netExposure ? Number.parseFloat(bet.netExposure) : 0;
+      const preview = calculateMatchedOutcomePreview({
+        storedNetExposure: bet.netExposure,
+        promoType: bet.promoType,
+        backStake: bet.backStake,
+        backStakeNok: bet.backStakeNok,
+        backOdds: bet.backOdds,
+        layStake: bet.layStake,
+        layStakeNok: bet.layStakeNok,
+        layOdds: bet.layOdds,
+        layAccountCommission: bet.layAccountCommission,
+        freeBetId: bet.freeBetId,
+        freeBetStakeReturned: bet.freeBetStakeReturned,
+      });
+      const exposure = preview?.netExposure ?? 0;
+      const profitIfBackWins = preview?.profitIfBackWins ?? exposure;
+      const profitIfLayWins = preview?.profitIfLayWins ?? exposure;
 
       const existing = exposureMap.get(key);
       if (existing) {
         existing.totalExposure += exposure;
+        existing.profitIfBackWins += profitIfBackWins;
+        existing.profitIfLayWins += profitIfLayWins;
         existing.betIds.push(bet.betId);
         if (bet.promoType) {
           existing.promoTypes.add(bet.promoType);
@@ -5194,6 +5408,8 @@ export async function getExposureByEvent({
                 }
               : null,
           totalExposure: exposure,
+          profitIfBackWins,
+          profitIfLayWins,
           betIds: [bet.betId],
           promoTypes: new Set(bet.promoType ? [bet.promoType] : []),
         });
@@ -5206,6 +5422,8 @@ export async function getExposureByEvent({
         matchId,
         match: data.matchInfo,
         totalExposure: Math.round(data.totalExposure * 100) / 100,
+        profitIfBackWins: Math.round(data.profitIfBackWins * 100) / 100,
+        profitIfLayWins: Math.round(data.profitIfLayWins * 100) / 100,
         betCount: data.betIds.length,
         betIds: data.betIds,
         promoTypes: Array.from(data.promoTypes),
@@ -5439,6 +5657,10 @@ export interface DashboardSummary {
   settledCount: number;
   /** Open exposure from non-settled bets (NOK) */
   openExposure: number;
+  /** Combined outcome if open back bets win (NOK) */
+  openProfitIfBackWins: number;
+  /** Combined outcome if open lay bets win (NOK) */
+  openProfitIfLayWins: number;
   /** Number of open positions */
   openPositions: number;
   /** Number of bets pending review */
@@ -5546,6 +5768,8 @@ export async function getDashboardSummary({
       totalProfit: Math.round(totalProfit * 100) / 100,
       settledCount,
       openExposure: openExposureData.totalExposure,
+      openProfitIfBackWins: openExposureData.profitIfBackWins,
+      openProfitIfLayWins: openExposureData.profitIfLayWins,
       openPositions: openExposureData.count,
       pendingReviewCount: pendingReview[0]?.count ?? 0,
       recentActivityCount: recentActivity[0]?.count ?? 0,
