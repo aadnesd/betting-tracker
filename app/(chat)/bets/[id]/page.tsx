@@ -200,22 +200,23 @@ export default async function Page({ params }: PageProps) {
 
       {/* Summary row */}
       <div className="flex flex-wrap gap-4">
-        {/* Show both outcomes for free bets, otherwise just net exposure */}
-        {betOutcomes?.isFreeBet ? (
+        {betOutcomes ? (
           <>
-            <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3">
-              <p className="flex items-center gap-1 text-muted-foreground text-xs uppercase tracking-wide">
-                <Gift className="h-3 w-3 text-green-600" />
-                Guaranteed profit
-              </p>
-              <p className="font-semibold text-green-700 text-lg">
-                NOK {betOutcomes.guaranteedProfit.toFixed(2)}
-              </p>
-            </div>
+            {betOutcomes.isFreeBet && (
+              <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3">
+                <p className="flex items-center gap-1 text-muted-foreground text-xs uppercase tracking-wide">
+                  <Gift className="h-3 w-3 text-green-600" />
+                  Guaranteed profit
+                </p>
+                <p className="font-semibold text-green-700 text-lg">
+                  NOK {betOutcomes.guaranteedProfit.toFixed(2)}
+                </p>
+              </div>
+            )}
             <div className="rounded-lg border bg-muted/50 px-4 py-3">
               <p className="flex items-center gap-1 text-muted-foreground text-xs uppercase tracking-wide">
                 <TrendingUp className="h-3 w-3" />
-                If selection wins
+                If back bet wins
               </p>
               <p
                 className={`font-semibold text-lg ${betOutcomes.profitIfWins >= 0 ? "text-green-600" : "text-red-600"}`}
@@ -226,7 +227,7 @@ export default async function Page({ params }: PageProps) {
             <div className="rounded-lg border bg-muted/50 px-4 py-3">
               <p className="flex items-center gap-1 text-muted-foreground text-xs uppercase tracking-wide">
                 <TrendingDown className="h-3 w-3" />
-                If selection loses
+                If lay bet wins
               </p>
               <p
                 className={`font-semibold text-lg ${betOutcomes.profitIfLoses >= 0 ? "text-green-600" : "text-red-600"}`}

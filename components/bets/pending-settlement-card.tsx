@@ -19,11 +19,11 @@ import { cn } from "@/lib/utils";
 
 export type SettlementFilter = "today" | "thisWeek" | "all";
 
-interface PendingSettlementCardProps {
+type PendingSettlementCardProps = {
   bets: PendingSettlementBet[];
   totalCount: number;
   filter?: SettlementFilter;
-}
+};
 
 /**
  * Dashboard widget showing matched bets awaiting settlement.
@@ -159,8 +159,9 @@ function FilterButton({
 }
 
 function PendingBetRow({ bet }: { bet: PendingSettlementBet }) {
-  const hasMatch = bet.footballMatch !== null;
-  const isMatchFinished = bet.footballMatch?.status === "FINISHED";
+  const footballMatch = bet.footballMatch;
+  const hasMatch = footballMatch !== null;
+  const isMatchFinished = footballMatch?.status === "FINISHED";
 
   return (
     <Link
@@ -181,15 +182,14 @@ function PendingBetRow({ bet }: { bet: PendingSettlementBet }) {
             <div className="flex items-center gap-2 text-xs">
               <Trophy className="h-3 w-3 text-muted-foreground" />
               <span className="text-muted-foreground">
-                {bet.footballMatch!.homeTeam} vs {bet.footballMatch!.awayTeam}
+                {footballMatch.homeTeam} vs {footballMatch.awayTeam}
               </span>
-              {isMatchFinished && bet.footballMatch!.homeScore !== null && (
+              {isMatchFinished && footballMatch.homeScore !== null && (
                 <span className="font-semibold text-green-600">
-                  ({bet.footballMatch!.homeScore} -{" "}
-                  {bet.footballMatch!.awayScore})
+                  ({footballMatch.homeScore} - {footballMatch.awayScore})
                 </span>
               )}
-              <MatchStatusBadge status={bet.footballMatch!.status} />
+              <MatchStatusBadge status={footballMatch.status} />
             </div>
           ) : (
             <p className="text-muted-foreground text-xs">
@@ -198,17 +198,50 @@ function PendingBetRow({ bet }: { bet: PendingSettlementBet }) {
           )}
         </div>
         <div className="flex items-center gap-3">
-          {bet.netExposure && (
-            <span
-              className={cn(
-                "font-medium text-sm",
-                Number(bet.netExposure) >= 0
-                  ? "text-green-600"
-                  : "text-amber-600"
-              )}
-            >
-              {formatNOK(Number(bet.netExposure))}
-            </span>
+          {bet.outcomePreview ? (
+            <div className="text-right text-xs">
+              <div>
+                <span className="text-muted-foreground">
+                  If back bet wins:{" "}
+                </span>
+                <span
+                  className={cn(
+                    "font-semibold",
+                    bet.outcomePreview.profitIfBackWins >= 0
+                      ? "text-green-600"
+                      : "text-amber-600"
+                  )}
+                >
+                  {formatNOK(bet.outcomePreview.profitIfBackWins)}
+                </span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">If lay bet wins: </span>
+                <span
+                  className={cn(
+                    "font-semibold",
+                    bet.outcomePreview.profitIfLayWins >= 0
+                      ? "text-green-600"
+                      : "text-amber-600"
+                  )}
+                >
+                  {formatNOK(bet.outcomePreview.profitIfLayWins)}
+                </span>
+              </div>
+            </div>
+          ) : (
+            bet.netExposure && (
+              <span
+                className={cn(
+                  "font-medium text-sm",
+                  Number(bet.netExposure) >= 0
+                    ? "text-green-600"
+                    : "text-amber-600"
+                )}
+              >
+                {formatNOK(Number(bet.netExposure))}
+              </span>
+            )
           )}
           {bet.promoType && (
             <span className="rounded-full bg-purple-100 px-2 py-0.5 text-purple-700 text-xs">
