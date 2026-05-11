@@ -264,10 +264,21 @@ export default async function Page(props: PageProps) {
                     </p>
                   </div>
                   <div className="flex flex-wrap items-center gap-3">
-                    {bet.netExposure !== null && (
-                      <span className="font-semibold text-sm">
-                        Exposure: {formatNOK(bet.netExposure)}
-                      </span>
+                    {bet.outcomePreview && (
+                      <div className="text-right text-xs">
+                        <div>
+                          If back bet wins:{" "}
+                          <span className="font-semibold">
+                            {formatNOK(bet.outcomePreview.profitIfBackWins)}
+                          </span>
+                        </div>
+                        <div>
+                          If lay bet wins:{" "}
+                          <span className="font-semibold">
+                            {formatNOK(bet.outcomePreview.profitIfLayWins)}
+                          </span>
+                        </div>
+                      </div>
                     )}
                     {missingLabel && (
                       <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-amber-800 text-xs">

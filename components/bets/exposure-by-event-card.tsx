@@ -9,11 +9,11 @@ import type { ExposureByEvent } from "@/lib/db/queries";
 import { formatNOK } from "@/lib/reporting";
 import { cn } from "@/lib/utils";
 
-interface ExposureByEventCardProps {
+type ExposureByEventCardProps = {
   exposureData: ExposureByEvent[];
   /** Optional threshold to highlight high exposure events */
   warningThreshold?: number;
-}
+};
 
 /**
  * Dashboard card showing open exposure grouped by football match/event.
@@ -29,6 +29,14 @@ export function ExposureByEventCard({
   const hasExposure = exposureData.length > 0;
   const totalExposure = exposureData.reduce(
     (sum, e) => sum + e.totalExposure,
+    0
+  );
+  const totalProfitIfBackWins = exposureData.reduce(
+    (sum, e) => sum + (e.profitIfBackWins ?? e.totalExposure),
+    0
+  );
+  const totalProfitIfLayWins = exposureData.reduce(
+    (sum, e) => sum + (e.profitIfLayWins ?? e.totalExposure),
     0
   );
   const highExposureEvents = exposureData.filter(
@@ -69,9 +77,15 @@ export function ExposureByEventCard({
               <CardTitle className="text-base">Exposure by Event</CardTitle>
               <p className="text-muted-foreground text-xs">
                 {linkedEvents.length} event
-                {linkedEvents.length !== 1 ? "s" : ""} • Total:{" "}
+                {linkedEvents.length !== 1 ? "s" : ""} - Worst case:{" "}
                 {formatNOK(totalExposure)}
               </p>
+              {hasExposure && (
+                <p className="text-muted-foreground text-xs">
+                  Back wins {formatNOK(totalProfitIfBackWins)} - Lay wins{" "}
+                  {formatNOK(totalProfitIfLayWins)}
+                </p>
+              )}
             </div>
           </div>
           {highExposureEvents.length > 0 && (
@@ -120,16 +134,7 @@ export function ExposureByEventCard({
                         Bets not linked to a football match
                       </p>
                     </div>
-                    <span
-                      className={cn(
-                        "font-semibold text-sm",
-                        Math.abs(unlinkedBets.totalExposure) >= warningThreshold
-                          ? "text-amber-600"
-                          : "text-gray-600"
-                      )}
-                    >
-                      {formatNOK(unlinkedBets.totalExposure)}
-                    </span>
+                    <OutcomePreview event={unlinkedBets} />
                   </div>
                 </div>
               </>
@@ -158,12 +163,11 @@ function EventRow({
   event: ExposureByEvent;
   isHighExposure: boolean;
 }) {
-  if (!event.match) return null;
+  if (!event.match) {
+    return null;
+  }
 
   const matchDate = new Date(event.match.matchDate);
-  const isLive =
-    event.match.status === "IN_PLAY" || event.match.status === "PAUSED";
-  const isFinished = event.match.status === "FINISHED";
 
   // Link to the first bet if only one, otherwise could link to filtered bet list
   const betLink = event.betCount === 1 ? `/bets/${event.betIds[0]}` : undefined;
@@ -194,14 +198,7 @@ function EventRow({
         </div>
         <div className="flex items-center gap-3">
           <div className="text-right">
-            <div
-              className={cn(
-                "font-semibold text-sm",
-                isHighExposure ? "text-amber-600" : "text-gray-900"
-              )}
-            >
-              {formatNOK(event.totalExposure)}
-            </div>
+            <OutcomePreview event={event} />
             <div className="text-muted-foreground text-xs">
               {event.betCount} bet{event.betCount !== 1 ? "s" : ""}
             </div>
@@ -233,6 +230,38 @@ function EventRow({
   }
 
   return content;
+}
+
+function OutcomePreview({ event }: { event: ExposureByEvent }) {
+  const profitIfBackWins = event.profitIfBackWins ?? event.totalExposure;
+  const profitIfLayWins = event.profitIfLayWins ?? event.totalExposure;
+
+  return (
+    <div className="space-y-0.5 text-xs">
+      <div>
+        <span className="text-muted-foreground">If back bet wins: </span>
+        <span
+          className={cn(
+            "font-semibold",
+            profitIfBackWins >= 0 ? "text-green-600" : "text-red-600"
+          )}
+        >
+          {formatNOK(profitIfBackWins)}
+        </span>
+      </div>
+      <div>
+        <span className="text-muted-foreground">If lay bet wins: </span>
+        <span
+          className={cn(
+            "font-semibold",
+            profitIfLayWins >= 0 ? "text-green-600" : "text-red-600"
+          )}
+        >
+          {formatNOK(profitIfLayWins)}
+        </span>
+      </div>
+    </div>
+  );
 }
 
 function MatchStatusBadge({ status }: { status: string }) {

@@ -26,11 +26,12 @@ import {
 } from "@/lib/db/queries";
 import { convertAmountToNok } from "@/lib/fx-rates";
 import {
+  formatNOK,
   markWalletBankTransactionsOnBalanceData,
   snapshotsToBalanceData,
 } from "@/lib/reporting";
 
-async function cacheDashboard<T>(
+function cacheDashboard<T>(
   userId: string,
   key: string,
   loader: () => Promise<T>
@@ -130,12 +131,10 @@ export default async function Page() {
     activeWallets,
     walletBankTransactions,
   ] = await Promise.all([
-    cacheDashboard(userId, "recent-matched-bets", () =>
-      listMatchedBetsByUser({
-        userId,
-        limit: 50,
-      })
-    ),
+    listMatchedBetsByUser({
+      userId,
+      limit: 50,
+    }),
     cacheDashboard(userId, "summary", () => getDashboardSummary({ userId })),
     cacheDashboard(userId, "expiring-free-bets", () =>
       countExpiringFreeBets({ userId, daysUntilExpiry: 7 })
@@ -153,9 +152,7 @@ export default async function Page() {
     cacheDashboard(userId, "exposure-by-event", () =>
       getExposureByEvent({ userId })
     ),
-    cacheDashboard(userId, "pending-settlement-list", () =>
-      getPendingSettlementBets({ userId, filter: "all", limit: 10 })
-    ),
+    getPendingSettlementBets({ userId, filter: "all", limit: 10 }),
     cacheDashboard(userId, "pending-settlement-count", () =>
       countPendingSettlementBets({ userId })
     ),
@@ -185,7 +182,7 @@ export default async function Page() {
     );
 
     // Resolve each currency conversion rate once per request.
-    const rateEntries: Array<[string, number]> = await Promise.all(
+    const rateEntries: [string, number][] = await Promise.all(
       distinctCurrencies.map(
         async (currency): Promise<[string, number]> => [
           currency,
@@ -283,6 +280,8 @@ export default async function Page() {
       <DashboardSummaryCards
         openExposure={summary.openExposure}
         openPositions={summary.openPositions}
+        openProfitIfBackWins={summary.openProfitIfBackWins}
+        openProfitIfLayWins={summary.openProfitIfLayWins}
         pendingReviewCount={summary.pendingReviewCount}
         recentActivityCount={summary.recentActivityCount}
         roi={summary.roi}
@@ -348,10 +347,21 @@ export default async function Page() {
                     </p>
                   </div>
                   <div className="flex flex-wrap items-center gap-3">
-                    {bet.netExposure && (
-                      <span className="font-semibold text-sm">
-                        Exposure: NOK {Number(bet.netExposure).toFixed(2)}
-                      </span>
+                    {bet.outcomePreview && (
+                      <div className="text-right text-xs">
+                        <div>
+                          If back bet wins:{" "}
+                          <span className="font-semibold">
+                            {formatNOK(bet.outcomePreview.profitIfBackWins)}
+                          </span>
+                        </div>
+                        <div>
+                          If lay bet wins:{" "}
+                          <span className="font-semibold">
+                            {formatNOK(bet.outcomePreview.profitIfLayWins)}
+                          </span>
+                        </div>
+                      </div>
                     )}
                     {missingLabel && (
                       <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-amber-800 text-xs">
