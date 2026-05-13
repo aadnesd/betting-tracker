@@ -1,17 +1,51 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/app/(auth)/auth";
-import { QuickAddForm } from "@/components/bets/quick-add-form";
+import {
+  QuickAddForm,
+  type QuickAddInitialMatchInfo,
+  type QuickAddInitialValues,
+} from "@/components/bets/quick-add-form";
 import { listAccountsByUser, listFreeBetsByUser } from "@/lib/db/queries";
 
 export const metadata = {
   title: "Quick Add Matched Bet",
 };
 
-export default async function QuickAddPage() {
+type QuickAddPageProps = {
+  searchParams: Promise<{
+    copyFrom?: string;
+    market?: string;
+    selection?: string;
+    matchId?: string;
+    normalizedSelection?: string;
+    homeTeam?: string;
+    awayTeam?: string;
+    promoType?: string;
+    backOdds?: string;
+    backStake?: string;
+    backBookmaker?: string;
+    backCurrency?: string;
+    layOdds?: string;
+    layStake?: string;
+    layExchange?: string;
+    layCurrency?: string;
+    notes?: string;
+  }>;
+};
+
+function normalizeCopiedSelection(value?: string) {
+  return value === "HOME_TEAM" || value === "AWAY_TEAM" || value === "DRAW"
+    ? value
+    : "";
+}
+
+export default async function QuickAddPage(props: QuickAddPageProps) {
   const session = await auth();
   if (!session?.user) {
     redirect("/login");
   }
+
+  const searchParams = await props.searchParams;
 
   const [accounts, freeBets] = await Promise.all([
     listAccountsByUser({
@@ -59,11 +93,49 @@ export default async function QuickAddPage() {
     stakeReturned: fb.stakeReturned ?? false,
   }));
 
+  const copiedFromMatchedBetId = searchParams.copyFrom;
+  const initialValues: QuickAddInitialValues | undefined =
+    copiedFromMatchedBetId
+      ? {
+          market: searchParams.market ?? "",
+          selection: searchParams.selection ?? "",
+          matchId: searchParams.matchId ?? "",
+          normalizedSelection: normalizeCopiedSelection(
+            searchParams.normalizedSelection
+          ),
+          promoType: searchParams.promoType ?? "",
+          backOdds: searchParams.backOdds ?? "",
+          backStake: searchParams.backStake ?? "",
+          backBookmaker: searchParams.backBookmaker ?? "",
+          backCurrency: searchParams.backCurrency ?? "NOK",
+          layOdds: searchParams.layOdds ?? "",
+          layStake: searchParams.layStake ?? "",
+          layExchange: searchParams.layExchange ?? "",
+          layCurrency: searchParams.layCurrency ?? "NOK",
+          notes: searchParams.notes ?? "",
+        }
+      : undefined;
+
+  const initialMatchInfo: QuickAddInitialMatchInfo | null =
+    copiedFromMatchedBetId &&
+    searchParams.matchId &&
+    searchParams.homeTeam &&
+    searchParams.awayTeam
+      ? {
+          id: searchParams.matchId,
+          homeTeam: searchParams.homeTeam,
+          awayTeam: searchParams.awayTeam,
+        }
+      : null;
+
   return (
     <QuickAddForm
       bookmakers={bookmakers}
+      copiedFromMatchedBetId={copiedFromMatchedBetId}
       exchanges={exchanges}
       freeBets={freeBetOptions}
+      initialMatchInfo={initialMatchInfo}
+      initialValues={initialValues}
     />
   );
 }
