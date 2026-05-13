@@ -1,4 +1,5 @@
 import { format } from "date-fns";
+import { Copy } from "lucide-react";
 import { unstable_cache } from "next/cache";
 import dynamic from "next/dynamic";
 import Link from "next/link";
@@ -9,6 +10,7 @@ import { DashboardActions } from "@/components/bets/dashboard-actions";
 import { DashboardSummaryCards } from "@/components/bets/dashboard-summary-cards";
 import { ExposureAlertBanner } from "@/components/bets/exposure-alert-banner";
 import { FreeBetExpiryBanner } from "@/components/bets/free-bet-expiry-banner";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { dashboardTag } from "@/lib/cache";
@@ -20,7 +22,7 @@ import {
   getExposureByEvent,
   getPendingSettlementBets,
   listAccountsWithBalances,
-  listMatchedBetsByUser,
+  listMatchedBetsForList,
   listWalletBankTransactionsByUser,
   listWalletsByUser,
 } from "@/lib/db/queries";
@@ -103,6 +105,45 @@ const ExposureByEventCard = dynamic(
   }
 );
 
+function buildCopyMatchedBetHref(
+  bet: Awaited<ReturnType<typeof listMatchedBetsForList>>[number]
+) {
+  const params = new URLSearchParams({
+    copyFrom: bet.id,
+    market: bet.market,
+    selection: bet.selection,
+  });
+
+  if (bet.normalizedSelection) {
+    params.set("normalizedSelection", bet.normalizedSelection);
+  }
+  if (bet.promoType) {
+    params.set("promoType", bet.promoType);
+  }
+  if (bet.notes) {
+    params.set("notes", bet.notes);
+  }
+  if (bet.footballMatch) {
+    params.set("matchId", bet.footballMatch.id);
+    params.set("homeTeam", bet.footballMatch.homeTeam);
+    params.set("awayTeam", bet.footballMatch.awayTeam);
+  }
+  if (bet.back) {
+    params.set("backOdds", String(bet.back.odds));
+    params.set("backStake", String(bet.back.stake));
+    params.set("backBookmaker", bet.back.accountName || bet.back.exchange);
+    params.set("backCurrency", bet.back.currency ?? "NOK");
+  }
+  if (bet.lay) {
+    params.set("layOdds", String(bet.lay.odds));
+    params.set("layStake", String(bet.lay.stake));
+    params.set("layExchange", bet.lay.accountName || bet.lay.exchange);
+    params.set("layCurrency", bet.lay.currency ?? "NOK");
+  }
+
+  return `/bets/quick-add?${params.toString()}`;
+}
+
 export default async function Page() {
   const session = await auth();
 
@@ -131,10 +172,12 @@ export default async function Page() {
     activeWallets,
     walletBankTransactions,
   ] = await Promise.all([
-    listMatchedBetsByUser({
-      userId,
-      limit: 50,
-    }),
+    cacheDashboard(userId, "recent-matched-bets", () =>
+      listMatchedBetsForList({
+        userId,
+        limit: 50,
+      })
+    ),
     cacheDashboard(userId, "summary", () => getDashboardSummary({ userId })),
     cacheDashboard(userId, "expiring-free-bets", () =>
       countExpiringFreeBets({ userId, daysUntilExpiry: 7 })
@@ -319,23 +362,28 @@ export default async function Page() {
 
           {bets.map((bet) => {
             const missingLeg =
-              bet.status === "draft" && (!bet.backBetId || !bet.layBetId);
+              bet.status === "draft" && (!bet.back || !bet.lay);
             const missingLabel = missingLeg
-              ? bet.backBetId
+              ? bet.back
                 ? "Missing lay leg"
                 : "Missing back leg"
               : null;
+            const copyHref = buildCopyMatchedBetHref(bet);
 
             return (
-              <Link
-                className="block rounded-md border p-3 transition-colors hover:bg-muted/50"
-                href={`/bets/${bet.id}`}
+              <div
+                className="rounded-md border p-3 transition-colors hover:bg-muted/50"
                 key={bet.id}
               >
                 <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                   <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold">{bet.selection}</span>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Link
+                        className="font-semibold hover:underline"
+                        href={`/bets/${bet.id}`}
+                      >
+                        {bet.selection}
+                      </Link>
                       <Separator className="h-4" orientation="vertical" />
                       <span className="text-muted-foreground text-sm">
                         {bet.market}
@@ -369,9 +417,18 @@ export default async function Page() {
                       </span>
                     )}
                     <BetStatusBadge status={bet.status} />
+                    <Button asChild size="sm" variant="outline">
+                      <Link
+                        aria-label={`Copy ${bet.selection}`}
+                        href={copyHref}
+                      >
+                        <Copy className="h-4 w-4" />
+                        Copy
+                      </Link>
+                    </Button>
                   </div>
                 </div>
-              </Link>
+              </div>
             );
           })}
         </CardContent>

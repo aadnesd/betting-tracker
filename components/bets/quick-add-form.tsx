@@ -61,6 +61,9 @@ interface QuickAddFormProps {
   bookmakers: AccountOption[];
   exchanges: AccountOption[];
   freeBets?: FreeBetOption[];
+  initialValues?: Partial<FormData>;
+  copiedFromMatchedBetId?: string;
+  initialMatchInfo?: SelectedMatchInfo | null;
 }
 
 interface FormData {
@@ -87,10 +90,16 @@ interface SelectedMatchInfo {
   awayTeam: string;
 }
 
+export type QuickAddInitialValues = Partial<FormData>;
+export type QuickAddInitialMatchInfo = SelectedMatchInfo;
+
 export function QuickAddForm({
   bookmakers,
   exchanges,
   freeBets = [],
+  initialValues,
+  copiedFromMatchedBetId,
+  initialMatchInfo = null,
 }: QuickAddFormProps) {
   const router = useRouter();
 
@@ -118,13 +127,14 @@ export function QuickAddForm({
     layExchange: defaultExchange,
     layCurrency: defaultLayCurrency,
     notes: "",
+    ...initialValues,
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<Partial<Record<keyof FormData, string>>>(
     {}
   );
   const [selectedMatchInfo, setSelectedMatchInfo] =
-    useState<SelectedMatchInfo | null>(null);
+    useState<SelectedMatchInfo | null>(initialMatchInfo);
 
   const updateField = (field: keyof FormData, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -367,7 +377,9 @@ export function QuickAddForm({
         <CardHeader>
           <CardTitle>Quick Add Matched Bet</CardTitle>
           <CardDescription>
-            Manually enter a matched bet without uploading screenshots
+            {copiedFromMatchedBetId
+              ? "Copied values from an existing matched bet. Review and adjust before creating."
+              : "Manually enter a matched bet without uploading screenshots"}
           </CardDescription>
         </CardHeader>
         <CardContent>

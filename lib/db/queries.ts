@@ -2167,6 +2167,7 @@ export type MatchedBetListItem = {
   id: string;
   market: string;
   selection: string;
+  normalizedSelection: "HOME_TEAM" | "AWAY_TEAM" | "DRAW" | null;
   status: "draft" | "matched" | "settled" | "needs_review";
   promoType: string | null;
   netExposure: number | null;
@@ -2266,6 +2267,7 @@ export async function listMatchedBetsForList({
         id: matchedBet.id,
         market: matchedBet.market,
         selection: matchedBet.selection,
+        normalizedSelection: matchedBet.normalizedSelection,
         status: matchedBet.status,
         promoType: matchedBet.promoType,
         netExposure: matchedBet.netExposure,
@@ -2388,6 +2390,7 @@ export async function listMatchedBetsForList({
         id: row.id,
         market: row.market,
         selection: row.selection,
+        normalizedSelection: row.normalizedSelection ?? null,
         status: row.status,
         promoType: row.promoType ?? null,
         netExposure: parseNumber(row.netExposure),
