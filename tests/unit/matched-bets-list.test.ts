@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => {
       id: "bet-1",
       market: "Premier League",
       selection: "Arsenal",
+      normalizedSelection: "HOME_TEAM",
       status: "matched",
       promoType: "Free Bet",
       netExposure: "125.50",
@@ -59,6 +60,7 @@ const mocks = vi.hoisted(() => {
       id: "bet-2",
       market: "Serie A",
       selection: "Roma",
+      normalizedSelection: null,
       status: "draft",
       promoType: null,
       netExposure: null,
@@ -136,6 +138,7 @@ describe("listMatchedBetsForList", () => {
 
     expect(results).toHaveLength(2);
     expect(results[0].netExposure).toBe(125.5);
+    expect(results[0].normalizedSelection).toBe("HOME_TEAM");
     expect(results[0].back?.odds).toBeCloseTo(2.4, 5);
     expect(results[0].back?.stake).toBe(100);
     expect(results[0].lay?.profitLoss).toBe(12.5);
