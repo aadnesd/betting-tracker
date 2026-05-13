@@ -521,7 +521,7 @@ export async function updateAccount({
 
 /**
  * Calculate current balance for a single account by summing all transactions.
- * Deposits and bonuses add, withdrawals and adjustments (negative) subtract.
+ * Deposits and bonuses add, withdrawals subtract, adjustments are signed.
  */
 export async function getAccountBalance({
   userId,
@@ -533,11 +533,13 @@ export async function getAccountBalance({
   try {
     const result = await db
       .select({
-        // Deposits and bonuses add to balance, withdrawals subtract
+        // Deposits and bonuses add to balance, withdrawals subtract,
+        // adjustments use their signed amount directly.
         balance: sql<string>`COALESCE(
           SUM(
             CASE 
               WHEN ${accountTransaction.type} = 'withdrawal' THEN -1 * ${accountTransaction.amount}::numeric
+              WHEN ${accountTransaction.type} = 'adjustment' THEN ${accountTransaction.amount}::numeric
               ELSE ${accountTransaction.amount}::numeric
             END
           ), 0
@@ -606,6 +608,7 @@ export async function listAccountsWithBalances({
           SUM(
             CASE 
               WHEN ${accountTransaction.type} = 'withdrawal' THEN -1 * ${accountTransaction.amount}::numeric
+              WHEN ${accountTransaction.type} = 'adjustment' THEN ${accountTransaction.amount}::numeric
               ELSE ${accountTransaction.amount}::numeric
             END
           ), 0
