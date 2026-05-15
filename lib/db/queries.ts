@@ -6765,6 +6765,69 @@ export async function addQualifyingBet({
 }
 
 /**
+ * Apply a matched back bet to any locked promos on the same account.
+ */
+export async function addQualifyingBetsForMatchedBet({
+  userId,
+  accountId,
+  matchedBetId,
+  stake,
+  odds,
+}: {
+  userId: string;
+  accountId: string;
+  matchedBetId: string;
+  stake: number;
+  odds: number;
+}) {
+  try {
+    const lockedPromos = await db
+      .select()
+      .from(freeBet)
+      .where(
+        and(
+          eq(freeBet.userId, userId),
+          eq(freeBet.accountId, accountId),
+          eq(freeBet.status, "locked"),
+          isNotNull(freeBet.unlockType),
+          isNotNull(freeBet.unlockTarget)
+        )
+      );
+
+    const results: Awaited<ReturnType<typeof addQualifyingBet>>[] = [];
+
+    for (const fb of lockedPromos) {
+      const minOdds = fb.unlockMinOdds
+        ? Number.parseFloat(fb.unlockMinOdds)
+        : 0;
+      if (odds < minOdds) {
+        continue;
+      }
+
+      const contribution = fb.unlockType === "bets" ? 1 : stake;
+      results.push(
+        await addQualifyingBet({
+          freeBetId: fb.id,
+          matchedBetId,
+          userId,
+          contribution,
+        })
+      );
+    }
+
+    return results;
+  } catch (error) {
+    if (error instanceof ChatSDKError) {
+      throw error;
+    }
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to add qualifying bets for matched bet"
+    );
+  }
+}
+
+/**
  * Remove a qualifying bet from a promo, updating its progress.
  * Called when a bet is voided or deleted.
  */

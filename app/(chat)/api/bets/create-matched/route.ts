@@ -8,6 +8,7 @@ import {
 import { evaluateNeedsReview, formatNeedsReviewNote } from "@/lib/bet-review";
 import { revalidateDashboard } from "@/lib/cache";
 import {
+  addQualifyingBetsForMatchedBet,
   createAuditEntry,
   createMatchedBetRecord,
   getAccountById,
@@ -18,7 +19,6 @@ import {
   saveBackBet,
   saveLayBet,
 } from "@/lib/db/queries";
-import type { NormalizedSelection } from "@/lib/db/schema";
 import { convertAmountToNok } from "@/lib/fx-rates";
 import { isFreeBetPromoType } from "@/lib/settlement";
 
@@ -400,6 +400,16 @@ export async function POST(request: Request) {
       netExposure,
       notes: mergedNotes || null,
     });
+
+    if (backBetRow && backAccountId && body.back) {
+      await addQualifyingBetsForMatchedBet({
+        userId: session.user.id,
+        accountId: backAccountId,
+        matchedBetId: matched.id,
+        stake: body.back.stake,
+        odds: body.back.odds,
+      });
+    }
 
     // Create audit entries for each created entity
     const auditPromises: Promise<unknown>[] = [];
