@@ -99,10 +99,10 @@ describe("auto-settlement detection queries", () => {
       expect(typeof dbQueries.countBetsReadyForAutoSettlement).toBe("function");
 
       // Type check: the function should return a number
-      type ReturnType = Awaited<
+      type CountReturnType = Awaited<
         ReturnType<typeof dbQueries.countBetsReadyForAutoSettlement>
       >;
-      const expectedType: ReturnType = 5;
+      const expectedType: CountReturnType = 5;
       expect(typeof expectedType).toBe("number");
     });
   });
@@ -115,6 +115,7 @@ describe("auto-settlement detection queries", () => {
         userId: "user-1",
         market: "Match Odds",
         selection: "Home Win",
+        normalizedSelection: "HOME_TEAM",
         status: "matched",
         promoType: null,
         matchId: "match-1",
@@ -123,11 +124,14 @@ describe("auto-settlement detection queries", () => {
         backOdds: "2.50",
         backStake: "100.00",
         backAccountId: "acct-1",
+        backCurrency: "NOK",
+        backBetPlacedAt: new Date("2026-01-10T12:00:00Z"),
         // Lay bet info
         layBetId: "lay-1",
         layOdds: "2.55",
         layStake: "98.00",
         layAccountId: "acct-2",
+        layCurrency: "NOK",
         layAccountCommission: 0.05, // 5% exchange commission
         // Football match result
         footballMatch: {
@@ -177,6 +181,7 @@ describe("auto-settlement detection queries", () => {
         userId: "user-1",
         market: "Match Odds",
         selection: "Away Win",
+        normalizedSelection: "AWAY_TEAM",
         status: "matched",
         promoType: "Free Bet",
         matchId: "match-1",
@@ -184,10 +189,13 @@ describe("auto-settlement detection queries", () => {
         backOdds: "3.00",
         backStake: "50.00",
         backAccountId: "acct-1",
+        backCurrency: "NOK",
+        backBetPlacedAt: new Date("2026-01-11T12:00:00Z"),
         layBetId: "lay-1",
         layOdds: "3.10",
         layStake: "48.00",
         layAccountId: "acct-2",
+        layCurrency: "NOK",
         layAccountCommission: 0.02, // 2% exchange commission
         footballMatch: {
           id: "match-1",
@@ -229,6 +237,7 @@ describe("auto-settlement detection queries", () => {
         userId: "user-1",
         market: "Match Odds",
         selection: "Draw",
+        normalizedSelection: "DRAW",
         status: "matched",
         promoType: null,
         matchId: "match-2",
@@ -236,10 +245,14 @@ describe("auto-settlement detection queries", () => {
         backOdds: "3.50",
         backStake: "100.00",
         backAccountId: "acct-1",
+        backCurrency: "NOK",
+        backBetPlacedAt: new Date("2026-01-12T12:00:00Z"),
         layBetId: null,
         layOdds: null,
         layStake: null,
         layAccountId: null,
+        layCurrency: null,
+        layAccountCommission: null,
         footballMatch: {
           id: "match-2",
           externalId: 538_003,

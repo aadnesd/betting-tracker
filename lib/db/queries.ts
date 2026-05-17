@@ -3111,6 +3111,13 @@ export type BetReadyForSettlement = {
   };
 };
 
+export type UnlinkedBetReadyForSettlement = Omit<
+  BetReadyForSettlement,
+  "matchId" | "footballMatch"
+> & {
+  matchId: null;
+};
+
 /**
  * Find matched bets ready for auto-settlement.
  *
@@ -3236,6 +3243,88 @@ export async function findBetsReadyForAutoSettlement({
     throw new ChatSDKError(
       "bad_request:database",
       "Failed to find bets ready for auto-settlement"
+    );
+  }
+}
+
+/**
+ * Find matched bets that are eligible for unlinked auto-settlement lookup.
+ *
+ * These matched sets were manually entered or could not be linked to the
+ * FootballMatch table, so the cron may use an external result lookup based on
+ * the market and selection text.
+ */
+export async function findUnlinkedBetsReadyForAutoSettlement({
+  limit = 25,
+}: {
+  limit?: number;
+} = {}): Promise<UnlinkedBetReadyForSettlement[]> {
+  try {
+    const exchangeAccount = aliasedTable(account, "exchangeAccount");
+
+    const rows = await db
+      .select({
+        id: matchedBet.id,
+        userId: matchedBet.userId,
+        market: matchedBet.market,
+        selection: matchedBet.selection,
+        normalizedSelection: matchedBet.normalizedSelection,
+        status: matchedBet.status,
+        promoType: matchedBet.promoType,
+        matchId: matchedBet.matchId,
+        backBetId: backBet.id,
+        backOdds: backBet.odds,
+        backStake: backBet.stake,
+        backAccountId: backBet.accountId,
+        backCurrency: backBet.currency,
+        backBetPlacedAt: backBet.placedAt,
+        layBetId: layBet.id,
+        layOdds: layBet.odds,
+        layStake: layBet.stake,
+        layAccountId: layBet.accountId,
+        layCurrency: layBet.currency,
+        layAccountCommission: exchangeAccount.commission,
+      })
+      .from(matchedBet)
+      .leftJoin(backBet, eq(matchedBet.backBetId, backBet.id))
+      .leftJoin(layBet, eq(matchedBet.layBetId, layBet.id))
+      .leftJoin(exchangeAccount, eq(layBet.accountId, exchangeAccount.id))
+      .where(and(eq(matchedBet.status, "matched"), isNull(matchedBet.matchId)))
+      .orderBy(asc(matchedBet.createdAt))
+      .limit(limit);
+
+    return rows.map((row) => ({
+      id: row.id,
+      userId: row.userId,
+      market: row.market,
+      selection: row.selection,
+      normalizedSelection: row.normalizedSelection as
+        | "HOME_TEAM"
+        | "AWAY_TEAM"
+        | "DRAW"
+        | null,
+      status: row.status,
+      promoType: row.promoType,
+      matchId: null,
+      backBetId: row.backBetId,
+      backOdds: row.backOdds,
+      backStake: row.backStake,
+      backAccountId: row.backAccountId,
+      backCurrency: row.backCurrency,
+      backBetPlacedAt: row.backBetPlacedAt,
+      layBetId: row.layBetId,
+      layOdds: row.layOdds,
+      layStake: row.layStake,
+      layAccountId: row.layAccountId,
+      layCurrency: row.layCurrency,
+      layAccountCommission: row.layAccountCommission
+        ? Number.parseFloat(row.layAccountCommission)
+        : null,
+    }));
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to find unlinked bets ready for auto-settlement"
     );
   }
 }
