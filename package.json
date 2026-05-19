@@ -22,6 +22,7 @@
   },
   "dependencies": {
     "@ai-sdk/gateway": "^3.0.22",
+    "@ai-sdk/openai": "^3.0.64",
     "@ai-sdk/provider": "3.0.5",
     "@ai-sdk/react": "3.0.50",
     "@ai-sdk/xai": "2.0.13",

@@ -278,6 +278,7 @@ async function processUnlinkedBet(
   );
 
   const matchResult = `${lookup.homeTeam ?? "Home"} ${lookup.homeScore}-${lookup.awayScore} ${lookup.awayTeam ?? "Away"}`;
+  const settlementMatchResult = `${matchResult} (unlinked web lookup).`;
   const sourceNote =
     lookup.sourceUrls.length > 0
       ? ` Sources: ${lookup.sourceUrls.slice(0, 3).join(", ")}`
@@ -297,7 +298,7 @@ async function processUnlinkedBet(
     layCurrency: bet.layCurrency ?? null,
     market: bet.market,
     selection: bet.selection,
-    matchResult: `${matchResult} (web lookup).${sourceNote}`,
+    matchResult: `${settlementMatchResult}${sourceNote}`,
   });
 
   if (bet.backAccountId && bet.backBetPlacedAt) {

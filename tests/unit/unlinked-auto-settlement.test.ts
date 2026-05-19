@@ -105,6 +105,11 @@ describe("unlinked auto-settlement cron", () => {
         ),
       })
     );
+    expect(applyAutoSettlement).toHaveBeenCalledWith(
+      expect.objectContaining({
+        matchResult: expect.stringContaining("unlinked web lookup"),
+      })
+    );
     expect(flagBetForReview).not.toHaveBeenCalled();
   });
 
@@ -112,8 +117,7 @@ describe("unlinked auto-settlement cron", () => {
     vi.mocked(resolveUnlinkedMatchedBetResult).mockResolvedValue({
       status: "not_configured",
       confidence: "low",
-      reason:
-        "AI_GATEWAY_API_KEY or OPENAI_API_KEY is not configured for web result lookup.",
+      reason: "AI_GATEWAY_API_KEY is not configured for web result lookup.",
       sourceUrls: [],
     });
 
