@@ -11,12 +11,13 @@ import {
   TrendingUp,
   Wallet,
 } from "lucide-react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/app/(auth)/auth";
-import { BankrollTransactionChart } from "@/components/bets/bankroll-transaction-chart";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   getBankrollSummary,
   getOpenBetStakesByAccount,
@@ -31,6 +32,16 @@ import { formatCurrency, formatNOK } from "@/lib/reporting";
 export const metadata = {
   title: "Bankroll",
 };
+
+const BankrollTransactionChart = dynamic(
+  () =>
+    import("@/components/bets/bankroll-transaction-chart").then(
+      (module) => module.BankrollTransactionChart
+    ),
+  {
+    loading: () => <Skeleton className="h-80" />,
+  }
+);
 
 export default async function BankrollPage() {
   const session = await auth();
@@ -90,8 +101,6 @@ export default async function BankrollPage() {
     const stakes = openStakesMap.get(acc.id);
     return sum + (stakes?.openLayLiability || 0);
   }, 0);
-  const totalOpenStakes = totalOpenBackStake + totalOpenLayLiability;
-
   // Total capital now includes wallet balances
   const totalCapitalWithWallets =
     summary.totalCapital + walletTotals.totalBalanceNok;

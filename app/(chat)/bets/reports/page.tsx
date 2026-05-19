@@ -1,13 +1,11 @@
-import { Download, Upload } from "lucide-react";
+import { Upload } from "lucide-react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { auth } from "@/app/(auth)/auth";
-import { BalanceChartWithControls } from "@/components/bets/balance-chart";
 import { BookmakerProfitWithBonusesTable } from "@/components/bets/bookmaker-profit-with-bonuses-table";
-import { BreakdownChartWithToggle } from "@/components/bets/breakdown-charts";
 import { ExportButton } from "@/components/bets/export-button";
-import { ProfitChartWithControls } from "@/components/bets/profit-chart";
 import { ReportingBreakdownTable } from "@/components/bets/reporting-breakdown-table";
 import { ReportingDateFilter } from "@/components/bets/reporting-date-filter";
 import { ReportingSummaryCard } from "@/components/bets/reporting-summary-card";
@@ -16,13 +14,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   getBalanceSnapshots,
   getBookmakerProfitWithBonuses,
-  listWalletBankTransactionsByUser,
   getMatchedBetsForReporting,
   getOpenExposure,
   getProfitByBookmaker,
   getProfitByExchange,
   getProfitByPromoType,
   getTotalBonusesForUser,
+  listWalletBankTransactionsByUser,
 } from "@/lib/db/queries";
 import { convertAmountToNok } from "@/lib/fx-rates";
 import {
@@ -31,14 +29,44 @@ import {
   enrichWithROI,
   formatNOK,
   getDateRange,
-  markWalletBankTransactionsOnBalanceData,
   type MatchedBetWithLegs,
+  markWalletBankTransactionsOnBalanceData,
   snapshotsToBalanceData,
 } from "@/lib/reporting";
 
 export const metadata = {
   title: "Reports — Matched Betting",
 };
+
+const BalanceChartWithControls = dynamic(
+  () =>
+    import("@/components/bets/balance-chart").then(
+      (module) => module.BalanceChartWithControls
+    ),
+  {
+    loading: () => <Skeleton className="h-80" />,
+  }
+);
+
+const BreakdownChartWithToggle = dynamic(
+  () =>
+    import("@/components/bets/breakdown-charts").then(
+      (module) => module.BreakdownChartWithToggle
+    ),
+  {
+    loading: () => <Skeleton className="h-80" />,
+  }
+);
+
+const ProfitChartWithControls = dynamic(
+  () =>
+    import("@/components/bets/profit-chart").then(
+      (module) => module.ProfitChartWithControls
+    ),
+  {
+    loading: () => <Skeleton className="h-80" />,
+  }
+);
 
 type Props = {
   searchParams: Promise<{ period?: string }>;
