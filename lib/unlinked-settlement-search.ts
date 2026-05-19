@@ -1,6 +1,7 @@
 import { gateway } from "@ai-sdk/gateway";
 import { openai } from "@ai-sdk/openai";
-import { generateText, stepCountIs } from "ai";
+import { Output, stepCountIs, ToolLoopAgent } from "ai";
+import { z } from "zod";
 import type { NormalizedSelection } from "@/lib/db/schema";
 
 export type UnlinkedSettlementLookupStatus =
@@ -26,7 +27,18 @@ export type UnlinkedSettlementLookupResult = {
 const DEFAULT_GATEWAY_MODEL = "google/gemini-3-flash";
 const OPENAI_GATEWAY_MODEL_PREFIX = "openai/";
 const MARKET_TEAM_SPLIT_PATTERN = /\s+(?:v|vs|vs\.|-|\u2013|@)\s+/i;
-const JSON_OBJECT_PATTERN = /\{[\s\S]*\}/;
+
+const lookupOutputSchema = z.object({
+  status: z.enum(["finished", "not_finished", "not_found", "ambiguous"]),
+  confidence: z.enum(["high", "medium", "low"]),
+  homeTeam: z.string().nullable(),
+  awayTeam: z.string().nullable(),
+  homeScore: z.number().nullable(),
+  awayScore: z.number().nullable(),
+  normalizedSelection: z.enum(["HOME_TEAM", "AWAY_TEAM", "DRAW"]).nullable(),
+  reason: z.string(),
+  sourceUrls: z.array(z.string()),
+});
 
 function splitMarketTeams(market: string) {
   const parts = market
@@ -84,78 +96,6 @@ Rules:
 - Keep the reason concise and include the score/date evidence.`;
 }
 
-function parseLookupJson(text: string): UnlinkedSettlementLookupResult {
-  const jsonMatch = text.match(JSON_OBJECT_PATTERN);
-  if (!jsonMatch) {
-    return {
-      status: "error",
-      confidence: "low",
-      reason: "Search response did not include JSON.",
-      sourceUrls: [],
-    };
-  }
-
-  try {
-    const parsed = JSON.parse(
-      jsonMatch[0]
-    ) as Partial<UnlinkedSettlementLookupResult>;
-    const statuses: UnlinkedSettlementLookupStatus[] = [
-      "finished",
-      "not_finished",
-      "not_found",
-      "ambiguous",
-      "not_configured",
-      "error",
-    ];
-    const status = statuses.includes(
-      parsed.status as UnlinkedSettlementLookupStatus
-    )
-      ? (parsed.status as UnlinkedSettlementLookupStatus)
-      : "error";
-    const confidence =
-      parsed.confidence === "high" || parsed.confidence === "medium"
-        ? parsed.confidence
-        : "low";
-    const normalizedSelection =
-      parsed.normalizedSelection === "HOME_TEAM" ||
-      parsed.normalizedSelection === "AWAY_TEAM" ||
-      parsed.normalizedSelection === "DRAW"
-        ? parsed.normalizedSelection
-        : null;
-    const sourceUrls = Array.isArray(parsed.sourceUrls)
-      ? parsed.sourceUrls.filter(
-          (url): url is string => typeof url === "string"
-        )
-      : [];
-
-    return {
-      status,
-      confidence,
-      reason:
-        typeof parsed.reason === "string"
-          ? parsed.reason
-          : "No explanation returned.",
-      homeTeam:
-        typeof parsed.homeTeam === "string" ? parsed.homeTeam : undefined,
-      awayTeam:
-        typeof parsed.awayTeam === "string" ? parsed.awayTeam : undefined,
-      homeScore:
-        typeof parsed.homeScore === "number" ? parsed.homeScore : undefined,
-      awayScore:
-        typeof parsed.awayScore === "number" ? parsed.awayScore : undefined,
-      normalizedSelection,
-      sourceUrls,
-    };
-  } catch {
-    return {
-      status: "error",
-      confidence: "low",
-      reason: "Search response JSON could not be parsed.",
-      sourceUrls: [],
-    };
-  }
-}
-
 function getSourceUrls(sources: unknown) {
   if (!Array.isArray(sources)) {
     return [];
@@ -205,22 +145,41 @@ export async function resolveUnlinkedMatchedBetResult({
           web_search: openai.tools.webSearch({ searchContextSize: "medium" }),
         }
       : undefined;
-    const { sources, text } = await generateText({
+
+    const agent = new ToolLoopAgent({
       model: gateway.languageModel(model),
-      prompt: buildPrompt({ market, selection, placedAt }),
+      output: Output.object({ schema: lookupOutputSchema }),
       stopWhen: tools ? stepCountIs(2) : undefined,
       tools,
     });
 
-    const result = parseLookupJson(text);
-    if (result.sourceUrls.length === 0) {
+    const { output, sources } = await agent.generate({
+      prompt: buildPrompt({ market, selection, placedAt }),
+    });
+
+    if (!output) {
       return {
-        ...result,
-        sourceUrls: getSourceUrls(sources),
+        status: "error",
+        confidence: "low",
+        reason: "Search response did not include structured output.",
+        sourceUrls: [],
       };
     }
 
-    return result;
+    const sourceUrls =
+      output.sourceUrls.length > 0 ? output.sourceUrls : getSourceUrls(sources);
+
+    return {
+      status: output.status,
+      confidence: output.confidence,
+      reason: output.reason,
+      homeTeam: output.homeTeam ?? undefined,
+      awayTeam: output.awayTeam ?? undefined,
+      homeScore: output.homeScore ?? undefined,
+      awayScore: output.awayScore ?? undefined,
+      normalizedSelection: output.normalizedSelection,
+      sourceUrls,
+    };
   } catch (error) {
     return {
       status: "error",
