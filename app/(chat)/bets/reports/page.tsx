@@ -202,6 +202,7 @@ async function ReportingContent({
         standaloneStake: standaloneProfitSummary.stake,
         standaloneCount: standaloneProfitSummary.count,
         walletFeeTotal: walletFeeSummary.total,
+        walletFeeCount: walletFeeSummary.count,
       }),
       calculateCumulativeProfitData(betsWithLegs, "day", [
         ...standaloneProfitEvents,

@@ -35,6 +35,8 @@ export type ReportingSummary = {
   bonusTotal: number;
   /** Wallet transaction fees that reduce net profit */
   walletFeeTotal: number;
+  /** Number of wallet fee transactions included in net profit */
+  walletFeeCount: number;
   /** Standalone settled bet profit/loss not attached to a matched set */
   standaloneProfit: number;
   /** Number of standalone settled bets included in profit */
@@ -151,6 +153,7 @@ export async function calculateReportingSummary(
     standaloneStake = 0,
     standaloneCount = 0,
     walletFeeTotal = 0,
+    walletFeeCount = 0,
   } = options;
 
   let totalProfit = 0;
@@ -205,6 +208,7 @@ export async function calculateReportingSummary(
     openExposure,
     bonusTotal,
     walletFeeTotal,
+    walletFeeCount,
     standaloneProfit,
     standaloneCount,
     bettingProfit,
@@ -450,6 +454,7 @@ export type ReportingSummaryOptions = {
   standaloneStake?: number;
   standaloneCount?: number;
   walletFeeTotal?: number;
+  walletFeeCount?: number;
 };
 
 /**
