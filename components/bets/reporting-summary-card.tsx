@@ -15,10 +15,12 @@ type Props = {
 
 export function ReportingSummaryCard({ summary, className }: Props) {
   const hasBonuses = summary.bonusTotal > 0;
+  const hasFees = summary.walletFeeTotal > 0;
+  const showNetBreakdown = hasBonuses || hasFees || summary.standaloneCount > 0;
 
   return (
-    <div className={cn("grid gap-4 md:grid-cols-2 lg:grid-cols-5", className)}>
-      <NetProfitCard hasBonuses={hasBonuses} summary={summary} />
+    <div className={cn("grid gap-4 md:grid-cols-2 lg:grid-cols-6", className)}>
+      <NetProfitCard showBreakdown={showNetBreakdown} summary={summary} />
       <StatCard
         subtitle="Total wagered"
         title="Total Stake"
@@ -32,11 +34,25 @@ export function ReportingSummaryCard({ summary, className }: Props) {
         value={formatNOK(-summary.qualifyingLoss)}
       />
       <StatCard
-        subtitle={hasBonuses ? "Includes bonuses" : "Return on investment"}
+        subtitle={
+          showNetBreakdown
+            ? "Includes bonuses and fees"
+            : "Return on investment"
+        }
         title="ROI"
         tooltipType="roi"
         trend={summary.roi >= 0 ? "positive" : "negative"}
         value={formatPercentage(summary.roi)}
+      />
+      <StatCard
+        subtitle={
+          summary.walletFeeCount > 0
+            ? `${summary.walletFeeCount} fee${summary.walletFeeCount === 1 ? "" : "s"}`
+            : "No fees recorded"
+        }
+        title="Fees"
+        trend={hasFees ? "negative" : "neutral"}
+        value={formatNOK(-summary.walletFeeTotal)}
       />
       <StatCard
         subtitle="Current risk"
@@ -55,10 +71,10 @@ export function ReportingSummaryCard({ summary, className }: Props) {
  */
 function NetProfitCard({
   summary,
-  hasBonuses,
+  showBreakdown,
 }: {
   summary: ReportingSummary;
-  hasBonuses: boolean;
+  showBreakdown: boolean;
 }) {
   const trend = summary.netProfit >= 0 ? "positive" : "negative";
   const trendColors = {
@@ -75,7 +91,7 @@ function NetProfitCard({
       <p className={cn("mt-1 font-bold text-2xl", trendColors[trend])}>
         {formatNOK(summary.netProfit)}
       </p>
-      {hasBonuses ? (
+      {showBreakdown ? (
         <div className="mt-1 space-y-0.5 text-muted-foreground text-xs">
           <div className="flex justify-between">
             <span>Betting P/L:</span>

@@ -11,8 +11,8 @@ import {
   getDateRange,
   groupByMonth,
   groupByWeek,
-  markWalletBankTransactionsOnBalanceData,
   type MatchedBetWithLegs,
+  markWalletBankTransactionsOnBalanceData,
 } from "@/lib/reporting";
 
 // FX conversion no longer used in reporting calculations (stored NOK values are used instead)
@@ -172,6 +172,7 @@ describe("calculateReportingSummary", () => {
       openExposure: 0,
       bonusTotal: 0,
       walletFeeTotal: 0,
+      walletFeeCount: 0,
       standaloneProfit: 0,
       standaloneCount: 0,
       bettingProfit: 0,
@@ -292,6 +293,29 @@ describe("calculateReportingSummary", () => {
     expect(summaryDefaultBonuses.netProfit).toBe(50);
     expect(summaryWithoutBonuses.bonusTotal).toBe(0);
     expect(summaryDefaultBonuses.bonusTotal).toBe(0);
+  });
+
+  test("subtracts wallet fees from net profit and ROI", async () => {
+    const bets: MatchedBetWithLegs[] = [
+      createMockMatchedBet({
+        matched: { status: "settled" },
+        back: { profitLoss: "50.00", stake: "100.00" },
+        lay: { profitLoss: "-20.00", stake: "100.00" },
+      }),
+    ];
+
+    const summary = await calculateReportingSummary(bets, {
+      bonusTotal: 10,
+      walletFeeTotal: 5,
+      walletFeeCount: 2,
+    });
+
+    expect(summary.bettingProfit).toBe(30);
+    expect(summary.bonusTotal).toBe(10);
+    expect(summary.walletFeeTotal).toBe(5);
+    expect(summary.walletFeeCount).toBe(2);
+    expect(summary.netProfit).toBe(35);
+    expect(summary.roi).toBe(17.5);
   });
 });
 
