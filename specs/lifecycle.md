@@ -18,11 +18,11 @@ A bet is eligible when:
 3. The linked match has status `FINISHED`
 
 Matched sets without a linked `matchId` can also be considered for fallback
-auto-settlement when `OPENAI_API_KEY` is configured. The cron uses the manually
-entered `market` and `selection` text to search the web for a final score, then
-settles only high/medium-confidence finished results. Unconfigured or
-not-finished lookups are skipped; ambiguous or unresolved results are flagged
-for review.
+auto-settlement when `AI_GATEWAY_API_KEY` is configured. The cron uses the
+manually entered `market` and `selection` text to search the web for a final
+score, then settles only high/medium-confidence finished results. Unconfigured
+or not-finished lookups are skipped; ambiguous or unresolved results are
+flagged for review.
 4. Match has valid scores (`homeScore` and `awayScore` not null)
 
 ### Settlement Flow

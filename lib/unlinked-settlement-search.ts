@@ -1,5 +1,6 @@
 import { gateway } from "@ai-sdk/gateway";
-import { generateText } from "ai";
+import { openai } from "@ai-sdk/openai";
+import { generateText, stepCountIs } from "ai";
 import type { NormalizedSelection } from "@/lib/db/schema";
 
 export type UnlinkedSettlementLookupStatus =
@@ -22,8 +23,8 @@ export type UnlinkedSettlementLookupResult = {
   sourceUrls: string[];
 };
 
-const DEFAULT_MODEL = "gpt-5-mini";
-const DEFAULT_GATEWAY_MODEL = "perplexity/sonar";
+const DEFAULT_GATEWAY_MODEL = "google/gemini-3-flash";
+const OPENAI_GATEWAY_MODEL_PREFIX = "openai/";
 const MARKET_TEAM_SPLIT_PATTERN = /\s+(?:v|vs|vs\.|-|\u2013|@)\s+/i;
 const JSON_OBJECT_PATTERN = /\{[\s\S]*\}/;
 
@@ -81,44 +82,6 @@ Rules:
 - Set normalizedSelection for match-winner selections: selected home team = HOME_TEAM, selected away team = AWAY_TEAM, draw/tie = DRAW.
 - If the selection is not a match-winner market, set normalizedSelection to null; the settlement code can still resolve totals, BTTS, and correct score markets from the score.
 - Keep the reason concise and include the score/date evidence.`;
-}
-
-function extractResponseText(payload: unknown) {
-  if (!payload || typeof payload !== "object") {
-    return "";
-  }
-
-  const direct = (payload as { output_text?: unknown }).output_text;
-  if (typeof direct === "string") {
-    return direct;
-  }
-
-  const output = (payload as { output?: unknown }).output;
-  if (!Array.isArray(output)) {
-    return "";
-  }
-
-  const chunks: string[] = [];
-  for (const item of output) {
-    if (!item || typeof item !== "object") {
-      continue;
-    }
-    const content = (item as { content?: unknown }).content;
-    if (!Array.isArray(content)) {
-      continue;
-    }
-    for (const contentItem of content) {
-      if (!contentItem || typeof contentItem !== "object") {
-        continue;
-      }
-      const text = (contentItem as { text?: unknown }).text;
-      if (typeof text === "string") {
-        chunks.push(text);
-      }
-    }
-  }
-
-  return chunks.join("\n");
 }
 
 function parseLookupJson(text: string): UnlinkedSettlementLookupResult {
@@ -193,6 +156,20 @@ function parseLookupJson(text: string): UnlinkedSettlementLookupResult {
   }
 }
 
+function getSourceUrls(sources: unknown) {
+  if (!Array.isArray(sources)) {
+    return [];
+  }
+
+  return sources.flatMap((source) => {
+    if (!source || typeof source !== "object") {
+      return [];
+    }
+    const url = (source as { url?: unknown }).url;
+    return typeof url === "string" ? [url] : [];
+  });
+}
+
 export async function resolveUnlinkedMatchedBetResult({
   market,
   selection,
@@ -211,74 +188,47 @@ export async function resolveUnlinkedMatchedBetResult({
     };
   }
 
-  if (process.env.AI_GATEWAY_API_KEY) {
-    try {
-      const { text } = await generateText({
-        model: gateway.languageModel(
-          process.env.UNLINKED_SETTLEMENT_SEARCH_MODEL || DEFAULT_GATEWAY_MODEL
-        ),
-        prompt: buildPrompt({ market, selection, placedAt }),
-      });
-
-      return parseLookupJson(text);
-    } catch (error) {
-      return {
-        status: "error",
-        confidence: "low",
-        reason:
-          error instanceof Error
-            ? `AI Gateway result lookup failed: ${error.message}`
-            : "AI Gateway result lookup failed.",
-        sourceUrls: [],
-      };
-    }
-  }
-
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
+  if (!process.env.AI_GATEWAY_API_KEY) {
     return {
       status: "not_configured",
       confidence: "low",
-      reason:
-        "AI_GATEWAY_API_KEY or OPENAI_API_KEY is not configured for web result lookup.",
+      reason: "AI_GATEWAY_API_KEY is not configured for web result lookup.",
       sourceUrls: [],
     };
   }
 
   try {
-    const response = await fetch("https://api.openai.com/v1/responses", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: process.env.UNLINKED_SETTLEMENT_SEARCH_MODEL || DEFAULT_MODEL,
-        tools: [{ type: "web_search" }],
-        tool_choice: "auto",
-        input: buildPrompt({ market, selection, placedAt }),
-      }),
+    const model =
+      process.env.UNLINKED_SETTLEMENT_SEARCH_MODEL || DEFAULT_GATEWAY_MODEL;
+    const tools = model.startsWith(OPENAI_GATEWAY_MODEL_PREFIX)
+      ? {
+          web_search: openai.tools.webSearch({ searchContextSize: "medium" }),
+        }
+      : undefined;
+    const { sources, text } = await generateText({
+      model: gateway.languageModel(model),
+      prompt: buildPrompt({ market, selection, placedAt }),
+      stopWhen: tools ? stepCountIs(2) : undefined,
+      tools,
     });
 
-    if (!response.ok) {
+    const result = parseLookupJson(text);
+    if (result.sourceUrls.length === 0) {
       return {
-        status: "error",
-        confidence: "low",
-        reason: `OpenAI web search failed with status ${response.status}.`,
-        sourceUrls: [],
+        ...result,
+        sourceUrls: getSourceUrls(sources),
       };
     }
 
-    const payload = await response.json();
-    return parseLookupJson(extractResponseText(payload));
+    return result;
   } catch (error) {
     return {
       status: "error",
       confidence: "low",
       reason:
         error instanceof Error
-          ? `OpenAI web search failed: ${error.message}`
-          : "OpenAI web search failed.",
+          ? `AI Gateway result lookup failed: ${error.message}`
+          : "AI Gateway result lookup failed.",
       sourceUrls: [],
     };
   }

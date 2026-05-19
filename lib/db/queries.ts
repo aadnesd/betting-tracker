@@ -2060,6 +2060,88 @@ export type MatchedBetListItem = {
   } | null;
 };
 
+type UnlinkedAutoSettlementChanges = {
+  outcome?: string;
+  backProfitLoss?: number;
+  layProfitLoss?: number;
+  matchResult?: string;
+};
+
+export type UnlinkedAutoSettledMatchedBetListItem = {
+  id: string;
+  market: string;
+  selection: string;
+  promoType: string | null;
+  netExposure: number | null;
+  createdAt: Date;
+  settledAt: Date;
+  outcome: string | null;
+  backProfitLoss: number | null;
+  layProfitLoss: number | null;
+  matchResult: string | null;
+};
+
+export async function listUnlinkedAutoSettledMatchedBets({
+  userId,
+}: {
+  userId: string;
+}): Promise<UnlinkedAutoSettledMatchedBetListItem[]> {
+  try {
+    const rows = await db
+      .select({
+        id: matchedBet.id,
+        market: matchedBet.market,
+        selection: matchedBet.selection,
+        promoType: matchedBet.promoType,
+        netExposure: matchedBet.netExposure,
+        createdAt: matchedBet.createdAt,
+        settledAt: auditLog.createdAt,
+        changes: auditLog.changes,
+      })
+      .from(auditLog)
+      .innerJoin(matchedBet, eq(auditLog.entityId, matchedBet.id))
+      .where(
+        and(
+          eq(auditLog.userId, userId),
+          eq(matchedBet.userId, userId),
+          eq(auditLog.entityType, "matched_bet"),
+          eq(auditLog.action, "auto_settle_applied"),
+          sql`(${auditLog.changes}->>'matchResult' LIKE ${"%(unlinked web lookup)%"} OR ${auditLog.changes}->>'matchResult' LIKE ${"%(web lookup)%"})`
+        )
+      )
+      .orderBy(desc(auditLog.createdAt));
+
+    const parseNumber = (value: unknown) =>
+      value === null || value === undefined
+        ? null
+        : Number.parseFloat(value.toString());
+
+    return rows.map((row) => {
+      const changes = (row.changes ?? {}) as UnlinkedAutoSettlementChanges;
+
+      return {
+        id: row.id,
+        market: row.market,
+        selection: row.selection,
+        promoType: row.promoType ?? null,
+        netExposure: parseNumber(row.netExposure),
+        createdAt: row.createdAt,
+        settledAt: row.settledAt,
+        outcome: typeof changes.outcome === "string" ? changes.outcome : null,
+        backProfitLoss: parseNumber(changes.backProfitLoss),
+        layProfitLoss: parseNumber(changes.layProfitLoss),
+        matchResult:
+          typeof changes.matchResult === "string" ? changes.matchResult : null,
+      };
+    });
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to list unlinked auto-settled matched bets"
+    );
+  }
+}
+
 export async function listMatchedBetsForList({
   userId,
   status,

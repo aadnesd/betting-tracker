@@ -9,6 +9,7 @@ import { Separator } from "@/components/ui/separator";
 import {
   countMatchedBetsByStatus,
   listMatchedBetsByStatus,
+  listUnlinkedAutoSettledMatchedBets,
 } from "@/lib/db/queries";
 
 export const metadata = {
@@ -25,15 +26,17 @@ export default async function Page() {
   const userId = session.user.id;
 
   // Fetch bets that need review or are incomplete drafts
-  const [queueItems, needsReviewCount, draftCount] = await Promise.all([
-    listMatchedBetsByStatus({
-      userId,
-      statuses: ["needs_review", "draft"],
-      limit: 100,
-    }),
-    countMatchedBetsByStatus({ userId, statuses: ["needs_review"] }),
-    countMatchedBetsByStatus({ userId, statuses: ["draft"] }),
-  ]);
+  const [queueItems, needsReviewCount, draftCount, unlinkedAutoSettledItems] =
+    await Promise.all([
+      listMatchedBetsByStatus({
+        userId,
+        statuses: ["needs_review", "draft"],
+        limit: 100,
+      }),
+      countMatchedBetsByStatus({ userId, statuses: ["needs_review"] }),
+      countMatchedBetsByStatus({ userId, statuses: ["draft"] }),
+      listUnlinkedAutoSettledMatchedBets({ userId }),
+    ]);
 
   const totalCount = needsReviewCount + draftCount;
 
@@ -76,6 +79,14 @@ export default async function Page() {
         <div className="flex items-center gap-2 rounded-lg border px-3 py-2">
           <span className="font-semibold text-lg">{totalCount}</span>
           <span className="text-muted-foreground text-sm">total pending</span>
+        </div>
+        <div className="flex items-center gap-2 rounded-lg border bg-emerald-50/50 px-3 py-2">
+          <span className="font-semibold text-emerald-800 text-lg">
+            {unlinkedAutoSettledItems.length}
+          </span>
+          <span className="text-emerald-700 text-sm">
+            unlinked auto-settled
+          </span>
         </div>
       </div>
 
@@ -161,6 +172,77 @@ export default async function Page() {
               </Link>
             );
           })}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Settled by unlinked lookup</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {unlinkedAutoSettledItems.length === 0 ? (
+            <div className="py-6 text-center text-muted-foreground text-sm">
+              No matched sets have been settled by unlinked web lookup yet.
+            </div>
+          ) : (
+            unlinkedAutoSettledItems.map((bet) => (
+              <Link
+                className="block rounded-md border p-3 transition-colors hover:bg-muted/50"
+                href={`/bets/${bet.id}`}
+                key={bet.id}
+              >
+                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                  <div className="min-w-0 space-y-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-semibold">{bet.selection}</span>
+                      <Separator className="h-4" orientation="vertical" />
+                      <span className="text-muted-foreground text-sm">
+                        {bet.market}
+                      </span>
+                    </div>
+                    <p className="text-muted-foreground text-xs">
+                      Settled{" "}
+                      {format(new Date(bet.settledAt), "dd MMM yyyy, HH:mm")}
+                    </p>
+                    {bet.matchResult && (
+                      <p className="text-muted-foreground text-xs">
+                        {bet.matchResult}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 text-sm">
+                    {bet.outcome && (
+                      <span className="rounded-full border bg-muted px-2 py-0.5 font-medium text-xs uppercase">
+                        {bet.outcome}
+                      </span>
+                    )}
+                    {bet.backProfitLoss !== null && (
+                      <span
+                        className={
+                          bet.backProfitLoss >= 0
+                            ? "font-medium text-emerald-700"
+                            : "font-medium text-red-700"
+                        }
+                      >
+                        Back NOK {bet.backProfitLoss.toFixed(2)}
+                      </span>
+                    )}
+                    {bet.layProfitLoss !== null && (
+                      <span
+                        className={
+                          bet.layProfitLoss >= 0
+                            ? "font-medium text-emerald-700"
+                            : "font-medium text-red-700"
+                        }
+                      >
+                        Lay NOK {bet.layProfitLoss.toFixed(2)}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </Link>
+            ))
+          )}
         </CardContent>
       </Card>
     </div>

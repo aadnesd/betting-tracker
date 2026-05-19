@@ -53,7 +53,6 @@ These routes are part of the current screenshot intake flow:
    POSTGRES_URL=
    BLOB_READ_WRITE_TOKEN=
    AI_GATEWAY_API_KEY=
-   OPENAI_API_KEY=
    FXRATES_API_KEY=
    FOOTBALL_DATA_API_TOKEN=
    UNLINKED_SETTLEMENT_SEARCH_MODEL=
@@ -69,10 +68,9 @@ These routes are part of the current screenshot intake flow:
 
    `AI_GATEWAY_API_KEY` enables auto-settlement fallback for matched sets that
    are not linked to a synced football match. The cron uses AI Gateway
-   (`perplexity/sonar` by default) to look up final scores from the manually
-   entered market/selection. If gateway is not configured, `OPENAI_API_KEY`
-   falls back to OpenAI Responses web search. Set
-   `UNLINKED_SETTLEMENT_SEARCH_MODE=disabled` to skip this fallback.
+   (`google/gemini-3-flash` by default) to look up final scores from the
+   manually entered market/selection. Set
+   `UNLINKED_SETTLEMENT_SEARCH_MODE=disabled` to skip this lookup.
 
    Optional settled-bet edit allowlists:
 
