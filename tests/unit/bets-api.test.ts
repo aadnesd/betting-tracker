@@ -61,6 +61,7 @@ vi.mock("@/lib/db/queries", () => ({
   saveBackBet: vi.fn(),
   saveLayBet: vi.fn(),
   createMatchedBetRecord: vi.fn(),
+  addQualifyingBetsForMatchedBet: vi.fn(),
   createAuditEntry: vi.fn(),
   getMatchedBetById: vi.fn(),
   updateMatchedBetRecord: vi.fn(),
@@ -72,6 +73,7 @@ vi.mock("@/lib/db/queries", () => ({
   createAccountTransaction: vi.fn(),
   activateFreeBetWageringOnWin: vi.fn(),
   markFreeBetAsUsed: vi.fn(),
+  getFreeBetById: vi.fn(),
   getBackBetById: vi.fn(),
   getLayBetById: vi.fn(),
   getFreeBetByMatchedBetId: vi.fn(),
@@ -1694,6 +1696,60 @@ describe("bets API routes (unit)", () => {
 
       // Verify markFreeBetAsUsed was NOT called
       expect(dbQueries.markFreeBetAsUsed).not.toHaveBeenCalled();
+    });
+
+    it("records qualifying progress for locked promos on the back account", async () => {
+      (dbQueries.createManualScreenshot as vi.Mock).mockResolvedValueOnce({
+        id: "manual-back-1",
+      });
+      (dbQueries.createManualScreenshot as vi.Mock).mockResolvedValueOnce({
+        id: "manual-lay-1",
+      });
+      (dbQueries.getOrCreateAccount as vi.Mock).mockResolvedValueOnce({
+        id: "acc-back",
+        commission: null,
+      });
+      (dbQueries.getOrCreateAccount as vi.Mock).mockResolvedValueOnce({
+        id: "acc-lay",
+        commission: null,
+      });
+      (dbQueries.saveBackBet as vi.Mock).mockResolvedValue({ id: "bb1" });
+      (dbQueries.saveLayBet as vi.Mock).mockResolvedValue({ id: "lb1" });
+      (dbQueries.createMatchedBetRecord as vi.Mock).mockResolvedValue({
+        id: "mb1",
+        status: "matched",
+      });
+
+      const res = await quickAddRoute(
+        new Request("http://localhost/api/bets/quick-add", {
+          method: "POST",
+          body: JSON.stringify({
+            market: "Premier League",
+            selection: "Arsenal to Win",
+            back: {
+              odds: 2.5,
+              stake: 100,
+              bookmaker: "bet365",
+              currency: "NOK",
+            },
+            lay: {
+              odds: 2.52,
+              stake: 99.2,
+              exchange: "bfb247",
+              currency: "NOK",
+            },
+          }),
+        })
+      );
+
+      expect(res.status).toBe(200);
+      expect(dbQueries.addQualifyingBetsForMatchedBet).toHaveBeenCalledWith({
+        userId: user.id,
+        accountId: "acc-back",
+        matchedBetId: "mb1",
+        stake: 100,
+        odds: 2.5,
+      });
     });
   });
 
