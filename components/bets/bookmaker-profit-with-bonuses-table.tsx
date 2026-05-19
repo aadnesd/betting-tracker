@@ -35,7 +35,7 @@ export function BookmakerProfitWithBonusesTable({
       <div className="border-b px-4 py-3">
         <h3 className="font-semibold text-lg">Bookmaker Performance</h3>
         <p className="text-muted-foreground text-sm">
-          Matched-betting efficiency from pre-settlement exposure plus bonus impact
+          Matched-set P/L, standalone losses, and bonus impact
         </p>
       </div>
       {sorted.length === 0 ? (
@@ -51,6 +51,8 @@ export function BookmakerProfitWithBonusesTable({
                 <TableHead className="text-right">Matched Sets</TableHead>
                 <TableHead className="text-right">Stake</TableHead>
                 <TableHead className="text-right">Net P/L</TableHead>
+                <TableHead className="text-right">Free Bets</TableHead>
+                <TableHead className="text-right">Standalone P/L</TableHead>
                 <TableHead className="text-right">Match ROI</TableHead>
                 <TableHead className="text-right">Retention</TableHead>
                 <TableHead className="text-right">
@@ -83,6 +85,38 @@ export function BookmakerProfitWithBonusesTable({
                     )}
                   >
                     {formatNOK(row.bettingProfit)}
+                  </TableCell>
+                  <TableCell
+                    className={cn(
+                      "text-right",
+                      (row.freeBetProfit ?? 0) >= 0
+                        ? "text-emerald-600"
+                        : "text-rose-600"
+                    )}
+                  >
+                    {(row.freeBetCount ?? 0) > 0 ? (
+                      <span className="inline-flex flex-col items-end">
+                        <span>{formatNOK(row.freeBetProfit ?? 0)}</span>
+                        <span className="text-muted-foreground text-xs">
+                          {row.freeBetCount} free bet
+                          {row.freeBetCount === 1 ? "" : "s"}
+                        </span>
+                      </span>
+                    ) : (
+                      "—"
+                    )}
+                  </TableCell>
+                  <TableCell
+                    className={cn(
+                      "text-right",
+                      (row.standaloneProfit ?? 0) >= 0
+                        ? "text-emerald-600"
+                        : "text-rose-600"
+                    )}
+                  >
+                    {(row.standaloneBetCount ?? 0) > 0
+                      ? formatNOK(row.standaloneProfit ?? 0)
+                      : "—"}
                   </TableCell>
                   <TableCell
                     className={cn(
@@ -164,13 +198,21 @@ export function BookmakerProfitWithBonusesTable({
                 <span
                   className={cn(
                     "font-medium",
-                    sorted.reduce((sum, r) => sum + r.bettingProfit, 0) >= 0
+                    sorted.reduce(
+                      (sum, r) =>
+                        sum + r.bettingProfit + (r.standaloneProfit ?? 0),
+                      0
+                    ) >= 0
                       ? "text-emerald-600"
                       : "text-rose-600"
                   )}
                 >
                   {formatNOK(
-                    sorted.reduce((sum, r) => sum + r.bettingProfit, 0)
+                    sorted.reduce(
+                      (sum, r) =>
+                        sum + r.bettingProfit + (r.standaloneProfit ?? 0),
+                      0
+                    )
                   )}
                 </span>
               </span>

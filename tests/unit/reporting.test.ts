@@ -171,6 +171,9 @@ describe("calculateReportingSummary", () => {
       settledCount: 0,
       openExposure: 0,
       bonusTotal: 0,
+      walletFeeTotal: 0,
+      standaloneProfit: 0,
+      standaloneCount: 0,
       bettingProfit: 0,
     });
   });
