@@ -1,5 +1,6 @@
 import { gateway } from "@ai-sdk/gateway";
 import { openai } from "@ai-sdk/openai";
+import type { ToolSet } from "ai";
 import { Output, stepCountIs, ToolLoopAgent } from "ai";
 import { z } from "zod";
 import type { NormalizedSelection } from "@/lib/db/schema";
@@ -140,10 +141,12 @@ export async function resolveUnlinkedMatchedBetResult({
   try {
     const model =
       process.env.UNLINKED_SETTLEMENT_SEARCH_MODEL || DEFAULT_GATEWAY_MODEL;
-    const tools = model.startsWith(OPENAI_GATEWAY_MODEL_PREFIX)
-      ? {
+    const tools: ToolSet | undefined = model.startsWith(
+      OPENAI_GATEWAY_MODEL_PREFIX
+    )
+      ? ({
           web_search: openai.tools.webSearch({ searchContextSize: "medium" }),
-        }
+        } as unknown as ToolSet)
       : undefined;
 
     const agent = new ToolLoopAgent({
