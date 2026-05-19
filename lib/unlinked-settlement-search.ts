@@ -24,7 +24,7 @@ export type UnlinkedSettlementLookupResult = {
   sourceUrls: string[];
 };
 
-const DEFAULT_GATEWAY_MODEL = "google/gemini-3-flash";
+const DEFAULT_GATEWAY_MODEL = "openai/gpt-5.4-mini";
 const OPENAI_GATEWAY_MODEL_PREFIX = "openai/";
 const MARKET_TEAM_SPLIT_PATTERN = /\s+(?:v|vs|vs\.|-|\u2013|@)\s+/i;
 

@@ -68,7 +68,7 @@ These routes are part of the current screenshot intake flow:
 
    `AI_GATEWAY_API_KEY` enables auto-settlement fallback for matched sets that
    are not linked to a synced football match. The cron uses AI Gateway
-   (`google/gemini-3-flash` by default) to look up final scores from the
+   (`openai/gpt-5.4-mini` by default) to look up final scores from the
    manually entered market/selection. Set
    `UNLINKED_SETTLEMENT_SEARCH_MODE=disabled` to skip this lookup.
 
