@@ -78,7 +78,11 @@ const TRANSACTION_TYPES: { value: WalletTransactionType; label: string }[] = [
   { value: "adjustment", label: "Adjustment" },
 ];
 
-function isInflow(type: WalletTransactionType): boolean {
+function isInflow(type: WalletTransactionType, amount: number): boolean {
+  if (type === "adjustment") {
+    return amount >= 0;
+  }
+
   return ["deposit", "transfer_from_account", "transfer_from_wallet"].includes(
     type
   );
@@ -178,8 +182,16 @@ export function WalletTransactionRow({
 
   const handleSave = async () => {
     const parsedAmount = Number.parseFloat(amount);
-    if (!amount || Number.isNaN(parsedAmount) || parsedAmount <= 0) {
-      toast.error("Please enter a valid amount");
+    if (
+      !amount ||
+      Number.isNaN(parsedAmount) ||
+      (type === "adjustment" ? parsedAmount === 0 : parsedAmount <= 0)
+    ) {
+      toast.error(
+        type === "adjustment"
+          ? "Please enter a non-zero adjustment amount"
+          : "Please enter a valid positive amount"
+      );
       return;
     }
     if (!date) {
@@ -258,7 +270,7 @@ export function WalletTransactionRow({
   };
 
   const amountValue = Number(transaction.amount);
-  const positive = isInflow(transaction.type);
+  const positive = isInflow(transaction.type, amountValue);
 
   return (
     <div className="group flex items-center justify-between rounded-md border p-3">
@@ -357,7 +369,7 @@ export function WalletTransactionRow({
                   </Label>
                   <Input
                     id={`wallet-tx-amount-${transaction.id}`}
-                    min="0.01"
+                    min={type === "adjustment" ? undefined : "0.01"}
                     onChange={(event) => setAmount(event.target.value)}
                     step="0.01"
                     type="number"

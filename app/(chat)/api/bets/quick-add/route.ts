@@ -7,6 +7,7 @@ import {
 } from "@/lib/bet-calculations";
 import { revalidateDashboard } from "@/lib/cache";
 import {
+  addQualifyingBetsForMatchedBet,
   createAuditEntry,
   createManualScreenshot,
   createMatchedBetRecord,
@@ -190,6 +191,14 @@ export async function POST(request: Request) {
       status: "matched",
       netExposure,
       notes: body.notes ? `[Manual Entry] ${body.notes}` : "[Manual Entry]",
+    });
+
+    await addQualifyingBetsForMatchedBet({
+      userId: session.user.id,
+      accountId: backAccount.id,
+      matchedBetId: matched.id,
+      stake: body.back.stake,
+      odds: body.back.odds,
     });
 
     // Mark free bet as used if one was selected

@@ -8,25 +8,46 @@ import {
   updateWalletTransaction,
 } from "@/lib/db/queries";
 
-const updateWalletTransactionSchema = z.object({
-  type: z.enum([
-    "deposit",
-    "withdrawal",
-    "transfer_to_account",
-    "transfer_from_account",
-    "transfer_to_wallet",
-    "transfer_from_wallet",
-    "fee",
-    "adjustment",
-  ]),
-  amount: z.number().positive("Amount must be positive"),
-  currency: z.string().min(1).max(10),
-  date: z.string().transform((value) => new Date(value)),
-  relatedAccountId: z.string().uuid().nullish(),
-  relatedWalletId: z.string().uuid().nullish(),
-  externalRef: z.string().nullish(),
-  notes: z.string().nullish(),
-});
+const updateWalletTransactionSchema = z
+  .object({
+    type: z.enum([
+      "deposit",
+      "withdrawal",
+      "transfer_to_account",
+      "transfer_from_account",
+      "transfer_to_wallet",
+      "transfer_from_wallet",
+      "fee",
+      "adjustment",
+    ]),
+    amount: z.number(),
+    currency: z.string().min(1).max(10),
+    date: z.string().transform((value) => new Date(value)),
+    relatedAccountId: z.string().uuid().nullish(),
+    relatedWalletId: z.string().uuid().nullish(),
+    externalRef: z.string().nullish(),
+    notes: z.string().nullish(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.type === "adjustment") {
+      if (data.amount === 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Adjustment amount must be non-zero",
+          path: ["amount"],
+        });
+      }
+      return;
+    }
+
+    if (data.amount <= 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Amount must be positive",
+        path: ["amount"],
+      });
+    }
+  });
 
 interface RouteParams {
   params: Promise<{ id: string; txId: string }>;

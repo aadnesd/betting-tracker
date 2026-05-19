@@ -348,9 +348,7 @@ export function QuickTransactionSheet({
     const amount = Number.parseFloat(accountForm.amount);
     if (!accountForm.amount || Number.isNaN(amount)) {
       newErrors.amount = "Amount is required";
-    } else if (
-      accountForm.type === "adjustment" ? amount === 0 : amount <= 0
-    ) {
+    } else if (accountForm.type === "adjustment" ? amount === 0 : amount <= 0) {
       newErrors.amount =
         accountForm.type === "adjustment"
           ? "Adjustment amount must be non-zero"
@@ -386,8 +384,11 @@ export function QuickTransactionSheet({
     const amount = Number.parseFloat(walletForm.amount);
     if (!walletForm.amount || Number.isNaN(amount)) {
       newErrors.amount = "Amount is required";
-    } else if (amount <= 0) {
-      newErrors.amount = "Amount must be positive";
+    } else if (walletForm.type === "adjustment" ? amount === 0 : amount <= 0) {
+      newErrors.amount =
+        walletForm.type === "adjustment"
+          ? "Adjustment amount must be non-zero"
+          : "Amount must be positive";
     }
 
     if (!walletForm.currency) {
@@ -1169,7 +1170,7 @@ export function QuickTransactionSheet({
                 <Input
                   className={walletErrors.amount ? "border-destructive" : ""}
                   id="walletAmount"
-                  min="0.01"
+                  min={walletForm.type === "adjustment" ? undefined : "0.01"}
                   onChange={(e) => updateWalletField("amount", e.target.value)}
                   placeholder="0.00"
                   step="0.01"

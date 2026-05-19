@@ -86,18 +86,26 @@ export function WalletTransactionForm({
     type === "transfer_to_account" || type === "transfer_from_account";
   const needsWallet =
     type === "transfer_to_wallet" || type === "transfer_from_wallet";
-  const selectedWallet = wallets.find((wallet) => wallet.id === relatedWalletId);
+  const selectedWallet = wallets.find(
+    (wallet) => wallet.id === relatedWalletId
+  );
   const showRelatedWalletAmount =
-    needsWallet &&
-    selectedWallet &&
-    selectedWallet.currency !== walletCurrency;
+    needsWallet && selectedWallet && selectedWallet.currency !== walletCurrency;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     const amountNum = Number.parseFloat(amount);
-    if (!amount || Number.isNaN(amountNum) || amountNum <= 0) {
-      toast.error("Please enter a valid amount");
+    if (
+      !amount ||
+      Number.isNaN(amountNum) ||
+      (type === "adjustment" ? amountNum === 0 : amountNum <= 0)
+    ) {
+      toast.error(
+        type === "adjustment"
+          ? "Please enter a non-zero adjustment amount"
+          : "Please enter a valid positive amount"
+      );
       return;
     }
 
@@ -118,7 +126,9 @@ export function WalletTransactionForm({
         Number.isNaN(relatedWalletAmountNum) ||
         relatedWalletAmountNum <= 0
       ) {
-        toast.error("Please enter a valid amount in the related wallet currency");
+        toast.error(
+          "Please enter a valid amount in the related wallet currency"
+        );
         return;
       }
     }
@@ -199,7 +209,7 @@ export function WalletTransactionForm({
           <div className="flex gap-2">
             <Input
               id="amount"
-              min="0"
+              min={type === "adjustment" ? undefined : "0"}
               onChange={(e) => setAmount(e.target.value)}
               placeholder="0.00"
               required
