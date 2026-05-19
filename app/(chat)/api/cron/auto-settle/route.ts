@@ -6,10 +6,12 @@ import {
   autoCompleteDepositBonusesIfEligible,
   type BetReadyForSettlement,
   findBetsReadyForAutoSettlement,
+  findUnlinkedBetsReadyForAutoSettlement,
   flagBetForReview,
   getFreeBetByMatchedBetId,
   processFreeBetWageringProgressOnSettle,
   processWageringProgressOnSettle,
+  type UnlinkedBetReadyForSettlement,
 } from "@/lib/db/queries";
 import {
   type BetOutcome,
@@ -18,6 +20,7 @@ import {
   resolveOutcome,
   resolveOutcomeWithNormalizedSelection,
 } from "@/lib/settlement";
+import { resolveUnlinkedMatchedBetResult } from "@/lib/unlinked-settlement-search";
 
 /**
  * Auto-settle cron endpoint.
@@ -40,7 +43,7 @@ type AutoSettleResult = {
   errors: number;
   details: Array<{
     matchedBetId: string;
-    action: "settled" | "flagged" | "error";
+    action: "settled" | "flagged" | "skipped" | "error";
     outcome?: BetOutcome;
     reason?: string;
   }>;
@@ -184,6 +187,173 @@ async function processBet(
   };
 }
 
+async function processUnlinkedBet(
+  bet: UnlinkedBetReadyForSettlement
+): Promise<AutoSettleResult["details"][0]> {
+  const lookup = await resolveUnlinkedMatchedBetResult({
+    market: bet.market,
+    selection: bet.selection,
+    placedAt: bet.backBetPlacedAt,
+  });
+
+  if (lookup.status === "not_configured" || lookup.status === "not_finished") {
+    return {
+      matchedBetId: bet.id,
+      action: "skipped",
+      reason: lookup.reason,
+    };
+  }
+
+  if (
+    lookup.status !== "finished" ||
+    lookup.confidence === "low" ||
+    lookup.homeScore === undefined ||
+    lookup.awayScore === undefined
+  ) {
+    await flagBetForReview({
+      matchedBetId: bet.id,
+      userId: bet.userId,
+      reason: `Unlinked result lookup could not confidently settle this bet: ${lookup.reason}`,
+    });
+
+    return {
+      matchedBetId: bet.id,
+      action: "flagged",
+      outcome: "unknown",
+      reason: lookup.reason,
+    };
+  }
+
+  const normalizedSelection =
+    bet.normalizedSelection ?? lookup.normalizedSelection;
+  const outcomeResult = normalizedSelection
+    ? resolveOutcomeWithNormalizedSelection(normalizedSelection, {
+        homeScore: lookup.homeScore,
+        awayScore: lookup.awayScore,
+      })
+    : resolveOutcome(bet.market, bet.selection, {
+        homeScore: lookup.homeScore,
+        awayScore: lookup.awayScore,
+      });
+
+  if (
+    outcomeResult.confidence === "low" ||
+    outcomeResult.outcome === "unknown"
+  ) {
+    await flagBetForReview({
+      matchedBetId: bet.id,
+      userId: bet.userId,
+      reason: `Unlinked result found, but outcome could not be resolved: ${outcomeResult.reason}`,
+    });
+
+    return {
+      matchedBetId: bet.id,
+      action: "flagged",
+      outcome: outcomeResult.outcome,
+      reason: outcomeResult.reason,
+    };
+  }
+
+  const backOdds = bet.backOdds ? Number.parseFloat(bet.backOdds) : 0;
+  const backStake = bet.backStake ? Number.parseFloat(bet.backStake) : 0;
+  const layOdds = bet.layOdds ? Number.parseFloat(bet.layOdds) : 0;
+  const layStake = bet.layStake ? Number.parseFloat(bet.layStake) : 0;
+  const exchangeCommission = bet.layAccountCommission ?? 0;
+
+  const matchedFreeBet = await getFreeBetByMatchedBetId({
+    matchedBetId: bet.id,
+    userId: bet.userId,
+  });
+  const freeBet = matchedFreeBet ? true : isFreeBetPromoType(bet.promoType);
+  const freeBetStakeReturned = matchedFreeBet?.stakeReturned ?? false;
+  const { backProfitLoss, layProfitLoss } = calculateMatchedBetProfitLoss(
+    outcomeResult.outcome,
+    backStake,
+    backOdds,
+    layStake,
+    layOdds,
+    freeBet,
+    freeBetStakeReturned,
+    exchangeCommission
+  );
+
+  const matchResult = `${lookup.homeTeam ?? "Home"} ${lookup.homeScore}-${lookup.awayScore} ${lookup.awayTeam ?? "Away"}`;
+  const settlementMatchResult = `${matchResult} (unlinked web lookup).`;
+  const sourceNote =
+    lookup.sourceUrls.length > 0
+      ? ` Sources: ${lookup.sourceUrls.slice(0, 3).join(", ")}`
+      : "";
+
+  await applyAutoSettlement({
+    matchedBetId: bet.id,
+    userId: bet.userId,
+    outcome: outcomeResult.outcome,
+    backProfitLoss,
+    layProfitLoss,
+    backBetId: bet.backBetId,
+    layBetId: bet.layBetId,
+    backAccountId: bet.backAccountId,
+    layAccountId: bet.layAccountId,
+    backCurrency: bet.backCurrency ?? null,
+    layCurrency: bet.layCurrency ?? null,
+    market: bet.market,
+    selection: bet.selection,
+    matchResult: `${settlementMatchResult}${sourceNote}`,
+  });
+
+  if (bet.backAccountId && bet.backBetPlacedAt) {
+    await processWageringProgressOnSettle({
+      accountId: bet.backAccountId,
+      userId: bet.userId,
+      backBetId: bet.backBetId,
+      matchedBetId: bet.id,
+      stake: backStake,
+      odds: backOdds,
+      placedAt: bet.backBetPlacedAt,
+    });
+
+    await processFreeBetWageringProgressOnSettle({
+      accountId: bet.backAccountId,
+      userId: bet.userId,
+      backBetId: bet.backBetId,
+      matchedBetId: bet.id,
+      stake: backStake,
+      odds: backOdds,
+      placedAt: bet.backBetPlacedAt,
+    });
+
+    try {
+      await autoCompleteDepositBonusesIfEligible({
+        userId: bet.userId,
+        accountId: bet.backAccountId,
+      });
+    } catch (error) {
+      console.error(
+        `[Auto-Settle] Failed deposit bonus auto-completion check for account ${bet.backAccountId}:`,
+        error
+      );
+    }
+  }
+
+  if (matchedFreeBet && outcomeResult.outcome === "win") {
+    const winAmount = freeBetStakeReturned
+      ? backStake * backOdds
+      : backStake * (backOdds - 1);
+    await activateFreeBetWageringOnWin({
+      freeBetId: matchedFreeBet.id,
+      userId: bet.userId,
+      winAmount,
+    });
+  }
+
+  return {
+    matchedBetId: bet.id,
+    action: "settled",
+    outcome: outcomeResult.outcome,
+    reason: `${lookup.reason} ${outcomeResult.reason}`,
+  };
+}
+
 export async function POST(request: Request) {
   // Validate CRON_SECRET for Vercel cron authentication
   const cronSecret = process.env.CRON_SECRET;
@@ -207,11 +377,19 @@ export async function POST(request: Request) {
   try {
     // Fetch all bets ready for auto-settlement
     const bets = await findBetsReadyForAutoSettlement({ limit: 100 });
-    const affectedUserIds = new Set(bets.map((bet) => bet.userId));
+    const unlinkedBets = await findUnlinkedBetsReadyForAutoSettlement({
+      limit: 25,
+    });
+    const affectedUserIds = new Set([
+      ...bets.map((bet) => bet.userId),
+      ...unlinkedBets.map((bet) => bet.userId),
+    ]);
 
-    console.log(`[Auto-Settle] Found ${bets.length} bets ready for settlement`);
+    console.log(
+      `[Auto-Settle] Found ${bets.length} linked and ${unlinkedBets.length} unlinked bets ready for settlement`
+    );
 
-    if (bets.length === 0) {
+    if (bets.length === 0 && unlinkedBets.length === 0) {
       return NextResponse.json({
         success: true,
         message: "No bets ready for auto-settlement",
@@ -246,6 +424,42 @@ export async function POST(request: Request) {
           reason: error instanceof Error ? error.message : "Unknown error",
         });
         console.error(`[Auto-Settle] Error processing bet ${bet.id}:`, error);
+      }
+    }
+
+    for (const bet of unlinkedBets) {
+      result.processed++;
+
+      try {
+        const detail = await processUnlinkedBet(bet);
+        result.details.push(detail);
+
+        if (detail.action === "settled") {
+          result.settled++;
+          console.log(
+            `[Auto-Settle] Settled unlinked bet ${bet.id}: ${detail.outcome} - ${detail.reason}`
+          );
+        } else if (detail.action === "flagged") {
+          result.flaggedForReview++;
+          console.log(
+            `[Auto-Settle] Flagged unlinked bet ${bet.id} for review: ${detail.reason}`
+          );
+        } else if (detail.action === "skipped") {
+          console.log(
+            `[Auto-Settle] Skipped unlinked bet ${bet.id}: ${detail.reason}`
+          );
+        }
+      } catch (error) {
+        result.errors++;
+        result.details.push({
+          matchedBetId: bet.id,
+          action: "error",
+          reason: error instanceof Error ? error.message : "Unknown error",
+        });
+        console.error(
+          `[Auto-Settle] Error processing unlinked bet ${bet.id}:`,
+          error
+        );
       }
     }
 
