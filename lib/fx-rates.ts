@@ -10,7 +10,9 @@ const FX_BASE_URL =
 const TARGET_CURRENCY = "NOK";
 
 const cache = new Map<string, { rate: number; expiresAt: number }>();
+const inFlightRateFetches = new Map<string, Promise<number>>();
 const CACHE_TTL_MS = 5 * 60 * 1000;
+const STORED_RATE_FRESH_MS = 30 * 60 * 1000;
 const MAX_RETRIES = 3;
 const BASE_RETRY_DELAY_MS = 300;
 const STALE_FALLBACK_MS = 72 * 60 * 60 * 1000;
@@ -36,7 +38,7 @@ const sleep = (ms: number) =>
 
 function parseRetryAfterMs(header: string | null): number | undefined {
   if (!header) {
-    return undefined;
+    return;
   }
 
   const asSeconds = Number.parseFloat(header);
@@ -49,7 +51,7 @@ function parseRetryAfterMs(header: string | null): number | undefined {
     return Math.max(1, asDateMs - Date.now());
   }
 
-  return undefined;
+  return;
 }
 
 function getRetryDelayMs(attempt: number, retryAfterMs?: number) {
@@ -164,6 +166,47 @@ async function fetchRate(fromCurrency: string): Promise<number> {
     return cached.rate;
   }
 
+  const inFlight = inFlightRateFetches.get(effectiveBase);
+  if (inFlight) {
+    const rate = await inFlight;
+    if (effectiveBase !== base) {
+      cache.set(base, {
+        rate,
+        expiresAt: Date.now() + CACHE_TTL_MS,
+      });
+    }
+    return rate;
+  }
+
+  const ratePromise = fetchFreshRate(effectiveBase);
+  inFlightRateFetches.set(effectiveBase, ratePromise);
+  try {
+    const rate = await ratePromise;
+    if (effectiveBase !== base) {
+      cache.set(base, {
+        rate,
+        expiresAt: Date.now() + CACHE_TTL_MS,
+      });
+    }
+    return rate;
+  } finally {
+    inFlightRateFetches.delete(effectiveBase);
+  }
+}
+
+async function fetchFreshRate(effectiveBase: string): Promise<number> {
+  const stored = await getStoredRate(effectiveBase);
+  if (stored) {
+    const ageMs = Date.now() - stored.updatedAt.getTime();
+    if (ageMs <= STORED_RATE_FRESH_MS) {
+      cache.set(effectiveBase, {
+        rate: stored.rate,
+        expiresAt: Date.now() + CACHE_TTL_MS,
+      });
+      return stored.rate;
+    }
+  }
+
   let lastError: FxFetchError | null = null;
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt += 1) {
     try {
@@ -172,10 +215,6 @@ async function fetchRate(fromCurrency: string): Promise<number> {
         rate,
         expiresAt: Date.now() + CACHE_TTL_MS,
       });
-      // Also cache the original currency if it's a stablecoin
-      if (effectiveBase !== base) {
-        cache.set(base, { rate, expiresAt: Date.now() + CACHE_TTL_MS });
-      }
       await storeRate(effectiveBase, rate);
       return rate;
     } catch (error) {
@@ -191,7 +230,6 @@ async function fetchRate(fromCurrency: string): Promise<number> {
     }
   }
 
-  const stored = await getStoredRate(effectiveBase);
   if (stored) {
     const ageMs = Date.now() - stored.updatedAt.getTime();
     if (ageMs <= STALE_FALLBACK_MS) {
@@ -199,12 +237,6 @@ async function fetchRate(fromCurrency: string): Promise<number> {
         rate: stored.rate,
         expiresAt: Date.now() + CACHE_TTL_MS,
       });
-      if (effectiveBase !== base) {
-        cache.set(base, {
-          rate: stored.rate,
-          expiresAt: Date.now() + CACHE_TTL_MS,
-        });
-      }
       console.warn(
         `[FX] Using stored rate for ${effectiveBase} (${Math.round(
           ageMs / 1000
