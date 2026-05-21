@@ -6,6 +6,7 @@ import {
   ArrowUpCircle,
   Gift,
   Loader2,
+  Plus,
   Receipt,
   Settings,
   Wallet,
@@ -35,46 +36,48 @@ import {
 } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 
-export interface AccountOption {
+export type AccountOption = {
   id: string;
   name: string;
   kind: "bookmaker" | "exchange";
   currency: string;
   currentBalance: string;
-}
+};
 
-export interface WalletOption {
+export type WalletOption = {
   id: string;
   name: string;
   type: "fiat" | "crypto" | "hybrid";
   currency: string;
   currentBalance?: string;
-}
+};
 
-interface QuickTransactionSheetProps {
+type QuickTransactionSheetProps = {
   accounts: AccountOption[];
   wallets?: WalletOption[];
+  bonusSubcategories?: string[];
   /** Trigger button element (default: "Quick Transaction" button) */
   trigger?: React.ReactNode;
   /** Whether the sheet should open on first mount */
   defaultOpen?: boolean;
   /** Called after successful transaction creation */
   onSuccess?: () => void;
-}
+};
 
 // --- Account transaction types ---
 type AccountTransactionType = "deposit" | "withdrawal" | "bonus" | "adjustment";
 
-interface AccountFormData {
+type AccountFormData = {
   accountId: string;
   type: AccountTransactionType;
+  bonusSubcategory: string;
   amount: string;
   currency: string;
   occurredAt: Date;
   notes: string;
   walletId: string;
   walletAmount: string;
-}
+};
 
 // --- Wallet transaction types ---
 type WalletTransactionType =
@@ -87,7 +90,7 @@ type WalletTransactionType =
   | "fee"
   | "adjustment";
 
-interface WalletFormData {
+type WalletFormData = {
   walletId: string;
   type: WalletTransactionType;
   amount: string;
@@ -97,11 +100,23 @@ interface WalletFormData {
   relatedAccountId: string;
   relatedWalletId: string;
   relatedWalletAmount: string;
-}
+};
 
 type TabMode = "account" | "wallet";
 
 const CURRENCIES = ["NOK", "EUR", "GBP", "USD", "SEK", "DKK"] as const;
+const CREATE_BONUS_SUBCATEGORY_VALUE = "__create_bonus_subcategory__";
+const BONUS_SUBCATEGORY_MAX_LENGTH = 80;
+
+function normalizeBonusSubcategory(value: string): string {
+  return value.trim().replace(/\s+/g, " ");
+}
+
+function sortBonusSubcategories(values: string[]): string[] {
+  return [...values].sort((left, right) =>
+    left.localeCompare(right, undefined, { sensitivity: "base" })
+  );
+}
 
 const ACCOUNT_TRANSACTION_TYPES: {
   value: AccountTransactionType;
@@ -204,6 +219,7 @@ function walletTypeNeedsWallet(type: WalletTransactionType): boolean {
 export function QuickTransactionSheet({
   accounts,
   wallets = [],
+  bonusSubcategories: initialBonusSubcategories = [],
   trigger,
   defaultOpen = false,
   onSuccess,
@@ -217,6 +233,7 @@ export function QuickTransactionSheet({
   const [accountForm, setAccountForm] = useState<AccountFormData>({
     accountId: "",
     type: "bonus",
+    bonusSubcategory: "",
     amount: "",
     currency: "NOK",
     occurredAt: new Date(),
@@ -224,6 +241,16 @@ export function QuickTransactionSheet({
     walletId: "",
     walletAmount: "",
   });
+  const [bonusSubcategories, setBonusSubcategories] = useState<string[]>(() =>
+    sortBonusSubcategories(
+      initialBonusSubcategories
+        .map((entry) => normalizeBonusSubcategory(entry))
+        .filter((entry) => entry.length > 0)
+    )
+  );
+  const [isCreatingBonusSubcategory, setIsCreatingBonusSubcategory] =
+    useState(false);
+  const [newBonusSubcategory, setNewBonusSubcategory] = useState("");
   const [accountErrors, setAccountErrors] = useState<
     Partial<Record<keyof AccountFormData, string>>
   >({});
@@ -275,6 +302,42 @@ export function QuickTransactionSheet({
     }
   };
 
+  const handleAddBonusSubcategory = () => {
+    const normalized = normalizeBonusSubcategory(newBonusSubcategory);
+
+    if (!normalized) {
+      setAccountErrors((prev) => ({
+        ...prev,
+        bonusSubcategory: "Subcategory is required",
+      }));
+      return;
+    }
+
+    if (normalized.length > BONUS_SUBCATEGORY_MAX_LENGTH) {
+      setAccountErrors((prev) => ({
+        ...prev,
+        bonusSubcategory: `Subcategory must be ${BONUS_SUBCATEGORY_MAX_LENGTH} characters or less`,
+      }));
+      return;
+    }
+
+    const existing =
+      bonusSubcategories.find(
+        (entry) => entry.toLowerCase() === normalized.toLowerCase()
+      ) ?? null;
+    const next = existing ?? normalized;
+
+    if (!existing) {
+      setBonusSubcategories((prev) =>
+        sortBonusSubcategories([...prev, normalized])
+      );
+    }
+
+    updateAccountField("bonusSubcategory", next);
+    setIsCreatingBonusSubcategory(false);
+    setNewBonusSubcategory("");
+  };
+
   const handleAccountChange = (accountId: string) => {
     const acct = accounts.find((a) => a.id === accountId);
     setAccountForm((prev) => ({
@@ -315,6 +378,7 @@ export function QuickTransactionSheet({
     setAccountForm({
       accountId: "",
       type: "bonus",
+      bonusSubcategory: "",
       amount: "",
       currency: "NOK",
       occurredAt: new Date(),
@@ -322,6 +386,8 @@ export function QuickTransactionSheet({
       walletId: "",
       walletAmount: "",
     });
+    setIsCreatingBonusSubcategory(false);
+    setNewBonusSubcategory("");
     setAccountErrors({});
     setWalletForm({
       walletId: "",
@@ -357,6 +423,19 @@ export function QuickTransactionSheet({
 
     if (!accountForm.currency) {
       newErrors.currency = "Currency is required";
+    }
+
+    if (accountForm.type === "bonus") {
+      const normalizedSubcategory = normalizeBonusSubcategory(
+        accountForm.bonusSubcategory
+      );
+
+      if (!normalizedSubcategory) {
+        newErrors.bonusSubcategory = "Please select a bonus subcategory";
+      } else if (normalizedSubcategory.length > BONUS_SUBCATEGORY_MAX_LENGTH) {
+        newErrors.bonusSubcategory =
+          "Bonus subcategory is too long (max 80 characters)";
+      }
     }
 
     if (showAccountWalletAmount) {
@@ -444,6 +523,10 @@ export function QuickTransactionSheet({
         amount: Number.parseFloat(accountForm.amount),
         currency: accountForm.currency,
         occurredAt: accountForm.occurredAt.toISOString(),
+        bonusSubcategory:
+          accountForm.type === "bonus"
+            ? normalizeBonusSubcategory(accountForm.bonusSubcategory) || null
+            : null,
         notes: accountForm.notes.trim() || null,
         walletId: accountForm.walletId || null,
       };
@@ -783,6 +866,87 @@ export function QuickTransactionSheet({
                   </p>
                 </div>
               )}
+
+            {/* Bonus Subcategory */}
+            {accountForm.type === "bonus" && (
+              <div className="space-y-2">
+                <Label htmlFor="bonusSubcategory">Bonus Subcategory</Label>
+                <Select
+                  onValueChange={(value) => {
+                    if (value === CREATE_BONUS_SUBCATEGORY_VALUE) {
+                      setIsCreatingBonusSubcategory(true);
+                      updateAccountField("bonusSubcategory", "");
+                      return;
+                    }
+
+                    setIsCreatingBonusSubcategory(false);
+                    setNewBonusSubcategory("");
+                    updateAccountField("bonusSubcategory", value);
+                  }}
+                  value={
+                    isCreatingBonusSubcategory
+                      ? CREATE_BONUS_SUBCATEGORY_VALUE
+                      : accountForm.bonusSubcategory
+                  }
+                >
+                  <SelectTrigger
+                    className={
+                      accountErrors.bonusSubcategory ? "border-destructive" : ""
+                    }
+                    id="bonusSubcategory"
+                  >
+                    <SelectValue placeholder="Select bonus subcategory" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {bonusSubcategories.map((subcategory) => (
+                      <SelectItem key={subcategory} value={subcategory}>
+                        {subcategory}
+                      </SelectItem>
+                    ))}
+                    <SelectItem value={CREATE_BONUS_SUBCATEGORY_VALUE}>
+                      <span className="flex items-center gap-1 text-primary">
+                        <Plus className="h-3 w-3" />
+                        Create new subcategory
+                      </span>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+
+                {isCreatingBonusSubcategory && (
+                  <div className="flex items-center gap-2">
+                    <Input
+                      maxLength={BONUS_SUBCATEGORY_MAX_LENGTH}
+                      onChange={(e) => setNewBonusSubcategory(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          handleAddBonusSubcategory();
+                        }
+                      }}
+                      placeholder="e.g., Weekly bonus"
+                      value={newBonusSubcategory}
+                    />
+                    <Button
+                      onClick={handleAddBonusSubcategory}
+                      type="button"
+                      variant="outline"
+                    >
+                      Add
+                    </Button>
+                  </div>
+                )}
+
+                {accountErrors.bonusSubcategory && (
+                  <p className="text-destructive text-xs">
+                    {accountErrors.bonusSubcategory}
+                  </p>
+                )}
+                <p className="text-muted-foreground text-xs">
+                  Pick a reusable category for bonus tracking, or create a new
+                  one.
+                </p>
+              </div>
+            )}
 
             {/* Wallet Amount for cross-currency transfers */}
             {showAccountWalletAmount && selectedAccountWallet && (

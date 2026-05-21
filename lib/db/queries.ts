@@ -1353,6 +1353,7 @@ export async function createAccountTransaction({
   amount,
   currency,
   occurredAt,
+  bonusSubcategory,
   notes,
   linkedWalletTransactionId,
   linkedBackBetId,
@@ -1364,6 +1365,7 @@ export async function createAccountTransaction({
   amount: number;
   currency: string;
   occurredAt?: Date | null;
+  bonusSubcategory?: string | null;
   notes?: string | null;
   linkedWalletTransactionId?: string | null;
   linkedBackBetId?: string | null;
@@ -1386,6 +1388,8 @@ export async function createAccountTransaction({
       currency: normalizedCurrency,
       amountNok: amountNok.toString(),
       occurredAt: occurredAt ?? new Date(),
+      bonusSubcategory:
+        type === "bonus" ? (bonusSubcategory ?? null) : null,
       notes: notes ?? null,
       linkedWalletTransactionId: linkedWalletTransactionId ?? null,
       linkedBackBetId: linkedBackBetId ?? null,
@@ -1401,6 +1405,69 @@ export async function createAccountTransaction({
     throw new ChatSDKError(
       "bad_request:database",
       "Failed to create transaction"
+    );
+  }
+}
+
+export async function listBonusSubcategoriesByUser({
+  userId,
+  limit = 100,
+}: {
+  userId: string;
+  limit?: number;
+}) {
+  try {
+    const rows = await db
+      .select({
+        bonusSubcategory: accountTransaction.bonusSubcategory,
+      })
+      .from(accountTransaction)
+      .where(
+        and(
+          eq(accountTransaction.userId, userId),
+          eq(accountTransaction.type, "bonus"),
+          isNotNull(accountTransaction.bonusSubcategory)
+        )
+      )
+      .groupBy(accountTransaction.bonusSubcategory)
+      .orderBy(
+        asc(sql<string>`LOWER(${accountTransaction.bonusSubcategory})`),
+        asc(accountTransaction.bonusSubcategory)
+      )
+      .limit(limit);
+
+    return rows
+      .map((row) => row.bonusSubcategory?.trim() ?? "")
+      .filter((subcategory) => subcategory.length > 0);
+  } catch (error) {
+    // Backwards-compatible fallback: if local DB is behind and missing the new
+    // bonusSubcategory column, keep dashboard usable and return no subcategories.
+    const message =
+      error instanceof Error ? error.message.toLowerCase() : String(error);
+    const errorCode =
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      typeof (error as { code?: unknown }).code === "string"
+        ? ((error as { code: string }).code ?? "").toUpperCase()
+        : "";
+    const isMissingColumnError =
+      errorCode === "42703" ||
+      (message.includes("bonussubcategory") &&
+        (message.includes("does not exist") ||
+          message.includes("undefined column") ||
+          message.includes("no such column")));
+
+    if (isMissingColumnError) {
+      console.warn(
+        "[listBonusSubcategoriesByUser] bonusSubcategory column missing; returning empty list. Run db migration to enable bonus subcategories."
+      );
+      return [];
+    }
+
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to list bonus subcategories"
     );
   }
 }
@@ -7836,6 +7903,7 @@ export async function updateAccountTransaction({
   amount,
   currency,
   occurredAt,
+  bonusSubcategory,
   notes,
 }: {
   id: string;
@@ -7844,6 +7912,7 @@ export async function updateAccountTransaction({
   amount: number;
   currency: string;
   occurredAt: Date;
+  bonusSubcategory?: string | null;
   notes?: string | null;
 }) {
   try {
@@ -7864,6 +7933,8 @@ export async function updateAccountTransaction({
 
     const normalizedCurrency = currency.toUpperCase();
     const amountNok = await convertAmountToNok(amount, normalizedCurrency);
+    const normalizedBonusSubcategory =
+      bonusSubcategory === undefined ? undefined : bonusSubcategory?.trim();
 
     const [updated] = await db
       .update(accountTransaction)
@@ -7873,6 +7944,12 @@ export async function updateAccountTransaction({
         currency: normalizedCurrency,
         amountNok: amountNok.toString(),
         occurredAt,
+        bonusSubcategory:
+          type === "bonus"
+            ? normalizedBonusSubcategory === undefined
+              ? existing.bonusSubcategory
+              : normalizedBonusSubcategory || null
+            : null,
         notes: notes ?? null,
       })
       .where(
@@ -7896,6 +7973,7 @@ export async function updateAccountTransaction({
           amount: existing.amount,
           currency: existing.currency,
           occurredAt: existing.occurredAt,
+          bonusSubcategory: existing.bonusSubcategory,
           notes: existing.notes,
         },
         after: {
@@ -7903,6 +7981,12 @@ export async function updateAccountTransaction({
           amount: amount.toString(),
           currency: normalizedCurrency,
           occurredAt,
+          bonusSubcategory:
+            type === "bonus"
+              ? normalizedBonusSubcategory === undefined
+                ? existing.bonusSubcategory
+                : normalizedBonusSubcategory || null
+              : null,
           notes: notes ?? null,
         },
       },
