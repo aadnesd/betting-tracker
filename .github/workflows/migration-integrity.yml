@@ -1,0 +1,47 @@
+name: Migration Integrity
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  verify-migrations:
+    name: Verify drizzle migration artifacts are committed
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Regenerate migrations
+        run: pnpm db:generate
+
+      - name: Fail if migration files changed
+        run: |
+          if ! git diff --quiet -- lib/db/migrations; then
+            echo "Detected uncommitted drizzle migration artifacts."
+            echo "Run 'pnpm db:generate' and commit updates under lib/db/migrations and lib/db/migrations/meta."
+            git --no-pager diff -- lib/db/migrations
+            exit 1
+          fi
