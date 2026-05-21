@@ -107,6 +107,18 @@ Then open [http://localhost:3000](http://localhost:3000).
 - `pnpm test:unit` - run unit tests
 - `pnpm test:integration` - run integration tests with `REAL_AI=true`
 
+## Migration operations and release gate
+
+- Manual migration job: `.github/workflows/db-migrate.yml`
+  - Run from GitHub Actions with `workflow_dispatch`
+  - Uses environment-scoped secret `POSTGRES_URL_NON_POOLING`
+  - Supports `production` or `preview` target environment
+- Migration integrity gate: `.github/workflows/migration-integrity.yml`
+  - Runs on PRs and pushes to `main`
+  - Executes `pnpm db:generate` and fails if generated files under `lib/db/migrations` differ from committed artifacts
+
+To enforce this as a hard release gate, set `Migration Integrity / Verify drizzle migration artifacts are committed` as a required status check in branch protection for `main`.
+
 ## Specs
 
 See `specs/README.md` for the full spec index, including:

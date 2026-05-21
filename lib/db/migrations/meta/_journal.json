@@ -253,6 +253,13 @@
       "when": 1777624229280,
       "tag": "0035_wooden_gamma_corps",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1779364725325,
+      "tag": "0036_bonus_subcategories",
+      "breakpoints": true
     }
   ]
 }
