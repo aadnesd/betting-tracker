@@ -7,7 +7,6 @@ import {
   jsonb,
   numeric,
   pgTable,
-  primaryKey,
   text,
   timestamp,
   uuid,
@@ -135,6 +134,7 @@ export const accountTransaction = pgTable(
     // Pre-computed NOK equivalent (computed at write-time to avoid FX API calls on read)
     amountNok: numeric("amountNok", { precision: 14, scale: 2 }),
     occurredAt: timestamp("occurredAt").notNull(),
+    bonusSubcategory: text("bonusSubcategory"),
     notes: text("notes"),
     // Link to corresponding wallet transaction (for deposit/withdrawal linked to wallet)
     linkedWalletTransactionId: uuid("linkedWalletTransactionId"),
@@ -155,6 +155,9 @@ export const accountTransaction = pgTable(
       table.type,
       table.occurredAt
     ),
+    accountTxUserBonusSubcategoryIdx: index(
+      "account_tx_user_bonus_subcategory_idx"
+    ).on(table.userId, table.type, table.bonusSubcategory),
   })
 );
 

@@ -22,6 +22,7 @@ import {
   getExposureByEvent,
   getPendingSettlementBets,
   listAccountsWithBalances,
+  listBonusSubcategoriesByUser,
   listMatchedBetsForList,
   listWalletBankTransactionsByUser,
   listWalletsByUser,
@@ -171,6 +172,7 @@ export default async function Page() {
     accountsWithBalances,
     activeWallets,
     walletBankTransactions,
+    bonusSubcategories,
   ] = await Promise.all([
     cacheDashboard(userId, "recent-matched-bets", () =>
       listMatchedBetsForList({
@@ -212,6 +214,9 @@ export default async function Page() {
           startDate,
           endDate,
         })
+    ),
+    cacheDashboard(userId, "bonus-subcategories", () =>
+      listBonusSubcategoriesByUser({ userId, limit: 200 })
     ),
   ]);
 
@@ -304,6 +309,7 @@ export default async function Page() {
         </div>
         <DashboardActions
           accounts={accounts}
+          bonusSubcategories={bonusSubcategories}
           pendingReviewCount={summary.pendingReviewCount}
           wallets={wallets}
         />

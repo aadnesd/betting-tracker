@@ -19,6 +19,7 @@ const createTransactionSchema = z
     amount: z.number().finite(),
     currency: z.string().length(3, "Currency must be 3 characters"),
     occurredAt: z.string().transform((val) => new Date(val)),
+    bonusSubcategory: z.string().trim().max(80).nullable().optional(),
     notes: z.string().nullable().optional(),
     walletId: z.string().uuid().nullable().optional(),
     // Amount in wallet currency (for cross-currency transfers)
@@ -83,7 +84,7 @@ export async function POST(
   }
 
   try {
-    let transaction;
+    let transaction: Awaited<ReturnType<typeof createAccountTransaction>>;
 
     // If wallet is specified for deposit/withdrawal, create linked transactions
     if (
@@ -137,6 +138,7 @@ export async function POST(
         amount: body.amount,
         currency: body.currency,
         occurredAt: body.occurredAt,
+        bonusSubcategory: body.type === "bonus" ? body.bonusSubcategory : null,
         notes: body.notes ?? null,
       });
     }
@@ -165,6 +167,7 @@ export async function POST(
           type: body.type,
           amount: body.amount,
           currency: body.currency,
+          bonusSubcategory: body.bonusSubcategory ?? null,
           walletId: body.walletId ?? null,
         },
       },
