@@ -9,9 +9,9 @@ import {
   updateAccountTransaction,
 } from "@/lib/db/queries";
 
-interface RouteParams {
+type RouteParams = {
   params: Promise<{ id: string; txId: string }>;
-}
+};
 
 const updateTransactionSchema = z
   .object({
@@ -19,6 +19,7 @@ const updateTransactionSchema = z
     amount: z.number().finite(),
     currency: z.string().length(3, "Currency must be 3 characters"),
     occurredAt: z.string().transform((val) => new Date(val)),
+    bonusSubcategory: z.string().trim().max(80).nullable().optional(),
     notes: z.string().nullable().optional(),
   })
   .superRefine((data, ctx) => {
@@ -83,6 +84,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       amount: body.amount,
       currency: body.currency,
       occurredAt: body.occurredAt,
+      bonusSubcategory: body.type === "bonus" ? body.bonusSubcategory : null,
       notes: body.notes ?? null,
     });
 
