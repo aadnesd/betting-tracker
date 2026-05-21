@@ -4,12 +4,12 @@ import { Gift } from "lucide-react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  type AccountOption,
-  type WalletOption,
+import { useState } from "react";
+import type {
+  AccountOption,
+  WalletOption,
 } from "@/components/bets/quick-transaction-sheet";
 import { Button } from "@/components/ui/button";
-import { useState } from "react";
 
 const QuickTransactionSheet = dynamic(
   () =>
@@ -23,6 +23,7 @@ type DashboardActionsProps = {
   pendingReviewCount: number;
   accounts: AccountOption[];
   wallets?: WalletOption[];
+  bonusSubcategories?: string[];
 };
 
 /**
@@ -33,6 +34,7 @@ export function DashboardActions({
   pendingReviewCount,
   accounts,
   wallets = [],
+  bonusSubcategories = [],
 }: DashboardActionsProps) {
   const [showQuickTransaction, setShowQuickTransaction] = useState(false);
   const router = useRouter();
@@ -114,6 +116,7 @@ export function DashboardActions({
       {showQuickTransaction ? (
         <QuickTransactionSheet
           accounts={accounts}
+          bonusSubcategories={bonusSubcategories}
           defaultOpen
           onSuccess={handleTransactionSuccess}
           wallets={wallets}
