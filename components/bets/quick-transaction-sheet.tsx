@@ -83,6 +83,7 @@ type AccountFormData = {
 type WalletTransactionType =
   | "deposit"
   | "withdrawal"
+  | "bonus"
   | "transfer_to_account"
   | "transfer_from_account"
   | "transfer_to_wallet"
@@ -167,6 +168,12 @@ const WALLET_TRANSACTION_TYPES: {
     label: "Withdrawal",
     icon: <ArrowUpCircle className="h-4 w-4 text-red-600" />,
     description: "Money withdrawn from wallet (e.g., bank transfer out)",
+  },
+  {
+    value: "bonus",
+    label: "Bonus",
+    icon: <Gift className="h-4 w-4 text-blue-600" />,
+    description: "Wallet reward, cashback, referral, or bonus funds",
   },
   {
     value: "transfer_to_account",
@@ -676,7 +683,7 @@ export function QuickTransactionSheet({
           <SheetDescription>
             {tab === "account"
               ? "Record a deposit, withdrawal, or bonus for any account."
-              : "Record a wallet deposit, withdrawal, transfer, or fee."}
+              : "Record a wallet deposit, withdrawal, bonus, transfer, or fee."}
           </SheetDescription>
         </SheetHeader>
 

@@ -16,26 +16,27 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import type { WalletTransactionType } from "@/lib/db/schema";
 
-interface Account {
+type Account = {
   id: string;
   name: string;
   kind: string;
-}
+};
 
-interface Wallet {
+type Wallet = {
   id: string;
   name: string;
   currency: string;
-}
+};
 
-interface WalletTransactionFormProps {
+type WalletTransactionFormProps = {
   walletId: string;
   walletCurrency: string;
-}
+};
 
 const TRANSACTION_TYPES: { value: WalletTransactionType; label: string }[] = [
   { value: "deposit", label: "Deposit (from bank)" },
   { value: "withdrawal", label: "Withdrawal (to bank)" },
+  { value: "bonus", label: "Bonus / Reward" },
   { value: "transfer_to_account", label: "Transfer to Betting Account" },
   { value: "transfer_from_account", label: "Transfer from Betting Account" },
   { value: "transfer_to_wallet", label: "Transfer to Another Wallet" },
@@ -120,17 +121,14 @@ export function WalletTransactionForm({
     }
 
     const relatedWalletAmountNum = Number.parseFloat(relatedWalletAmount);
-    if (showRelatedWalletAmount) {
-      if (
-        !relatedWalletAmount ||
+    if (
+      showRelatedWalletAmount &&
+      (!relatedWalletAmount ||
         Number.isNaN(relatedWalletAmountNum) ||
-        relatedWalletAmountNum <= 0
-      ) {
-        toast.error(
-          "Please enter a valid amount in the related wallet currency"
-        );
-        return;
-      }
+        relatedWalletAmountNum <= 0)
+    ) {
+      toast.error("Please enter a valid amount in the related wallet currency");
+      return;
     }
 
     setSaving(true);

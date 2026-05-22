@@ -3,6 +3,7 @@
 import {
   ArrowDownRight,
   ArrowUpRight,
+  Gift,
   Pencil,
   Settings,
   Trash2,
@@ -55,21 +56,22 @@ type WalletTransactionItem = {
   relatedWalletName: string | null;
 };
 
-interface Account {
+type Account = {
   id: string;
   name: string;
   kind: string;
-}
+};
 
-interface Wallet {
+type Wallet = {
   id: string;
   name: string;
   currency: string;
-}
+};
 
 const TRANSACTION_TYPES: { value: WalletTransactionType; label: string }[] = [
   { value: "deposit", label: "Deposit" },
   { value: "withdrawal", label: "Withdrawal" },
+  { value: "bonus", label: "Bonus" },
   { value: "transfer_to_account", label: "Transfer to Account" },
   { value: "transfer_from_account", label: "Transfer from Account" },
   { value: "transfer_to_wallet", label: "Transfer to Wallet" },
@@ -83,9 +85,12 @@ function isInflow(type: WalletTransactionType, amount: number): boolean {
     return amount >= 0;
   }
 
-  return ["deposit", "transfer_from_account", "transfer_from_wallet"].includes(
-    type
-  );
+  return [
+    "deposit",
+    "bonus",
+    "transfer_from_account",
+    "transfer_from_wallet",
+  ].includes(type);
 }
 
 function transactionTypeLabel(type: WalletTransactionType): string {
@@ -95,6 +100,8 @@ function transactionTypeLabel(type: WalletTransactionType): string {
 
 function TransactionTypeIcon({ type }: { type: WalletTransactionType }) {
   switch (type) {
+    case "bonus":
+      return <Gift className="h-4 w-4 text-blue-600" />;
     case "deposit":
     case "transfer_from_account":
     case "transfer_from_wallet":
@@ -109,10 +116,10 @@ function TransactionTypeIcon({ type }: { type: WalletTransactionType }) {
   }
 }
 
-interface WalletTransactionRowProps {
+type WalletTransactionRowProps = {
   walletId: string;
   transaction: WalletTransactionItem;
-}
+};
 
 export function WalletTransactionRow({
   walletId,

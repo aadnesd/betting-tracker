@@ -16,6 +16,7 @@ const createTransactionSchema = z
     type: z.enum([
       "deposit",
       "withdrawal",
+      "bonus",
       "transfer_to_account",
       "transfer_from_account",
       "transfer_to_wallet",
@@ -128,7 +129,7 @@ export async function POST(
       notes,
     } = parsed.data;
 
-    let result;
+    let result: unknown;
 
     // Handle linked transactions
     if (type === "transfer_to_account" && relatedAccountId) {
