@@ -5035,32 +5035,48 @@ export async function getTotalBonusesForUser({
   endDate?: Date | null;
 }): Promise<number> {
   try {
-    const conditions: SQL<unknown>[] = [
+    const accountConditions: SQL<unknown>[] = [
       eq(accountTransaction.userId, userId),
       eq(accountTransaction.type, "bonus"),
     ];
+    const walletConditions: SQL<unknown>[] = [
+      eq(wallet.userId, userId),
+      eq(walletTransaction.type, "bonus"),
+    ];
 
     if (startDate) {
-      conditions.push(gte(accountTransaction.occurredAt, startDate));
+      accountConditions.push(gte(accountTransaction.occurredAt, startDate));
+      walletConditions.push(gte(walletTransaction.date, startDate));
     }
     if (endDate) {
-      conditions.push(lte(accountTransaction.occurredAt, endDate));
+      accountConditions.push(lte(accountTransaction.occurredAt, endDate));
+      walletConditions.push(lte(walletTransaction.date, endDate));
     }
 
     // Fetch individual transactions with pre-computed amountNok
-    const transactions = await db
-      .select({
-        amount: accountTransaction.amount,
-        amountNok: accountTransaction.amountNok,
-        currency: account.currency,
-      })
-      .from(accountTransaction)
-      .innerJoin(account, eq(accountTransaction.accountId, account.id))
-      .where(and(...conditions));
+    const [accountTransactions, walletTransactions] = await Promise.all([
+      db
+        .select({
+          amount: accountTransaction.amount,
+          amountNok: accountTransaction.amountNok,
+          currency: account.currency,
+        })
+        .from(accountTransaction)
+        .innerJoin(account, eq(accountTransaction.accountId, account.id))
+        .where(and(...accountConditions)),
+      db
+        .select({
+          amount: walletTransaction.amount,
+          currency: walletTransaction.currency,
+        })
+        .from(walletTransaction)
+        .innerJoin(wallet, eq(walletTransaction.walletId, wallet.id))
+        .where(and(...walletConditions)),
+    ]);
 
     // Sum using pre-computed amountNok (with fallback for legacy rows)
     let total = 0;
-    for (const tx of transactions) {
+    for (const tx of accountTransactions) {
       if (tx.amountNok != null) {
         total += Number.parseFloat(tx.amountNok);
       } else {
@@ -5070,6 +5086,12 @@ export async function getTotalBonusesForUser({
         const amountNok = await convertAmountToNok(amount, currency);
         total += amountNok;
       }
+    }
+    for (const tx of walletTransactions) {
+      total += await convertAmountToNok(
+        Number.parseFloat(tx.amount ?? "0"),
+        tx.currency ?? "NOK"
+      );
     }
 
     return Math.round(total * 100) / 100;
@@ -5091,30 +5113,47 @@ export async function getBonusProfitEvents({
   endDate?: Date | null;
 }): Promise<ReportingProfitEvent[]> {
   try {
-    const conditions: SQL<unknown>[] = [
+    const accountConditions: SQL<unknown>[] = [
       eq(accountTransaction.userId, userId),
       eq(accountTransaction.type, "bonus"),
     ];
+    const walletConditions: SQL<unknown>[] = [
+      eq(wallet.userId, userId),
+      eq(walletTransaction.type, "bonus"),
+    ];
 
     if (startDate) {
-      conditions.push(gte(accountTransaction.occurredAt, startDate));
+      accountConditions.push(gte(accountTransaction.occurredAt, startDate));
+      walletConditions.push(gte(walletTransaction.date, startDate));
     }
     if (endDate) {
-      conditions.push(lte(accountTransaction.occurredAt, endDate));
+      accountConditions.push(lte(accountTransaction.occurredAt, endDate));
+      walletConditions.push(lte(walletTransaction.date, endDate));
     }
 
-    const transactions = await db
-      .select({
-        occurredAt: accountTransaction.occurredAt,
-        amount: accountTransaction.amount,
-        amountNok: accountTransaction.amountNok,
-        currency: accountTransaction.currency,
-      })
-      .from(accountTransaction)
-      .where(and(...conditions));
+    const [accountTransactions, walletTransactions] = await Promise.all([
+      db
+        .select({
+          occurredAt: accountTransaction.occurredAt,
+          amount: accountTransaction.amount,
+          amountNok: accountTransaction.amountNok,
+          currency: accountTransaction.currency,
+        })
+        .from(accountTransaction)
+        .where(and(...accountConditions)),
+      db
+        .select({
+          occurredAt: walletTransaction.date,
+          amount: walletTransaction.amount,
+          currency: walletTransaction.currency,
+        })
+        .from(walletTransaction)
+        .innerJoin(wallet, eq(walletTransaction.walletId, wallet.id))
+        .where(and(...walletConditions)),
+    ]);
 
     const events: ReportingProfitEvent[] = [];
-    for (const transaction of transactions) {
+    for (const transaction of accountTransactions) {
       const amountNok =
         transaction.amountNok != null
           ? Number.parseFloat(transaction.amountNok)
@@ -5122,6 +5161,18 @@ export async function getBonusProfitEvents({
               Number.parseFloat(transaction.amount ?? "0"),
               transaction.currency ?? "NOK"
             );
+
+      events.push({
+        occurredAt: transaction.occurredAt,
+        profit: amountNok,
+        count: 0,
+      });
+    }
+    for (const transaction of walletTransactions) {
+      const amountNok = await convertAmountToNok(
+        Number.parseFloat(transaction.amount ?? "0"),
+        transaction.currency ?? "NOK"
+      );
 
       events.push({
         occurredAt: transaction.occurredAt,
