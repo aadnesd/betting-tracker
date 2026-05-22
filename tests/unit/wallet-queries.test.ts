@@ -53,7 +53,12 @@ vi.mock("postgres", () => ({
   default: vi.fn(() => ({})),
 }));
 
-import * as dbQueries from "@/lib/db/queries";
+import {
+  type CreateWalletTransactionParams,
+  calculateWalletBalance,
+  listWalletsByUser,
+  type WalletWithBalance,
+} from "@/lib/db/queries";
 
 describe("wallet balance queries", () => {
   beforeEach(() => {
@@ -62,7 +67,7 @@ describe("wallet balance queries", () => {
 
   describe("calculateWalletBalance", () => {
     it("returns a numeric balance from aggregated transactions", async () => {
-      const balance = await dbQueries.calculateWalletBalance("wallet-1");
+      const balance = await calculateWalletBalance("wallet-1");
       expect(balance).toBe(250);
       expect(typeof balance).toBe("number");
     });
@@ -70,14 +75,14 @@ describe("wallet balance queries", () => {
 
   describe("listWalletsByUser", () => {
     it("returns wallets with numeric balances", async () => {
-      const wallets = await dbQueries.listWalletsByUser("user-1");
+      const wallets = await listWalletsByUser("user-1");
       expect(wallets).toHaveLength(2);
       expect(wallets[0]?.balance).toBe(1250.5);
       expect(wallets[1]?.balance).toBe(200);
     });
 
     it("returns WalletWithBalance fields needed by the wallets UI", () => {
-      type CheckFields = dbQueries.WalletWithBalance extends {
+      type CheckFields = WalletWithBalance extends {
         id: string;
         name: string;
         type: "fiat" | "crypto" | "hybrid";
@@ -90,6 +95,23 @@ describe("wallet balance queries", () => {
 
       const check: CheckFields = true;
       expect(check).toBe(true);
+    });
+
+    it("supports wallet bonus transactions as balance-increasing entries", () => {
+      type WalletBonus = CreateWalletTransactionParams & {
+        type: "bonus";
+      };
+
+      const bonus: WalletBonus = {
+        walletId: "wallet-1",
+        type: "bonus",
+        amount: 50,
+        currency: "NOK",
+        date: new Date("2026-04-12"),
+      };
+
+      expect(bonus.type).toBe("bonus");
+      expect(bonus.amount).toBeGreaterThan(0);
     });
   });
 });

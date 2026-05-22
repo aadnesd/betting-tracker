@@ -68,6 +68,7 @@ As a matched bettor, I want to:
 |------|-------------|----------------|
 | `deposit` | Money in from bank/external source | None |
 | `withdrawal` | Money out to bank/external | None |
+| `bonus` | Wallet reward, cashback, referral credit, or other bonus funds | None |
 | `transfer_to_account` | Transfer to bookmaker/exchange | Account |
 | `transfer_from_account` | Transfer from bookmaker/exchange | Account |
 | `transfer_to_wallet` | Transfer to another wallet | Wallet |
@@ -140,6 +141,7 @@ This maintains accurate balances on both sides while showing the fund flow.
 
 Wallet balance = SUM of:
 - `+ deposit`
+- `+ bonus`
 - `- withdrawal`
 - `- transfer_to_account`
 - `+ transfer_from_account`

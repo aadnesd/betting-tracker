@@ -13,6 +13,7 @@ const updateWalletTransactionSchema = z
     type: z.enum([
       "deposit",
       "withdrawal",
+      "bonus",
       "transfer_to_account",
       "transfer_from_account",
       "transfer_to_wallet",
@@ -49,9 +50,9 @@ const updateWalletTransactionSchema = z
     }
   });
 
-interface RouteParams {
+type RouteParams = {
   params: Promise<{ id: string; txId: string }>;
-}
+};
 
 export async function PATCH(request: Request, { params }: RouteParams) {
   try {

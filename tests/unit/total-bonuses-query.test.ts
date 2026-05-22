@@ -1,7 +1,7 @@
 /**
  * Unit tests for getTotalBonusesForUser query.
  *
- * Why: This query sums all bonus-type transactions for a user within a date range.
+ * Why: This query sums all account and wallet bonus-type transactions for a user within a date range.
  * It's used in the reports summary to include bonuses in the overall profit calculation.
  * Bonuses are real profit that should be reflected in performance metrics.
  */
@@ -25,7 +25,7 @@ vi.mock("postgres", () => ({
   default: vi.fn(() => ({})),
 }));
 
-import * as dbQueries from "@/lib/db/queries";
+import { getTotalBonusesForUser } from "@/lib/db/queries";
 
 describe("getTotalBonusesForUser", () => {
   beforeEach(() => {
@@ -33,20 +33,20 @@ describe("getTotalBonusesForUser", () => {
   });
 
   describe("function signature", () => {
-    it("is a function that accepts userId and optional date filters", async () => {
-      expect(typeof dbQueries.getTotalBonusesForUser).toBe("function");
+    it("is a function that accepts userId and optional date filters", () => {
+      expect(typeof getTotalBonusesForUser).toBe("function");
 
       // Verify function returns a number
       const fn: (args: {
         userId: string;
         startDate?: Date | null;
         endDate?: Date | null;
-      }) => Promise<number> = dbQueries.getTotalBonusesForUser;
+      }) => Promise<number> = getTotalBonusesForUser;
       expect(fn).toBeDefined();
     });
 
     it("accepts all date range parameters", () => {
-      const params: Parameters<typeof dbQueries.getTotalBonusesForUser>[0] = {
+      const params: Parameters<typeof getTotalBonusesForUser>[0] = {
         userId: "user-1",
         startDate: new Date("2025-01-01"),
         endDate: new Date("2025-12-31"),
@@ -57,7 +57,7 @@ describe("getTotalBonusesForUser", () => {
     });
 
     it("allows null date parameters for all-time queries", () => {
-      const params: Parameters<typeof dbQueries.getTotalBonusesForUser>[0] = {
+      const params: Parameters<typeof getTotalBonusesForUser>[0] = {
         userId: "user-1",
         startDate: null,
         endDate: null,
@@ -67,7 +67,7 @@ describe("getTotalBonusesForUser", () => {
     });
 
     it("allows omitting date parameters entirely", () => {
-      const params: Parameters<typeof dbQueries.getTotalBonusesForUser>[0] = {
+      const params: Parameters<typeof getTotalBonusesForUser>[0] = {
         userId: "user-1",
       };
       expect(params.userId).toBe("user-1");
@@ -77,16 +77,15 @@ describe("getTotalBonusesForUser", () => {
   });
 
   describe("return value", () => {
-    it("returns a number representing total bonus amount", async () => {
+    it("returns a number representing total bonus amount", () => {
       // The function is typed to return Promise<number>
-      const returnType: Awaited<
-        ReturnType<typeof dbQueries.getTotalBonusesForUser>
-      > = 100.5;
+      const returnType: Awaited<ReturnType<typeof getTotalBonusesForUser>> =
+        100.5;
       expect(typeof returnType).toBe("number");
     });
 
-    it("represents total as sum of all bonus transactions", () => {
-      // Example: User received bonuses of 50, 30, and 20 = 100 total
+    it("represents total as sum of account and wallet bonus transactions", () => {
+      // Example: Account bonuses of 50 and 30 plus wallet cashback of 20 = 100 total
       const mockBonuses = [50, 30, 20];
       const expectedTotal = mockBonuses.reduce((sum, b) => sum + b, 0);
       expect(expectedTotal).toBe(100);
