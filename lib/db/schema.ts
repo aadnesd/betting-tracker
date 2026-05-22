@@ -601,6 +601,7 @@ export type WalletStatus = (typeof walletStatusEnum)[number];
 const walletTransactionTypeEnum = [
   "deposit",
   "withdrawal",
+  "bonus",
   "transfer_to_account",
   "transfer_from_account",
   "transfer_to_wallet",
