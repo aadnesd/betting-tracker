@@ -160,7 +160,8 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
 
     if (
       error instanceof Error &&
-      error.message.includes("Cannot delete a used")
+      (error.message.includes("Cannot delete a used") ||
+        String(error.cause).includes("Cannot delete a used"))
     ) {
       return NextResponse.json(
         { error: "Cannot delete a used free bet" },
