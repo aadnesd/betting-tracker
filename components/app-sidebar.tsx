@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   ListChecks,
   LogIn,
+  Mail,
   PlusSquare,
   Settings,
   Wallet,
@@ -37,6 +38,7 @@ const navigation = [
   { name: "Bankroll", href: "/bets/bankroll", icon: Wallet },
   { name: "Transactions", href: "/bets/transactions", icon: ArrowUpDown },
   { name: "Free Bets", href: "/bets/settings/promos", icon: Gift },
+  { name: "Promo Inbox", href: "/bets/promo-inbox", icon: Mail },
 ];
 
 const settingsNavigation = [
