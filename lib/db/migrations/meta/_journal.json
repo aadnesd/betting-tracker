@@ -260,6 +260,13 @@
       "when": 1779364725325,
       "tag": "0036_bonus_subcategories",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1779526145811,
+      "tag": "0037_faithful_deathbird",
+      "breakpoints": true
     }
   ]
 }
