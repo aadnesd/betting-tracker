@@ -62,6 +62,8 @@ These routes are part of the current screenshot intake flow:
    AUTH_SECRET=
    GOOGLE_CLIENT_ID=
    GOOGLE_CLIENT_SECRET=
+   GMAIL_REDIRECT_URI=
+   GMAIL_TOKEN_ENCRYPTION_KEY=
    GITHUB_CLIENT_ID=
    GITHUB_CLIENT_SECRET=
    ```
@@ -71,6 +73,10 @@ These routes are part of the current screenshot intake flow:
    (`openai/gpt-5.4-mini` by default) to look up final scores from the
    manually entered market/selection. Set
    `UNLINKED_SETTLEMENT_SEARCH_MODE=disabled` to skip this lookup.
+
+   `GMAIL_REDIRECT_URI` and `GMAIL_TOKEN_ENCRYPTION_KEY` enable Gmail promotion
+   intake. The redirect URI should point at `/api/bets/gmail/callback`.
+   Generate a 32-byte token encryption key with `openssl rand -hex 32`.
 
    Optional settled-bet edit allowlists:
 

@@ -9,6 +9,7 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
   varchar,
 } from "drizzle-orm/pg-core";
@@ -308,6 +309,8 @@ const auditEntityTypeEnum = [
   "screenshot",
   "free_bet",
   "deposit_bonus",
+  "gmail_connection",
+  "email_promo",
 ] as const;
 
 const auditActionEnum = [
@@ -778,3 +781,116 @@ export const bonusQualifyingBet = pgTable("BonusQualifyingBet", {
 });
 
 export type BonusQualifyingBet = InferSelectModel<typeof bonusQualifyingBet>;
+
+const gmailConnectionStatusEnum = [
+  "connected",
+  "error",
+  "disconnected",
+] as const;
+
+export const gmailConnection = pgTable(
+  "GmailConnection",
+  {
+    id: uuid("id").primaryKey().notNull().defaultRandom(),
+    createdAt: timestamp("createdAt").notNull(),
+    updatedAt: timestamp("updatedAt").notNull(),
+    userId: uuid("userId")
+      .notNull()
+      .references(() => user.id),
+    gmailEmail: text("gmailEmail").notNull(),
+    accessTokenCiphertext: text("accessTokenCiphertext").notNull(),
+    refreshTokenCiphertext: text("refreshTokenCiphertext"),
+    tokenExpiresAt: timestamp("tokenExpiresAt"),
+    scope: text("scope"),
+    historyId: text("historyId"),
+    watchExpiration: timestamp("watchExpiration"),
+    status: varchar("status", { enum: gmailConnectionStatusEnum })
+      .notNull()
+      .default("connected"),
+    lastSyncedAt: timestamp("lastSyncedAt"),
+    lastError: text("lastError"),
+  },
+  (table) => ({
+    gmailConnectionUserUniqueIdx: uniqueIndex(
+      "gmail_connection_user_unique_idx"
+    ).on(table.userId),
+    gmailConnectionStatusIdx: index("gmail_connection_status_idx").on(
+      table.status
+    ),
+  })
+);
+
+export type GmailConnection = InferSelectModel<typeof gmailConnection>;
+export type GmailConnectionStatus = (typeof gmailConnectionStatusEnum)[number];
+
+const emailPromoKindEnum = [
+  "free_bet",
+  "deposit_bonus",
+  "odds_boost",
+  "refund",
+  "cashback",
+  "enhanced_odds",
+  "other",
+] as const;
+
+const emailPromoStatusEnum = [
+  "new",
+  "interesting",
+  "needs_review",
+  "ignored",
+  "converted",
+] as const;
+
+export const emailPromoCandidate = pgTable(
+  "EmailPromoCandidate",
+  {
+    id: uuid("id").primaryKey().notNull().defaultRandom(),
+    createdAt: timestamp("createdAt").notNull(),
+    updatedAt: timestamp("updatedAt").notNull(),
+    userId: uuid("userId")
+      .notNull()
+      .references(() => user.id),
+    gmailConnectionId: uuid("gmailConnectionId")
+      .notNull()
+      .references(() => gmailConnection.id),
+    gmailMessageId: text("gmailMessageId").notNull(),
+    gmailThreadId: text("gmailThreadId"),
+    receivedAt: timestamp("receivedAt"),
+    sender: text("sender"),
+    subject: text("subject").notNull(),
+    snippet: text("snippet"),
+    bodyHash: varchar("bodyHash", { length: 64 }).notNull(),
+    accountId: uuid("accountId").references(() => account.id),
+    accountNameGuess: text("accountNameGuess"),
+    promoKind: varchar("promoKind", { enum: emailPromoKindEnum }).notNull(),
+    title: text("title").notNull(),
+    summary: text("summary").notNull(),
+    terms: jsonb("terms"),
+    expiresAt: timestamp("expiresAt"),
+    minOdds: numeric("minOdds", { precision: 12, scale: 4 }),
+    maxStake: numeric("maxStake", { precision: 14, scale: 2 }),
+    currency: varchar("currency", { length: 3 }),
+    confidence: numeric("confidence", { precision: 5, scale: 4 }).notNull(),
+    status: varchar("status", { enum: emailPromoStatusEnum })
+      .notNull()
+      .default("new"),
+    rawModelOutput: jsonb("rawModelOutput"),
+  },
+  (table) => ({
+    emailPromoUserStatusIdx: index("email_promo_user_status_idx").on(
+      table.userId,
+      table.status
+    ),
+    emailPromoUserReceivedIdx: index("email_promo_user_received_idx").on(
+      table.userId,
+      table.receivedAt
+    ),
+    emailPromoUserMessageUniqueIdx: uniqueIndex(
+      "email_promo_user_message_unique_idx"
+    ).on(table.userId, table.gmailMessageId),
+  })
+);
+
+export type EmailPromoCandidate = InferSelectModel<typeof emailPromoCandidate>;
+export type EmailPromoKind = (typeof emailPromoKindEnum)[number];
+export type EmailPromoStatus = (typeof emailPromoStatusEnum)[number];

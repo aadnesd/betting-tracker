@@ -39,10 +39,15 @@ import {
   DEFAULT_COMPETITION_CODES,
   type DepositBonusStatus,
   depositBonus,
+  type EmailPromoKind,
+  type EmailPromoStatus,
+  emailPromoCandidate,
   type FootballMatchStatus,
   footballMatch,
   freeBet,
   freeBetWageringBet,
+  type GmailConnectionStatus,
+  gmailConnection,
   layBet,
   matchedBet,
   promo,
@@ -3742,7 +3747,11 @@ export type AuditEntityType =
   | "account"
   | "wallet"
   | "wallet_transaction"
-  | "screenshot";
+  | "screenshot"
+  | "free_bet"
+  | "deposit_bonus"
+  | "gmail_connection"
+  | "email_promo";
 
 export type AuditAction =
   | "create"
@@ -10697,5 +10706,352 @@ export async function processWageringProgressOnSettle({
     // Log but don't fail settlement if wagering tracking fails
     console.error("[processWageringProgressOnSettle] Error:", error);
     return { bonusesUpdated: 0, totalProgressAdded: 0 };
+  }
+}
+
+export type GmailConnectionUpsertParams = {
+  userId: string;
+  gmailEmail: string;
+  accessTokenCiphertext: string;
+  refreshTokenCiphertext?: string | null;
+  tokenExpiresAt?: Date | null;
+  scope?: string | null;
+  historyId?: string | null;
+};
+
+export async function upsertGmailConnection({
+  userId,
+  gmailEmail,
+  accessTokenCiphertext,
+  refreshTokenCiphertext,
+  tokenExpiresAt,
+  scope,
+  historyId,
+}: GmailConnectionUpsertParams) {
+  try {
+    const now = new Date();
+    const [row] = await db
+      .insert(gmailConnection)
+      .values({
+        createdAt: now,
+        updatedAt: now,
+        userId,
+        gmailEmail,
+        accessTokenCiphertext,
+        refreshTokenCiphertext: refreshTokenCiphertext ?? null,
+        tokenExpiresAt: tokenExpiresAt ?? null,
+        scope: scope ?? null,
+        historyId: historyId ?? null,
+        status: "connected",
+        lastError: null,
+      })
+      .onConflictDoUpdate({
+        target: gmailConnection.userId,
+        set: {
+          updatedAt: now,
+          gmailEmail,
+          accessTokenCiphertext,
+          refreshTokenCiphertext:
+            refreshTokenCiphertext ??
+            sql`${gmailConnection.refreshTokenCiphertext}`,
+          tokenExpiresAt: tokenExpiresAt ?? null,
+          scope: scope ?? null,
+          historyId: historyId ?? sql`${gmailConnection.historyId}`,
+          status: "connected",
+          lastError: null,
+        },
+      })
+      .returning();
+
+    return row;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to save Gmail connection"
+    );
+  }
+}
+
+export async function getGmailConnectionByUserId({
+  userId,
+}: {
+  userId: string;
+}) {
+  try {
+    const [row] = await db
+      .select()
+      .from(gmailConnection)
+      .where(eq(gmailConnection.userId, userId))
+      .limit(1);
+    return row ?? null;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get Gmail connection"
+    );
+  }
+}
+
+export async function updateGmailConnectionSyncState({
+  id,
+  userId,
+  accessTokenCiphertext,
+  tokenExpiresAt,
+  historyId,
+  lastSyncedAt,
+  status,
+  lastError,
+}: {
+  id: string;
+  userId: string;
+  accessTokenCiphertext?: string;
+  tokenExpiresAt?: Date | null;
+  historyId?: string | null;
+  lastSyncedAt?: Date | null;
+  status?: GmailConnectionStatus;
+  lastError?: string | null;
+}) {
+  try {
+    const values: Partial<typeof gmailConnection.$inferInsert> = {
+      updatedAt: new Date(),
+    };
+
+    if (accessTokenCiphertext !== undefined) {
+      values.accessTokenCiphertext = accessTokenCiphertext;
+    }
+    if (tokenExpiresAt !== undefined) {
+      values.tokenExpiresAt = tokenExpiresAt;
+    }
+    if (historyId !== undefined) {
+      values.historyId = historyId;
+    }
+    if (lastSyncedAt !== undefined) {
+      values.lastSyncedAt = lastSyncedAt;
+    }
+    if (status !== undefined) {
+      values.status = status;
+    }
+    if (lastError !== undefined) {
+      values.lastError = lastError;
+    }
+
+    const [row] = await db
+      .update(gmailConnection)
+      .set(values)
+      .where(
+        and(eq(gmailConnection.id, id), eq(gmailConnection.userId, userId))
+      )
+      .returning();
+    return row ?? null;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to update Gmail connection"
+    );
+  }
+}
+
+export async function disconnectGmailConnection({
+  userId,
+}: {
+  userId: string;
+}) {
+  try {
+    const [row] = await db
+      .update(gmailConnection)
+      .set({
+        updatedAt: new Date(),
+        status: "disconnected",
+        accessTokenCiphertext: "",
+        refreshTokenCiphertext: null,
+        tokenExpiresAt: null,
+      })
+      .where(eq(gmailConnection.userId, userId))
+      .returning();
+    return row ?? null;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to disconnect Gmail"
+    );
+  }
+}
+
+export type EmailPromoCandidateInput = {
+  userId: string;
+  gmailConnectionId: string;
+  gmailMessageId: string;
+  gmailThreadId?: string | null;
+  receivedAt?: Date | null;
+  sender?: string | null;
+  subject: string;
+  snippet?: string | null;
+  bodyHash: string;
+  accountId?: string | null;
+  accountNameGuess?: string | null;
+  promoKind: EmailPromoKind;
+  title: string;
+  summary: string;
+  terms?: unknown;
+  expiresAt?: Date | null;
+  minOdds?: number | null;
+  maxStake?: number | null;
+  currency?: string | null;
+  confidence: number;
+  status: EmailPromoStatus;
+  rawModelOutput?: unknown;
+};
+
+export async function upsertEmailPromoCandidate(
+  params: EmailPromoCandidateInput
+) {
+  try {
+    const now = new Date();
+    const values: typeof emailPromoCandidate.$inferInsert = {
+      createdAt: now,
+      updatedAt: now,
+      userId: params.userId,
+      gmailConnectionId: params.gmailConnectionId,
+      gmailMessageId: params.gmailMessageId,
+      gmailThreadId: params.gmailThreadId ?? null,
+      receivedAt: params.receivedAt ?? null,
+      sender: params.sender ?? null,
+      subject: params.subject,
+      snippet: params.snippet ?? null,
+      bodyHash: params.bodyHash,
+      accountId: params.accountId ?? null,
+      accountNameGuess: params.accountNameGuess ?? null,
+      promoKind: params.promoKind,
+      title: params.title,
+      summary: params.summary,
+      terms: params.terms ?? null,
+      expiresAt: params.expiresAt ?? null,
+      minOdds: params.minOdds != null ? String(params.minOdds) : null,
+      maxStake: params.maxStake != null ? String(params.maxStake) : null,
+      currency: params.currency ?? null,
+      confidence: String(params.confidence),
+      status: params.status,
+      rawModelOutput: params.rawModelOutput ?? null,
+    };
+
+    const [row] = await db
+      .insert(emailPromoCandidate)
+      .values(values)
+      .onConflictDoUpdate({
+        target: [
+          emailPromoCandidate.userId,
+          emailPromoCandidate.gmailMessageId,
+        ],
+        set: {
+          updatedAt: now,
+          gmailConnectionId: params.gmailConnectionId,
+          gmailThreadId: params.gmailThreadId ?? null,
+          receivedAt: params.receivedAt ?? null,
+          sender: params.sender ?? null,
+          subject: params.subject,
+          snippet: params.snippet ?? null,
+          bodyHash: params.bodyHash,
+          accountId: params.accountId ?? null,
+          accountNameGuess: params.accountNameGuess ?? null,
+          promoKind: params.promoKind,
+          title: params.title,
+          summary: params.summary,
+          terms: params.terms ?? null,
+          expiresAt: params.expiresAt ?? null,
+          minOdds: params.minOdds != null ? String(params.minOdds) : null,
+          maxStake: params.maxStake != null ? String(params.maxStake) : null,
+          currency: params.currency ?? null,
+          confidence: String(params.confidence),
+          status: params.status,
+          rawModelOutput: params.rawModelOutput ?? null,
+        },
+      })
+      .returning();
+
+    return row;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to save email promo candidate"
+    );
+  }
+}
+
+export async function getEmailPromoCandidateByMessageId({
+  userId,
+  gmailMessageId,
+}: {
+  userId: string;
+  gmailMessageId: string;
+}) {
+  try {
+    const [row] = await db
+      .select()
+      .from(emailPromoCandidate)
+      .where(
+        and(
+          eq(emailPromoCandidate.userId, userId),
+          eq(emailPromoCandidate.gmailMessageId, gmailMessageId)
+        )
+      )
+      .limit(1);
+    return row ?? null;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get email promo candidate"
+    );
+  }
+}
+
+export async function listEmailPromoCandidatesByUser({
+  userId,
+  includeIgnored = false,
+  limit = 50,
+}: {
+  userId: string;
+  includeIgnored?: boolean;
+  limit?: number;
+}) {
+  try {
+    const predicates = [eq(emailPromoCandidate.userId, userId)];
+
+    if (!includeIgnored) {
+      predicates.push(ne(emailPromoCandidate.status, "ignored"));
+    }
+
+    return await db
+      .select({
+        id: emailPromoCandidate.id,
+        createdAt: emailPromoCandidate.createdAt,
+        updatedAt: emailPromoCandidate.updatedAt,
+        receivedAt: emailPromoCandidate.receivedAt,
+        sender: emailPromoCandidate.sender,
+        subject: emailPromoCandidate.subject,
+        snippet: emailPromoCandidate.snippet,
+        accountId: emailPromoCandidate.accountId,
+        accountName: account.name,
+        accountNameGuess: emailPromoCandidate.accountNameGuess,
+        promoKind: emailPromoCandidate.promoKind,
+        title: emailPromoCandidate.title,
+        summary: emailPromoCandidate.summary,
+        terms: emailPromoCandidate.terms,
+        expiresAt: emailPromoCandidate.expiresAt,
+        minOdds: emailPromoCandidate.minOdds,
+        maxStake: emailPromoCandidate.maxStake,
+        currency: emailPromoCandidate.currency,
+        confidence: emailPromoCandidate.confidence,
+        status: emailPromoCandidate.status,
+      })
+      .from(emailPromoCandidate)
+      .leftJoin(account, eq(emailPromoCandidate.accountId, account.id))
+      .where(and(...predicates))
+      .orderBy(desc(emailPromoCandidate.receivedAt))
+      .limit(Math.min(Math.max(limit, 1), 200));
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to list email promo candidates"
+    );
   }
 }
