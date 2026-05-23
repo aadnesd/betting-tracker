@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as authModule from "@/app/(auth)/auth";
 import { POST as autoparseRoute } from "@/app/(chat)/api/bets/autoparse/route";
 import { POST as createMatchedRoute } from "@/app/(chat)/api/bets/create-matched/route";
+import { DELETE as deleteFreeBetRoute } from "@/app/(chat)/api/bets/free-bets/[id]/route";
 import { POST as deleteIndividualRoute } from "@/app/(chat)/api/bets/individual/delete/route";
 import { POST as updateIndividualRoute } from "@/app/(chat)/api/bets/individual/update/route";
 import { POST as quickAddRoute } from "@/app/(chat)/api/bets/quick-add/route";
@@ -73,6 +74,7 @@ vi.mock("@/lib/db/queries", () => ({
   createAccountTransaction: vi.fn(),
   activateFreeBetWageringOnWin: vi.fn(),
   markFreeBetAsUsed: vi.fn(),
+  deleteFreeBet: vi.fn(),
   getFreeBetById: vi.fn(),
   getBackBetById: vi.fn(),
   getLayBetById: vi.fn(),
@@ -133,6 +135,60 @@ describe("bets API routes (unit)", () => {
     const json = await res.json();
     expect(json.back.id).toBe("back-1");
     expect(json.lay.id).toBe("lay-1");
+  });
+
+  describe("DELETE /api/bets/free-bets/[id]", () => {
+    it("deletes a free bet", async () => {
+      (dbQueries.deleteFreeBet as vi.Mock).mockResolvedValue({
+        success: true,
+      });
+
+      const res = await deleteFreeBetRoute(
+        new Request(
+          "http://localhost/api/bets/free-bets/123e4567-e89b-12d3-a456-426614174000",
+          {
+            method: "DELETE",
+          }
+        ),
+        {
+          params: Promise.resolve({
+            id: "123e4567-e89b-12d3-a456-426614174000",
+          }),
+        }
+      );
+
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ success: true });
+      expect(dbQueries.deleteFreeBet).toHaveBeenCalledWith({
+        id: "123e4567-e89b-12d3-a456-426614174000",
+        userId: user.id,
+      });
+    });
+
+    it("returns a client error for used free bets", async () => {
+      const error = new Error("The request couldn't be processed.");
+      error.cause = "Cannot delete a used free bet";
+      (dbQueries.deleteFreeBet as vi.Mock).mockRejectedValue(error);
+
+      const res = await deleteFreeBetRoute(
+        new Request(
+          "http://localhost/api/bets/free-bets/123e4567-e89b-12d3-a456-426614174000",
+          {
+            method: "DELETE",
+          }
+        ),
+        {
+          params: Promise.resolve({
+            id: "123e4567-e89b-12d3-a456-426614174000",
+          }),
+        }
+      );
+
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({
+        error: "Cannot delete a used free bet",
+      });
+    });
   });
 
   it("autoparse uses stubbed parser and returns aligned bets", async () => {
