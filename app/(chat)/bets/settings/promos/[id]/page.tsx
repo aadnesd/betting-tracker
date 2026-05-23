@@ -3,6 +3,7 @@ import { ArrowLeft, CalendarDays, Gift, Lock, Target } from "lucide-react";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/app/(auth)/auth";
+import { FreeBetDeleteButton } from "@/components/bets/free-bet-delete-button";
 import { FreeBetForm } from "@/components/bets/free-bet-form";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -409,6 +410,25 @@ export default async function FreeBetDetailPage({
                 winWageringMinOdds: freeBet.winWageringMinOdds ?? undefined,
               }}
               mode="edit"
+            />
+          </CardContent>
+        </Card>
+      )}
+
+      {!isEditable && freeBet.status !== "used" && (
+        <Card className="max-w-2xl border-destructive/30">
+          <CardHeader>
+            <CardTitle className="text-destructive">Delete Free Bet</CardTitle>
+            <CardDescription>
+              Delete this free bet permanently. This cannot be undone.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <FreeBetDeleteButton
+              currency={freeBet.currency}
+              id={freeBet.id}
+              name={freeBet.name}
+              value={freeBet.value}
             />
           </CardContent>
         </Card>

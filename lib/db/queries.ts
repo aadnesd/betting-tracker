@@ -6772,6 +6772,12 @@ export async function deleteFreeBet({
       );
     }
 
+    await db.delete(qualifyingBet).where(eq(qualifyingBet.freeBetId, id));
+
+    await db
+      .delete(freeBetWageringBet)
+      .where(eq(freeBetWageringBet.freeBetId, id));
+
     await db
       .delete(freeBet)
       .where(and(eq(freeBet.id, id), eq(freeBet.userId, userId)));
