@@ -4,7 +4,7 @@ import { ChevronDown, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
-import { DeleteConfirmDialog } from "@/components/bets/delete-confirm-dialog";
+import { FreeBetDeleteButton } from "@/components/bets/free-bet-delete-button";
 import { Button } from "@/components/ui/button";
 import {
   Collapsible,
@@ -277,23 +277,6 @@ export function FreeBetForm({ accounts, initialData, mode }: FreeBetFormProps) {
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  const handleDelete = async () => {
-    if (!initialData?.id) return;
-
-    const response = await fetch(`/api/bets/free-bets/${initialData.id}`, {
-      method: "DELETE",
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data.error || "Failed to delete free bet");
-    }
-
-    toast.success("Free bet deleted!");
-    router.push("/bets/settings/promos");
   };
 
   const bookmakers = accounts.filter((a) => a.currency); // Only show accounts with currency set
@@ -785,12 +768,12 @@ export function FreeBetForm({ accounts, initialData, mode }: FreeBetFormProps) {
                 Delete this free bet permanently. This cannot be undone.
               </p>
             </div>
-            <DeleteConfirmDialog
-              description={`This will permanently delete the free bet "${initialData.name}" worth ${initialData.currency} ${Number.parseFloat(initialData.value).toFixed(2)}. This action cannot be undone.`}
-              destructiveLabel="Delete Free Bet"
+            <FreeBetDeleteButton
+              currency={initialData.currency}
               disabled={isSubmitting}
-              onConfirm={handleDelete}
-              title="Delete free bet?"
+              id={initialData.id}
+              name={initialData.name}
+              value={initialData.value}
             />
           </div>
         </div>
