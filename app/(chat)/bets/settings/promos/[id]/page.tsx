@@ -25,9 +25,9 @@ export const metadata = {
   title: "Free Bet Details",
 };
 
-interface FreeBetDetailPageProps {
+type FreeBetDetailPageProps = {
   params: Promise<{ id: string }>;
-}
+};
 
 function getStatusBadge(status: string) {
   switch (status) {
@@ -356,6 +356,17 @@ export default async function FreeBetDetailPage({
                       </dd>
                     </div>
                   )}
+                  {freeBet.winWageringExpiresAt && (
+                    <div>
+                      <dt className="text-muted-foreground">Deadline</dt>
+                      <dd className="font-medium">
+                        {format(
+                          new Date(freeBet.winWageringExpiresAt),
+                          "d MMM yyyy"
+                        )}
+                      </dd>
+                    </div>
+                  )}
                 </dl>
               </>
             ) : (
@@ -369,6 +380,13 @@ export default async function FreeBetDetailPage({
                     {" "}
                     • Min odds:{" "}
                     {Number.parseFloat(freeBet.winWageringMinOdds).toFixed(2)}
+                  </span>
+                )}
+                {freeBet.winWageringExpiresInDays && (
+                  <span>
+                    {" "}
+                    • Complete within {freeBet.winWageringExpiresInDays} days
+                    after winning
                   </span>
                 )}
               </div>
@@ -408,6 +426,8 @@ export default async function FreeBetDetailPage({
                 winWageringMultiplier:
                   freeBet.winWageringMultiplier ?? undefined,
                 winWageringMinOdds: freeBet.winWageringMinOdds ?? undefined,
+                winWageringExpiresInDays:
+                  freeBet.winWageringExpiresInDays ?? undefined,
               }}
               mode="edit"
             />

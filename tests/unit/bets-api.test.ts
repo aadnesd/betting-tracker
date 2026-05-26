@@ -3,7 +3,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as authModule from "@/app/(auth)/auth";
 import { POST as autoparseRoute } from "@/app/(chat)/api/bets/autoparse/route";
 import { POST as createMatchedRoute } from "@/app/(chat)/api/bets/create-matched/route";
-import { DELETE as deleteFreeBetRoute } from "@/app/(chat)/api/bets/free-bets/[id]/route";
+import {
+  DELETE as deleteFreeBetRoute,
+  PATCH as updateFreeBetRoute,
+} from "@/app/(chat)/api/bets/free-bets/[id]/route";
 import { POST as deleteIndividualRoute } from "@/app/(chat)/api/bets/individual/delete/route";
 import { POST as updateIndividualRoute } from "@/app/(chat)/api/bets/individual/update/route";
 import { POST as quickAddRoute } from "@/app/(chat)/api/bets/quick-add/route";
@@ -75,6 +78,7 @@ vi.mock("@/lib/db/queries", () => ({
   activateFreeBetWageringOnWin: vi.fn(),
   markFreeBetAsUsed: vi.fn(),
   deleteFreeBet: vi.fn(),
+  updateFreeBet: vi.fn(),
   getFreeBetById: vi.fn(),
   getBackBetById: vi.fn(),
   getLayBetById: vi.fn(),
@@ -188,6 +192,42 @@ describe("bets API routes (unit)", () => {
       expect(await res.json()).toEqual({
         error: "Cannot delete a used free bet",
       });
+    });
+  });
+
+  describe("PATCH /api/bets/free-bets/[id]", () => {
+    it("updates free bet winnings wagering deadline settings", async () => {
+      const freeBetId = "123e4567-e89b-12d3-a456-426614174000";
+      (dbQueries.getFreeBetById as vi.Mock).mockResolvedValue({
+        id: freeBetId,
+        userId: user.id,
+      });
+      (dbQueries.updateFreeBet as vi.Mock).mockResolvedValue({
+        id: freeBetId,
+      });
+
+      const res = await updateFreeBetRoute(
+        new Request(`http://localhost/api/bets/free-bets/${freeBetId}`, {
+          method: "PATCH",
+          body: JSON.stringify({
+            winWageringMultiplier: 3,
+            winWageringMinOdds: 1.8,
+            winWageringExpiresInDays: 7,
+          }),
+        }),
+        { params: Promise.resolve({ id: freeBetId }) }
+      );
+
+      expect(res.status).toBe(200);
+      expect(dbQueries.updateFreeBet).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: freeBetId,
+          userId: user.id,
+          winWageringMultiplier: 3,
+          winWageringMinOdds: 1.8,
+          winWageringExpiresInDays: 7,
+        })
+      );
     });
   });
 
