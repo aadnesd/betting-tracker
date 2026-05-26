@@ -6,6 +6,7 @@ import {
   Lock,
   Plus,
   Tag,
+  Target,
   TrendingUp,
   Wallet,
   X,
@@ -35,7 +36,10 @@ function formatCurrency(value: number | string, currency: string): string {
 }
 
 function formatDate(date: Date | null): string {
-  if (!date) return "No expiry";
+  if (!date) {
+    return "No expiry";
+  }
+
   return new Date(date).toLocaleDateString("en-GB", {
     day: "numeric",
     month: "short",
@@ -44,7 +48,10 @@ function formatDate(date: Date | null): string {
 }
 
 function isExpiringSoon(date: Date | null): boolean {
-  if (!date) return false;
+  if (!date) {
+    return false;
+  }
+
   const now = new Date();
   const sevenDays = 7 * 24 * 60 * 60 * 1000;
   return new Date(date).getTime() - now.getTime() < sevenDays;
@@ -131,6 +138,16 @@ export default async function PromosSettingsPage({
 
   const usedFreeBets = freeBets.filter((fb) => fb.status === "used");
   const expiredFreeBets = freeBets.filter((fb) => fb.status === "expired");
+  const winningsWageringFreeBets = freeBets.filter((fb) => {
+    const requirement = fb.winWageringRequirement
+      ? Number.parseFloat(fb.winWageringRequirement)
+      : 0;
+    const progress = fb.winWageringProgress
+      ? Number.parseFloat(fb.winWageringProgress)
+      : 0;
+
+    return requirement > 0 && progress < requirement;
+  });
 
   // Deposit bonus categories
   const activeDepositBonuses = depositBonuses.filter(
@@ -449,6 +466,106 @@ export default async function PromosSettingsPage({
                       </div>
                       <Progress
                         className="h-2 bg-amber-100"
+                        value={progressPercent}
+                      />
+                    </div>
+                  </div>
+                </Link>
+              );
+            })}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Free Bet Winnings Wagering */}
+      {winningsWageringFreeBets.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Target className="h-5 w-5 text-blue-600" />
+              Free Bet Winnings Wagering ({winningsWageringFreeBets.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {winningsWageringFreeBets.map((fb) => {
+              const requirement = Number.parseFloat(
+                fb.winWageringRequirement ?? "0"
+              );
+              const progress = Number.parseFloat(fb.winWageringProgress ?? "0");
+              const progressPercent =
+                requirement > 0
+                  ? Math.min((progress / requirement) * 100, 100)
+                  : 0;
+              const remaining = Math.max(0, requirement - progress);
+
+              return (
+                <Link
+                  className="block rounded-md border border-blue-200 bg-blue-50/30 p-4 transition-colors hover:bg-blue-50/50"
+                  href={`/bets/settings/promos/${fb.id}`}
+                  key={fb.id}
+                >
+                  <div className="space-y-3">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold">{fb.name}</span>
+                          <span className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-blue-700 text-xs">
+                            <TrendingUp className="mr-1 h-3 w-3" />
+                            {progressPercent.toFixed(0)}%
+                          </span>
+                          {fb.winWageringExpiresAt &&
+                            isExpiringSoon(fb.winWageringExpiresAt) && (
+                              <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-amber-700 text-xs">
+                                <AlertTriangle className="h-3 w-3" />
+                                Deadline soon
+                              </span>
+                            )}
+                        </div>
+                        <div className="flex flex-wrap items-center gap-3 text-muted-foreground text-sm">
+                          {fb.accountName && (
+                            <span className="flex items-center gap-1">
+                              <Tag className="h-3 w-3" />
+                              {fb.accountName}
+                            </span>
+                          )}
+                          {fb.winWageringMinOdds && (
+                            <span>
+                              Min odds:{" "}
+                              {Number.parseFloat(fb.winWageringMinOdds).toFixed(
+                                2
+                              )}
+                            </span>
+                          )}
+                          <span>
+                            {fb.currency} {remaining.toFixed(2)} remaining
+                          </span>
+                          {fb.winWageringExpiresAt && (
+                            <span className="flex items-center gap-1">
+                              <Calendar className="h-3 w-3" />
+                              Deadline: {formatDate(fb.winWageringExpiresAt)}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-semibold text-blue-600 text-lg">
+                          {fb.currency} {requirement.toFixed(2)}
+                        </p>
+                        <p className="text-muted-foreground text-xs">
+                          Wagering target
+                        </p>
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-muted-foreground text-xs">
+                        <span>
+                          {fb.currency} {progress.toFixed(2)} /{" "}
+                          {requirement.toFixed(2)}
+                        </span>
+                        <span>{progressPercent.toFixed(0)}%</span>
+                      </div>
+                      <Progress
+                        className="h-2 bg-blue-100"
                         value={progressPercent}
                       />
                     </div>
