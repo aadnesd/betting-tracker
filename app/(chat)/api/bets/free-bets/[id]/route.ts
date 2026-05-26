@@ -118,6 +118,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       stakeReturned: parsed.data.stakeReturned,
       winWageringMultiplier: parsed.data.winWageringMultiplier,
       winWageringMinOdds: parsed.data.winWageringMinOdds,
+      winWageringExpiresInDays: parsed.data.winWageringExpiresInDays,
     });
 
     revalidateDashboard(userId);
