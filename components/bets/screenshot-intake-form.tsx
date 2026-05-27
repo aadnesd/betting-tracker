@@ -9,14 +9,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 type UploadState = "idle" | "uploading" | "parsing" | "success" | "error";
 
-interface ScreenshotRecord {
+type ScreenshotRecord = {
   id: string;
   url: string;
   kind: "back" | "lay";
   filename?: string | null;
-}
+};
 
-interface ParsedResult {
+type ParsedResult = {
   backScreenshotId: string;
   layScreenshotId: string;
   back: {
@@ -27,27 +27,27 @@ interface ParsedResult {
     id: string;
     url: string;
   };
-}
+};
 
-interface ScreenshotIntakeFormProps {
+type ScreenshotIntakeFormProps = {
   /** Called when parsing completes successfully - provides screenshot IDs for the review form */
   onParseComplete?: (data: {
     backScreenshotId: string;
     layScreenshotId: string;
     parsedData: unknown;
   }) => void;
-}
+};
 
 export function ScreenshotIntakeForm({
   onParseComplete,
 }: ScreenshotIntakeFormProps) {
-  const router = useRouter();
+  const _router = useRouter();
   const [backFile, setBackFile] = useState<File | null>(null);
   const [layFile, setLayFile] = useState<File | null>(null);
   const [uploadState, setUploadState] = useState<UploadState>("idle");
   const [error, setError] = useState<string | null>(null);
   const [autoParseTriggered, setAutoParseTriggered] = useState(false);
-  const [screenshots, setScreenshots] = useState<{
+  const [_screenshots, setScreenshots] = useState<{
     back?: ScreenshotRecord;
     lay?: ScreenshotRecord;
   }>({});

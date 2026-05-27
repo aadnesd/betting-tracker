@@ -13,7 +13,7 @@ import { searchFootballMatches } from "@/lib/db/queries";
 
 import type { NormalizedSelection } from "@/lib/db/schema";
 
-export interface MatchCandidate {
+export type MatchCandidate = {
   id: string;
   externalId: string;
   homeTeam: string;
@@ -22,16 +22,16 @@ export interface MatchCandidate {
   matchDate: Date;
   status: string;
   similarity?: number;
-}
+};
 
-export interface MatchLinkResult {
+export type MatchLinkResult = {
   matchId: string | null;
   matchConfidence: "high" | "medium" | "low" | null;
   matchCandidates: number;
   linkedMatch?: MatchCandidate;
   /** Normalized selection for Match Odds: HOME_TEAM, AWAY_TEAM, DRAW */
   normalizedSelection?: NormalizedSelection | null;
-}
+};
 
 const TEAM_NAME_NORMALIZATION: Record<string, string> = {
   "man utd": "Manchester United",

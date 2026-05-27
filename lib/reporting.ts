@@ -254,7 +254,9 @@ async function calculateQualifyingLossInNok(
  * Calculate ROI percentage from profit and stake.
  */
 export function calculateROI(profit: number, stake: number): number {
-  if (stake <= 0) return 0;
+  if (stake <= 0) {
+    return 0;
+  }
   return (profit / stake) * 100;
 }
 
@@ -678,7 +680,6 @@ export function snapshotsToBalanceData(
         });
         break;
       }
-      case "day":
       default: {
         key = date.toISOString().split("T")[0];
         label = date.toLocaleDateString("en-GB", {
@@ -740,7 +741,6 @@ export function markWalletBankTransactionsOnBalanceData(
       }
       case "month":
         return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-01`;
-      case "day":
       default:
         return date.toISOString().split("T")[0];
     }

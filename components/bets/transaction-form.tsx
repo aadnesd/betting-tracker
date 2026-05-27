@@ -16,24 +16,24 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 
-export interface WalletOption {
+export type WalletOption = {
   id: string;
   name: string;
   type: "fiat" | "crypto" | "hybrid";
   currency: string;
-}
+};
 
-interface TransactionFormProps {
+type TransactionFormProps = {
   accountId: string;
   accountName: string;
   defaultCurrency: string;
   wallets?: WalletOption[];
   onSuccess?: () => void;
-}
+};
 
 type TransactionType = "deposit" | "withdrawal" | "bonus" | "adjustment";
 
-interface FormData {
+type FormData = {
   type: TransactionType;
   amount: string;
   currency: string;
@@ -41,7 +41,7 @@ interface FormData {
   notes: string;
   walletId: string;
   walletAmount: string;
-}
+};
 
 const CURRENCIES = ["NOK", "EUR", "GBP", "USD", "SEK", "DKK"] as const;
 

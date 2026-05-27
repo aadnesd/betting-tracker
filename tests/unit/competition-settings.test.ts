@@ -233,11 +233,11 @@ describe("competition settings API routes", () => {
   describe("GET /api/bets/settings/competitions", () => {
     it("should return enabled, available, and defaults", () => {
       // Type check: expected response structure
-      interface GetCompetitionsResponse {
+      type GetCompetitionsResponse = {
         enabled: string[];
         available: typeof AVAILABLE_COMPETITIONS;
         defaults: typeof DEFAULT_COMPETITION_CODES;
-      }
+      };
 
       const mockResponse: GetCompetitionsResponse = {
         enabled: ["PL", "CL"],
@@ -254,9 +254,9 @@ describe("competition settings API routes", () => {
   describe("PATCH /api/bets/settings/competitions", () => {
     it("should accept competitions array", () => {
       // Type check: expected request structure
-      interface PatchCompetitionsRequest {
+      type PatchCompetitionsRequest = {
         competitions: string[];
-      }
+      };
 
       const mockRequest: PatchCompetitionsRequest = {
         competitions: ["PL", "CL", "BL1"],
@@ -275,11 +275,11 @@ describe("competition settings API routes", () => {
   describe("POST /api/bets/settings/competitions (reset)", () => {
     it("should reset to defaults", () => {
       // Type check: expected response structure
-      interface ResetCompetitionsResponse {
+      type ResetCompetitionsResponse = {
         success: boolean;
         enabled: string[];
         message: string;
-      }
+      };
 
       const mockResponse: ResetCompetitionsResponse = {
         success: true,

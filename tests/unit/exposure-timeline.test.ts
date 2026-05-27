@@ -274,8 +274,8 @@ describe("Exposure timeline data structure", () => {
       },
     ];
 
-    const currentExposure = dataPoints[dataPoints.length - 1].exposure;
-    const currentPositions = dataPoints[dataPoints.length - 1].openPositions;
+    const currentExposure = dataPoints.at(-1).exposure;
+    const currentPositions = dataPoints.at(-1).openPositions;
 
     expect(currentExposure).toBe(1800);
     expect(currentPositions).toBe(2);

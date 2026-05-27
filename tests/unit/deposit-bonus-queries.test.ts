@@ -144,10 +144,8 @@ describe("Deposit bonus query contracts", () => {
       userId: string;
       reason?: string;
     }) => Promise<unknown> = dbQueries.forfeitDepositBonus;
-    const deleteFn: (args: {
-      id: string;
-      userId: string;
-    }) => Promise<unknown> = dbQueries.deleteDepositBonus;
+    const deleteFn: (args: { id: string; userId: string }) => Promise<unknown> =
+      dbQueries.deleteDepositBonus;
 
     expect(typeof getFn).toBe("function");
     expect(typeof listFn).toBe("function");

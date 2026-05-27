@@ -71,7 +71,7 @@ describe("reconciliation queue queries", () => {
     expect(typeof dbQueries.listMatchedBetsByStatus).toBe("function");
 
     // Verify function accepts correct parameters
-    const params = {
+    const _params = {
       userId: "user-1",
       statuses: ["needs_review", "draft"] as const,
       limit: 100,

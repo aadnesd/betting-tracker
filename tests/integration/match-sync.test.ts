@@ -16,15 +16,7 @@
  * - Date range handling
  */
 
-import {
-  afterAll,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock server-only to allow testing server modules
 vi.mock("server-only", () => ({}));
@@ -49,7 +41,7 @@ async function waitForRateLimit(ms = 6000): Promise<void> {
 const API_DELAY_MS = 7000;
 
 // API types from the sync-matches route
-interface FootballDataMatch {
+type FootballDataMatch = {
   id: number;
   utcDate: string;
   status:
@@ -84,9 +76,9 @@ interface FootballDataMatch {
       away: number | null;
     };
   };
-}
+};
 
-interface FootballDataResponse {
+type FootballDataResponse = {
   matches: FootballDataMatch[];
   resultSet?: {
     count: number;
@@ -94,7 +86,7 @@ interface FootballDataResponse {
     first: string;
     last: string;
   };
-}
+};
 
 /**
  * Helper to format date as YYYY-MM-DD for the API.
@@ -583,9 +575,7 @@ describe("Football-data.org API Integration", () => {
       "respects user-configured competitions",
       { timeout: 45_000 },
       async () => {
-        const { getAllEnabledCompetitions, upsertUserSettings } = await import(
-          "@/lib/db/queries"
-        );
+        const { getAllEnabledCompetitions } = await import("@/lib/db/queries");
         const { DEFAULT_COMPETITION_CODES } = await import("@/lib/db/schema");
 
         // First check what defaults are

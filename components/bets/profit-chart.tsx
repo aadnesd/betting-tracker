@@ -23,7 +23,6 @@ type ProfitChartProps = {
 function CustomTooltip({
   active,
   payload,
-  label,
 }: {
   active?: boolean;
   payload?: Array<{ value: number; dataKey: string; payload: ProfitDataPoint }>;
@@ -88,7 +87,7 @@ export function ProfitChart({
   }
 
   // Determine if overall profit is positive or negative for coloring
-  const finalCumulative = data[data.length - 1]?.cumulative ?? 0;
+  const finalCumulative = data.at(-1)?.cumulative ?? 0;
   const gradientColor = finalCumulative >= 0 ? "#22c55e" : "#ef4444"; // green-500 / red-500
   const strokeColor = finalCumulative >= 0 ? "#16a34a" : "#dc2626"; // green-600 / red-600
 
@@ -197,7 +196,7 @@ export function ProfitChartWithControls({
   }
 
   // Determine if overall profit is positive or negative for coloring
-  const finalCumulative = data[data.length - 1]?.cumulative ?? 0;
+  const finalCumulative = data.at(-1)?.cumulative ?? 0;
   const gradientColor = finalCumulative >= 0 ? "#22c55e" : "#ef4444";
   const strokeColor = finalCumulative >= 0 ? "#16a34a" : "#dc2626";
 

@@ -91,7 +91,7 @@ describe("account balance queries", () => {
     });
 
     it("returns a number representing the balance", async () => {
-      const params = {
+      const _params = {
         userId: "user-1",
         accountId: "acct-1",
       };

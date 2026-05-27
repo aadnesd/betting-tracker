@@ -17,22 +17,22 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 
-interface AccountOption {
+type AccountOption = {
   id: string;
   name: string;
   currency: string | null;
   kind: "bookmaker" | "exchange";
-}
+};
 
-interface DepositTransaction {
+type DepositTransaction = {
   id: string;
   amount: string;
   currency: string;
   occurredAt: Date;
   notes: string | null;
-}
+};
 
-interface DepositBonusFormProps {
+type DepositBonusFormProps = {
   accounts: AccountOption[];
   mode?: "create" | "edit";
   initialData?: {
@@ -50,7 +50,7 @@ interface DepositBonusFormProps {
     linkedTransactionId: string | null;
     notes: string | null;
   };
-}
+};
 
 export function DepositBonusForm({
   accounts,

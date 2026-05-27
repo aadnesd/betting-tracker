@@ -34,12 +34,12 @@ function getClient(): DocumentAnalysisClient {
   return client;
 }
 
-export interface OcrResult {
+export type OcrResult = {
   text: string;
   lines: string[];
   confidence: number;
   durationMs: number;
-}
+};
 
 /**
  * Extract text from an image using Azure Document Intelligence OCR.

@@ -43,7 +43,6 @@ export async function middleware(request: NextRequest) {
   });
 
   if (["/login", "/register"].includes(pathname)) {
-
     // If already authenticated, redirect away from auth pages
     if (token) {
       return NextResponse.redirect(new URL("/", request.url));

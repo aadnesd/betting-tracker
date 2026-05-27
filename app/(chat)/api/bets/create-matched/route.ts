@@ -286,10 +286,10 @@ export async function POST(request: Request) {
     }
 
     const backBetRow =
-      hasBack && body.back
+      hasBack && body.back && backShot
         ? await saveBackBet({
             userId: session.user.id,
-            screenshotId: backShot!.id,
+            screenshotId: backShot.id,
             market: body.back.market,
             selection: body.back.selection,
             normalizedSelection: body.normalizedSelection ?? null,
@@ -308,10 +308,10 @@ export async function POST(request: Request) {
         : null;
 
     const layBetRow =
-      hasLay && body.lay
+      hasLay && body.lay && layShot
         ? await saveLayBet({
             userId: session.user.id,
-            screenshotId: layShot!.id,
+            screenshotId: layShot.id,
             market: body.lay.market,
             selection: body.lay.selection,
             normalizedSelection: body.normalizedSelection ?? null,
