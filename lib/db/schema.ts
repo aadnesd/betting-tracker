@@ -399,6 +399,7 @@ export const freeBet = pgTable(
     // Calculated deadline: startedAt + expiresInDays
     winWageringExpiresAt: timestamp("winWageringExpiresAt"),
     winWageringCompletedAt: timestamp("winWageringCompletedAt"),
+    winWageringCompletedEarlyAt: timestamp("winWageringCompletedEarlyAt"),
   },
   (table) => ({
     freeBetUserStatusIdx: index("free_bet_user_status_idx").on(

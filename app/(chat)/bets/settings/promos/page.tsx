@@ -146,7 +146,11 @@ export default async function PromosSettingsPage({
       ? Number.parseFloat(fb.winWageringProgress)
       : 0;
 
-    return requirement > 0 && progress < requirement;
+    return (
+      requirement > 0 &&
+      progress < requirement &&
+      !fb.winWageringCompletedEarlyAt
+    );
   });
 
   // Deposit bonus categories

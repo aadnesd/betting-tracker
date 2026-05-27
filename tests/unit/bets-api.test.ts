@@ -1,10 +1,11 @@
-import { NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as authModule from "@/app/(auth)/auth";
 import { POST as autoparseRoute } from "@/app/(chat)/api/bets/autoparse/route";
 import { POST as createMatchedRoute } from "@/app/(chat)/api/bets/create-matched/route";
 import {
   DELETE as deleteFreeBetRoute,
+  POST as freeBetActionRoute,
   PATCH as updateFreeBetRoute,
 } from "@/app/(chat)/api/bets/free-bets/[id]/route";
 import { POST as deleteIndividualRoute } from "@/app/(chat)/api/bets/individual/delete/route";
@@ -16,6 +17,7 @@ import { POST as standaloneRoute } from "@/app/(chat)/api/bets/standalone/route"
 import { PATCH as updateMatchedRoute } from "@/app/(chat)/api/bets/update-matched/route";
 import { parseMatchedBetFromScreenshots } from "@/lib/bet-parser";
 import * as dbQueries from "@/lib/db/queries";
+import { ChatSDKError } from "@/lib/errors";
 import { convertAmountToNok } from "@/lib/fx-rates";
 import * as matchLinking from "@/lib/match-linking";
 
@@ -76,6 +78,7 @@ vi.mock("@/lib/db/queries", () => ({
   getMatchedBetWithParts: vi.fn(),
   createAccountTransaction: vi.fn(),
   activateFreeBetWageringOnWin: vi.fn(),
+  completeFreeBetWageringEarly: vi.fn(),
   markFreeBetAsUsed: vi.fn(),
   deleteFreeBet: vi.fn(),
   updateFreeBet: vi.fn(),
@@ -229,6 +232,54 @@ describe("bets API routes (unit)", () => {
           winWageringExpiresInDays: 7,
         })
       );
+    });
+  });
+
+  describe("POST /api/bets/free-bets/[id]", () => {
+    it("completes free bet winnings wagering early", async () => {
+      const freeBetId = "123e4567-e89b-12d3-a456-426614174000";
+      (dbQueries.completeFreeBetWageringEarly as vi.Mock).mockResolvedValue({
+        id: freeBetId,
+        winWageringCompletedEarlyAt: new Date("2026-05-27T12:00:00.000Z"),
+      });
+
+      const res = await freeBetActionRoute(
+        new Request(`http://localhost/api/bets/free-bets/${freeBetId}`, {
+          method: "POST",
+          body: JSON.stringify({ action: "complete_win_wagering_early" }),
+        }) as unknown as NextRequest,
+        { params: Promise.resolve({ id: freeBetId }) }
+      );
+
+      expect(res.status).toBe(200);
+      expect(dbQueries.completeFreeBetWageringEarly).toHaveBeenCalledWith({
+        id: freeBetId,
+        userId: user.id,
+        reason: "User manually completed free bet winnings wagering early",
+      });
+    });
+
+    it("returns 400 when free bet winnings wagering is not active", async () => {
+      const freeBetId = "123e4567-e89b-12d3-a456-426614174000";
+      (dbQueries.completeFreeBetWageringEarly as vi.Mock).mockRejectedValue(
+        new ChatSDKError(
+          "bad_request:api",
+          "Free bet winnings wagering is not active"
+        )
+      );
+
+      const res = await freeBetActionRoute(
+        new Request(`http://localhost/api/bets/free-bets/${freeBetId}`, {
+          method: "POST",
+          body: JSON.stringify({ action: "complete_win_wagering_early" }),
+        }) as unknown as NextRequest,
+        { params: Promise.resolve({ id: freeBetId }) }
+      );
+
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({
+        error: "Free bet winnings wagering is not active",
+      });
     });
   });
 

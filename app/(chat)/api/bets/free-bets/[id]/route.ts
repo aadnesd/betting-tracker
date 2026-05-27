@@ -3,11 +3,13 @@ import { z } from "zod";
 import { auth } from "@/app/(auth)/auth";
 import { revalidateDashboard } from "@/lib/cache";
 import {
+  completeFreeBetWageringEarly,
   deleteFreeBet,
   getFreeBetById,
   markFreeBetAsUsed,
   updateFreeBet,
 } from "@/lib/db/queries";
+import { ChatSDKError } from "@/lib/errors";
 
 const updateFreeBetSchema = z.object({
   name: z.string().min(1).max(100).optional(),
@@ -170,6 +172,58 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
       );
     }
 
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(request: NextRequest, { params }: RouteParams) {
+  const session = await auth();
+
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const userId = session.user.id;
+  const { id } = await params;
+
+  try {
+    const body = await request.json();
+    const action = body.action;
+
+    if (action === "complete_win_wagering_early") {
+      const result = await completeFreeBetWageringEarly({
+        id,
+        userId,
+        reason:
+          body.reason ||
+          "User manually completed free bet winnings wagering early",
+      });
+
+      if (!result) {
+        return NextResponse.json(
+          { error: "Free bet not found" },
+          { status: 404 }
+        );
+      }
+
+      revalidateDashboard(userId);
+
+      return NextResponse.json(result);
+    }
+
+    return NextResponse.json({ error: "Unknown action" }, { status: 400 });
+  } catch (error) {
+    if (error instanceof ChatSDKError && error.type === "bad_request") {
+      return NextResponse.json(
+        { error: error.cause || error.message },
+        { status: 400 }
+      );
+    }
+
+    console.error("Error processing free bet action:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
