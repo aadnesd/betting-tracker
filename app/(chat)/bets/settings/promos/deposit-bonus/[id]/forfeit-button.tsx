@@ -17,10 +17,10 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 
-interface DepositBonusForfeitButtonProps {
+type DepositBonusForfeitButtonProps = {
   bonusId: string;
   bonusName: string;
-}
+};
 
 export function DepositBonusForfeitButton({
   bonusId,

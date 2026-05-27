@@ -22,20 +22,19 @@ type MismatchIssue = {
 
 type MatchedBetStatus = "draft" | "matched" | "settled" | "needs_review";
 
-interface Props {
+type Props = {
   matchedBetId: string;
   currentStatus: MatchedBetStatus;
   hasBothLegs: boolean;
   mismatches: MismatchIssue[];
   backBetId?: string | null;
-}
+};
 
 export function MatchedBetDetailActions({
   matchedBetId,
   currentStatus,
   hasBothLegs,
   mismatches,
-  backBetId,
 }: Props) {
   const router = useRouter();
   const [status, setStatus] = useState<MatchedBetStatus>(currentStatus);

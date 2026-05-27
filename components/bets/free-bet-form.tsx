@@ -22,13 +22,13 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 
-interface Account {
+type Account = {
   id: string;
   name: string;
   currency: string | null;
-}
+};
 
-interface FreeBetFormProps {
+type FreeBetFormProps = {
   accounts: Account[];
   initialData?: {
     id?: string;
@@ -49,9 +49,9 @@ interface FreeBetFormProps {
     winWageringExpiresInDays?: number | null;
   };
   mode: "create" | "edit";
-}
+};
 
-interface FormData {
+type FormData = {
   accountId: string;
   name: string;
   value: string;
@@ -68,7 +68,7 @@ interface FormData {
   winWageringMultiplier: string;
   winWageringMinOdds: string;
   winWageringExpiresInDays: string;
-}
+};
 
 const CURRENCIES = ["NOK", "EUR", "GBP", "USD", "SEK", "DKK"] as const;
 

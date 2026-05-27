@@ -4,15 +4,15 @@ import { auth } from "@/app/(auth)/auth";
 import { revalidateDashboard } from "@/lib/cache";
 import { deleteMatchedBet, getMatchedBetWithParts } from "@/lib/db/queries";
 
-interface RouteParams {
+type RouteParams = {
   params: Promise<{ id: string }>;
-}
+};
 
-const deleteQuerySchema = z.object({
+const _deleteQuerySchema = z.object({
   cascade: z.boolean().optional().default(false),
 });
 
-export async function GET(request: Request, { params }: RouteParams) {
+export async function GET(_request: Request, { params }: RouteParams) {
   const session = await auth();
 
   if (!session?.user) {

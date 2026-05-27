@@ -38,14 +38,14 @@ const PROMO_TYPES = [
   "Other",
 ] as const;
 
-export interface AccountOption {
+export type AccountOption = {
   id: string;
   name: string;
   kind: "bookmaker" | "exchange";
   currency: string | null;
-}
+};
 
-export interface FreeBetOption {
+export type FreeBetOption = {
   id: string;
   name: string;
   value: number;
@@ -55,18 +55,18 @@ export interface FreeBetOption {
   expiresAt: string | null;
   minOdds: number | null;
   stakeReturned?: boolean;
-}
+};
 
-interface QuickAddFormProps {
+type QuickAddFormProps = {
   bookmakers: AccountOption[];
   exchanges: AccountOption[];
   freeBets?: FreeBetOption[];
   initialValues?: Partial<FormData>;
   copiedFromMatchedBetId?: string;
   initialMatchInfo?: SelectedMatchInfo | null;
-}
+};
 
-interface FormData {
+type FormData = {
   market: string;
   selection: string;
   matchId: string;
@@ -82,13 +82,13 @@ interface FormData {
   layExchange: string;
   layCurrency: string;
   notes: string;
-}
+};
 
-interface SelectedMatchInfo {
+type SelectedMatchInfo = {
   id: string;
   homeTeam: string;
   awayTeam: string;
-}
+};
 
 export type QuickAddInitialValues = Partial<FormData>;
 export type QuickAddInitialMatchInfo = SelectedMatchInfo;
@@ -149,7 +149,9 @@ export function QuickAddForm({
     const selectedBookmaker = bookmakers.find(
       (b) => b.name === formData.backBookmaker
     );
-    if (!selectedBookmaker) return freeBets;
+    if (!selectedBookmaker) {
+      return freeBets;
+    }
     // Show free bets for the selected bookmaker's account
     return freeBets.filter(
       (fb) => fb.accountId === selectedBookmaker.id || !fb.accountId
@@ -158,7 +160,9 @@ export function QuickAddForm({
 
   // Get selected free bet details
   const selectedFreeBet = useMemo(() => {
-    if (!formData.freeBetId) return null;
+    if (!formData.freeBetId) {
+      return null;
+    }
     return freeBets.find((fb) => fb.id === formData.freeBetId) ?? null;
   }, [formData.freeBetId, freeBets]);
 

@@ -105,8 +105,8 @@ const makeBlob = (content = "stub") =>
 describe("bets API routes (unit)", () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    delete process.env.SETTLED_BET_EDIT_USER_IDS;
-    delete process.env.SETTLED_BET_EDIT_USER_EMAILS;
+    Reflect.deleteProperty(process.env, "SETTLED_BET_EDIT_USER_IDS");
+    Reflect.deleteProperty(process.env, "SETTLED_BET_EDIT_USER_EMAILS");
     (authModule.auth as vi.Mock).mockResolvedValue({ user });
     (dbQueries.listAccountsByUser as vi.Mock).mockResolvedValue([]);
     (matchLinking.linkBetToMatch as vi.Mock).mockResolvedValue({
@@ -1435,13 +1435,13 @@ describe("bets API routes (unit)", () => {
           profitLossNok: null,
         })
       );
-      expect(dbQueries.reverseBackBetSettlementSideEffects).toHaveBeenCalledWith(
-        {
-          backBetId: "22222222-2222-2222-2222-222222222222",
-          matchedBetId: "11111111-1111-1111-1111-111111111111",
-          userId: user.id,
-        }
-      );
+      expect(
+        dbQueries.reverseBackBetSettlementSideEffects
+      ).toHaveBeenCalledWith({
+        backBetId: "22222222-2222-2222-2222-222222222222",
+        matchedBetId: "11111111-1111-1111-1111-111111111111",
+        userId: user.id,
+      });
       expect(dbQueries.updateLayBet).toHaveBeenCalledWith(
         expect.objectContaining({
           id: "33333333-3333-3333-3333-333333333333",
@@ -2814,13 +2814,13 @@ describe("bets API routes (unit)", () => {
           profitLossNok: null,
         })
       );
-      expect(dbQueries.reverseBackBetSettlementSideEffects).toHaveBeenCalledWith(
-        {
-          backBetId: betId,
-          matchedBetId: null,
-          userId: user.id,
-        }
-      );
+      expect(
+        dbQueries.reverseBackBetSettlementSideEffects
+      ).toHaveBeenCalledWith({
+        backBetId: betId,
+        matchedBetId: null,
+        userId: user.id,
+      });
       expect(dbQueries.createAccountTransaction).toHaveBeenCalledWith(
         expect.objectContaining({
           accountId,

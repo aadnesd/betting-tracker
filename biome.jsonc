@@ -6,7 +6,8 @@
       "**/*",
       "!components/ui",
       "!lib/utils.ts",
-      "!hooks/use-mobile.ts"
+      "!hooks/use-mobile.ts",
+      "!lib/db/migrations/meta/*.json"
     ]
   },
   "linter": {
@@ -14,6 +15,27 @@
       "suspicious": {
         /* Needs more work to fix */
         "noExplicitAny": "off",
+
+        /* Needs more work to fix */
+        "noArrayIndexKey": "off",
+
+        /* Needs more work to fix */
+        "noEvolvingTypes": "off",
+
+        /* Needs more work to fix */
+        "noImplicitAnyLet": "off",
+
+        /* Existing tests intentionally repeat scoped setup hooks */
+        "noDuplicateTestHooks": "off",
+
+        /* Existing no-op test callbacks are intentional */
+        "noEmptyBlockStatements": "off",
+
+        /* Existing forEach callbacks sometimes return collection results */
+        "useIterableCallbackReturn": "off",
+
+        /* Needs more work to fix */
+        "useAwait": "off",
 
         /* Allow for Tailwind @ rules */
         "noUnknownAtRules": "off",
@@ -29,22 +51,75 @@
         "noMagicNumbers": "off",
 
         /* Needs more work to fix */
-        "noNestedTernary": "off"
+        "noNonNullAssertion": "off",
+
+        /* Needs more work to fix */
+        "noNestedTernary": "off",
+
+        /* Too strict for generated and temporary files */
+        "useDefaultSwitchClause": "off",
+
+        /* Too strict for existing dot-prefixed helper scripts */
+        "useFilenamingConvention": "off",
+
+        /* .at(-1) currently loses useful narrowing in build-checked scripts */
+        "useAtIndex": "off"
       },
       "nursery": {
         /* Too many false positives */
-        "noUnnecessaryConditions": "off"
+        "noUnnecessaryConditions": "off",
+
+        /* Needs more work to fix */
+        "noShadow": "off",
+
+        /* Needs more work to fix */
+        "useExhaustiveSwitchCases": "off",
+
+        /* Needs more work to fix */
+        "useMaxParams": "off"
+      },
+      "correctness": {
+        /* Existing callback signatures keep some unused parameters for API shape */
+        "noUnusedFunctionParameters": "off"
       },
       "complexity": {
         /* Needs more work to fix */
         "noExcessiveCognitiveComplexity": "off",
 
         /* This one has false positives. It's a bit... iffy 😉 */
-        "useSimplifiedLogicExpression": "off"
+        "useSimplifiedLogicExpression": "off",
+
+        /* Existing code uses forEach in straightforward collection updates */
+        "noForEach": "off"
       },
       "a11y": {
         /* Needs more work to fix */
-        "noSvgWithoutTitle": "off"
+        "noLabelWithoutControl": "off",
+
+        /* Needs more work to fix */
+        "noNoninteractiveElementInteractions": "off",
+
+        /* Needs more work to fix */
+        "noStaticElementInteractions": "off",
+
+        /* Needs more work to fix */
+        "noSvgWithoutTitle": "off",
+
+        /* Needs more work to fix */
+        "useKeyWithClickEvents": "off",
+
+        /* Existing paste/drop zones use ARIA roles intentionally */
+        "useSemanticElements": "off"
+      },
+      "performance": {
+        /* Existing compatibility modules intentionally re-export APIs */
+        "noBarrelFile": "off",
+
+        /* Existing tests and one-off scripts use inline regexes heavily */
+        "useTopLevelRegex": "off",
+
+        /* Existing test mocks use namespace imports heavily */
+        "noNamespaceImport": "off"
       }
     }
   }

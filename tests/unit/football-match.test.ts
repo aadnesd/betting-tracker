@@ -37,7 +37,10 @@ vi.mock("drizzle-orm/postgres-js", () => ({
           limit: vi.fn().mockImplementation(() => mockSelectRows()),
           orderBy: vi.fn().mockImplementation(() => {
             const result = mockSelectRows();
-            if (result && typeof (result as Promise<unknown>).then === "function") {
+            if (
+              result &&
+              typeof (result as Promise<unknown>).then === "function"
+            ) {
               (result as { limit?: () => unknown }).limit = vi
                 .fn()
                 .mockImplementation(() => mockSelectRows());
@@ -52,7 +55,10 @@ vi.mock("drizzle-orm/postgres-js", () => ({
         })),
         orderBy: vi.fn().mockImplementation(() => {
           const result = mockSelectRows();
-          if (result && typeof (result as Promise<unknown>).then === "function") {
+          if (
+            result &&
+            typeof (result as Promise<unknown>).then === "function"
+          ) {
             (result as { limit?: () => unknown }).limit = vi
               .fn()
               .mockImplementation(() => mockSelectRows());

@@ -16,7 +16,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 
-interface DeleteConfirmDialogProps {
+type DeleteConfirmDialogProps = {
   title: string;
   description: string;
   onConfirm: () => Promise<void>;
@@ -26,7 +26,7 @@ interface DeleteConfirmDialogProps {
   showCascadeOption?: boolean;
   onCascadeChange?: (cascade: boolean) => void;
   disabled?: boolean;
-}
+};
 
 /**
  * DeleteConfirmDialog - Reusable confirmation dialog for delete operations.

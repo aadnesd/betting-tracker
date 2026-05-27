@@ -171,7 +171,7 @@ describe("getPendingSettlementBets", () => {
             awayScore: null,
           },
         };
-        expect(bet.footballMatch!.status).toBe(status);
+        expect(bet.footballMatch?.status).toBe(status);
       }
     });
   });
@@ -309,7 +309,7 @@ describe("pending settlement workflow", () => {
       if (!groups.has(dateKey)) {
         groups.set(dateKey, []);
       }
-      groups.get(dateKey)!.push(bet);
+      groups.get(dateKey)?.push(bet);
     }
 
     expect(groups.size).toBe(2);

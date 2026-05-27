@@ -113,14 +113,14 @@ IMPORTANT DEFAULTS:
 
 Flag needsReview=true if the markets or selections don't align between back and lay.`;
 
-interface BenchmarkResult {
+type BenchmarkResult = {
   model: string;
   durationMs: number;
   success: boolean;
   error?: string;
   rawResponse?: unknown;
   result?: z.infer<typeof pairSchema>;
-}
+};
 
 async function benchmarkModel(modelId: string): Promise<BenchmarkResult> {
   console.log(`\n🔄 Testing: ${modelId}`);
@@ -220,15 +220,17 @@ async function main() {
   for (const r of results) {
     console.log(`\n--- ${r.model} ---`);
     if (r.success && r.result) {
-      console.log("Duration:", r.durationMs + "ms");
+      console.log("Duration:", `${r.durationMs}ms`);
       console.log("\nBack bet:");
       console.log(JSON.stringify(r.result.back, null, 2));
       console.log("\nLay bet:");
       console.log(JSON.stringify(r.result.lay, null, 2));
       console.log("\nNeeds review:", r.result.needsReview);
-      if (r.result.notes) console.log("Notes:", r.result.notes);
+      if (r.result.notes) {
+        console.log("Notes:", r.result.notes);
+      }
     } else {
-      console.log("Duration:", r.durationMs + "ms");
+      console.log("Duration:", `${r.durationMs}ms`);
       console.log("Error:", r.error);
       if (r.rawResponse) {
         console.log("\nRaw response (for debugging):");

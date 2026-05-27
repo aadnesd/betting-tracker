@@ -26,7 +26,7 @@ const db = drizzle(client);
 import { footballMatch } from "../lib/db/schema";
 
 // Types matching lib/match-linking.ts
-export interface MatchCandidate {
+export type MatchCandidate = {
   id: string;
   externalId: string;
   homeTeam: string;
@@ -35,14 +35,14 @@ export interface MatchCandidate {
   matchDate: Date;
   status: string;
   similarity?: number;
-}
+};
 
-export interface MatchLinkResult {
+export type MatchLinkResult = {
   matchId: string | null;
   matchConfidence: "high" | "medium" | "low" | null;
   matchCandidates: number;
   linkedMatch?: MatchCandidate;
-}
+};
 
 /**
  * Mirrors searchFootballMatches from lib/db/queries.ts

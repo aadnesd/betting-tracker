@@ -17,10 +17,10 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 
-interface DepositBonusCompleteEarlyButtonProps {
+type DepositBonusCompleteEarlyButtonProps = {
   bonusId: string;
   bonusName: string;
-}
+};
 
 export function DepositBonusCompleteEarlyButton({
   bonusId,

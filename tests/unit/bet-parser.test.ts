@@ -41,9 +41,9 @@ function restoreEnv() {
 }
 
 function setTestEnv(overrides: Record<string, string | undefined>) {
-  delete process.env.PLAYWRIGHT;
-  delete process.env.PLAYWRIGHT_TEST_BASE_URL;
-  delete process.env.CI_PLAYWRIGHT;
+  process.env.PLAYWRIGHT = undefined;
+  process.env.PLAYWRIGHT_TEST_BASE_URL = undefined;
+  process.env.CI_PLAYWRIGHT = undefined;
 
   for (const [key, value] of Object.entries(overrides)) {
     if (value === undefined) {

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 /**
  * Unit tests for iOS Shortcut API key management and endpoint.
@@ -352,7 +352,7 @@ describe("API Key Settings Page", () => {
 describe("UserSettings Schema Extension", () => {
   it("should include shortcut API key columns", () => {
     // These represent the expected column names in the schema
-    const expectedColumns = [
+    const _expectedColumns = [
       "shortcutApiKeyHash",
       "shortcutApiKeyHint",
       "shortcutApiKeyCreatedAt",
@@ -360,7 +360,7 @@ describe("UserSettings Schema Extension", () => {
     ];
 
     // Type checking simulation
-    interface UserSettingsWithApiKey {
+    type UserSettingsWithApiKey = {
       id: string;
       userId: string;
       enabledCompetitions: string[] | null;
@@ -370,7 +370,7 @@ describe("UserSettings Schema Extension", () => {
       lastShortcutRequestAt: Date | null;
       createdAt: Date;
       updatedAt: Date;
-    }
+    };
 
     const mockSettings: UserSettingsWithApiKey = {
       id: "uuid",
@@ -391,12 +391,12 @@ describe("UserSettings Schema Extension", () => {
   });
 
   it("should allow null values for optional API key fields", () => {
-    interface UserSettingsWithApiKey {
+    type UserSettingsWithApiKey = {
       shortcutApiKeyHash: string | null;
       shortcutApiKeyHint: string | null;
       shortcutApiKeyCreatedAt: Date | null;
       lastShortcutRequestAt: Date | null;
-    }
+    };
 
     const settingsWithoutKey: UserSettingsWithApiKey = {
       shortcutApiKeyHash: null,

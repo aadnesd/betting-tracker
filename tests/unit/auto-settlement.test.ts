@@ -367,7 +367,7 @@ describe("auto-settlement detection queries", () => {
     });
 
     it("accepts all three outcome types: win, loss, push", () => {
-      const outcomes: Array<dbQueries.ApplyAutoSettlementParams["outcome"]> = [
+      const outcomes: dbQueries.ApplyAutoSettlementParams["outcome"][] = [
         "win",
         "loss",
         "push",

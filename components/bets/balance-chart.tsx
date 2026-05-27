@@ -88,7 +88,7 @@ export function BalanceChart({
     );
   }
 
-  const finalCumulative = data[data.length - 1]?.cumulative ?? 0;
+  const finalCumulative = data.at(-1)?.cumulative ?? 0;
   const gradientColor = finalCumulative >= 0 ? "#22c55e" : "#ef4444";
   const strokeColor = finalCumulative >= 0 ? "#16a34a" : "#dc2626";
 
@@ -218,7 +218,7 @@ export function BalanceChartWithControls({
     );
   }
 
-  const finalCumulative = data[data.length - 1]?.cumulative ?? 0;
+  const finalCumulative = data.at(-1)?.cumulative ?? 0;
   const gradientColor = finalCumulative >= 0 ? "#22c55e" : "#ef4444";
   const strokeColor = finalCumulative >= 0 ? "#16a34a" : "#dc2626";
 

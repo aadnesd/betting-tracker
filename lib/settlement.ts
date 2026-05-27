@@ -31,27 +31,29 @@ export type MarketType =
 /**
  * Match result for outcome calculation
  */
-export interface MatchResult {
+export type MatchResult = {
   homeScore: number;
   awayScore: number;
-}
+};
 
 /**
  * Outcome calculation result
  */
-export interface OutcomeResult {
+export type OutcomeResult = {
   outcome: BetOutcome;
   confidence: "high" | "medium" | "low";
   reason: string;
   detectedMarket: MarketType;
-}
+};
 
 /**
  * Normalize promo type labels to detect free bets.
  * Free bets do not return stake on win, so P&L differs.
  */
 export function isFreeBetPromoType(promoType: string | null): boolean {
-  if (!promoType) return false;
+  if (!promoType) {
+    return false;
+  }
   const normalized = promoType.toLowerCase();
   return (
     normalized.includes("free bet") ||

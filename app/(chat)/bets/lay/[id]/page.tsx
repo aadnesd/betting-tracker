@@ -18,9 +18,9 @@ export const metadata = {
   title: "Lay bet detail",
 };
 
-interface PageProps {
+type PageProps = {
   params: Promise<{ id: string }>;
-}
+};
 
 export default async function Page({ params }: PageProps) {
   const { id } = await params;
@@ -71,9 +71,7 @@ export default async function Page({ params }: PageProps) {
     (entry) => entry.action === "manual_settle"
   );
   const settlementChanges =
-    settlementEntry &&
-    settlementEntry.changes &&
-    typeof settlementEntry.changes === "object"
+    settlementEntry?.changes && typeof settlementEntry.changes === "object"
       ? (settlementEntry.changes as Record<string, unknown>)
       : null;
 

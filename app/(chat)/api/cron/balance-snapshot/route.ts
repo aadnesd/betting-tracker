@@ -18,7 +18,7 @@ import {
  * Schedule: Runs twice daily (08:00 and 20:00 UTC via vercel.json)
  */
 
-interface SnapshotResult {
+type SnapshotResult = {
   processed: number;
   succeeded: number;
   failed: number;
@@ -28,7 +28,7 @@ interface SnapshotResult {
     totalCapitalNok?: number;
     error?: string;
   }>;
-}
+};
 
 export async function POST(request: Request) {
   // Validate CRON_SECRET for Vercel cron authentication

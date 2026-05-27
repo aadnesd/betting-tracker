@@ -11,10 +11,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-interface ExportButtonProps {
+type ExportButtonProps = {
   startDate?: Date | null;
   endDate?: Date | null;
-}
+};
 
 /**
  * Export button that triggers CSV download of matched bets.

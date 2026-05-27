@@ -14,7 +14,7 @@ import {
 
 type Outcome = "won" | "lost" | "push";
 
-interface BetSettlementDropdownProps {
+type BetSettlementDropdownProps = {
   betId: string;
   betKind: "back" | "lay";
   odds: number;
@@ -23,7 +23,7 @@ interface BetSettlementDropdownProps {
   selection: string;
   /** Exchange commission rate for lay bets (e.g., 0.05 for 5%). Defaults to 0. */
   commissionRate?: number;
-}
+};
 
 /**
  * Calculate potential P&L for display in dropdown.
