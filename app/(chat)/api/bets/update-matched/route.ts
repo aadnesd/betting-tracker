@@ -7,6 +7,9 @@ import {
   createAuditEntry,
   getMatchedBetById,
   getMatchedBetWithParts,
+  reverseBackBetSettlementSideEffects,
+  updateBackBet,
+  updateLayBet,
   updateMatchedBetRecord,
 } from "@/lib/db/queries";
 
@@ -153,6 +156,8 @@ export async function PATCH(request: Request) {
     // Handle settlement: create adjustment transactions for account balances
     const isSettling =
       existing.status !== "settled" && updated.status === "settled";
+    const isReopening =
+      existing.status === "settled" && updated.status === "matched";
 
     if (isSettling) {
       // Fetch the full matched bet with back/lay legs to get profitLoss and accountId
@@ -223,6 +228,85 @@ export async function PATCH(request: Request) {
             settledProfitNok: backProfitLossNok + layProfitLossNok,
           });
         }
+      }
+    }
+
+    if (isReopening) {
+      const fullBet = await getMatchedBetWithParts({
+        id: updated.id,
+        userId: session.user.id,
+      });
+
+      if (fullBet) {
+        const now = new Date();
+        const reversalPromises: Promise<unknown>[] = [];
+
+        if (fullBet.back) {
+          const backProfitLoss = Number(fullBet.back.profitLoss ?? 0);
+          if (fullBet.back.accountId && backProfitLoss !== 0) {
+            reversalPromises.push(
+              createAccountTransaction({
+                userId: session.user.id,
+                accountId: fullBet.back.accountId,
+                type: "adjustment",
+                amount: -backProfitLoss,
+                currency: fullBet.back.currency ?? "NOK",
+                occurredAt: now,
+                notes: `Settlement reversal: ${fullBet.matched.market} - ${fullBet.matched.selection}`,
+                linkedBackBetId: fullBet.back.id,
+              })
+            );
+          }
+
+          await updateBackBet({
+            id: fullBet.back.id,
+            userId: session.user.id,
+            status: "matched",
+            settledAt: null,
+            profitLoss: null,
+            profitLossNok: null,
+          });
+
+          await reverseBackBetSettlementSideEffects({
+            backBetId: fullBet.back.id,
+            matchedBetId: updated.id,
+            userId: session.user.id,
+          });
+        }
+
+        if (fullBet.lay) {
+          const layProfitLoss = Number(fullBet.lay.profitLoss ?? 0);
+          if (fullBet.lay.accountId && layProfitLoss !== 0) {
+            reversalPromises.push(
+              createAccountTransaction({
+                userId: session.user.id,
+                accountId: fullBet.lay.accountId,
+                type: "adjustment",
+                amount: -layProfitLoss,
+                currency: fullBet.lay.currency ?? "NOK",
+                occurredAt: now,
+                notes: `Settlement reversal: ${fullBet.matched.market} - ${fullBet.matched.selection}`,
+                linkedLayBetId: fullBet.lay.id,
+              })
+            );
+          }
+
+          await updateLayBet({
+            id: fullBet.lay.id,
+            userId: session.user.id,
+            status: "matched",
+            settledAt: null,
+            profitLoss: null,
+            profitLossNok: null,
+          });
+        }
+
+        await Promise.all(reversalPromises);
+        await updateMatchedBetRecord({
+          id: updated.id,
+          userId: session.user.id,
+          settledProfitNok: null,
+        });
       }
     }
 

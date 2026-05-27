@@ -15,6 +15,7 @@ import {
   getFreeBetByMatchedBetId,
   getLayBetById,
   getMatchedBetByLegId,
+  reverseBackBetSettlementSideEffects,
   updateBackBet,
   updateBackBetDetails,
   updateLayBet,
@@ -43,7 +44,10 @@ const updateSchema = z.object({
   currency: z.string().length(3),
   matchId: z.string().uuid().optional().nullable(),
   placedAt: z.string().optional().nullable(),
-  settlementOutcome: z.enum(["won", "lost", "push"]).optional().nullable(),
+  settlementOutcome: z
+    .enum(["won", "lost", "push", "unsettled"])
+    .optional()
+    .nullable(),
   notes: z.string().optional(),
 });
 
@@ -60,11 +64,11 @@ function computeChanges(
   after: Record<string, unknown>
 ) {
   const changes: Record<string, { from: unknown; to: unknown }> = {};
-  Object.keys(after).forEach((key) => {
+  for (const key of Object.keys(after)) {
     if (before[key] !== after[key]) {
       changes[key] = { from: before[key], to: after[key] };
     }
-  });
+  }
   return Object.keys(changes).length > 0 ? changes : null;
 }
 
@@ -238,10 +242,18 @@ export async function POST(request: Request) {
       fromOutcome: string | null;
       toOutcome: string;
       fromProfitLoss: number;
-      toProfitLoss: number;
+      toProfitLoss: number | null;
       deltaProfitLoss: number;
     } | null = null;
     let correctedProfitLossNok: number | null = null;
+    let reopenedStatus:
+      | "draft"
+      | "placed"
+      | "matched"
+      | "settled"
+      | "needs_review"
+      | "error"
+      | null = null;
 
     if (isSettled && payload.settlementOutcome) {
       const oldProfitLoss = Number(bet.profitLoss ?? 0);
@@ -256,106 +268,187 @@ export async function POST(request: Request) {
         userId,
       });
 
-      let isFreeBet = false;
-      let freeBetStakeReturned = false;
-      if (payload.betKind === "back") {
-        const freeBet = matchedBet?.id
-          ? await getFreeBetByMatchedBetId({
-              matchedBetId: matchedBet.id,
-              userId,
-            })
-          : null;
-
-        freeBetStakeReturned = freeBet?.stakeReturned ?? false;
-        isFreeBet = freeBet
-          ? true
-          : isFreeBetPromoType(matchedBet?.promoType ?? null);
-      }
-
-      let commissionRate = 0;
-      if (payload.betKind === "lay" && updated.accountId) {
-        const exchangeAccount = await getAccountById({
-          id: updated.accountId,
-          userId,
-        });
-        if (exchangeAccount?.commission) {
-          commissionRate = Number.parseFloat(exchangeAccount.commission);
-        }
-      }
-
-      const stake = Number(updated.stake);
-      const odds = Number(updated.odds);
-      const newProfitLoss =
-        payload.betKind === "back"
-          ? calculateProfitLoss(
-              payload.settlementOutcome === "won"
-                ? "win"
-                : payload.settlementOutcome === "lost"
-                  ? "loss"
-                  : "push",
-              stake,
-              odds,
-              isFreeBet,
-              freeBetStakeReturned
-            )
-          : calculateLayProfitLoss(
-              payload.settlementOutcome === "won"
-                ? "loss"
-                : payload.settlementOutcome === "lost"
-                  ? "win"
-                  : "push",
-              stake,
-              odds,
-              commissionRate
-            );
-
-      const deltaProfitLoss = Number(
-        (newProfitLoss - oldProfitLoss).toFixed(2)
-      );
-
-      if (deltaProfitLoss !== 0 || oldOutcome !== payload.settlementOutcome) {
-        const currency = updated.currency ?? "NOK";
-        const profitLossNok = await convertAmountToNok(newProfitLoss, currency);
-        correctedProfitLossNok = profitLossNok;
+      if (payload.settlementOutcome === "unsettled") {
+        const nextStatus = matchedBet ? "matched" : "placed";
+        reopenedStatus = nextStatus;
 
         if (payload.betKind === "back") {
           await updateBackBet({
             id: updated.id,
             userId,
-            profitLoss: newProfitLoss.toFixed(2),
-            profitLossNok: profitLossNok.toFixed(2),
+            status: nextStatus,
+            settledAt: null,
+            profitLoss: null,
+            profitLossNok: null,
           });
         } else {
           await updateLayBet({
             id: updated.id,
             userId,
-            profitLoss: newProfitLoss.toFixed(2),
-            profitLossNok: profitLossNok.toFixed(2),
+            status: nextStatus,
+            settledAt: null,
+            profitLoss: null,
+            profitLossNok: null,
           });
         }
 
-        if (deltaProfitLoss !== 0 && updated.accountId) {
+        if (oldProfitLoss !== 0 && updated.accountId) {
           await createAccountTransaction({
             userId,
             accountId: updated.accountId,
             type: "adjustment",
-            amount: deltaProfitLoss,
-            currency,
+            amount: -oldProfitLoss,
+            currency: updated.currency ?? "NOK",
             occurredAt: new Date(),
-            notes: `Settlement correction delta: ${payload.settlementOutcome} - ${updated.market} / ${updated.selection} @ ${odds}`,
+            notes: `Settlement reversal: ${updated.market} / ${updated.selection}`,
             linkedBackBetId: payload.betKind === "back" ? updated.id : null,
             linkedLayBetId: payload.betKind === "lay" ? updated.id : null,
           });
         }
-      }
 
-      settlementCorrection = {
-        fromOutcome: oldOutcome,
-        toOutcome: payload.settlementOutcome,
-        fromProfitLoss: oldProfitLoss,
-        toProfitLoss: newProfitLoss,
-        deltaProfitLoss,
-      };
+        if (payload.betKind === "back") {
+          await reverseBackBetSettlementSideEffects({
+            backBetId: updated.id,
+            matchedBetId: matchedBet?.id ?? null,
+            userId,
+          });
+        }
+
+        if (matchedBet?.status === "settled") {
+          await updateMatchedBetRecord({
+            id: matchedBet.id,
+            userId,
+            status: "matched",
+            settledProfitNok: null,
+          });
+
+          await createAuditEntry({
+            userId,
+            entityType: "matched_bet",
+            entityId: matchedBet.id,
+            action: "status_change",
+            changes: {
+              status: { from: "settled", to: "matched" },
+              settledProfitNok: { from: matchedBet.settledProfitNok, to: null },
+              reason: "leg_reopened",
+            },
+            notes:
+              "Reopened after a settled leg was changed back to unsettled.",
+          });
+        }
+
+        settlementCorrection = {
+          fromOutcome: oldOutcome,
+          toOutcome: "unsettled",
+          fromProfitLoss: oldProfitLoss,
+          toProfitLoss: null,
+          deltaProfitLoss: -oldProfitLoss,
+        };
+      } else {
+        let isFreeBet = false;
+        let freeBetStakeReturned = false;
+        if (payload.betKind === "back") {
+          const freeBet = matchedBet?.id
+            ? await getFreeBetByMatchedBetId({
+                matchedBetId: matchedBet.id,
+                userId,
+              })
+            : null;
+
+          freeBetStakeReturned = freeBet?.stakeReturned ?? false;
+          isFreeBet = freeBet
+            ? true
+            : isFreeBetPromoType(matchedBet?.promoType ?? null);
+        }
+
+        let commissionRate = 0;
+        if (payload.betKind === "lay" && updated.accountId) {
+          const exchangeAccount = await getAccountById({
+            id: updated.accountId,
+            userId,
+          });
+          if (exchangeAccount?.commission) {
+            commissionRate = Number.parseFloat(exchangeAccount.commission);
+          }
+        }
+
+        const stake = Number(updated.stake);
+        const odds = Number(updated.odds);
+        const newProfitLoss =
+          payload.betKind === "back"
+            ? calculateProfitLoss(
+                payload.settlementOutcome === "won"
+                  ? "win"
+                  : payload.settlementOutcome === "lost"
+                    ? "loss"
+                    : "push",
+                stake,
+                odds,
+                isFreeBet,
+                freeBetStakeReturned
+              )
+            : calculateLayProfitLoss(
+                payload.settlementOutcome === "won"
+                  ? "loss"
+                  : payload.settlementOutcome === "lost"
+                    ? "win"
+                    : "push",
+                stake,
+                odds,
+                commissionRate
+              );
+
+        const deltaProfitLoss = Number(
+          (newProfitLoss - oldProfitLoss).toFixed(2)
+        );
+
+        if (deltaProfitLoss !== 0 || oldOutcome !== payload.settlementOutcome) {
+          const currency = updated.currency ?? "NOK";
+          const profitLossNok = await convertAmountToNok(
+            newProfitLoss,
+            currency
+          );
+          correctedProfitLossNok = profitLossNok;
+
+          if (payload.betKind === "back") {
+            await updateBackBet({
+              id: updated.id,
+              userId,
+              profitLoss: newProfitLoss.toFixed(2),
+              profitLossNok: profitLossNok.toFixed(2),
+            });
+          } else {
+            await updateLayBet({
+              id: updated.id,
+              userId,
+              profitLoss: newProfitLoss.toFixed(2),
+              profitLossNok: profitLossNok.toFixed(2),
+            });
+          }
+
+          if (deltaProfitLoss !== 0 && updated.accountId) {
+            await createAccountTransaction({
+              userId,
+              accountId: updated.accountId,
+              type: "adjustment",
+              amount: deltaProfitLoss,
+              currency,
+              occurredAt: new Date(),
+              notes: `Settlement correction delta: ${payload.settlementOutcome} - ${updated.market} / ${updated.selection} @ ${odds}`,
+              linkedBackBetId: payload.betKind === "back" ? updated.id : null,
+              linkedLayBetId: payload.betKind === "lay" ? updated.id : null,
+            });
+          }
+        }
+
+        settlementCorrection = {
+          fromOutcome: oldOutcome,
+          toOutcome: payload.settlementOutcome,
+          fromProfitLoss: oldProfitLoss,
+          toProfitLoss: newProfitLoss,
+          deltaProfitLoss,
+        };
+      }
     }
 
     await createAuditEntry({
@@ -534,7 +627,7 @@ export async function POST(request: Request) {
         selection: updated.selection,
         odds: Number(updated.odds),
         stake: Number(updated.stake),
-        status: updated.status,
+        status: reopenedStatus ?? updated.status,
         currency: updated.currency,
         placedAt: updated.placedAt,
         accountId: updated.accountId,
