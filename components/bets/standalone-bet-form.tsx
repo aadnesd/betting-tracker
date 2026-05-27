@@ -242,7 +242,7 @@ export function StandaloneBetForm({
       newErrors.accountId = "Account is required";
     }
     if (isSettledEdit && !formData.settlementOutcome) {
-      newErrors.settlementOutcome = "Settlement outcome is required";
+      newErrors.settlementOutcome = "Settlement status is required";
     }
     if (isSettledEdit && !formData.notes.trim()) {
       newErrors.notes = "Correction reason is required";
@@ -371,7 +371,7 @@ export function StandaloneBetForm({
           <CardTitle>{isEdit ? "Edit Bet" : "Create Standalone Bet"}</CardTitle>
           <CardDescription>
             {isSettledEdit
-              ? "Correct settlement details and metadata for this settled bet"
+              ? "Correct settlement details or reopen this settled bet"
               : isEdit
                 ? "Update the details of this individual bet"
                 : "Add a single back or lay bet without a matched pair"}
@@ -699,7 +699,7 @@ export function StandaloneBetForm({
 
               {isSettledEdit && (
                 <div className="space-y-2">
-                  <Label htmlFor="settlementOutcome">Correct outcome</Label>
+                  <Label htmlFor="settlementOutcome">Correct settlement</Label>
                   <Select
                     onValueChange={(value) =>
                       updateField("settlementOutcome", value)
@@ -707,12 +707,15 @@ export function StandaloneBetForm({
                     value={formData.settlementOutcome}
                   >
                     <SelectTrigger id="settlementOutcome">
-                      <SelectValue placeholder="Select corrected outcome" />
+                      <SelectValue placeholder="Select corrected settlement" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="won">Won</SelectItem>
                       <SelectItem value="lost">Lost</SelectItem>
                       <SelectItem value="push">Push</SelectItem>
+                      <SelectItem value="unsettled">
+                        Unsettled / open
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                   {errors.settlementOutcome && (
@@ -744,7 +747,7 @@ export function StandaloneBetForm({
                   onChange={(e) => updateField("notes", e.target.value)}
                   placeholder={
                     isSettledEdit
-                      ? "Explain why this settled bet is being corrected..."
+                      ? "Explain why this settled bet is being corrected or reopened..."
                       : "Any additional notes..."
                   }
                   rows={2}
