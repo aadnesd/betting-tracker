@@ -1,4 +1,4 @@
-export type SettlementOutcome = "won" | "lost" | "push";
+export type SettlementOutcome = "won" | "lost" | "push" | "unsettled";
 
 /**
  * Comma-separated list of user IDs allowed to edit settled bets.

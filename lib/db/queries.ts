@@ -1388,8 +1388,7 @@ export async function createAccountTransaction({
       currency: normalizedCurrency,
       amountNok: amountNok.toString(),
       occurredAt: occurredAt ?? new Date(),
-      bonusSubcategory:
-        type === "bonus" ? (bonusSubcategory ?? null) : null,
+      bonusSubcategory: type === "bonus" ? (bonusSubcategory ?? null) : null,
       notes: notes ?? null,
       linkedWalletTransactionId: linkedWalletTransactionId ?? null,
       linkedBackBetId: linkedBackBetId ?? null,
@@ -5353,7 +5352,6 @@ export async function getOpenExposure({ userId }: { userId: string }) {
         totalExposure += preview.netExposure;
         profitIfBackWins += preview.profitIfBackWins;
         profitIfLayWins += preview.profitIfLayWins;
-        continue;
       }
     }
 
@@ -6681,6 +6679,165 @@ export async function processFreeBetWageringProgressOnSettle({
     }
   } catch (error) {
     console.error("[processFreeBetWageringProgressOnSettle] Error:", error);
+  }
+}
+
+export async function reverseBackBetSettlementSideEffects({
+  backBetId,
+  matchedBetId,
+  userId,
+}: {
+  backBetId: string;
+  matchedBetId?: string | null;
+  userId: string;
+}) {
+  try {
+    const qualifyingConditions = [eq(bonusQualifyingBet.backBetId, backBetId)];
+    if (matchedBetId) {
+      qualifyingConditions.push(
+        eq(bonusQualifyingBet.matchedBetId, matchedBetId)
+      );
+    }
+
+    const qualifyingBets = await db
+      .select({
+        id: bonusQualifyingBet.id,
+        depositBonusId: bonusQualifyingBet.depositBonusId,
+        stake: bonusQualifyingBet.stake,
+        qualified: bonusQualifyingBet.qualified,
+      })
+      .from(bonusQualifyingBet)
+      .where(or(...qualifyingConditions));
+
+    for (const qb of qualifyingBets) {
+      if (qb.qualified !== "true") {
+        continue;
+      }
+
+      const [bonus] = await db
+        .select()
+        .from(depositBonus)
+        .where(
+          and(
+            eq(depositBonus.id, qb.depositBonusId),
+            eq(depositBonus.userId, userId)
+          )
+        );
+
+      if (!bonus) {
+        continue;
+      }
+
+      const stakeValue = Number.parseFloat(qb.stake);
+      const currentProgress = Number.parseFloat(bonus.wageringProgress ?? "0");
+      const requirement = Number.parseFloat(bonus.wageringRequirement ?? "0");
+      const newProgress = Math.max(0, currentProgress - stakeValue);
+      const updates: Record<string, unknown> = {
+        wageringProgress: newProgress.toString(),
+      };
+
+      if (bonus.status === "cleared" && newProgress < requirement) {
+        updates.status = "active";
+        updates.clearedAt = null;
+      }
+
+      await db
+        .update(depositBonus)
+        .set(updates)
+        .where(eq(depositBonus.id, qb.depositBonusId));
+
+      await db.insert(auditLog).values({
+        createdAt: new Date(),
+        userId,
+        entityType: "deposit_bonus",
+        entityId: qb.depositBonusId,
+        action: "update",
+        changes: {
+          previousProgress: currentProgress,
+          removedStake: stakeValue,
+          newProgress,
+          reason: "bet_reopened",
+          statusReverted: updates.status === "active" ? true : undefined,
+        },
+        notes: `Wagering progress reduced due to bet reopening: ${newProgress.toFixed(2)} / ${requirement.toFixed(2)}`,
+      });
+    }
+
+    if (qualifyingBets.length > 0) {
+      await db.delete(bonusQualifyingBet).where(or(...qualifyingConditions));
+    }
+
+    const wageringConditions = [eq(freeBetWageringBet.backBetId, backBetId)];
+    if (matchedBetId) {
+      wageringConditions.push(
+        eq(freeBetWageringBet.matchedBetId, matchedBetId)
+      );
+    }
+
+    const wageringBets = await db
+      .select({
+        id: freeBetWageringBet.id,
+        freeBetId: freeBetWageringBet.freeBetId,
+        stake: freeBetWageringBet.stake,
+        qualified: freeBetWageringBet.qualified,
+      })
+      .from(freeBetWageringBet)
+      .where(or(...wageringConditions));
+
+    for (const wager of wageringBets) {
+      if (wager.qualified !== "true") {
+        continue;
+      }
+
+      const [fb] = await db
+        .select()
+        .from(freeBet)
+        .where(
+          and(eq(freeBet.id, wager.freeBetId), eq(freeBet.userId, userId))
+        );
+
+      if (!fb) {
+        continue;
+      }
+
+      const stakeValue = Number.parseFloat(wager.stake);
+      const currentProgress = Number.parseFloat(fb.winWageringProgress ?? "0");
+      const requirement = Number.parseFloat(fb.winWageringRequirement ?? "0");
+      const newProgress = Math.max(0, currentProgress - stakeValue);
+      const updates: Record<string, unknown> = {
+        winWageringProgress: newProgress.toString(),
+      };
+
+      if (fb.winWageringCompletedAt && newProgress < requirement) {
+        updates.winWageringCompletedAt = null;
+      }
+
+      await db
+        .update(freeBet)
+        .set(updates)
+        .where(eq(freeBet.id, wager.freeBetId));
+
+      await db.insert(auditLog).values({
+        createdAt: new Date(),
+        userId,
+        entityType: "free_bet",
+        entityId: wager.freeBetId,
+        action: "update",
+        changes: {
+          previousProgress: currentProgress,
+          removedStake: stakeValue,
+          newProgress,
+          reason: "bet_reopened",
+        },
+        notes: `Winnings wagering progress reduced due to bet reopening: ${newProgress.toFixed(2)} / ${requirement.toFixed(2)}`,
+      });
+    }
+
+    if (wageringBets.length > 0) {
+      await db.delete(freeBetWageringBet).where(or(...wageringConditions));
+    }
+  } catch (error) {
+    console.error("[reverseBackBetSettlementSideEffects] Error:", error);
   }
 }
 

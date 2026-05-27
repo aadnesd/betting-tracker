@@ -32,7 +32,7 @@ type AuditEntry = {
   createdAt: Date;
 };
 
-interface IndividualBetDetailProps {
+type IndividualBetDetailProps = {
   bet: BackBet | LayBet;
   betKind: "back" | "lay";
   account: Account | null;
@@ -48,7 +48,9 @@ interface IndividualBetDetailProps {
     profitLoss?: number | null;
   } | null;
   canEditSettled: boolean;
-}
+};
+
+const HTTP_URL_PATTERN = /^https?:\/\//;
 
 function formatCurrency(amount: number, currency: string | null) {
   const formatted = new Intl.NumberFormat("en-US", {
@@ -268,7 +270,7 @@ export function IndividualBetDetail({
 
       <div className="grid gap-6 lg:grid-cols-[1.4fr,0.9fr]">
         <div className="space-y-6">
-          {screenshot?.url && /^https?:\/\//.test(screenshot.url) && (
+          {screenshot?.url && HTTP_URL_PATTERN.test(screenshot.url) && (
             <Card>
               <CardHeader>
                 <CardTitle>Screenshot</CardTitle>
@@ -335,9 +337,12 @@ export function IndividualBetDetail({
 
         <IndividualBetActions
           accountBalance={accountBalance}
+          accountId={bet.accountId}
           betId={bet.id}
           betKind={betKind}
+          canEditSettled={canEditSettled}
           currency={currency}
+          market={bet.market}
           matchedBetId={matchedBet?.id ?? null}
           odds={odds}
           selection={bet.selection}
