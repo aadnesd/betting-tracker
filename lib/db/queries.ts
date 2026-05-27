@@ -6252,6 +6252,7 @@ export async function listFreeBetsByUser({
         winWageringStartedAt: freeBet.winWageringStartedAt,
         winWageringExpiresAt: freeBet.winWageringExpiresAt,
         winWageringCompletedAt: freeBet.winWageringCompletedAt,
+        winWageringCompletedEarlyAt: freeBet.winWageringCompletedEarlyAt,
       })
       .from(freeBet)
       .leftJoin(account, eq(freeBet.accountId, account.id))
@@ -6505,6 +6506,7 @@ export async function activateFreeBetWageringOnWin({
         winWageringStartedAt: now,
         winWageringExpiresAt: expiresAt,
         winWageringCompletedAt: null,
+        winWageringCompletedEarlyAt: null,
       })
       .where(and(eq(freeBet.id, freeBetId), eq(freeBet.userId, userId)))
       .returning();
@@ -6529,6 +6531,82 @@ export async function activateFreeBetWageringOnWin({
     throw new ChatSDKError(
       "bad_request:database",
       "Failed to activate free bet wagering"
+    );
+  }
+}
+
+/**
+ * Close free bet winnings wagering before the full requirement is reached.
+ */
+export async function completeFreeBetWageringEarly({
+  id,
+  userId,
+  reason = "User manually completed free bet winnings wagering early",
+}: {
+  id: string;
+  userId: string;
+  reason?: string;
+}) {
+  try {
+    const fb = await getFreeBetById({ id, userId });
+
+    if (!fb) {
+      return null;
+    }
+
+    const requirement = Number.parseFloat(fb.winWageringRequirement ?? "0");
+    const progress = Number.parseFloat(fb.winWageringProgress ?? "0");
+
+    if (!(requirement > 0) || !fb.winWageringStartedAt) {
+      throw new ChatSDKError(
+        "bad_request:api",
+        "Free bet winnings wagering is not active"
+      );
+    }
+
+    if (fb.winWageringCompletedEarlyAt) {
+      throw new ChatSDKError(
+        "bad_request:api",
+        "Free bet winnings wagering is already completed early"
+      );
+    }
+
+    if (fb.winWageringCompletedAt || progress >= requirement) {
+      throw new ChatSDKError(
+        "bad_request:api",
+        "Free bet winnings wagering is already complete"
+      );
+    }
+
+    const completedEarlyAt = new Date();
+    const [result] = await db
+      .update(freeBet)
+      .set({ winWageringCompletedEarlyAt: completedEarlyAt })
+      .where(and(eq(freeBet.id, id), eq(freeBet.userId, userId)))
+      .returning();
+
+    await db.insert(auditLog).values({
+      createdAt: completedEarlyAt,
+      userId,
+      entityType: "free_bet",
+      entityId: id,
+      action: "update",
+      changes: {
+        previousProgress: progress,
+        winWageringRequirement: requirement,
+        completedEarlyAt: completedEarlyAt.toISOString(),
+      },
+      notes: reason,
+    });
+
+    return result ?? null;
+  } catch (error) {
+    if (error instanceof ChatSDKError) {
+      throw error;
+    }
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to complete free bet wagering early"
     );
   }
 }
@@ -6651,7 +6729,8 @@ export async function processFreeBetWageringProgressOnSettle({
           eq(freeBet.userId, userId),
           eq(freeBet.accountId, accountId),
           isNotNull(freeBet.winWageringRequirement),
-          isNotNull(freeBet.winWageringStartedAt)
+          isNotNull(freeBet.winWageringStartedAt),
+          isNull(freeBet.winWageringCompletedEarlyAt)
         )
       );
 
@@ -6660,7 +6739,7 @@ export async function processFreeBetWageringProgressOnSettle({
       const progress = Number.parseFloat(fb.winWageringProgress ?? "0");
       const startedAt = fb.winWageringStartedAt;
 
-      if (!startedAt || progress >= requirement) {
+      if (!startedAt || fb.winWageringCompletedAt || progress >= requirement) {
         continue;
       }
 

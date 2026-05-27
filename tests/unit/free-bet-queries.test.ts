@@ -525,6 +525,19 @@ describe("FreeBet CRUD queries", () => {
     });
   });
 
+  describe("completeFreeBetWageringEarly", () => {
+    it("is a function that closes active winnings wagering early", async () => {
+      expect(typeof dbQueries.completeFreeBetWageringEarly).toBe("function");
+
+      const fn: (args: {
+        id: string;
+        userId: string;
+        reason?: string;
+      }) => Promise<unknown> = dbQueries.completeFreeBetWageringEarly;
+      expect(fn).toBeDefined();
+    });
+  });
+
   describe("removeQualifyingBet", () => {
     it("is a function that removes a qualifying bet and updates progress", async () => {
       expect(typeof dbQueries.removeQualifyingBet).toBe("function");
