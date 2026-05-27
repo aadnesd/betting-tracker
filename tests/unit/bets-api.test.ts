@@ -92,6 +92,7 @@ vi.mock("@/lib/db/queries", () => ({
   getMatchedBetByLegId: vi.fn(),
   processFreeBetWageringProgressOnSettle: vi.fn(),
   processWageringProgressOnSettle: vi.fn(),
+  reverseBackBetSettlementSideEffects: vi.fn(),
   getFootballMatchById: vi.fn(),
 }));
 
@@ -1310,6 +1311,117 @@ describe("bets API routes (unit)", () => {
       expect(dbQueries.createAccountTransaction).not.toHaveBeenCalled();
     });
 
+    it("reopens a settled matched bet and reverses settlement transactions", async () => {
+      const existingBet = {
+        id: "11111111-1111-1111-1111-111111111111",
+        userId: user.id,
+        status: "settled",
+        notes: null,
+        netExposure: "100",
+        backBetId: "22222222-2222-2222-2222-222222222222",
+        layBetId: "33333333-3333-3333-3333-333333333333",
+        promoId: null,
+        promoType: null,
+        lastError: null,
+        confirmedAt: null,
+        settledProfitNok: "5.00",
+        market: "Premier League",
+        selection: "Arsenal to Win",
+      };
+
+      const updatedBet = { ...existingBet, status: "matched" };
+      const fullBetWithParts = {
+        matched: existingBet,
+        back: {
+          id: "22222222-2222-2222-2222-222222222222",
+          accountId: "acc-back-1",
+          status: "settled",
+          profitLoss: "150.00",
+          profitLossNok: "150.00",
+          currency: "NOK",
+        },
+        lay: {
+          id: "33333333-3333-3333-3333-333333333333",
+          accountId: "acc-lay-1",
+          status: "settled",
+          profitLoss: "-145.00",
+          profitLossNok: "-145.00",
+          currency: "NOK",
+        },
+      };
+
+      (dbQueries.getMatchedBetById as vi.Mock).mockResolvedValue(existingBet);
+      (dbQueries.updateMatchedBetRecord as vi.Mock).mockResolvedValue(
+        updatedBet
+      );
+      (dbQueries.getMatchedBetWithParts as vi.Mock).mockResolvedValue(
+        fullBetWithParts
+      );
+      (dbQueries.createAccountTransaction as vi.Mock).mockResolvedValue({
+        id: "txn-1",
+      });
+      (dbQueries.createAuditEntry as vi.Mock).mockResolvedValue({
+        id: "audit-1",
+      });
+
+      const res = await updateMatchedRoute(
+        new Request("http://localhost/api/bets/update-matched", {
+          method: "PATCH",
+          body: JSON.stringify({
+            id: "11111111-1111-1111-1111-111111111111",
+            status: "matched",
+          }),
+        })
+      );
+
+      expect(res.status).toBe(200);
+      expect(dbQueries.updateBackBet).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: "22222222-2222-2222-2222-222222222222",
+          status: "matched",
+          settledAt: null,
+          profitLoss: null,
+          profitLossNok: null,
+        })
+      );
+      expect(dbQueries.reverseBackBetSettlementSideEffects).toHaveBeenCalledWith(
+        {
+          backBetId: "22222222-2222-2222-2222-222222222222",
+          matchedBetId: "11111111-1111-1111-1111-111111111111",
+          userId: user.id,
+        }
+      );
+      expect(dbQueries.updateLayBet).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: "33333333-3333-3333-3333-333333333333",
+          status: "matched",
+          settledAt: null,
+          profitLoss: null,
+          profitLossNok: null,
+        })
+      );
+      expect(dbQueries.createAccountTransaction).toHaveBeenCalledWith(
+        expect.objectContaining({
+          accountId: "acc-back-1",
+          amount: -150,
+          linkedBackBetId: "22222222-2222-2222-2222-222222222222",
+        })
+      );
+      expect(dbQueries.createAccountTransaction).toHaveBeenCalledWith(
+        expect.objectContaining({
+          accountId: "acc-lay-1",
+          amount: 145,
+          linkedLayBetId: "33333333-3333-3333-3333-333333333333",
+        })
+      );
+      expect(dbQueries.updateMatchedBetRecord).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: "11111111-1111-1111-1111-111111111111",
+          settledProfitNok: null,
+        })
+      );
+    });
+
     it("does not create transactions when bets have no accountId", async () => {
       const existingBet = {
         id: "11111111-1111-1111-1111-111111111111",
@@ -2336,7 +2448,7 @@ describe("bets API routes (unit)", () => {
       expect(dbQueries.updateMatchedBetRecord).toHaveBeenCalledWith(
         expect.objectContaining({
           id: "44444444-4444-4444-4444-444444444444",
-          netExposure: 48,
+          netExposure: -10,
         })
       );
     });
@@ -2577,6 +2689,108 @@ describe("bets API routes (unit)", () => {
       );
     });
 
+    it("allows authorized settled-bet edits to reopen a standalone bet", async () => {
+      process.env.SETTLED_BET_EDIT_USER_IDS = user.id;
+
+      const betId = "66666666-6666-6666-6666-666666666666";
+      const accountId = "77777777-7777-7777-7777-777777777777";
+
+      (dbQueries.getBackBetById as vi.Mock).mockResolvedValue({
+        id: betId,
+        status: "settled",
+        market: "Old market",
+        selection: "Old selection",
+        odds: "2.50",
+        stake: "120.00",
+        accountId,
+        currency: "NOK",
+        placedAt: new Date("2025-01-01T00:00:00Z"),
+        profitLoss: "180.00",
+      });
+      (dbQueries.getAccountById as vi.Mock).mockResolvedValue({
+        id: accountId,
+        name: "Bet365",
+        kind: "bookmaker",
+      });
+      (dbQueries.updateBackBetDetails as vi.Mock).mockResolvedValue({
+        id: betId,
+        status: "settled",
+        market: "Corrected market",
+        selection: "Corrected selection",
+        odds: "2.50",
+        stake: "120.00",
+        accountId,
+        currency: "NOK",
+        placedAt: new Date("2025-01-01T00:00:00Z"),
+      });
+      (dbQueries.getMatchedBetByLegId as vi.Mock).mockResolvedValue(null);
+      (dbQueries.updateBackBet as vi.Mock).mockResolvedValue({
+        id: betId,
+        status: "placed",
+      });
+      (dbQueries.createAccountTransaction as vi.Mock).mockResolvedValue({
+        id: "tx-1",
+      });
+      (dbQueries.createAuditEntry as vi.Mock).mockResolvedValue({
+        id: "audit-1",
+      });
+
+      const res = await updateIndividualRoute(
+        new Request("http://localhost/api/bets/individual/update", {
+          method: "POST",
+          body: JSON.stringify({
+            betId,
+            betKind: "back",
+            market: "Corrected market",
+            selection: "Corrected selection",
+            odds: 2.5,
+            stake: 120,
+            accountId,
+            currency: "NOK",
+            settlementOutcome: "unsettled",
+            notes: "Result was entered before the market settled.",
+          }),
+        })
+      );
+
+      expect(res.status).toBe(200);
+      expect(dbQueries.updateBackBet).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: betId,
+          status: "placed",
+          settledAt: null,
+          profitLoss: null,
+          profitLossNok: null,
+        })
+      );
+      expect(dbQueries.reverseBackBetSettlementSideEffects).toHaveBeenCalledWith(
+        {
+          backBetId: betId,
+          matchedBetId: null,
+          userId: user.id,
+        }
+      );
+      expect(dbQueries.createAccountTransaction).toHaveBeenCalledWith(
+        expect.objectContaining({
+          accountId,
+          amount: -180,
+          linkedBackBetId: betId,
+        })
+      );
+      expect(dbQueries.createAuditEntry).toHaveBeenCalledWith(
+        expect.objectContaining({
+          notes: expect.stringContaining("[Settled Bet Correction]"),
+          changes: expect.objectContaining({
+            settlementCorrection: expect.objectContaining({
+              toOutcome: "unsettled",
+              toProfitLoss: null,
+              deltaProfitLoss: -180,
+            }),
+          }),
+        })
+      );
+    });
+
     it("rejects account kind mismatch", async () => {
       (dbQueries.getBackBetById as vi.Mock).mockResolvedValue({
         id: "88888888-8888-8888-8888-888888888888",
@@ -2751,9 +2965,9 @@ describe("bets API routes (unit)", () => {
         expect.objectContaining({
           entityType: "matched_bet",
           action: "status_change",
-          changes: {
+          changes: expect.objectContaining({
             status: { from: "matched", to: "settled" },
-          },
+          }),
         })
       );
     });

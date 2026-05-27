@@ -42,18 +42,21 @@ type SettlementInfo = {
   profitLoss?: number | null;
 };
 
-interface IndividualBetActionsProps {
+type IndividualBetActionsProps = {
   betId: string;
   betKind: "back" | "lay";
+  market: string;
   status: "draft" | "placed" | "matched" | "settled" | "needs_review" | "error";
   odds: number;
   stake: number;
   currency: string;
   selection: string;
+  accountId?: string | null;
   accountBalance?: number | null;
   matchedBetId?: string | null;
   settlementInfo?: SettlementInfo | null;
-}
+  canEditSettled?: boolean;
+};
 
 function calculatePotentialPL(
   kind: "back" | "lay",
@@ -67,6 +70,8 @@ function calculatePotentialPL(
     case "lost":
       return kind === "back" ? -stake : -stake * (odds - 1);
     case "push":
+      return 0;
+    default:
       return 0;
   }
 }
@@ -82,19 +87,23 @@ function formatCurrency(amount: number, currency: string) {
 export function IndividualBetActions({
   betId,
   betKind,
+  market,
   status,
   odds,
   stake,
   currency,
   selection,
+  accountId,
   accountBalance,
   matchedBetId,
   settlementInfo,
+  canEditSettled = false,
 }: IndividualBetActionsProps) {
   const router = useRouter();
   const [outcome, setOutcome] = useState<Outcome | "">("");
   const [notes, setNotes] = useState("");
   const [isSettling, setIsSettling] = useState(false);
+  const [isReopening, setIsReopening] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
   const preview = useMemo(() => {
@@ -190,6 +199,47 @@ export function IndividualBetActions({
     }
   };
 
+  const reopenBet = async () => {
+    setIsReopening(true);
+
+    try {
+      const response = await fetch("/api/bets/individual/update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          betId,
+          betKind,
+          market,
+          selection,
+          odds,
+          stake,
+          accountId,
+          currency,
+          settlementOutcome: "unsettled",
+          notes: notes.trim() || "Reopened settled bet",
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to reopen bet");
+      }
+
+      toast.success("Bet reopened", {
+        description: `${selection} is now unsettled.`,
+      });
+
+      router.refresh();
+    } catch (error) {
+      toast.error("Failed to reopen bet", {
+        description: error instanceof Error ? error.message : "Unknown error",
+      });
+    } finally {
+      setIsReopening(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <Card>
@@ -198,31 +248,64 @@ export function IndividualBetActions({
         </CardHeader>
         <CardContent className="space-y-4">
           {status === "settled" ? (
-            <div className="space-y-3 text-sm">
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Outcome</span>
-                <span className="font-medium capitalize">
-                  {settlementInfo?.outcome ?? "Settled"}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Profit / Loss</span>
-                <span
-                  className={cn(
-                    "font-semibold",
-                    (settlementInfo?.profitLoss ?? 0) >= 0
-                      ? "text-emerald-600"
-                      : "text-rose-600"
-                  )}
-                >
-                  {formatCurrency(settlementInfo?.profitLoss ?? 0, currency)}
-                </span>
-              </div>
-              {settlementInfo?.settledAt && (
+            <div className="space-y-4">
+              <div className="space-y-3 text-sm">
                 <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Settled at</span>
-                  <span>{settlementInfo.settledAt}</span>
+                  <span className="text-muted-foreground">Outcome</span>
+                  <span className="font-medium capitalize">
+                    {settlementInfo?.outcome ?? "Settled"}
+                  </span>
                 </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Profit / Loss</span>
+                  <span
+                    className={cn(
+                      "font-semibold",
+                      (settlementInfo?.profitLoss ?? 0) >= 0
+                        ? "text-emerald-600"
+                        : "text-rose-600"
+                    )}
+                  >
+                    {formatCurrency(settlementInfo?.profitLoss ?? 0, currency)}
+                  </span>
+                </div>
+                {settlementInfo?.settledAt && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Settled at</span>
+                    <span>{settlementInfo.settledAt}</span>
+                  </div>
+                )}
+              </div>
+
+              {canEditSettled && (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="reopen-notes">Reopen reason</Label>
+                    <Textarea
+                      id="reopen-notes"
+                      onChange={(event) => setNotes(event.target.value)}
+                      placeholder="Why should this bet become unsettled again?"
+                      value={notes}
+                    />
+                  </div>
+
+                  <Button
+                    className="w-full"
+                    disabled={isReopening || !accountId}
+                    onClick={reopenBet}
+                    type="button"
+                    variant="outline"
+                  >
+                    {isReopening ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Reopening...
+                      </span>
+                    ) : (
+                      "Reopen as unsettled"
+                    )}
+                  </Button>
+                </>
               )}
             </div>
           ) : (
