@@ -91,8 +91,12 @@ ${ocrResult.text}`,
     const selection = result.object.selection.toLowerCase();
     // Handle common abbreviations
     const searchTerms = [selection];
-    if (selection === "man city") searchTerms.push("manchester city");
-    if (selection === "man utd") searchTerms.push("manchester united");
+    if (selection === "man city") {
+      searchTerms.push("manchester city");
+    }
+    if (selection === "man utd") {
+      searchTerms.push("manchester united");
+    }
 
     const matching =
       data.matches?.filter((m) =>

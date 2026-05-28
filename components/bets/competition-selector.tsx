@@ -9,11 +9,11 @@ import type { AVAILABLE_COMPETITIONS } from "@/lib/db/schema";
 
 type Competition = (typeof AVAILABLE_COMPETITIONS)[number];
 
-interface CompetitionSelectorProps {
+type CompetitionSelectorProps = {
   available: Competition[];
   enabled: string[];
   defaults: string[];
-}
+};
 
 export function CompetitionSelector({
   available,
@@ -44,10 +44,18 @@ export function CompetitionSelector({
 
   // Sort groups: England, Europe, then alphabetically
   const sortedGroups = Object.keys(grouped).sort((a, b) => {
-    if (a === "England") return -1;
-    if (b === "England") return 1;
-    if (a === "Europe") return -1;
-    if (b === "Europe") return 1;
+    if (a === "England") {
+      return -1;
+    }
+    if (b === "England") {
+      return 1;
+    }
+    if (a === "Europe") {
+      return -1;
+    }
+    if (b === "Europe") {
+      return 1;
+    }
     return a.localeCompare(b);
   });
 

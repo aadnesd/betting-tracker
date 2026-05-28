@@ -36,7 +36,7 @@ describe("Delete Query Functions - Type Safety", () => {
     });
 
     it("should accept id, userId, and optional cascade parameters", () => {
-      const params = {
+      const _params = {
         id: "test-uuid",
         userId: "user-uuid",
         cascade: false,
@@ -65,7 +65,7 @@ describe("Delete Query Functions - Type Safety", () => {
     });
 
     it("should accept id and userId parameters", () => {
-      const params = {
+      const _params = {
         id: "test-uuid",
         userId: "user-uuid",
       };
@@ -84,7 +84,7 @@ describe("Delete Query Functions - Type Safety", () => {
     });
 
     it("should accept id and userId parameters", () => {
-      const params = {
+      const _params = {
         id: "transaction-uuid",
         userId: "user-uuid",
       };
@@ -103,12 +103,12 @@ describe("Delete Query Functions - Type Safety", () => {
     });
 
     it("should accept id, kind (back/lay), and userId parameters", () => {
-      const paramsBack = {
+      const _paramsBack = {
         id: "bet-uuid",
         kind: "back" as const,
         userId: "user-uuid",
       };
-      const paramsLay = {
+      const _paramsLay = {
         id: "bet-uuid",
         kind: "lay" as const,
         userId: "user-uuid",
@@ -129,7 +129,7 @@ describe("Delete Query Functions - Type Safety", () => {
     });
 
     it("should accept id and userId parameters", () => {
-      const params = {
+      const _params = {
         id: "freebet-uuid",
         userId: "user-uuid",
       };

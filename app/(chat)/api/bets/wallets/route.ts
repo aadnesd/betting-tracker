@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/app/(auth)/auth";
 import { revalidateDashboard } from "@/lib/cache";
-import { createWallet } from "@/lib/db/queries";
 import { listWalletsByUserCached } from "@/lib/db/cached-queries";
+import { createWallet } from "@/lib/db/queries";
 
 const createWalletSchema = z.object({
   name: z.string().min(1, "Name is required"),

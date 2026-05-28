@@ -11,7 +11,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { getEnabledCompetitions, getUserSettings } from "@/lib/db/queries";
+import { getUserSettings } from "@/lib/db/queries";
 import {
   AVAILABLE_COMPETITIONS,
   DEFAULT_COMPETITION_CODES,

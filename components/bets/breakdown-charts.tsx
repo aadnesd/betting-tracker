@@ -252,7 +252,7 @@ export function BreakdownBarChart({
               <Bar
                 cursor={onItemClick ? "pointer" : "default"}
                 dataKey="totalProfitLoss"
-                onClick={(_data, _index, event) => {
+                onClick={(_data, _index, _event) => {
                   // The payload contains our original data
                   const payload = (
                     _data as unknown as { payload?: BreakdownDataPoint }

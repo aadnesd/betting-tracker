@@ -14,11 +14,11 @@ import { toast } from "@/components/toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 
-interface ApiKeyManagerProps {
+type ApiKeyManagerProps = {
   hasKey: boolean;
   hint: string | null;
   createdAt: string | null;
-}
+};
 
 /**
  * Client component for managing iOS Shortcut API keys.
@@ -97,7 +97,9 @@ export function ApiKeyManager({ hasKey, hint, createdAt }: ApiKeyManagerProps) {
   }, [router]);
 
   const handleCopy = useCallback(async () => {
-    if (!newKey) return;
+    if (!newKey) {
+      return;
+    }
 
     try {
       await navigator.clipboard.writeText(newKey);

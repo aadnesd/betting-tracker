@@ -1,4 +1,4 @@
-import { describe, expect, test, vi } from "vitest";
+import { describe, expect, test } from "vitest";
 import type { BackBet, LayBet, MatchedBet } from "@/lib/db/schema";
 import {
   calculateCumulativeProfitData,
@@ -389,7 +389,7 @@ describe("getDateRange", () => {
     const { startDate, endDate } = getDateRange("week");
     expect(startDate).toBeInstanceOf(Date);
     const diffDays = Math.round(
-      (endDate.getTime() - startDate!.getTime()) / (1000 * 60 * 60 * 24)
+      (endDate.getTime() - startDate?.getTime()) / (1000 * 60 * 60 * 24)
     );
     // Can be 7-8 days due to start/end time boundary adjustments
     expect(diffDays).toBeGreaterThanOrEqual(7);
@@ -400,7 +400,7 @@ describe("getDateRange", () => {
     const { startDate, endDate } = getDateRange("month");
     expect(startDate).toBeInstanceOf(Date);
     const diffDays = Math.round(
-      (endDate.getTime() - startDate!.getTime()) / (1000 * 60 * 60 * 24)
+      (endDate.getTime() - startDate?.getTime()) / (1000 * 60 * 60 * 24)
     );
     // Month can be 28-32 days due to varying month lengths and boundary adjustments
     expect(diffDays).toBeGreaterThanOrEqual(28);

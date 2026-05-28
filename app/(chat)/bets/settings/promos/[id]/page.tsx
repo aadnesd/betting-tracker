@@ -20,6 +20,7 @@ import {
   listAccountsByUser,
   listQualifyingBetsForPromo,
 } from "@/lib/db/queries";
+import { CompleteWinWageringEarlyButton } from "./complete-win-wagering-early-button";
 
 export const metadata = {
   title: "Free Bet Details",
@@ -109,6 +110,12 @@ export default async function FreeBetDetailPage({
     winWageringRequirement > 0
       ? Math.min((winWageringProgress / winWageringRequirement) * 100, 100)
       : 0;
+  const winWageringCompletedEarly = freeBet.winWageringCompletedEarlyAt != null;
+  const canCompleteWinWageringEarly =
+    winWageringRequirement > 0 &&
+    winWageringProgress < winWageringRequirement &&
+    !freeBet.winWageringCompletedAt &&
+    !winWageringCompletedEarly;
 
   return (
     <div className="space-y-6 p-4 md:p-8">
@@ -318,7 +325,9 @@ export default async function FreeBetDetailPage({
               Winnings Wagering
             </CardTitle>
             <CardDescription>
-              Track wagering requirements for free bet winnings.
+              {winWageringCompletedEarly
+                ? "Closed early before the full winnings wagering target was reached."
+                : "Track wagering requirements for free bet winnings."}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -367,7 +376,26 @@ export default async function FreeBetDetailPage({
                       </dd>
                     </div>
                   )}
+                  {freeBet.winWageringCompletedEarlyAt && (
+                    <div>
+                      <dt className="text-muted-foreground">Completed Early</dt>
+                      <dd className="font-medium">
+                        {format(
+                          new Date(freeBet.winWageringCompletedEarlyAt),
+                          "d MMM yyyy"
+                        )}
+                      </dd>
+                    </div>
+                  )}
                 </dl>
+                {canCompleteWinWageringEarly && (
+                  <div className="flex justify-end">
+                    <CompleteWinWageringEarlyButton
+                      freeBetId={freeBet.id}
+                      freeBetName={freeBet.name}
+                    />
+                  </div>
+                )}
               </>
             ) : (
               <div className="rounded-md border border-dashed p-4 text-muted-foreground text-sm">

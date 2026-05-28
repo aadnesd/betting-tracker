@@ -1,4 +1,4 @@
-import { AlertTriangle, ExternalLink, Key, Smartphone } from "lucide-react";
+import { AlertTriangle, Key, Smartphone } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/app/(auth)/auth";

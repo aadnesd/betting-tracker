@@ -215,9 +215,9 @@ describe("/api/bets/matches", () => {
 
   describe("GET /api/bets/matches route", () => {
     it("returns upcoming matches when no search term provided", async () => {
-      (cachedQueries.listUpcomingMatchesCached as vi.Mock).mockResolvedValueOnce(
-        []
-      );
+      (
+        cachedQueries.listUpcomingMatchesCached as vi.Mock
+      ).mockResolvedValueOnce([]);
       const res = await listMatchesRoute(
         new Request("http://localhost/api/bets/matches")
       );
@@ -227,9 +227,9 @@ describe("/api/bets/matches", () => {
     });
 
     it("uses listUpcomingMatches when search term is too short", async () => {
-      (cachedQueries.listUpcomingMatchesCached as vi.Mock).mockResolvedValueOnce(
-        []
-      );
+      (
+        cachedQueries.listUpcomingMatchesCached as vi.Mock
+      ).mockResolvedValueOnce([]);
       await listMatchesRoute(
         new Request("http://localhost/api/bets/matches?search=a&limit=10")
       );
@@ -255,9 +255,9 @@ describe("/api/bets/matches", () => {
     });
 
     it("caps limit at 50 for upcoming matches", async () => {
-      (cachedQueries.listUpcomingMatchesCached as vi.Mock).mockResolvedValueOnce(
-        []
-      );
+      (
+        cachedQueries.listUpcomingMatchesCached as vi.Mock
+      ).mockResolvedValueOnce([]);
       await listMatchesRoute(
         new Request("http://localhost/api/bets/matches?limit=500")
       );
@@ -298,21 +298,23 @@ describe("/api/bets/matches/:id", () => {
   });
 
   it("returns formatted match details", async () => {
-    (cachedQueries.getFootballMatchByIdCached as vi.Mock).mockResolvedValueOnce({
-      id: "match-1",
-      externalId: "ext-123",
-      homeTeam: "Arsenal",
-      awayTeam: "Chelsea",
-      competition: "Premier League",
-      competitionCode: "PL",
-      matchDate: new Date("2025-02-01T17:30:00Z"),
-      status: "SCHEDULED",
-      homeScore: null,
-      awayScore: null,
-      lastSyncedAt: new Date(),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
+    (cachedQueries.getFootballMatchByIdCached as vi.Mock).mockResolvedValueOnce(
+      {
+        id: "match-1",
+        externalId: "ext-123",
+        homeTeam: "Arsenal",
+        awayTeam: "Chelsea",
+        competition: "Premier League",
+        competitionCode: "PL",
+        matchDate: new Date("2025-02-01T17:30:00Z"),
+        status: "SCHEDULED",
+        homeScore: null,
+        awayScore: null,
+        lastSyncedAt: new Date(),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }
+    );
 
     const res = await getMatchByIdRoute(
       new Request("http://localhost/api/bets/matches/match-1"),

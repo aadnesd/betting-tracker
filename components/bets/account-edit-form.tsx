@@ -16,7 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-interface AccountEditFormProps {
+type AccountEditFormProps = {
   account: {
     id: string;
     name: string;
@@ -25,15 +25,15 @@ interface AccountEditFormProps {
     commission: number | null;
     status: "active" | "archived";
   };
-}
+};
 
-interface FormData {
+type FormData = {
   name: string;
   kind: "bookmaker" | "exchange";
   currency: string;
   commission: string;
   status: "active" | "archived";
-}
+};
 
 const CURRENCIES = ["NOK", "EUR", "GBP", "USD", "SEK", "DKK"] as const;
 

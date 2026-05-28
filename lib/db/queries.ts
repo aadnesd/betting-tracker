@@ -7,12 +7,10 @@ import {
   count,
   desc,
   eq,
-  gt,
   gte,
   inArray,
   isNotNull,
   isNull,
-  lt,
   lte,
   ne,
   or,
@@ -561,7 +559,7 @@ export async function getAccountBalance({
   }
 }
 
-export interface AccountWithBalance {
+export type AccountWithBalance = {
   id: string;
   createdAt: Date;
   userId: string;
@@ -574,7 +572,7 @@ export interface AccountWithBalance {
   limits: unknown;
   currentBalance: number;
   transactionCount: number;
-}
+};
 
 /**
  * List all accounts for a user with computed balance from transactions.
@@ -662,7 +660,7 @@ export async function listAccountsWithBalances({
 /**
  * Bankroll summary type for dashboard display.
  */
-export interface BankrollSummary {
+export type BankrollSummary = {
   totalCapital: number;
   bookmakerBalance: number;
   exchangeBalance: number;
@@ -672,7 +670,7 @@ export interface BankrollSummary {
   totalWithdrawals: number;
   totalBonuses: number;
   netDeposits: number;
-}
+};
 
 /**
  * Get bankroll summary aggregating all account balances and transactions.
@@ -766,7 +764,7 @@ export async function getBankrollSummary({
  * Note: openBackStake excludes free bet stakes since they don't lock real money.
  * openFreeBetStake tracks free bet stakes separately for informational purposes.
  */
-export interface OpenBetStakes {
+export type OpenBetStakes = {
   accountId: string;
   /** Real money stakes locked in open back bets (excludes free bets) */
   openBackStake: number;
@@ -776,7 +774,7 @@ export interface OpenBetStakes {
   openLayLiability: number;
   /** Total locked stake = openBackStake + openLayLiability (excludes free bets) */
   totalOpenStake: number;
-}
+};
 
 /**
  * Get open (unsettled) bet stakes per account.
@@ -968,20 +966,20 @@ export async function countPendingBetsForAccount({
 /**
  * Transaction trend data point for charts.
  */
-export interface TransactionTrendPoint {
+export type TransactionTrendPoint = {
   date: string;
   label: string;
   deposits: number;
   withdrawals: number;
   bonuses: number;
   net: number;
-}
+};
 
-export interface BalanceTrendPoint {
+export type BalanceTrendPoint = {
   date: string;
   label: string;
   net: number;
-}
+};
 
 /**
  * Get transaction trends grouped by day/week/month for charts.
@@ -1919,10 +1917,18 @@ export async function updateBackBet({
 }) {
   try {
     const updates: Partial<typeof backBet.$inferInsert> = {};
-    if (status !== undefined) updates.status = status;
-    if (settledAt !== undefined) updates.settledAt = settledAt;
-    if (profitLoss !== undefined) updates.profitLoss = profitLoss;
-    if (profitLossNok !== undefined) updates.profitLossNok = profitLossNok;
+    if (status !== undefined) {
+      updates.status = status;
+    }
+    if (settledAt !== undefined) {
+      updates.settledAt = settledAt;
+    }
+    if (profitLoss !== undefined) {
+      updates.profitLoss = profitLoss;
+    }
+    if (profitLossNok !== undefined) {
+      updates.profitLossNok = profitLossNok;
+    }
 
     const [row] = await db
       .update(backBet)
@@ -2018,10 +2024,18 @@ export async function updateLayBet({
 }) {
   try {
     const updates: Partial<typeof layBet.$inferInsert> = {};
-    if (status !== undefined) updates.status = status;
-    if (settledAt !== undefined) updates.settledAt = settledAt;
-    if (profitLoss !== undefined) updates.profitLoss = profitLoss;
-    if (profitLossNok !== undefined) updates.profitLossNok = profitLossNok;
+    if (status !== undefined) {
+      updates.status = status;
+    }
+    if (settledAt !== undefined) {
+      updates.settledAt = settledAt;
+    }
+    if (profitLoss !== undefined) {
+      updates.profitLoss = profitLoss;
+    }
+    if (profitLossNok !== undefined) {
+      updates.profitLossNok = profitLossNok;
+    }
 
     const [row] = await db
       .update(layBet)
@@ -3508,7 +3522,7 @@ export async function countBetsReadyForAutoSettlement(): Promise<number> {
 /**
  * Parameters for applying auto-settlement to a bet.
  */
-export interface ApplyAutoSettlementParams {
+export type ApplyAutoSettlementParams = {
   /** The matched bet ID */
   matchedBetId: string;
   /** User ID who owns the bet */
@@ -3537,16 +3551,16 @@ export interface ApplyAutoSettlementParams {
   selection: string;
   /** Match result description for audit notes */
   matchResult: string;
-}
+};
 
 /**
  * Result of auto-settlement application.
  */
-export interface ApplyAutoSettlementResult {
+export type ApplyAutoSettlementResult = {
   success: boolean;
   matchedBetId: string;
   transactionsCreated: number;
-}
+};
 
 /**
  * Apply auto-settlement to a single matched bet.
@@ -4234,7 +4248,9 @@ export async function getProfitByBookmaker({
     >();
 
     for (const row of rows) {
-      if (!row.accountId) continue;
+      if (!row.accountId) {
+        continue;
+      }
 
       const existing = accountMap.get(row.accountId) ?? {
         accountId: row.accountId,
@@ -4391,7 +4407,9 @@ export async function getProfitByExchange({
     >();
 
     for (const row of rows) {
-      if (!row.accountId) continue;
+      if (!row.accountId) {
+        continue;
+      }
 
       const existing = accountMap.get(row.accountId) ?? {
         accountId: row.accountId,
@@ -5438,7 +5456,9 @@ export async function getExposureTimeline({
     for (const bet of bets) {
       const exposure = bet.netExposure ? Number.parseFloat(bet.netExposure) : 0;
 
-      if (exposure === 0) continue;
+      if (exposure === 0) {
+        continue;
+      }
 
       // Add event when bet was created
       const createdDate = new Date(bet.createdAt);
@@ -5943,7 +5963,7 @@ export async function findOrCreateAccount({
 // Dashboard Summary
 // ─────────────────────────────────────────────────────────────────────────────
 
-export interface DashboardSummary {
+export type DashboardSummary = {
   /** Total profit/loss from all settled bets (NOK) */
   totalProfit: number;
   /** Number of settled bets */
@@ -5962,7 +5982,7 @@ export interface DashboardSummary {
   recentActivityCount: number;
   /** Total ROI percentage */
   roi: number;
-}
+};
 
 /**
  * Get dashboard summary statistics for a user.
@@ -6252,6 +6272,7 @@ export async function listFreeBetsByUser({
         winWageringStartedAt: freeBet.winWageringStartedAt,
         winWageringExpiresAt: freeBet.winWageringExpiresAt,
         winWageringCompletedAt: freeBet.winWageringCompletedAt,
+        winWageringCompletedEarlyAt: freeBet.winWageringCompletedEarlyAt,
       })
       .from(freeBet)
       .leftJoin(account, eq(freeBet.accountId, account.id))
@@ -6505,6 +6526,7 @@ export async function activateFreeBetWageringOnWin({
         winWageringStartedAt: now,
         winWageringExpiresAt: expiresAt,
         winWageringCompletedAt: null,
+        winWageringCompletedEarlyAt: null,
       })
       .where(and(eq(freeBet.id, freeBetId), eq(freeBet.userId, userId)))
       .returning();
@@ -6529,6 +6551,82 @@ export async function activateFreeBetWageringOnWin({
     throw new ChatSDKError(
       "bad_request:database",
       "Failed to activate free bet wagering"
+    );
+  }
+}
+
+/**
+ * Close free bet winnings wagering before the full requirement is reached.
+ */
+export async function completeFreeBetWageringEarly({
+  id,
+  userId,
+  reason = "User manually completed free bet winnings wagering early",
+}: {
+  id: string;
+  userId: string;
+  reason?: string;
+}) {
+  try {
+    const fb = await getFreeBetById({ id, userId });
+
+    if (!fb) {
+      return null;
+    }
+
+    const requirement = Number.parseFloat(fb.winWageringRequirement ?? "0");
+    const progress = Number.parseFloat(fb.winWageringProgress ?? "0");
+
+    if (!(requirement > 0) || !fb.winWageringStartedAt) {
+      throw new ChatSDKError(
+        "bad_request:api",
+        "Free bet winnings wagering is not active"
+      );
+    }
+
+    if (fb.winWageringCompletedEarlyAt) {
+      throw new ChatSDKError(
+        "bad_request:api",
+        "Free bet winnings wagering is already completed early"
+      );
+    }
+
+    if (fb.winWageringCompletedAt || progress >= requirement) {
+      throw new ChatSDKError(
+        "bad_request:api",
+        "Free bet winnings wagering is already complete"
+      );
+    }
+
+    const completedEarlyAt = new Date();
+    const [result] = await db
+      .update(freeBet)
+      .set({ winWageringCompletedEarlyAt: completedEarlyAt })
+      .where(and(eq(freeBet.id, id), eq(freeBet.userId, userId)))
+      .returning();
+
+    await db.insert(auditLog).values({
+      createdAt: completedEarlyAt,
+      userId,
+      entityType: "free_bet",
+      entityId: id,
+      action: "update",
+      changes: {
+        previousProgress: progress,
+        winWageringRequirement: requirement,
+        completedEarlyAt: completedEarlyAt.toISOString(),
+      },
+      notes: reason,
+    });
+
+    return result ?? null;
+  } catch (error) {
+    if (error instanceof ChatSDKError) {
+      throw error;
+    }
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to complete free bet wagering early"
     );
   }
 }
@@ -6651,7 +6749,8 @@ export async function processFreeBetWageringProgressOnSettle({
           eq(freeBet.userId, userId),
           eq(freeBet.accountId, accountId),
           isNotNull(freeBet.winWageringRequirement),
-          isNotNull(freeBet.winWageringStartedAt)
+          isNotNull(freeBet.winWageringStartedAt),
+          isNull(freeBet.winWageringCompletedEarlyAt)
         )
       );
 
@@ -6660,7 +6759,7 @@ export async function processFreeBetWageringProgressOnSettle({
       const progress = Number.parseFloat(fb.winWageringProgress ?? "0");
       const startedAt = fb.winWageringStartedAt;
 
-      if (!startedAt || progress >= requirement) {
+      if (!startedAt || fb.winWageringCompletedAt || progress >= requirement) {
         continue;
       }
 
@@ -7051,7 +7150,7 @@ export async function listFreeBetsWithProgress({
   }
 }
 
-export interface QualifyingBetInfo {
+export type QualifyingBetInfo = {
   id: string;
   createdAt: Date;
   matchedBetId: string;
@@ -7060,7 +7159,7 @@ export interface QualifyingBetInfo {
   selection: string | null;
   backStake: string | null;
   backOdds: string | null;
-}
+};
 
 /**
  * List qualifying bets for a specific free bet/promo.
@@ -7449,7 +7548,7 @@ export async function createLockedPromo({
 /**
  * Parameters for creating or upserting a football match.
  */
-export interface CreateFootballMatchParams {
+export type CreateFootballMatchParams = {
   externalId: number;
   homeTeam: string;
   awayTeam: string;
@@ -7459,7 +7558,7 @@ export interface CreateFootballMatchParams {
   status?: FootballMatchStatus;
   homeScore?: number | null;
   awayScore?: number | null;
-}
+};
 
 /**
  * Create a new football match record.
@@ -8396,7 +8495,7 @@ export async function deleteBet({
           and(
             eq(accountTransaction.accountId, existing.accountId),
             eq(accountTransaction.type, "adjustment"),
-            sql`${accountTransaction.notes} LIKE ${"%" + betIdentifier + "%"}`
+            sql`${accountTransaction.notes} LIKE ${`%${betIdentifier}%`}`
           )
         );
     }
@@ -9042,23 +9141,23 @@ export async function getShortcutApiKeyInfo({
 /**
  * Wallet type definitions for API responses and form data
  */
-export interface CreateWalletParams {
+export type CreateWalletParams = {
   userId: string;
   name: string;
   type: WalletType;
   currency: string;
   notes?: string | null;
-}
+};
 
-export interface UpdateWalletParams {
+export type UpdateWalletParams = {
   name?: string;
   type?: WalletType;
   currency?: string;
   notes?: string | null;
   status?: WalletStatus;
-}
+};
 
-export interface WalletWithBalance {
+export type WalletWithBalance = {
   id: string;
   createdAt: Date;
   userId: string;
@@ -9068,7 +9167,7 @@ export interface WalletWithBalance {
   notes: string | null;
   status: WalletStatus;
   balance: number;
-}
+};
 
 /**
  * Create a new wallet for a user.
@@ -9255,7 +9354,7 @@ export async function calculateWalletBalance(
 // WALLET TRANSACTION QUERIES
 // =============================================================================
 
-export interface CreateWalletTransactionParams {
+export type CreateWalletTransactionParams = {
   walletId: string;
   type: WalletTransactionType;
   amount: number;
@@ -9267,7 +9366,7 @@ export interface CreateWalletTransactionParams {
   linkedWalletTransactionId?: string | null;
   externalRef?: string | null;
   notes?: string | null;
-}
+};
 
 /**
  * Create a wallet transaction.
@@ -10272,10 +10371,18 @@ export type UpdateDepositBonusParams = {
 export async function updateDepositBonus(params: UpdateDepositBonusParams) {
   try {
     const updates: Record<string, unknown> = {};
-    if (params.name !== undefined) updates.name = params.name;
-    if (params.expiresAt !== undefined) updates.expiresAt = params.expiresAt;
-    if (params.notes !== undefined) updates.notes = params.notes;
-    if (params.status !== undefined) updates.status = params.status;
+    if (params.name !== undefined) {
+      updates.name = params.name;
+    }
+    if (params.expiresAt !== undefined) {
+      updates.expiresAt = params.expiresAt;
+    }
+    if (params.notes !== undefined) {
+      updates.notes = params.notes;
+    }
+    if (params.status !== undefined) {
+      updates.status = params.status;
+    }
 
     if (Object.keys(updates).length === 0) {
       return await getDepositBonusById({

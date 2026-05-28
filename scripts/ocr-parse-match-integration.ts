@@ -22,13 +22,13 @@ config({ path: ".env.local" });
 
 const TEST_IMAGES_DIR = path.join(__dirname, "..", "test-images");
 
-interface TestResult {
+type TestResult = {
   step: string;
   success: boolean;
   durationMs: number;
   data?: unknown;
   error?: string;
-}
+};
 
 async function runTest(): Promise<void> {
   console.log("============================================================");
@@ -191,7 +191,9 @@ async function runTest(): Promise<void> {
     console.log(`    Liability: ${result.lay.liability || "N/A"}`);
     console.log("");
     console.log(`  Needs Review: ${result.needsReview}`);
-    if (result.notes) console.log(`  Notes: ${result.notes}`);
+    if (result.notes) {
+      console.log(`  Notes: ${result.notes}`);
+    }
     console.log("");
 
     // Verify expected values

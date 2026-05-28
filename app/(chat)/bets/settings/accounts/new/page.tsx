@@ -23,12 +23,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-interface FormData {
+type FormData = {
   name: string;
   kind: "bookmaker" | "exchange";
   currency: string;
   commission: string;
-}
+};
 
 const initialFormData: FormData = {
   name: "",

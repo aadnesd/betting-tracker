@@ -46,7 +46,7 @@ const CRYPTO_CURRENCIES = [
   "OP",
 ];
 
-interface WalletFormProps {
+type WalletFormProps = {
   wallet?: {
     id: string;
     name: string;
@@ -55,7 +55,7 @@ interface WalletFormProps {
     notes: string | null;
     status: "active" | "archived";
   };
-}
+};
 
 export function WalletForm({ wallet }: WalletFormProps) {
   const router = useRouter();

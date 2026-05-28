@@ -1,9 +1,9 @@
 type CellValue = string | number | null | undefined;
 
-interface XlsxSheetInput {
+type XlsxSheetInput = {
   name: string;
   rows: CellValue[][];
-}
+};
 
 const ZIP_LOCAL_FILE_SIGNATURE = 0x04_03_4b_50;
 const ZIP_CENTRAL_DIRECTORY_SIGNATURE = 0x02_01_4b_50;
@@ -13,7 +13,9 @@ const CRC32_TABLE = new Uint32Array(256);
 let crcTableReady = false;
 
 function ensureCrcTable() {
-  if (crcTableReady) return;
+  if (crcTableReady) {
+    return;
+  }
   for (let i = 0; i < 256; i += 1) {
     let c = i;
     for (let j = 0; j < 8; j += 1) {
@@ -35,7 +37,9 @@ function crc32(buffer: Buffer) {
 
 function sanitizeSheetName(name: string) {
   const cleaned = name.replace(/[[\]:*?/\\]/g, " ").trim();
-  if (!cleaned) return "Sheet1";
+  if (!cleaned) {
+    return "Sheet1";
+  }
   return cleaned.slice(0, 31);
 }
 
@@ -158,10 +162,10 @@ function buildStylesXml() {
 </styleSheet>`;
 }
 
-interface ZipEntry {
+type ZipEntry = {
   name: string;
   data: Buffer;
-}
+};
 
 function createZip(entries: ZipEntry[]) {
   const localFileParts: Buffer[] = [];

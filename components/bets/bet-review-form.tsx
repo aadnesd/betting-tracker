@@ -45,7 +45,7 @@ type ParsedForm = {
   lay: ParsedPair["lay"];
 };
 
-interface BetReviewFormProps {
+type BetReviewFormProps = {
   backScreenshotId: string;
   layScreenshotId: string;
   parsedData: ParsedPair & {
@@ -60,7 +60,7 @@ interface BetReviewFormProps {
   exchanges: AccountOption[];
   onBack?: () => void;
   onSaveComplete?: () => void;
-}
+};
 
 export function BetReviewForm({
   backScreenshotId,

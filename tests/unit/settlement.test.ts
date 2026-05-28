@@ -8,7 +8,6 @@
  */
 import { describe, expect, it } from "vitest";
 import {
-  type BetOutcome,
   calculateLayProfitLoss,
   calculateMatchedBetProfitLoss,
   calculateProfitLoss,

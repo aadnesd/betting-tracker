@@ -1,12 +1,10 @@
 import { Buffer } from "node:buffer";
 import { put } from "@vercel/blob";
 import { NextResponse } from "next/server";
-import { z } from "zod";
 import {
   computeMatchedNetExposure,
   computeNetExposureInputs,
 } from "@/lib/bet-calculations";
-import { revalidateDashboard } from "@/lib/cache";
 import {
   isOcrConfigured,
   parseMatchedBetFromScreenshots,
@@ -17,6 +15,7 @@ import {
   parseMatchedBetWithAgent,
 } from "@/lib/bet-parser-agent";
 import { evaluateNeedsReview, formatNeedsReviewNote } from "@/lib/bet-review";
+import { revalidateDashboard } from "@/lib/cache";
 import { isTestEnvironment } from "@/lib/constants";
 import {
   createAuditEntry,
@@ -346,7 +345,7 @@ export async function POST(request: Request) {
     });
 
     const needsReview = reviewInfo.needsReview;
-    const status = needsReview ? "needs_review" : "matched";
+    const _status = needsReview ? "needs_review" : "matched";
 
     // Build review reasons for response
     const reviewReasons: string[] = [];

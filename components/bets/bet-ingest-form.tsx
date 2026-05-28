@@ -52,10 +52,10 @@ type ParsedForm = {
   lay: ParsedPair["lay"];
 };
 
-interface BetIngestFormProps {
+type BetIngestFormProps = {
   bookmakers: AccountOption[];
   exchanges: AccountOption[];
-}
+};
 
 export function BetIngestForm({ bookmakers, exchanges }: BetIngestFormProps) {
   const router = useRouter();
