@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/app/(auth)/auth";
 import {
+  combineSplitBetLegs,
   computeMatchedNetExposure,
   computeNetExposureInputs,
 } from "@/lib/bet-calculations";
@@ -21,6 +22,11 @@ import {
 import { convertAmountToNok } from "@/lib/fx-rates";
 import { isFreeBetPromoType } from "@/lib/settlement";
 
+const splitLegSchema = z.object({
+  odds: z.number().positive(),
+  stake: z.number().positive(),
+});
+
 const quickAddSchema = z.object({
   market: z.string().min(1, "Market is required"),
   selection: z.string().min(1, "Selection is required"),
@@ -33,15 +39,37 @@ const quickAddSchema = z.object({
     stake: z.number().positive("Back stake must be positive"),
     bookmaker: z.string().min(1, "Bookmaker is required"),
     currency: z.string().length(3).default("NOK"),
+    legs: z.array(splitLegSchema).optional(),
   }),
   lay: z.object({
     odds: z.number().positive("Lay odds must be positive"),
     stake: z.number().positive("Lay stake must be positive"),
     exchange: z.string().default("bfb247"),
     currency: z.string().length(3).default("NOK"),
+    legs: z.array(splitLegSchema).optional(),
   }),
   notes: z.string().optional(),
 });
+
+function formatSplitLegNotes({
+  label,
+  legs,
+  currency,
+}: {
+  label: string;
+  legs: { odds: number; stake: number }[];
+  currency: string;
+}) {
+  if (legs.length <= 1) {
+    return null;
+  }
+
+  return `${label} splits: ${legs
+    .map(
+      (leg) => `${currency} ${leg.stake.toFixed(2)} @ ${leg.odds.toFixed(4)}`
+    )
+    .join(", ")}`;
+}
 
 export async function POST(request: Request) {
   const session = await auth();
@@ -65,6 +93,17 @@ export async function POST(request: Request) {
   }
 
   try {
+    const backLegs =
+      body.back.legs && body.back.legs.length > 0
+        ? body.back.legs
+        : [{ odds: body.back.odds, stake: body.back.stake }];
+    const layLegs =
+      body.lay.legs && body.lay.legs.length > 0
+        ? body.lay.legs
+        : [{ odds: body.lay.odds, stake: body.lay.stake }];
+    const combinedBack = combineSplitBetLegs(backLegs, "back");
+    const combinedLay = combineSplitBetLegs(layLegs, "lay");
+
     // Create placeholder screenshots for manual entry
     const [backScreenshot, layScreenshot] = await Promise.all([
       createManualScreenshot({
@@ -109,8 +148,8 @@ export async function POST(request: Request) {
         market: body.market,
         selection: body.selection,
         normalizedSelection: body.normalizedSelection ?? null,
-        odds: body.back.odds,
-        stake: body.back.stake,
+        odds: combinedBack.odds,
+        stake: combinedBack.stake,
         exchange: body.back.bookmaker,
         matchId: body.matchId ?? null,
         accountId: backAccount.id,
@@ -127,8 +166,8 @@ export async function POST(request: Request) {
         market: body.market,
         selection: body.selection,
         normalizedSelection: body.normalizedSelection ?? null,
-        odds: body.lay.odds,
-        stake: body.lay.stake,
+        odds: combinedLay.odds,
+        stake: combinedLay.stake,
         exchange: body.lay.exchange,
         matchId: body.matchId ?? null,
         accountId: layAccount.id,
@@ -143,17 +182,18 @@ export async function POST(request: Request) {
 
     // Calculate net exposure in NOK
     const { backProfit, layLiability } = computeNetExposureInputs({
-      backStake: body.back.stake,
-      backOdds: body.back.odds,
-      layStake: body.lay.stake,
-      layOdds: body.lay.odds,
+      backStake: combinedBack.stake,
+      backOdds: combinedBack.odds,
+      layStake: combinedLay.stake,
+      layOdds: combinedLay.odds,
+      layLiabilityProvided: combinedLay.liability,
     });
 
     const [backStakeNok, backProfitNok, layStakeNok, layLiabilityNok] =
       await Promise.all([
-        convertAmountToNok(body.back.stake, body.back.currency),
+        convertAmountToNok(combinedBack.stake, body.back.currency),
         convertAmountToNok(backProfit, body.back.currency),
-        convertAmountToNok(body.lay.stake, body.lay.currency),
+        convertAmountToNok(combinedLay.stake, body.lay.currency),
         convertAmountToNok(layLiability, body.lay.currency),
       ]);
 
@@ -177,6 +217,22 @@ export async function POST(request: Request) {
         : 0,
     });
 
+    const splitNotes = [
+      formatSplitLegNotes({
+        label: "Back",
+        legs: combinedBack.legs,
+        currency: body.back.currency,
+      }),
+      formatSplitLegNotes({
+        label: "Lay",
+        legs: combinedLay.legs,
+        currency: body.lay.currency,
+      }),
+    ]
+      .filter(Boolean)
+      .join("\n");
+    const notes = [body.notes, splitNotes].filter(Boolean).join("\n\n");
+
     // Create the matched bet record
     const matched = await createMatchedBetRecord({
       userId: session.user.id,
@@ -190,15 +246,15 @@ export async function POST(request: Request) {
       promoType: body.promoType ?? null,
       status: "matched",
       netExposure,
-      notes: body.notes ? `[Manual Entry] ${body.notes}` : "[Manual Entry]",
+      notes: notes ? `[Manual Entry] ${notes}` : "[Manual Entry]",
     });
 
     await addQualifyingBetsForMatchedBet({
       userId: session.user.id,
       accountId: backAccount.id,
       matchedBetId: matched.id,
-      stake: body.back.stake,
-      odds: body.back.odds,
+      stake: combinedBack.stake,
+      odds: combinedBack.odds,
     });
 
     // Mark free bet as used if one was selected
@@ -220,10 +276,11 @@ export async function POST(request: Request) {
         changes: {
           market: body.market,
           selection: body.selection,
-          odds: body.back.odds,
-          stake: body.back.stake,
+          odds: combinedBack.odds,
+          stake: combinedBack.stake,
           bookmaker: body.back.bookmaker,
           currency: body.back.currency,
+          splitCount: combinedBack.legs.length,
           source: "quick_add",
         },
         notes: "Created via Quick Add",
@@ -236,10 +293,11 @@ export async function POST(request: Request) {
         changes: {
           market: body.market,
           selection: body.selection,
-          odds: body.lay.odds,
-          stake: body.lay.stake,
+          odds: combinedLay.odds,
+          stake: combinedLay.stake,
           exchange: body.lay.exchange,
           currency: body.lay.currency,
+          splitCount: combinedLay.legs.length,
           source: "quick_add",
         },
         notes: "Created via Quick Add",

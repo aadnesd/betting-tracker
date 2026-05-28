@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Gift, Loader2, Plus, Trophy } from "lucide-react";
+import { ArrowLeft, Gift, Loader2, Plus, Trash2, Trophy } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
@@ -84,6 +84,11 @@ type FormData = {
   notes: string;
 };
 
+type SplitLegFormData = {
+  odds: string;
+  stake: string;
+};
+
 type SelectedMatchInfo = {
   id: string;
   homeTeam: string;
@@ -129,6 +134,18 @@ export function QuickAddForm({
     notes: "",
     ...initialValues,
   });
+  const [backLegs, setBackLegs] = useState<SplitLegFormData[]>([
+    {
+      odds: initialValues?.backOdds ?? "",
+      stake: initialValues?.backStake ?? "",
+    },
+  ]);
+  const [layLegs, setLayLegs] = useState<SplitLegFormData[]>([
+    {
+      odds: initialValues?.layOdds ?? "",
+      stake: initialValues?.layStake ?? "",
+    },
+  ]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<Partial<Record<keyof FormData, string>>>(
     {}
@@ -142,6 +159,30 @@ export function QuickAddForm({
     if (errors[field]) {
       setErrors((prev) => ({ ...prev, [field]: undefined }));
     }
+  };
+
+  const updateSplitLeg = (
+    kind: "back" | "lay",
+    index: number,
+    field: keyof SplitLegFormData,
+    value: string
+  ) => {
+    const setLegs = kind === "back" ? setBackLegs : setLayLegs;
+    setLegs((prev) =>
+      prev.map((leg, legIndex) =>
+        legIndex === index ? { ...leg, [field]: value } : leg
+      )
+    );
+  };
+
+  const addSplitLeg = (kind: "back" | "lay") => {
+    const setLegs = kind === "back" ? setBackLegs : setLayLegs;
+    setLegs((prev) => [...prev, { odds: "", stake: "" }]);
+  };
+
+  const removeSplitLeg = (kind: "back" | "lay", index: number) => {
+    const setLegs = kind === "back" ? setBackLegs : setLayLegs;
+    setLegs((prev) => prev.filter((_, legIndex) => legIndex !== index));
   };
 
   // Filter available free bets based on selected bookmaker
@@ -202,6 +243,9 @@ export function QuickAddForm({
     const fb = freeBets.find((f) => f.id === freeBetId);
     if (fb) {
       updateField("backStake", fb.value.toString());
+      setBackLegs([
+        { odds: backLegs[0]?.odds ?? "", stake: fb.value.toString() },
+      ]);
       updateField("backCurrency", fb.currency);
       // Also select the bookmaker if the free bet has an account
       if (fb.accountName) {
@@ -269,19 +313,34 @@ export function QuickAddForm({
     if (!formData.selection.trim()) {
       newErrors.selection = "Selection is required";
     }
-    if (!formData.backOdds || Number.parseFloat(formData.backOdds) <= 1) {
+    const validBackLegs = backLegs.every(
+      (leg) =>
+        leg.odds &&
+        Number.parseFloat(leg.odds) > 1 &&
+        leg.stake &&
+        Number.parseFloat(leg.stake) > 0
+    );
+    const validLayLegs = layLegs.every(
+      (leg) =>
+        leg.odds &&
+        Number.parseFloat(leg.odds) > 1 &&
+        leg.stake &&
+        Number.parseFloat(leg.stake) > 0
+    );
+
+    if (!validBackLegs) {
       newErrors.backOdds = "Valid odds (> 1.0) required";
     }
-    if (!formData.backStake || Number.parseFloat(formData.backStake) <= 0) {
+    if (!validBackLegs) {
       newErrors.backStake = "Valid stake required";
     }
     if (!formData.backBookmaker.trim()) {
       newErrors.backBookmaker = "Bookmaker is required";
     }
-    if (!formData.layOdds || Number.parseFloat(formData.layOdds) <= 1) {
+    if (!validLayLegs) {
       newErrors.layOdds = "Valid odds (> 1.0) required";
     }
-    if (!formData.layStake || Number.parseFloat(formData.layStake) <= 0) {
+    if (!validLayLegs) {
       newErrors.layStake = "Valid stake required";
     }
     if (!formData.layExchange.trim()) {
@@ -293,12 +352,21 @@ export function QuickAddForm({
   };
 
   const calculateLayLiability = (): number | null => {
-    const odds = Number.parseFloat(formData.layOdds);
-    const stake = Number.parseFloat(formData.layStake);
-    if (Number.isNaN(odds) || Number.isNaN(stake) || odds <= 1) {
+    if (
+      layLegs.some((leg) => {
+        const odds = Number.parseFloat(leg.odds);
+        const stake = Number.parseFloat(leg.stake);
+        return Number.isNaN(odds) || Number.isNaN(stake) || odds <= 1;
+      })
+    ) {
       return null;
     }
-    return stake * (odds - 1);
+    return layLegs.reduce(
+      (total, leg) =>
+        total +
+        Number.parseFloat(leg.stake) * (Number.parseFloat(leg.odds) - 1),
+      0
+    );
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -312,6 +380,15 @@ export function QuickAddForm({
     setIsSubmitting(true);
 
     try {
+      const parsedBackLegs = backLegs.map((leg) => ({
+        odds: Number.parseFloat(leg.odds),
+        stake: Number.parseFloat(leg.stake),
+      }));
+      const parsedLayLegs = layLegs.map((leg) => ({
+        odds: Number.parseFloat(leg.odds),
+        stake: Number.parseFloat(leg.stake),
+      }));
+
       const response = await fetch("/api/bets/quick-add", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -323,16 +400,18 @@ export function QuickAddForm({
           promoType: formData.promoType || undefined,
           freeBetId: formData.freeBetId || undefined,
           back: {
-            odds: Number.parseFloat(formData.backOdds),
-            stake: Number.parseFloat(formData.backStake),
+            odds: parsedBackLegs[0]?.odds ?? 0,
+            stake: parsedBackLegs[0]?.stake ?? 0,
             bookmaker: formData.backBookmaker.trim(),
             currency: formData.backCurrency,
+            legs: parsedBackLegs,
           },
           lay: {
-            odds: Number.parseFloat(formData.layOdds),
-            stake: Number.parseFloat(formData.layStake),
+            odds: parsedLayLegs[0]?.odds ?? 0,
+            stake: parsedLayLegs[0]?.stake ?? 0,
             exchange: formData.layExchange.trim(),
             currency: formData.layCurrency,
+            legs: parsedLayLegs,
           },
           notes: formData.notes.trim() || undefined,
         }),
@@ -688,43 +767,74 @@ export function QuickAddForm({
                   </Select>
                 </div>
               </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="backOdds">Odds</Label>
-                  <Input
-                    className={errors.backOdds ? "border-destructive" : ""}
-                    id="backOdds"
-                    min="1.01"
-                    onChange={(e) => updateField("backOdds", e.target.value)}
-                    placeholder="e.g., 2.50"
-                    step="any"
-                    type="number"
-                    value={formData.backOdds}
-                  />
-                  {errors.backOdds && (
-                    <p className="text-destructive text-xs">
-                      {errors.backOdds}
-                    </p>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="backStake">Stake</Label>
-                  <Input
-                    className={errors.backStake ? "border-destructive" : ""}
-                    id="backStake"
-                    min="0.01"
-                    onChange={(e) => updateField("backStake", e.target.value)}
-                    placeholder="e.g., 100"
-                    step="0.01"
-                    type="number"
-                    value={formData.backStake}
-                  />
-                  {errors.backStake && (
-                    <p className="text-destructive text-xs">
-                      {errors.backStake}
-                    </p>
-                  )}
-                </div>
+              <div className="space-y-3">
+                {backLegs.map((leg, index) => (
+                  <div
+                    className="grid gap-3 sm:grid-cols-[1fr_1fr_auto]"
+                    key={index}
+                  >
+                    <div className="space-y-2">
+                      <Label htmlFor={`backOdds-${index}`}>
+                        Odds{backLegs.length > 1 ? ` ${index + 1}` : ""}
+                      </Label>
+                      <Input
+                        className={errors.backOdds ? "border-destructive" : ""}
+                        id={`backOdds-${index}`}
+                        min="1.01"
+                        onChange={(e) =>
+                          updateSplitLeg("back", index, "odds", e.target.value)
+                        }
+                        placeholder="e.g., 2.50"
+                        step="any"
+                        type="number"
+                        value={leg.odds}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor={`backStake-${index}`}>
+                        Stake{backLegs.length > 1 ? ` ${index + 1}` : ""}
+                      </Label>
+                      <Input
+                        className={errors.backStake ? "border-destructive" : ""}
+                        id={`backStake-${index}`}
+                        min="0.01"
+                        onChange={(e) =>
+                          updateSplitLeg("back", index, "stake", e.target.value)
+                        }
+                        placeholder="e.g., 100"
+                        step="0.01"
+                        type="number"
+                        value={leg.stake}
+                      />
+                    </div>
+                    <div className="flex items-end">
+                      <Button
+                        aria-label="Remove back split"
+                        disabled={backLegs.length === 1}
+                        onClick={() => removeSplitLeg("back", index)}
+                        size="icon"
+                        type="button"
+                        variant="ghost"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+                {(errors.backOdds || errors.backStake) && (
+                  <p className="text-destructive text-xs">
+                    {errors.backOdds ?? errors.backStake}
+                  </p>
+                )}
+                <Button
+                  onClick={() => addSplitLeg("back")}
+                  size="sm"
+                  type="button"
+                  variant="outline"
+                >
+                  <Plus className="mr-1 h-4 w-4" />
+                  Add Back Split
+                </Button>
               </div>
             </div>
 
@@ -789,41 +899,74 @@ export function QuickAddForm({
                   </Select>
                 </div>
               </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="layOdds">Odds</Label>
-                  <Input
-                    className={errors.layOdds ? "border-destructive" : ""}
-                    id="layOdds"
-                    min="1.01"
-                    onChange={(e) => updateField("layOdds", e.target.value)}
-                    placeholder="e.g., 2.52"
-                    step="any"
-                    type="number"
-                    value={formData.layOdds}
-                  />
-                  {errors.layOdds && (
-                    <p className="text-destructive text-xs">{errors.layOdds}</p>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="layStake">Stake</Label>
-                  <Input
-                    className={errors.layStake ? "border-destructive" : ""}
-                    id="layStake"
-                    min="0.01"
-                    onChange={(e) => updateField("layStake", e.target.value)}
-                    placeholder="e.g., 99.20"
-                    step="0.01"
-                    type="number"
-                    value={formData.layStake}
-                  />
-                  {errors.layStake && (
-                    <p className="text-destructive text-xs">
-                      {errors.layStake}
-                    </p>
-                  )}
-                </div>
+              <div className="space-y-3">
+                {layLegs.map((leg, index) => (
+                  <div
+                    className="grid gap-3 sm:grid-cols-[1fr_1fr_auto]"
+                    key={index}
+                  >
+                    <div className="space-y-2">
+                      <Label htmlFor={`layOdds-${index}`}>
+                        Odds{layLegs.length > 1 ? ` ${index + 1}` : ""}
+                      </Label>
+                      <Input
+                        className={errors.layOdds ? "border-destructive" : ""}
+                        id={`layOdds-${index}`}
+                        min="1.01"
+                        onChange={(e) =>
+                          updateSplitLeg("lay", index, "odds", e.target.value)
+                        }
+                        placeholder="e.g., 2.52"
+                        step="any"
+                        type="number"
+                        value={leg.odds}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor={`layStake-${index}`}>
+                        Stake{layLegs.length > 1 ? ` ${index + 1}` : ""}
+                      </Label>
+                      <Input
+                        className={errors.layStake ? "border-destructive" : ""}
+                        id={`layStake-${index}`}
+                        min="0.01"
+                        onChange={(e) =>
+                          updateSplitLeg("lay", index, "stake", e.target.value)
+                        }
+                        placeholder="e.g., 99.20"
+                        step="0.01"
+                        type="number"
+                        value={leg.stake}
+                      />
+                    </div>
+                    <div className="flex items-end">
+                      <Button
+                        aria-label="Remove lay split"
+                        disabled={layLegs.length === 1}
+                        onClick={() => removeSplitLeg("lay", index)}
+                        size="icon"
+                        type="button"
+                        variant="ghost"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+                {(errors.layOdds || errors.layStake) && (
+                  <p className="text-destructive text-xs">
+                    {errors.layOdds ?? errors.layStake}
+                  </p>
+                )}
+                <Button
+                  onClick={() => addSplitLeg("lay")}
+                  size="sm"
+                  type="button"
+                  variant="outline"
+                >
+                  <Plus className="mr-1 h-4 w-4" />
+                  Add Lay Split
+                </Button>
               </div>
               {layLiability !== null && (
                 <p className="text-muted-foreground text-sm">
