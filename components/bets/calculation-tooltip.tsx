@@ -58,11 +58,11 @@ const CALCULATION_EXPLANATIONS: Record<
   },
 };
 
-interface CalculationTooltipProps {
+type CalculationTooltipProps = {
   type: CalculationType;
   className?: string;
   side?: "top" | "right" | "bottom" | "left";
-}
+};
 
 export function CalculationTooltip({
   type,
@@ -97,12 +97,12 @@ export function CalculationTooltip({
   );
 }
 
-interface ValueWithTooltipProps {
+type ValueWithTooltipProps = {
   type: CalculationType;
   children: React.ReactNode;
   className?: string;
   side?: "top" | "right" | "bottom" | "left";
-}
+};
 
 /**
  * A wrapper that displays a value with an inline calculation tooltip.

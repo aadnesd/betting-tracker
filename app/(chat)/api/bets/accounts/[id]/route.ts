@@ -3,11 +3,11 @@ import { auth } from "@/app/(auth)/auth";
 import { revalidateDashboard } from "@/lib/cache";
 import { deleteAccount, getAccountById } from "@/lib/db/queries";
 
-interface RouteParams {
+type RouteParams = {
   params: Promise<{ id: string }>;
-}
+};
 
-export async function GET(request: Request, { params }: RouteParams) {
+export async function GET(_request: Request, { params }: RouteParams) {
   const session = await auth();
 
   if (!session?.user) {
@@ -36,7 +36,7 @@ export async function GET(request: Request, { params }: RouteParams) {
   }
 }
 
-export async function DELETE(request: Request, { params }: RouteParams) {
+export async function DELETE(_request: Request, { params }: RouteParams) {
   const session = await auth();
 
   if (!session?.user) {

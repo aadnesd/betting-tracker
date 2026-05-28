@@ -19,15 +19,15 @@ import type { CsvRowError } from "@/lib/csv";
 
 type ImportType = "bets" | "balances";
 
-interface ImportResult {
+type ImportResult = {
   success: boolean;
   imported: number;
   errors: CsvRowError[];
   totalRows: number;
-}
+};
 
 export default function ImportPage() {
-  const router = useRouter();
+  const _router = useRouter();
   const [importType, setImportType] = useState<ImportType>("bets");
   const [file, setFile] = useState<File | null>(null);
   const [csvContent, setCsvContent] = useState<string>("");
@@ -37,7 +37,9 @@ export default function ImportPage() {
   const handleFileSelect = useCallback(
     async (event: React.ChangeEvent<HTMLInputElement>) => {
       const selectedFile = event.target.files?.[0];
-      if (!selectedFile) return;
+      if (!selectedFile) {
+        return;
+      }
 
       // Validate file type
       if (

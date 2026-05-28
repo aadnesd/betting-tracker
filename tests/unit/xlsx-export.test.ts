@@ -121,7 +121,7 @@ describe("XLSX buffer generation", () => {
     // Match the sheet element specifically
     const sheetNameMatch = content.match(/<sheet name="([^"]+)"/);
     expect(sheetNameMatch).not.toBeNull();
-    const sheetName = sheetNameMatch![1];
+    const sheetName = sheetNameMatch?.[1];
     expect(sheetName).not.toContain("[");
     expect(sheetName).not.toContain("]");
     expect(sheetName).not.toContain(":");

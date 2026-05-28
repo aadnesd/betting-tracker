@@ -17,10 +17,10 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 
-interface WalletActionsProps {
+type WalletActionsProps = {
   walletId: string;
   walletName: string;
-}
+};
 
 export function WalletActions({ walletId, walletName }: WalletActionsProps) {
   const router = useRouter();
@@ -40,7 +40,7 @@ export function WalletActions({ walletId, walletName }: WalletActionsProps) {
       toast.success("Wallet archived");
       router.push("/bets/settings/wallets");
       router.refresh();
-    } catch (error) {
+    } catch (_error) {
       toast.error("Failed to archive wallet");
     } finally {
       setIsDeleting(false);
@@ -61,7 +61,7 @@ export function WalletActions({ walletId, walletName }: WalletActionsProps) {
       toast.success("Wallet permanently deleted");
       router.push("/bets/settings/wallets");
       router.refresh();
-    } catch (error) {
+    } catch (_error) {
       toast.error("Failed to delete wallet");
     } finally {
       setIsDeleting(false);

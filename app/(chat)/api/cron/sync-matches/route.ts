@@ -14,7 +14,7 @@ import {
  * Football-data.org API v4 response types.
  * These match the actual API response structure.
  */
-interface FootballDataMatch {
+type FootballDataMatch = {
   id: number;
   utcDate: string;
   status:
@@ -49,9 +49,9 @@ interface FootballDataMatch {
       away: number | null;
     };
   };
-}
+};
 
-interface FootballDataResponse {
+type FootballDataResponse = {
   matches: FootballDataMatch[];
   resultSet?: {
     count: number;
@@ -59,7 +59,7 @@ interface FootballDataResponse {
     first: string;
     last: string;
   };
-}
+};
 
 /**
  * Parse a football-data.org match into our CreateFootballMatchParams format.

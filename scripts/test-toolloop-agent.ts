@@ -4,8 +4,8 @@
  * Usage: pnpm tsx scripts/test-toolloop-agent.ts
  */
 
+import * as path from "node:path";
 import * as dotenv from "dotenv";
-import * as path from "path";
 
 // Load environment variables
 dotenv.config({ path: path.join(__dirname, "../.env.local") });

@@ -4,9 +4,9 @@
  * Usage: pnpm tsx scripts/test-agent-parser.ts
  */
 
+import * as fs from "node:fs";
+import * as path from "node:path";
 import * as dotenv from "dotenv";
-import * as fs from "fs";
-import * as path from "path";
 
 // Load environment variables FIRST before any other imports
 const envPath = path.join(__dirname, "../.env.local");
@@ -24,7 +24,6 @@ console.log(
 // Now import the parser (after env is loaded)
 import {
   type AgentAccount,
-  parseMatchedBetWithAgent,
   parseSingleBetWithAgent,
 } from "../lib/bet-parser-agent";
 

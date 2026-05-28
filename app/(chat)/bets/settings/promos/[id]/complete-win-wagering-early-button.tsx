@@ -17,15 +17,15 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 
-type DepositBonusCompleteEarlyButtonProps = {
-  bonusId: string;
-  bonusName: string;
+type CompleteWinWageringEarlyButtonProps = {
+  freeBetId: string;
+  freeBetName: string;
 };
 
-export function DepositBonusCompleteEarlyButton({
-  bonusId,
-  bonusName,
-}: DepositBonusCompleteEarlyButtonProps) {
+export function CompleteWinWageringEarlyButton({
+  freeBetId,
+  freeBetName,
+}: CompleteWinWageringEarlyButtonProps) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [open, setOpen] = useState(false);
@@ -33,25 +33,27 @@ export function DepositBonusCompleteEarlyButton({
   const handleCompleteEarly = async () => {
     setIsSubmitting(true);
     try {
-      const response = await fetch(`/api/bets/deposit-bonuses/${bonusId}`, {
+      const response = await fetch(`/api/bets/free-bets/${freeBetId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "complete_early" }),
+        body: JSON.stringify({ action: "complete_win_wagering_early" }),
       });
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || "Failed to complete bonus early");
+        throw new Error(
+          error.error || "Failed to complete winnings wagering early"
+        );
       }
 
-      toast.success("Bonus marked as completed early");
+      toast.success("Winnings wagering marked as completed early");
       setOpen(false);
       router.refresh();
     } catch (error) {
       toast.error(
         error instanceof Error
           ? error.message
-          : "Failed to complete bonus early"
+          : "Failed to complete winnings wagering early"
       );
     } finally {
       setIsSubmitting(false);
@@ -68,11 +70,11 @@ export function DepositBonusCompleteEarlyButton({
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Complete Bonus Early?</AlertDialogTitle>
+          <AlertDialogTitle>Complete Wagering Early?</AlertDialogTitle>
           <AlertDialogDescription>
-            Mark &quot;{bonusName}&quot; as completed early to stop tracking
-            wagering on it. This keeps the wagering audit trail but closes the
-            bonus before full wagering completion.
+            Mark &quot;{freeBetName}&quot; winnings wagering as completed early.
+            This stops future wagering tracking while keeping the recorded
+            progress and audit trail.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

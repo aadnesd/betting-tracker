@@ -27,7 +27,7 @@ async function measureTime<T>(
 }
 
 async function testWithImages(backPath: string, layPath: string) {
-  console.log("\n" + "=".repeat(60));
+  console.log(`\n${"=".repeat(60)}`);
   console.log(
     `Testing with: ${path.basename(backPath)} / ${path.basename(layPath)}`
   );
@@ -93,7 +93,7 @@ async function testWithImages(backPath: string, layPath: string) {
   console.log("   Needs Review:", autoparseResult.result.needsReview);
 
   // Summary
-  console.log("\n" + "-".repeat(60));
+  console.log(`\n${"-".repeat(60)}`);
   console.log("TIMING SUMMARY:");
   console.log(`  Upload:    ${uploadResult.durationMs}ms`);
   console.log(`  Autoparse: ${autoparseResult.durationMs}ms`);

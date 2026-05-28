@@ -115,7 +115,7 @@ describe("deleteWalletTransaction", () => {
         changes: expect.objectContaining({
           linkedWalletTransactionId: "tx-destination",
         }),
-      }),
+      })
     );
   });
 

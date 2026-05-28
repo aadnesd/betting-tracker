@@ -1,13 +1,13 @@
 "use client";
 
-import { AlertTriangle, Clock, ExternalLink, TrendingUp } from "lucide-react";
+import { AlertTriangle, ExternalLink, TrendingUp } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 
-interface DepositBonusCardProps {
+type DepositBonusCardProps = {
   bonus: {
     id: string;
     name: string;
@@ -23,7 +23,7 @@ interface DepositBonusCardProps {
     clearedAt: Date | null;
     createdAt: Date;
   };
-}
+};
 
 export function DepositBonusCard({ bonus }: DepositBonusCardProps) {
   const wageringRequirement = Number.parseFloat(bonus.wageringRequirement);

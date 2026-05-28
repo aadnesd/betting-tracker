@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-export interface MatchOption {
+export type MatchOption = {
   id: string;
   externalId: string;
   homeTeam: string;
@@ -16,14 +16,14 @@ export interface MatchOption {
   status: string;
   label: string;
   detail: string;
-}
+};
 
-interface MatchPickerProps {
+type MatchPickerProps = {
   value: string | null;
   onChange: (match: MatchOption | null) => void;
   disabled?: boolean;
   placeholder?: string;
-}
+};
 
 /**
  * MatchPicker - Searchable dropdown for selecting a football match.

@@ -17,10 +17,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { TransactionTrendPoint } from "@/lib/db/queries";
 
-interface Props {
+type Props = {
   data30: TransactionTrendPoint[];
   data90: TransactionTrendPoint[];
-}
+};
 
 function formatValue(value: number): string {
   if (Math.abs(value) >= 1000) {
@@ -29,7 +29,7 @@ function formatValue(value: number): string {
   return value.toFixed(0);
 }
 
-interface CustomTooltipProps {
+type CustomTooltipProps = {
   active?: boolean;
   payload?: Array<{
     value: number;
@@ -37,7 +37,7 @@ interface CustomTooltipProps {
     color: string;
   }>;
   label?: string;
-}
+};
 
 function CustomTooltip({ active, payload, label }: CustomTooltipProps) {
   if (!active || !payload || payload.length === 0) {

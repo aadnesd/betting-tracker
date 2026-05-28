@@ -13,20 +13,7 @@ type ScreenshotRecord = {
   filename?: string | null;
 };
 
-type ParsedForm = {
-  market: string;
-  selection: string;
-  notes?: string;
-  needsReview: boolean;
-  matchId?: string | null;
-  matchConfidence?: string | null;
-  matchCandidates?: number | null;
-  normalizedSelection?: "HOME_TEAM" | "AWAY_TEAM" | "DRAW" | null;
-  back: ParsedPair["back"];
-  lay: ParsedPair["lay"];
-};
-
-interface IntakeData {
+type IntakeData = {
   backScreenshotId: string;
   layScreenshotId: string;
   parsedData: ParsedPair & {
@@ -41,12 +28,12 @@ interface IntakeData {
     back?: ScreenshotRecord;
     lay?: ScreenshotRecord;
   };
-}
+};
 
-interface BetIntakeWrapperProps {
+type BetIntakeWrapperProps = {
   bookmakers: AccountOption[];
   exchanges: AccountOption[];
-}
+};
 
 /**
  * Wrapper component that orchestrates the two-phase bet intake:

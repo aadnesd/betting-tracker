@@ -22,12 +22,12 @@ import type { ParsedBet } from "@/lib/bet-parser";
 import { isTestEnvironment } from "@/lib/constants";
 
 /** Account info passed to the agent for matching */
-export interface AgentAccount {
+export type AgentAccount = {
   id: string;
   name: string;
   kind: "bookmaker" | "exchange";
   currency: string | null;
-}
+};
 
 /** Single bet result from the agent parser */
 export interface AgentParsedBet extends ParsedBet {
@@ -35,14 +35,14 @@ export interface AgentParsedBet extends ParsedBet {
 }
 
 /** Combined result for back + lay bets */
-export interface AgentParsedPair {
+export type AgentParsedPair = {
   back: AgentParsedBet;
   lay: AgentParsedBet;
   needsReview: boolean;
   notes?: string;
   ocrDurationMs: number;
   llmDurationMs: number;
-}
+};
 
 /** Schema for agent output */
 const agentOutputSchema = z.object({
@@ -83,14 +83,22 @@ const agentOutputSchema = z.object({
     .union([z.enum(["high", "medium", "low"]), z.string(), z.number()])
     .nullable()
     .transform((val): "high" | "medium" | "low" | null => {
-      if (val === null || val === undefined) return null;
-      if (val === "high" || val === "medium" || val === "low") return val;
+      if (val === null || val === undefined) {
+        return null;
+      }
+      if (val === "high" || val === "medium" || val === "low") {
+        return val;
+      }
       // Convert numeric confidence to enum
       const numVal =
         typeof val === "number" ? val : Number.parseFloat(String(val));
-      if (!isNaN(numVal)) {
-        if (numVal >= 0.8) return "high";
-        if (numVal >= 0.5) return "medium";
+      if (!Number.isNaN(numVal)) {
+        if (numVal >= 0.8) {
+          return "high";
+        }
+        if (numVal >= 0.5) {
+          return "medium";
+        }
         return "low";
       }
       return null;
@@ -202,7 +210,7 @@ Then provide your final structured output.`;
 function createBetParserAgent(
   accounts: AgentAccount[],
   betKind: "back" | "lay",
-  imageUrl: string
+  _imageUrl: string
 ) {
   const relevantAccounts = accounts.filter(
     (a) => a.kind === (betKind === "back" ? "bookmaker" : "exchange")

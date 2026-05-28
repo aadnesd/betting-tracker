@@ -66,7 +66,9 @@ export function parseOdds(value: string): number | null {
   // Fractional format (e.g., "3/2")
   if (/^\d+\/\d+$/.test(trimmed)) {
     const [numerator, denominator] = trimmed.split("/").map(Number);
-    if (denominator === 0) return null;
+    if (denominator === 0) {
+      return null;
+    }
     const decimal = numerator / denominator + 1;
     return isValidOdds(decimal) ? decimal : null;
   }
@@ -90,14 +92,14 @@ export function parseOdds(value: string): number | null {
 // CSV Parsing Types
 // ─────────────────────────────────────────────────────────────────────────────
 
-export interface CsvRowError {
+export type CsvRowError = {
   row: number;
   field: string;
   message: string;
   value?: string;
-}
+};
 
-export interface CsvParseResult<T> {
+export type CsvParseResult<T> = {
   success: boolean;
   data: T[];
   errors: CsvRowError[];
@@ -105,7 +107,7 @@ export interface CsvParseResult<T> {
   successCount: number;
   /** Total number of data rows (excluding header) */
   totalCount: number;
-}
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Bet CSV Schema
@@ -141,7 +143,7 @@ export const BetCsvRowSchema = z.object({
 
 export type BetCsvRow = z.infer<typeof BetCsvRowSchema>;
 
-export interface ParsedBet {
+export type ParsedBet = {
   kind: "back" | "lay";
   market: string;
   selection: string;
@@ -151,7 +153,7 @@ export interface ParsedBet {
   currency: CurrencyCode;
   placedAt: Date | null;
   notes: string | null;
-}
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Balance CSV Schema
@@ -181,14 +183,14 @@ export const BalanceCsvRowSchema = z.object({
 
 export type BalanceCsvRow = z.infer<typeof BalanceCsvRowSchema>;
 
-export interface ParsedBalance {
+export type ParsedBalance = {
   account: string;
   type: "deposit" | "withdrawal" | "bonus" | "adjustment";
   amount: number;
   currency: CurrencyCode;
   date: Date;
   notes: string | null;
-}
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CSV Parsing Functions
@@ -202,14 +204,18 @@ export function parseCsvText(
   csvText: string
 ): { headers: string[]; rows: Record<string, string>[] } | null {
   const lines = csvText.split(/\r?\n/).filter((line) => line.trim());
-  if (lines.length === 0) return null;
+  if (lines.length === 0) {
+    return null;
+  }
 
   const headerLine = lines[0];
   const headers = parseCsvLine(headerLine).map((h) =>
     h.trim().toLowerCase().replace(/\s+/g, "_")
   );
 
-  if (headers.length === 0) return null;
+  if (headers.length === 0) {
+    return null;
+  }
 
   const rows: Record<string, string>[] = [];
   for (let i = 1; i < lines.length; i++) {
@@ -264,7 +270,9 @@ function parseCsvLine(line: string): string[] {
  * - US: "01/15/2024"
  */
 export function parseDate(value: string): Date | null {
-  if (!value || !value.trim()) return null;
+  if (!value || !value.trim()) {
+    return null;
+  }
 
   const trimmed = value.trim();
 
@@ -514,7 +522,7 @@ export function parseBalancesCsv(
 // CSV Export Functions
 // ─────────────────────────────────────────────────────────────────────────────
 
-export interface ExportableMatchedBet {
+export type ExportableMatchedBet = {
   id: string;
   market: string;
   selection: string;
@@ -536,7 +544,7 @@ export interface ExportableMatchedBet {
     currency: string | null;
     profitLoss: string | null;
   } | null;
-}
+};
 
 /**
  * Generate CSV content from matched bets for export.

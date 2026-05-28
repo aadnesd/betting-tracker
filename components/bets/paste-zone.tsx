@@ -13,7 +13,7 @@ type PasteZoneState =
   | "loading"
   | "error";
 
-interface PasteZoneProps {
+type PasteZoneProps = {
   /** Identifier for this zone (e.g., "back" or "lay") */
   kind: "back" | "lay";
   /** Label shown in the header */
@@ -28,7 +28,7 @@ interface PasteZoneProps {
   error?: string | null;
   /** Whether this zone is disabled */
   disabled?: boolean;
-}
+};
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
@@ -83,10 +83,14 @@ export function PasteZone({
   // Handle paste event
   const handlePaste = useCallback(
     (event: React.ClipboardEvent) => {
-      if (disabled || isLoading) return;
+      if (disabled || isLoading) {
+        return;
+      }
 
       const items = event.clipboardData?.items;
-      if (!items) return;
+      if (!items) {
+        return;
+      }
 
       for (const item of Array.from(items)) {
         if (item.type.startsWith("image/")) {
@@ -111,7 +115,9 @@ export function PasteZone({
   // Handle drag events
   const handleDragOver = useCallback(
     (event: React.DragEvent) => {
-      if (disabled || isLoading) return;
+      if (disabled || isLoading) {
+        return;
+      }
       event.preventDefault();
       event.stopPropagation();
       setIsDragOver(true);
@@ -131,7 +137,9 @@ export function PasteZone({
       event.stopPropagation();
       setIsDragOver(false);
 
-      if (disabled || isLoading) return;
+      if (disabled || isLoading) {
+        return;
+      }
 
       const droppedFile = event.dataTransfer.files?.[0];
       if (droppedFile) {
@@ -163,14 +171,18 @@ export function PasteZone({
 
   // Handle click to focus for paste
   const handleContainerClick = useCallback(() => {
-    if (disabled || isLoading) return;
+    if (disabled || isLoading) {
+      return;
+    }
     containerRef.current?.focus();
   }, [disabled, isLoading]);
 
   // Handle keyboard for remove
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent) => {
-      if (disabled || isLoading) return;
+      if (disabled || isLoading) {
+        return;
+      }
 
       if ((event.key === "Delete" || event.key === "Backspace") && file) {
         event.preventDefault();
@@ -184,11 +196,21 @@ export function PasteZone({
   const hasImage = file !== null && previewUrl !== null;
 
   const getState = (): PasteZoneState => {
-    if (isLoading) return "loading";
-    if (displayError) return "error";
-    if (hasImage) return "preview";
-    if (isDragOver) return "hovering";
-    if (isFocused) return "focused";
+    if (isLoading) {
+      return "loading";
+    }
+    if (displayError) {
+      return "error";
+    }
+    if (hasImage) {
+      return "preview";
+    }
+    if (isDragOver) {
+      return "hovering";
+    }
+    if (isFocused) {
+      return "focused";
+    }
     return "empty";
   };
 

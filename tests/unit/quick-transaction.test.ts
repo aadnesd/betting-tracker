@@ -10,13 +10,13 @@ import { describe, expect, it } from "vitest";
  */
 
 // Test the AccountOption interface structure
-interface AccountOption {
+type AccountOption = {
   id: string;
   name: string;
   kind: "bookmaker" | "exchange";
   currency: string;
   currentBalance: string;
-}
+};
 
 describe("QuickTransactionSheet", () => {
   describe("AccountOption interface", () => {

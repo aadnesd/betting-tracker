@@ -3,7 +3,7 @@ import { auth } from "@/app/(auth)/auth";
 import { getRecentDepositsForAccountCached } from "@/lib/db/cached-queries";
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ accountId: string }> }
 ) {
   const session = await auth();

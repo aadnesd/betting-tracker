@@ -170,7 +170,7 @@ describe("open bet stakes queries", () => {
       // Free bets are house money, so they shouldn't reduce available balance
       const accountBalance = 150.0;
       const openBackStake = 50.0; // Real money locked
-      const openFreeBetStake = 100.0; // Free bet - not locked
+      const _openFreeBetStake = 100.0; // Free bet - not locked
       const availableBalance = accountBalance - openBackStake;
       // Should be 100, not 0 (if we incorrectly subtracted free bet)
       expect(availableBalance).toBe(100.0);

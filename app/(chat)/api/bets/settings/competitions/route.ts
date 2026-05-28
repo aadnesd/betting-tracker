@@ -1,11 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/app/(auth)/auth";
-import {
-  getEnabledCompetitions,
-  getUserSettings,
-  upsertUserSettings,
-} from "@/lib/db/queries";
+import { getUserSettings, upsertUserSettings } from "@/lib/db/queries";
 import {
   AVAILABLE_COMPETITIONS,
   DEFAULT_COMPETITION_CODES,
@@ -95,7 +91,7 @@ export async function PATCH(request: Request) {
  *
  * Resets to default competitions.
  */
-export async function POST(request: Request) {
+export async function POST(_request: Request) {
   const session = await auth();
 
   if (!session?.user?.id) {

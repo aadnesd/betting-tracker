@@ -65,7 +65,6 @@ async function backfillTable<T extends typeof backBet | typeof layBet>({
             stakeNok: stakeNok.toFixed(2),
             profitLossNok:
               profitLossNok === null ? null : profitLossNok.toFixed(2),
-            // biome-ignore lint/suspicious/noExplicitAny: Generic table type requires type assertion
           } as any)
           .where(eq(table.id, row.id));
 
