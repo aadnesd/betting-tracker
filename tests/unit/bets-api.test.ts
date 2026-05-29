@@ -1748,7 +1748,7 @@ describe("bets API routes (unit)", () => {
       expect(dbQueries.saveLayBet).toHaveBeenCalledWith(
         expect.objectContaining({
           screenshotId: "manual-lay-1",
-          odds: 2.52,
+          odds: expect.closeTo(2.52, 8),
           stake: 99.2,
           status: "matched",
         })
@@ -2009,6 +2009,72 @@ describe("bets API routes (unit)", () => {
         stake: 100,
         odds: 2.5,
       });
+    });
+
+    it("combines quick-add split lay legs before saving and exposure calculation", async () => {
+      (dbQueries.createManualScreenshot as vi.Mock).mockResolvedValueOnce({
+        id: "manual-back-1",
+      });
+      (dbQueries.createManualScreenshot as vi.Mock).mockResolvedValueOnce({
+        id: "manual-lay-1",
+      });
+      (dbQueries.getOrCreateAccount as vi.Mock).mockResolvedValueOnce({
+        id: "acc-back",
+        commission: null,
+      });
+      (dbQueries.getOrCreateAccount as vi.Mock).mockResolvedValueOnce({
+        id: "acc-lay",
+        commission: null,
+      });
+      (dbQueries.saveBackBet as vi.Mock).mockResolvedValue({ id: "bb1" });
+      (dbQueries.saveLayBet as vi.Mock).mockResolvedValue({ id: "lb1" });
+      (dbQueries.createMatchedBetRecord as vi.Mock).mockResolvedValue({
+        id: "mb1",
+        status: "matched",
+      });
+
+      const res = await quickAddRoute(
+        new Request("http://localhost/api/bets/quick-add", {
+          method: "POST",
+          body: JSON.stringify({
+            market: "Premier League",
+            selection: "Arsenal to Win",
+            back: {
+              odds: 2.5,
+              stake: 300,
+              bookmaker: "bet365",
+              currency: "USD",
+            },
+            lay: {
+              odds: 2.02,
+              stake: 200,
+              exchange: "bfb247",
+              currency: "USD",
+              legs: [
+                { odds: 2.02, stake: 200 },
+                { odds: 2.04, stake: 100 },
+              ],
+            },
+          }),
+        })
+      );
+
+      expect(res.status).toBe(200);
+      expect(dbQueries.saveLayBet).toHaveBeenCalledWith(
+        expect.objectContaining({
+          odds: expect.closeTo(2.026_666_666_7, 8),
+          stake: 300,
+        })
+      );
+      expect(convertAmountToNok).toHaveBeenCalledWith(
+        expect.closeTo(308, 8),
+        "USD"
+      );
+      expect(dbQueries.createMatchedBetRecord).toHaveBeenCalledWith(
+        expect.objectContaining({
+          notes: expect.stringContaining("Lay splits:"),
+        })
+      );
     });
   });
 

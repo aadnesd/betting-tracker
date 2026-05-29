@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { computeMatchedNetExposure } from "@/lib/bet-calculations";
+import {
+  combineSplitBetLegs,
+  computeMatchedNetExposure,
+} from "@/lib/bet-calculations";
 
 describe("computeMatchedNetExposure", () => {
   it("uses the worse outcome after exchange commission", () => {
@@ -43,5 +46,35 @@ describe("computeMatchedNetExposure", () => {
     expect(result.profitIfBackWins).toBe(72);
     expect(result.profitIfLayWins).toBe(78.4);
     expect(result.netExposure).toBe(72);
+  });
+});
+
+describe("combineSplitBetLegs", () => {
+  it("combines back splits into total stake and equivalent odds", () => {
+    const result = combineSplitBetLegs(
+      [
+        { odds: 2.02, stake: 200 },
+        { odds: 2.04, stake: 100 },
+      ],
+      "back"
+    );
+
+    expect(result.stake).toBe(300);
+    expect(result.profit).toBeCloseTo(308);
+    expect(result.odds).toBeCloseTo(2.026_666_666_7);
+  });
+
+  it("combines lay splits using total liability", () => {
+    const result = combineSplitBetLegs(
+      [
+        { odds: 2.02, stake: 200 },
+        { odds: 2.04, stake: 100 },
+      ],
+      "lay"
+    );
+
+    expect(result.stake).toBe(300);
+    expect(result.liability).toBeCloseTo(308);
+    expect(result.odds).toBeCloseTo(2.026_666_666_7);
   });
 });
