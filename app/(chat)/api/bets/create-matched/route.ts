@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getTestAwareSession } from "@/lib/auth";
 import {
+  combineSplitBetLegs,
   computeMatchedNetExposure,
   computeNetExposureInputs,
 } from "@/lib/bet-calculations";
@@ -59,23 +60,28 @@ const payloadSchema = z
     notes: z.string().optional(),
     back: betPartSchema.optional(),
     lay: betPartSchema.optional(),
+    backBets: z.array(betPartSchema).optional(),
+    layBets: z.array(betPartSchema).optional(),
   })
   .superRefine((value, ctx) => {
-    if (!value.back && !value.lay) {
+    const hasBack = Boolean(value.back || value.backBets?.length);
+    const hasLay = Boolean(value.lay || value.layBets?.length);
+
+    if (!hasBack && !hasLay) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: "At least one bet leg is required",
       });
     }
 
-    if (value.back && !value.backScreenshotId) {
+    if (hasBack && !value.backScreenshotId) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: "Back screenshot is required when back bet is provided",
       });
     }
 
-    if (value.lay && !value.layScreenshotId) {
+    if (hasLay && !value.layScreenshotId) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: "Lay screenshot is required when lay bet is provided",
@@ -155,6 +161,45 @@ async function resolvePromoId({
   return null;
 }
 
+function combineBetParts(
+  parts: z.infer<typeof betPartSchema>[],
+  kind: "back" | "lay"
+) {
+  if (parts.length === 0) {
+    return null;
+  }
+
+  const [first] = parts;
+  const combined = combineSplitBetLegs(parts, kind);
+
+  return {
+    ...first,
+    odds: combined.odds,
+    stake: combined.stake,
+    liability: kind === "lay" ? combined.liability : first.liability,
+    splitLegs: combined.legs,
+  };
+}
+
+function formatSplitLegNotes({
+  label,
+  legs,
+  currency,
+}: {
+  label: string;
+  legs: { odds: number; stake: number }[];
+  currency?: string | null;
+}) {
+  if (legs.length <= 1) {
+    return null;
+  }
+
+  const prefix = currency ? `${currency} ` : "";
+  return `${label} splits: ${legs
+    .map((leg) => `${prefix}${leg.stake.toFixed(2)} @ ${leg.odds.toFixed(4)}`)
+    .join(", ")}`;
+}
+
 export async function POST(request: Request) {
   const session = await getTestAwareSession();
 
@@ -171,12 +216,24 @@ export async function POST(request: Request) {
   }
 
   try {
-    const hasBack = Boolean(body.back);
-    const hasLay = Boolean(body.lay);
+    const backParts = body.backBets?.length
+      ? body.backBets
+      : body.back
+        ? [body.back]
+        : [];
+    const layParts = body.layBets?.length
+      ? body.layBets
+      : body.lay
+        ? [body.lay]
+        : [];
+    const backPart = combineBetParts(backParts, "back");
+    const layPart = combineBetParts(layParts, "lay");
+    const hasBack = Boolean(backPart);
+    const hasLay = Boolean(layPart);
     const reviewInfo = evaluateNeedsReview({
       explicitFlag: body.needsReview,
-      backConfidence: body.back?.confidence,
-      layConfidence: body.lay?.confidence,
+      backConfidence: backPart?.confidence,
+      layConfidence: layPart?.confidence,
     });
     const needsReview = reviewInfo.needsReview;
     const missingLeg = !hasBack || !hasLay;
@@ -210,9 +267,9 @@ export async function POST(request: Request) {
       );
     }
 
-    const layExchange = body.lay?.exchange?.trim() || "bfb247";
+    const layExchange = layPart?.exchange?.trim() || "bfb247";
     const layCurrency =
-      body.lay?.currency?.toUpperCase() ?? (hasLay ? "NOK" : undefined);
+      layPart?.currency?.toUpperCase() ?? (hasLay ? "NOK" : undefined);
     const betStatusFallback = needsReview
       ? "needs_review"
       : missingLeg
@@ -220,23 +277,23 @@ export async function POST(request: Request) {
         : "matched";
 
     const backCurrency =
-      body.back?.currency?.toUpperCase() ?? (hasBack ? "NOK" : undefined);
+      backPart?.currency?.toUpperCase() ?? (hasBack ? "NOK" : undefined);
 
-    const backExchange = body.back?.exchange?.trim() || "Unknown";
+    const backExchange = backPart?.exchange?.trim() || "Unknown";
     const [backAccountResult, layAccountResult] = await Promise.all([
-      hasBack && body.back
+      hasBack && backPart
         ? resolveAccountId({
             userId: session.user.id,
-            accountId: body.back.accountId,
+            accountId: backPart.accountId,
             exchange: backExchange,
             kind: "bookmaker",
             currency: backCurrency ?? null,
           })
         : Promise.resolve(null),
-      hasLay && body.lay
+      hasLay && layPart
         ? resolveAccountId({
             userId: session.user.id,
-            accountId: body.lay.accountId,
+            accountId: layPart.accountId,
             exchange: layExchange,
             kind: "exchange",
             currency: layCurrency ?? "NOK",
@@ -261,14 +318,14 @@ export async function POST(request: Request) {
     const backAccountId = backAccountResult?.id ?? null;
     const layAccountId = layAccountResult?.id ?? null;
 
-    if (hasBack && body.back?.accountId && !backAccountId) {
+    if (hasBack && backPart?.accountId && !backAccountId) {
       return NextResponse.json(
         { error: "Back account not found" },
         { status: 404 }
       );
     }
 
-    if (hasLay && body.lay?.accountId && !layAccountId) {
+    if (hasLay && layPart?.accountId && !layAccountId) {
       return NextResponse.json(
         { error: "Lay account not found" },
         { status: 404 }
@@ -286,62 +343,62 @@ export async function POST(request: Request) {
     }
 
     const backBetRow =
-      hasBack && body.back && backShot
+      hasBack && backPart && backShot
         ? await saveBackBet({
             userId: session.user.id,
             screenshotId: backShot.id,
-            market: body.back.market,
-            selection: body.back.selection,
+            market: backPart.market,
+            selection: backPart.selection,
             normalizedSelection: body.normalizedSelection ?? null,
-            odds: body.back.odds,
-            stake: body.back.stake,
+            odds: backPart.odds,
+            stake: backPart.stake,
             exchange: backExchange,
             matchId: body.matchId ?? null,
             accountId: backAccountId,
             currency: backCurrency ?? null,
-            placedAt: safeDate(body.back.placedAt),
-            settledAt: safeDate(body.back.settledAt),
-            profitLoss: body.back.profitLoss ?? null,
-            confidence: body.back.confidence ?? null,
-            status: body.back.status ?? betStatusFallback,
+            placedAt: safeDate(backPart.placedAt),
+            settledAt: safeDate(backPart.settledAt),
+            profitLoss: backPart.profitLoss ?? null,
+            confidence: backPart.confidence ?? null,
+            status: backPart.status ?? betStatusFallback,
           })
         : null;
 
     const layBetRow =
-      hasLay && body.lay && layShot
+      hasLay && layPart && layShot
         ? await saveLayBet({
             userId: session.user.id,
             screenshotId: layShot.id,
-            market: body.lay.market,
-            selection: body.lay.selection,
+            market: layPart.market,
+            selection: layPart.selection,
             normalizedSelection: body.normalizedSelection ?? null,
-            odds: body.lay.odds,
-            stake: body.lay.stake,
+            odds: layPart.odds,
+            stake: layPart.stake,
             exchange: layExchange,
             matchId: body.matchId ?? null,
             accountId: layAccountId,
             currency: layCurrency ?? "NOK",
-            placedAt: safeDate(body.lay.placedAt),
-            settledAt: safeDate(body.lay.settledAt),
-            profitLoss: body.lay.profitLoss ?? null,
-            confidence: body.lay.confidence ?? null,
-            status: body.lay.status ?? betStatusFallback,
+            placedAt: safeDate(layPart.placedAt),
+            settledAt: safeDate(layPart.settledAt),
+            profitLoss: layPart.profitLoss ?? null,
+            confidence: layPart.confidence ?? null,
+            status: layPart.status ?? betStatusFallback,
           })
         : null;
 
     let netExposure: number | null = null;
 
-    if (hasBack && hasLay && body.back && body.lay) {
+    if (hasBack && hasLay && backPart && layPart) {
       console.log(
-        `[NET EXPOSURE] Input values: backStake=${body.back.stake}, backOdds=${body.back.odds}, layStake=${body.lay.stake}, layOdds=${body.lay.odds}, layLiability=${body.lay.liability}`
+        `[NET EXPOSURE] Input values: backStake=${backPart.stake}, backOdds=${backPart.odds}, layStake=${layPart.stake}, layOdds=${layPart.odds}, layLiability=${layPart.liability}`
       );
 
       const { backProfit, layLiability } = computeNetExposureInputs({
-        backStake: body.back.stake,
-        backOdds: body.back.odds,
-        layStake: body.lay.stake,
-        layOdds: body.lay.odds,
-        layLiabilityProvided: body.lay.liability,
+        backStake: backPart.stake,
+        backOdds: backPart.odds,
+        layStake: layPart.stake,
+        layOdds: layPart.odds,
+        layLiabilityProvided: layPart.liability,
       });
 
       console.log(
@@ -353,9 +410,9 @@ export async function POST(request: Request) {
 
       const [backStakeNok, backProfitNok, layStakeNok, layLiabilityNok] =
         await Promise.all([
-          convertAmountToNok(body.back.stake, backCurrency ?? "NOK"),
+          convertAmountToNok(backPart.stake, backCurrency ?? "NOK"),
           convertAmountToNok(backProfit, backCurrency ?? "NOK"),
-          convertAmountToNok(body.lay.stake, layCurrency ?? "NOK"),
+          convertAmountToNok(layPart.stake, layCurrency ?? "NOK"),
           convertAmountToNok(layLiability, layCurrency ?? "NOK"),
         ]);
 
@@ -382,7 +439,25 @@ export async function POST(request: Request) {
     }
 
     const auditNote = formatNeedsReviewNote(reviewInfo);
-    const mergedNotes = [body.notes?.trim(), auditNote]
+    const splitNotes = [
+      backPart
+        ? formatSplitLegNotes({
+            label: "Back",
+            legs: backPart.splitLegs,
+            currency: backCurrency,
+          })
+        : null,
+      layPart
+        ? formatSplitLegNotes({
+            label: "Lay",
+            legs: layPart.splitLegs,
+            currency: layCurrency,
+          })
+        : null,
+    ]
+      .filter(Boolean)
+      .join("\n");
+    const mergedNotes = [body.notes?.trim(), splitNotes, auditNote]
       .filter(Boolean)
       .join("\n\n");
 
@@ -401,13 +476,13 @@ export async function POST(request: Request) {
       notes: mergedNotes || null,
     });
 
-    if (backBetRow && backAccountId && body.back) {
+    if (backBetRow && backAccountId && backPart) {
       await addQualifyingBetsForMatchedBet({
         userId: session.user.id,
         accountId: backAccountId,
         matchedBetId: matched.id,
-        stake: body.back.stake,
-        odds: body.back.odds,
+        stake: backPart?.stake ?? 0,
+        odds: backPart?.odds ?? 0,
       });
     }
 
@@ -422,13 +497,14 @@ export async function POST(request: Request) {
           entityId: backBetRow.id,
           action: "create",
           changes: {
-            market: body.back?.market,
-            selection: body.back?.selection,
-            odds: body.back?.odds,
-            stake: body.back?.stake,
+            market: backPart?.market,
+            selection: backPart?.selection,
+            odds: backPart?.odds,
+            stake: backPart?.stake,
+            splitCount: backPart?.splitLegs.length ?? 1,
             exchange: backExchange,
             currency: backCurrency,
-            status: body.back?.status ?? betStatusFallback,
+            status: backPart?.status ?? betStatusFallback,
           },
           notes: needsReview ? auditNote : null,
         })
@@ -443,13 +519,14 @@ export async function POST(request: Request) {
           entityId: layBetRow.id,
           action: "create",
           changes: {
-            market: body.lay?.market,
-            selection: body.lay?.selection,
-            odds: body.lay?.odds,
-            stake: body.lay?.stake,
+            market: layPart?.market,
+            selection: layPart?.selection,
+            odds: layPart?.odds,
+            stake: layPart?.stake,
+            splitCount: layPart?.splitLegs.length ?? 1,
             exchange: layExchange,
             currency: layCurrency,
-            status: body.lay?.status ?? betStatusFallback,
+            status: layPart?.status ?? betStatusFallback,
           },
           notes: needsReview ? auditNote : null,
         })

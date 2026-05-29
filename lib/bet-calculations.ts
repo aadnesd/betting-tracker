@@ -20,6 +20,48 @@ export function computeNetExposureInputs({
   return { backProfit, layLiability };
 }
 
+export type SplitBetLegInput = {
+  odds: number;
+  stake: number;
+  liability?: number | null;
+};
+
+export function combineSplitBetLegs(
+  legs: SplitBetLegInput[],
+  kind: "back" | "lay"
+) {
+  const validLegs = legs.filter((leg) => leg.stake > 0 && leg.odds > 1);
+  const stake = validLegs.reduce((total, leg) => total + leg.stake, 0);
+
+  if (stake <= 0) {
+    return { odds: 0, stake: 0, profit: 0, liability: 0, legs: validLegs };
+  }
+
+  const profit = validLegs.reduce(
+    (total, leg) => total + leg.stake * (leg.odds - 1),
+    0
+  );
+  const liability =
+    kind === "lay"
+      ? validLegs.reduce(
+          (total, leg) =>
+            total +
+            (leg.liability != null && leg.liability > 0
+              ? leg.liability
+              : leg.stake * (leg.odds - 1)),
+          0
+        )
+      : 0;
+
+  return {
+    odds: kind === "lay" ? liability / stake + 1 : profit / stake + 1,
+    stake,
+    profit,
+    liability,
+    legs: validLegs,
+  };
+}
+
 export function computeMatchedNetExposure({
   backStake,
   backProfit,
