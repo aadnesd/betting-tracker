@@ -1,13 +1,13 @@
 import { endOfDay, format, startOfDay, subDays } from "date-fns";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { auth } from "@/app/(auth)/auth";
 import { BetStatusBadge } from "@/components/bets/bet-status-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
+import { getCachedSession } from "@/lib/auth";
 import { listMatchedBetsForList } from "@/lib/db/queries";
 import { formatNOK } from "@/lib/reporting";
 
@@ -88,7 +88,7 @@ function formatOdds(value: number) {
 }
 
 export default async function Page(props: PageProps) {
-  const session = await auth();
+  const session = await getCachedSession();
 
   if (!session?.user) {
     redirect("/login");

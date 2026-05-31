@@ -1,9 +1,9 @@
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { auth } from "@/app/(auth)/auth";
 import { TransactionForm } from "@/components/bets/transaction-form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { getCachedSession } from "@/lib/auth";
 import { getAccountById, listActiveWalletsByUser } from "@/lib/db/queries";
 
 export const metadata = {
@@ -15,7 +15,7 @@ export default async function NewTransactionPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const session = await auth();
+  const session = await getCachedSession();
   if (!session?.user) {
     redirect("/login");
   }

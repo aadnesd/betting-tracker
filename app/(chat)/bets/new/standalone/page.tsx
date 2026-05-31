@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
-import { auth } from "@/app/(auth)/auth";
 import { StandaloneBetForm } from "@/components/bets/standalone-bet-form";
+import { getCachedSession } from "@/lib/auth";
 import { listAccountsByUser, listFreeBetsByUser } from "@/lib/db/queries";
 
 export const metadata = {
@@ -8,7 +8,7 @@ export const metadata = {
 };
 
 export default async function StandaloneBetPage() {
-  const session = await auth();
+  const session = await getCachedSession();
   if (!session?.user) {
     redirect("/login");
   }

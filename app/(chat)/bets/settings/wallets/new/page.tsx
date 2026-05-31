@@ -1,17 +1,17 @@
 import { Wallet } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { auth } from "@/app/(auth)/auth";
 import { WalletForm } from "@/components/bets/wallet-form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { getCachedSession } from "@/lib/auth";
 
 export const metadata = {
   title: "Add Wallet",
 };
 
 export default async function NewWalletPage() {
-  const session = await auth();
+  const session = await getCachedSession();
 
   if (!session?.user) {
     redirect("/login");

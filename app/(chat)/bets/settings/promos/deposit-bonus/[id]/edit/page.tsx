@@ -1,10 +1,10 @@
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { auth } from "@/app/(auth)/auth";
 import { DepositBonusForm } from "@/components/bets/deposit-bonus-form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { getCachedSession } from "@/lib/auth";
 import { getDepositBonusById, listAccountsByUser } from "@/lib/db/queries";
 
 export default async function EditDepositBonusPage({
@@ -12,7 +12,7 @@ export default async function EditDepositBonusPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const session = await auth();
+  const session = await getCachedSession();
   if (!session?.user?.id) {
     redirect("/login");
   }

@@ -13,10 +13,10 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { auth } from "@/app/(auth)/auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { getCachedSession } from "@/lib/auth";
 import {
   countExpiringDepositBonuses,
   countExpiringFreeBets,
@@ -99,7 +99,7 @@ export default async function PromosSettingsPage({
 }: {
   searchParams: Promise<{ filter?: string }>;
 }) {
-  const session = await auth();
+  const session = await getCachedSession();
 
   if (!session?.user) {
     redirect("/login");

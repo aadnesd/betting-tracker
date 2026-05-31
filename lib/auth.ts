@@ -1,9 +1,18 @@
 import { headers } from "next/headers";
 import type { Session } from "next-auth";
+import { cache } from "react";
 import { auth } from "@/app/(auth)/auth";
 import { isTestEnvironment } from "@/lib/constants";
 
 const TEST_SESSION_TTL_MS = 60 * 60 * 1000;
+
+/**
+ * Per-request session accessor for Server Component trees.
+ * Repeated calls with the same arguments are deduplicated within one render.
+ */
+export const getCachedSession = cache(
+  async (): Promise<Session | null> => auth()
+);
 
 /**
  * Returns the authenticated session, with a Playwright-only fallback

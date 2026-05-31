@@ -1,7 +1,6 @@
 import { AlertTriangle, ArrowLeft, CheckCircle, Pencil, X } from "lucide-react";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { auth } from "@/app/(auth)/auth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,6 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { getCachedSession } from "@/lib/auth";
 import {
   getAccountBalance,
   getDepositBonusById,
@@ -27,7 +27,7 @@ export default async function DepositBonusDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const session = await auth();
+  const session = await getCachedSession();
   if (!session?.user?.id) {
     redirect("/login");
   }

@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
-import { auth } from "@/app/(auth)/auth";
 import { TransactionsPageClient } from "@/components/bets/transactions-page-client";
+import { getCachedSession } from "@/lib/auth";
 import { listUnifiedTransactionsByUser } from "@/lib/db/queries";
 
 export const metadata = {
@@ -8,7 +8,7 @@ export const metadata = {
 };
 
 export default async function TransactionsPage() {
-  const session = await auth();
+  const session = await getCachedSession();
 
   if (!session?.user) {
     redirect("/login");
