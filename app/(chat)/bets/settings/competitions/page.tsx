@@ -1,7 +1,6 @@
 import { Globe, Trophy } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { auth } from "@/app/(auth)/auth";
 import { CompetitionSelector } from "@/components/bets/competition-selector";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,6 +10,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { getCachedSession } from "@/lib/auth";
 import { getUserSettings } from "@/lib/db/queries";
 import {
   AVAILABLE_COMPETITIONS,
@@ -22,7 +22,7 @@ export const metadata = {
 };
 
 export default async function CompetitionSettingsPage() {
-  const session = await auth();
+  const session = await getCachedSession();
 
   if (!session?.user) {
     redirect("/login");

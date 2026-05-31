@@ -1,10 +1,10 @@
 import { endOfDay, startOfDay, subDays } from "date-fns";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { auth } from "@/app/(auth)/auth";
 import { IndividualBetsTable } from "@/components/bets/individual-bets-table";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { getCachedSession } from "@/lib/auth";
 import { listAccountsByUser, listAllBetsByUser } from "@/lib/db/queries";
 
 export const metadata = {
@@ -83,7 +83,7 @@ function normalizeStatusFilter(status?: string): StatusFilter {
 }
 
 export default async function Page(props: PageProps) {
-  const session = await auth();
+  const session = await getCachedSession();
 
   if (!session?.user) {
     redirect("/login");

@@ -4,7 +4,6 @@ import { unstable_cache } from "next/cache";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { auth } from "@/app/(auth)/auth";
 import { BetStatusBadge } from "@/components/bets/bet-status-badge";
 import { DashboardActions } from "@/components/bets/dashboard-actions";
 import { DashboardSummaryCards } from "@/components/bets/dashboard-summary-cards";
@@ -13,6 +12,7 @@ import { FreeBetExpiryBanner } from "@/components/bets/free-bet-expiry-banner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { getCachedSession } from "@/lib/auth";
 import { dashboardTag } from "@/lib/cache";
 import {
   countExpiringFreeBets,
@@ -146,7 +146,7 @@ function buildCopyMatchedBetHref(
 }
 
 export default async function Page() {
-  const session = await auth();
+  const session = await getCachedSession();
 
   if (!session?.user) {
     redirect("/login");

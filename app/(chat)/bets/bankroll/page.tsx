@@ -14,10 +14,10 @@ import {
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { auth } from "@/app/(auth)/auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getCachedSession } from "@/lib/auth";
 import {
   getBankrollSummary,
   getOpenBetStakesByAccount,
@@ -44,7 +44,7 @@ const BankrollTransactionChart = dynamic(
 );
 
 export default async function BankrollPage() {
-  const session = await auth();
+  const session = await getCachedSession();
 
   if (!session?.user) {
     redirect("/login");

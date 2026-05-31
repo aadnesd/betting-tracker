@@ -1,10 +1,10 @@
 import { Wallet } from "lucide-react";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { auth } from "@/app/(auth)/auth";
 import { WalletForm } from "@/components/bets/wallet-form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { getCachedSession } from "@/lib/auth";
 import { getWalletById } from "@/lib/db/queries";
 import type { WalletStatus, WalletType } from "@/lib/db/schema";
 
@@ -17,7 +17,7 @@ export default async function EditWalletPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const session = await auth();
+  const session = await getCachedSession();
 
   if (!session?.user) {
     redirect("/login");

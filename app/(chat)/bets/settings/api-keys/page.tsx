@@ -1,7 +1,6 @@
 import { AlertTriangle, Key, Smartphone } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { auth } from "@/app/(auth)/auth";
 import { ApiKeyManager } from "@/components/bets/api-key-manager";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,6 +10,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { getCachedSession } from "@/lib/auth";
 import { getShortcutApiKeyInfo } from "@/lib/db/queries";
 
 export const metadata = {
@@ -18,7 +18,7 @@ export const metadata = {
 };
 
 export default async function ApiKeysPage() {
-  const session = await auth();
+  const session = await getCachedSession();
 
   if (!session?.user) {
     redirect("/login");

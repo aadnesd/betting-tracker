@@ -9,12 +9,12 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { auth } from "@/app/(auth)/auth";
 import { BetStatusBadge } from "@/components/bets/bet-status-badge";
 import { ValueWithTooltip } from "@/components/bets/calculation-tooltip";
 import { MatchedBetDetailActions } from "@/components/bets/matched-bet-detail-actions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { getCachedSession } from "@/lib/auth";
 import { computeMatchedBetOutcomes } from "@/lib/bet-calculations";
 import {
   getMatchedBetWithParts,
@@ -41,7 +41,7 @@ type PageProps = {
 
 export default async function Page({ params }: PageProps) {
   const { id } = await params;
-  const session = await auth();
+  const session = await getCachedSession();
 
   if (!session?.user) {
     redirect("/login");
