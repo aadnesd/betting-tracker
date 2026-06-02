@@ -21,6 +21,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  DEFAULT_WIN_WAGERING_EXPIRES_IN_DAYS,
+  DEFAULT_WIN_WAGERING_MIN_ODDS,
+  DEFAULT_WIN_WAGERING_MULTIPLIER,
+} from "@/lib/bets/free-bet-defaults";
 
 type Account = {
   id: string;
@@ -75,7 +80,11 @@ const CURRENCIES = ["NOK", "EUR", "GBP", "USD", "SEK", "DKK"] as const;
 export function FreeBetForm({ accounts, initialData, mode }: FreeBetFormProps) {
   const router = useRouter();
   const hasExistingUnlock = initialData?.unlockType != null;
-  const hasExistingWinWagering = initialData?.winWageringMultiplier != null;
+  const hasExistingWinWagering =
+    initialData?.winWageringMultiplier != null ||
+    initialData?.winWageringMinOdds != null ||
+    initialData?.winWageringExpiresInDays != null;
+  const shouldEnableDefaultWinWagering = mode === "create";
   const [formData, setFormData] = useState<FormData>({
     accountId: initialData?.accountId ?? "",
     name: initialData?.name ?? "",
@@ -89,16 +98,28 @@ export function FreeBetForm({ accounts, initialData, mode }: FreeBetFormProps) {
     unlockTarget: initialData?.unlockTarget ?? "",
     unlockMinOdds: initialData?.unlockMinOdds ?? "",
     stakeReturned: initialData?.stakeReturned ?? false,
-    hasWinWageringRequirements: hasExistingWinWagering,
-    winWageringMultiplier: initialData?.winWageringMultiplier ?? "",
-    winWageringMinOdds: initialData?.winWageringMinOdds ?? "",
+    hasWinWageringRequirements:
+      shouldEnableDefaultWinWagering || hasExistingWinWagering,
+    winWageringMultiplier:
+      initialData?.winWageringMultiplier ??
+      (shouldEnableDefaultWinWagering
+        ? DEFAULT_WIN_WAGERING_MULTIPLIER.toString()
+        : ""),
+    winWageringMinOdds:
+      initialData?.winWageringMinOdds ??
+      (shouldEnableDefaultWinWagering
+        ? DEFAULT_WIN_WAGERING_MIN_ODDS.toString()
+        : ""),
     winWageringExpiresInDays:
-      initialData?.winWageringExpiresInDays?.toString() ?? "",
+      initialData?.winWageringExpiresInDays?.toString() ??
+      (shouldEnableDefaultWinWagering
+        ? DEFAULT_WIN_WAGERING_EXPIRES_IN_DAYS.toString()
+        : ""),
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showUnlockSection, setShowUnlockSection] = useState(hasExistingUnlock);
   const [showWinWageringSection, setShowWinWageringSection] = useState(
-    hasExistingWinWagering
+    shouldEnableDefaultWinWagering || hasExistingWinWagering
   );
   const [errors, setErrors] = useState<Partial<Record<keyof FormData, string>>>(
     {}
