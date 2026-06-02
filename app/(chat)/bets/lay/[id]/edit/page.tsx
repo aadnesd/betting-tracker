@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation";
-import { auth } from "@/app/(auth)/auth";
 import { StandaloneBetForm } from "@/components/bets/standalone-bet-form";
+import { getCachedSession } from "@/lib/auth";
 import { getLayBetById, listAccountsByUser } from "@/lib/db/queries";
 import {
   canUserEditSettledBets,
@@ -17,7 +17,7 @@ type PageProps = {
 
 export default async function Page({ params }: PageProps) {
   const { id } = await params;
-  const session = await auth();
+  const session = await getCachedSession();
 
   if (!session?.user) {
     redirect("/login");

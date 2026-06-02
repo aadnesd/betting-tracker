@@ -8,13 +8,13 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { auth } from "@/app/(auth)/auth";
 import { MonthDivider, monthKey } from "@/components/bets/month-divider";
 import { WalletActions } from "@/components/bets/wallet-actions";
 import { WalletTransactionForm } from "@/components/bets/wallet-transaction-form";
 import { WalletTransactionRow } from "@/components/bets/wallet-transaction-row";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { getCachedSession } from "@/lib/auth";
 import {
   calculateWalletBalance,
   getWalletById,
@@ -77,7 +77,7 @@ export default async function WalletDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const session = await auth();
+  const session = await getCachedSession();
 
   if (!session?.user) {
     redirect("/login");

@@ -1,13 +1,13 @@
 import { ArrowLeft, Building2, CreditCard, Pencil, Plus } from "lucide-react";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { auth } from "@/app/(auth)/auth";
 import { AccountEditForm } from "@/components/bets/account-edit-form";
 import { MonthDivider, monthKey } from "@/components/bets/month-divider";
 import { TransactionRow } from "@/components/bets/transaction-row";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { getCachedSession } from "@/lib/auth";
 import {
   getAccountBalance,
   getAccountById,
@@ -45,7 +45,7 @@ export default async function AccountDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const session = await auth();
+  const session = await getCachedSession();
   if (!session?.user) {
     redirect("/login");
   }

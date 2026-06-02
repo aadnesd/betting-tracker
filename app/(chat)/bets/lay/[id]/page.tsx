@@ -1,7 +1,7 @@
 import { format } from "date-fns";
 import { notFound, redirect } from "next/navigation";
-import { auth } from "@/app/(auth)/auth";
 import { IndividualBetDetail } from "@/components/bets/individual-bet-detail";
+import { getCachedSession } from "@/lib/auth";
 import {
   getAccountBalance,
   getAccountById,
@@ -24,7 +24,7 @@ type PageProps = {
 
 export default async function Page({ params }: PageProps) {
   const { id } = await params;
-  const session = await auth();
+  const session = await getCachedSession();
 
   if (!session?.user) {
     redirect("/login");

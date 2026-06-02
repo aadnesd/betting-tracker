@@ -2,7 +2,6 @@ import { format } from "date-fns";
 import { ArrowLeft, CalendarDays, Gift, Lock, Target } from "lucide-react";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { auth } from "@/app/(auth)/auth";
 import { FreeBetDeleteButton } from "@/components/bets/free-bet-delete-button";
 import { FreeBetForm } from "@/components/bets/free-bet-form";
 import { Badge } from "@/components/ui/badge";
@@ -15,6 +14,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { getCachedSession } from "@/lib/auth";
 import {
   getFreeBetById,
   listAccountsByUser,
@@ -48,7 +48,7 @@ function getStatusBadge(status: string) {
 export default async function FreeBetDetailPage({
   params,
 }: FreeBetDetailPageProps) {
-  const session = await auth();
+  const session = await getCachedSession();
 
   if (!session?.user) {
     redirect("/login");

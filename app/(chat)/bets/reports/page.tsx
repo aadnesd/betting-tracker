@@ -3,7 +3,6 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
-import { auth } from "@/app/(auth)/auth";
 import { BookmakerProfitWithBonusesTable } from "@/components/bets/bookmaker-profit-with-bonuses-table";
 import { ExportButton } from "@/components/bets/export-button";
 import { ReportingBreakdownTable } from "@/components/bets/reporting-breakdown-table";
@@ -11,6 +10,7 @@ import { ReportingDateFilter } from "@/components/bets/reporting-date-filter";
 import { ReportingSummaryCard } from "@/components/bets/reporting-summary-card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getCachedSession } from "@/lib/auth";
 import {
   getBalanceSnapshots,
   getBonusProfitEvents,
@@ -78,7 +78,7 @@ type Props = {
 };
 
 export default async function Page(props: Props) {
-  const session = await auth();
+  const session = await getCachedSession();
 
   if (!session?.user) {
     redirect("/login");

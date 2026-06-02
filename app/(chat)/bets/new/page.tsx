@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
-import { auth } from "@/app/(auth)/auth";
 import { BetIntakeWrapper } from "@/components/bets/bet-intake-wrapper";
+import { getCachedSession } from "@/lib/auth";
 import { listAccountsByUser } from "@/lib/db/queries";
 
 export const metadata = {
@@ -10,7 +10,7 @@ export const metadata = {
 
 export default async function Page() {
   await connection();
-  const session = await auth();
+  const session = await getCachedSession();
 
   if (!session?.user) {
     redirect("/login");

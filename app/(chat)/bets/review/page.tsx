@@ -1,11 +1,11 @@
 import { format } from "date-fns";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { auth } from "@/app/(auth)/auth";
 import { BetStatusBadge } from "@/components/bets/bet-status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { getCachedSession } from "@/lib/auth";
 import {
   countMatchedBetsByStatus,
   listMatchedBetsByStatus,
@@ -17,7 +17,7 @@ export const metadata = {
 };
 
 export default async function Page() {
-  const session = await auth();
+  const session = await getCachedSession();
 
   if (!session?.user) {
     redirect("/login");

@@ -1,10 +1,10 @@
 import { redirect } from "next/navigation";
-import { auth } from "@/app/(auth)/auth";
 import {
   QuickAddForm,
   type QuickAddInitialMatchInfo,
   type QuickAddInitialValues,
 } from "@/components/bets/quick-add-form";
+import { getCachedSession } from "@/lib/auth";
 import { listAccountsByUser, listFreeBetsByUser } from "@/lib/db/queries";
 
 export const metadata = {
@@ -40,7 +40,7 @@ function normalizeCopiedSelection(value?: string) {
 }
 
 export default async function QuickAddPage(props: QuickAddPageProps) {
-  const session = await auth();
+  const session = await getCachedSession();
   if (!session?.user) {
     redirect("/login");
   }
