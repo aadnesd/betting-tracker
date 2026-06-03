@@ -18,6 +18,7 @@ type QuickAddPageProps = {
     selection?: string;
     matchId?: string;
     normalizedSelection?: string;
+    unlinkedMatchDate?: string;
     homeTeam?: string;
     awayTeam?: string;
     promoType?: string;
@@ -37,6 +38,20 @@ function normalizeCopiedSelection(value?: string) {
   return value === "HOME_TEAM" || value === "AWAY_TEAM" || value === "DRAW"
     ? value
     : "";
+}
+
+function toLocalDateTimeInputValue(value?: string) {
+  if (!value) {
+    return "";
+  }
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return "";
+  }
+  const local = new Date(
+    parsed.getTime() - parsed.getTimezoneOffset() * 60_000
+  );
+  return local.toISOString().slice(0, 16);
 }
 
 export default async function QuickAddPage(props: QuickAddPageProps) {
@@ -100,6 +115,9 @@ export default async function QuickAddPage(props: QuickAddPageProps) {
           market: searchParams.market ?? "",
           selection: searchParams.selection ?? "",
           matchId: searchParams.matchId ?? "",
+          unlinkedMatchDate: toLocalDateTimeInputValue(
+            searchParams.unlinkedMatchDate
+          ),
           normalizedSelection: normalizeCopiedSelection(
             searchParams.normalizedSelection
           ),

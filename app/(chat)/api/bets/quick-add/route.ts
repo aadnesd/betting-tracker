@@ -31,6 +31,7 @@ const quickAddSchema = z.object({
   market: z.string().min(1, "Market is required"),
   selection: z.string().min(1, "Selection is required"),
   matchId: z.string().uuid().optional(),
+  unlinkedMatchDate: z.string().datetime({ offset: true }).optional(),
   normalizedSelection: z.enum(["HOME_TEAM", "AWAY_TEAM", "DRAW"]).optional(),
   promoType: z.string().optional(),
   freeBetId: z.string().uuid().optional(),
@@ -204,6 +205,11 @@ export async function POST(request: Request) {
         })
       : null;
 
+    const unlinkedMatchDate =
+      body.matchId || !body.unlinkedMatchDate
+        ? null
+        : new Date(body.unlinkedMatchDate);
+
     const { netExposure } = computeMatchedNetExposure({
       backStake: backStakeNok,
       backProfit: backProfitNok,
@@ -239,6 +245,7 @@ export async function POST(request: Request) {
       backBetId: backBetRow.id,
       layBetId: layBetRow.id,
       matchId: body.matchId ?? null,
+      unlinkedMatchDate,
       market: body.market,
       selection: body.selection,
       normalizedSelection: body.normalizedSelection ?? null,
@@ -313,6 +320,7 @@ export async function POST(request: Request) {
           promoType: body.promoType ?? null,
           status: "matched",
           netExposure,
+          unlinkedMatchDate: unlinkedMatchDate?.toISOString() ?? null,
           source: "quick_add",
           freeBetId: body.freeBetId ?? null,
         },

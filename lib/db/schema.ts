@@ -262,6 +262,9 @@ export const matchedBet = pgTable(
     layBetId: uuid("layBetId").references(() => layBet.id),
     // Link to a football match for auto-settlement (optional until match picker is implemented)
     matchId: uuid("matchId"),
+    // Optional kickoff time for unlinked matched bets created manually.
+    // Used to defer unlinked auto-settlement lookups until the match should be finished.
+    unlinkedMatchDate: timestamp("unlinkedMatchDate"),
     market: text("market").notNull(),
     selection: text("selection").notNull(),
     // Normalized selection for Match Odds: HOME_TEAM, AWAY_TEAM, DRAW (populated during match linking)

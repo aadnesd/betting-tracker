@@ -2110,6 +2110,7 @@ export async function createMatchedBetRecord({
   backBetId,
   layBetId,
   matchId,
+  unlinkedMatchDate,
   market,
   selection,
   normalizedSelection,
@@ -2125,6 +2126,7 @@ export async function createMatchedBetRecord({
   backBetId?: string | null;
   layBetId?: string | null;
   matchId?: string | null;
+  unlinkedMatchDate?: Date | null;
   market: string;
   selection: string;
   /** Normalized selection for Match Odds: HOME_TEAM, AWAY_TEAM, DRAW */
@@ -2144,6 +2146,7 @@ export async function createMatchedBetRecord({
       backBetId: backBetId ?? null,
       layBetId: layBetId ?? null,
       matchId: matchId ?? null,
+      unlinkedMatchDate: unlinkedMatchDate ?? null,
       market,
       selection,
       normalizedSelection: normalizedSelection ?? null,
@@ -2250,6 +2253,7 @@ export type MatchedBetListItem = {
   id: string;
   market: string;
   selection: string;
+  unlinkedMatchDate: Date | null;
   normalizedSelection: "HOME_TEAM" | "AWAY_TEAM" | "DRAW" | null;
   status: "draft" | "matched" | "settled" | "needs_review";
   promoType: string | null;
@@ -2432,6 +2436,7 @@ export async function listMatchedBetsForList({
         id: matchedBet.id,
         market: matchedBet.market,
         selection: matchedBet.selection,
+        unlinkedMatchDate: matchedBet.unlinkedMatchDate,
         normalizedSelection: matchedBet.normalizedSelection,
         status: matchedBet.status,
         promoType: matchedBet.promoType,
@@ -2555,6 +2560,7 @@ export async function listMatchedBetsForList({
         id: row.id,
         market: row.market,
         selection: row.selection,
+        unlinkedMatchDate: row.unlinkedMatchDate ?? null,
         normalizedSelection: row.normalizedSelection ?? null,
         status: row.status,
         promoType: row.promoType ?? null,
@@ -3278,6 +3284,7 @@ export type UnlinkedBetReadyForSettlement = Omit<
   "matchId" | "footballMatch"
 > & {
   matchId: null;
+  unlinkedMatchDate: Date | null;
 };
 
 /**
@@ -3423,6 +3430,7 @@ export async function findUnlinkedBetsReadyForAutoSettlement({
 } = {}): Promise<UnlinkedBetReadyForSettlement[]> {
   try {
     const exchangeAccount = aliasedTable(account, "exchangeAccount");
+    const now = new Date();
 
     const rows = await db
       .select({
@@ -3434,6 +3442,7 @@ export async function findUnlinkedBetsReadyForAutoSettlement({
         status: matchedBet.status,
         promoType: matchedBet.promoType,
         matchId: matchedBet.matchId,
+        unlinkedMatchDate: matchedBet.unlinkedMatchDate,
         backBetId: backBet.id,
         backOdds: backBet.odds,
         backStake: backBet.stake,
@@ -3451,7 +3460,16 @@ export async function findUnlinkedBetsReadyForAutoSettlement({
       .leftJoin(backBet, eq(matchedBet.backBetId, backBet.id))
       .leftJoin(layBet, eq(matchedBet.layBetId, layBet.id))
       .leftJoin(exchangeAccount, eq(layBet.accountId, exchangeAccount.id))
-      .where(and(eq(matchedBet.status, "matched"), isNull(matchedBet.matchId)))
+      .where(
+        and(
+          eq(matchedBet.status, "matched"),
+          isNull(matchedBet.matchId),
+          or(
+            isNull(matchedBet.unlinkedMatchDate),
+            lte(matchedBet.unlinkedMatchDate, now)
+          )
+        )
+      )
       .orderBy(asc(matchedBet.createdAt))
       .limit(limit);
 
@@ -3468,6 +3486,7 @@ export async function findUnlinkedBetsReadyForAutoSettlement({
       status: row.status,
       promoType: row.promoType,
       matchId: null,
+      unlinkedMatchDate: row.unlinkedMatchDate ?? null,
       backBetId: row.backBetId,
       backOdds: row.backOdds,
       backStake: row.backStake,

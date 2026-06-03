@@ -70,6 +70,7 @@ type FormData = {
   market: string;
   selection: string;
   matchId: string;
+  unlinkedMatchDate: string;
   normalizedSelection: "HOME_TEAM" | "AWAY_TEAM" | "DRAW" | "";
   promoType: string;
   freeBetId: string;
@@ -120,6 +121,7 @@ export function QuickAddForm({
     market: "",
     selection: "",
     matchId: "",
+    unlinkedMatchDate: "",
     normalizedSelection: "",
     promoType: "",
     freeBetId: "",
@@ -313,6 +315,13 @@ export function QuickAddForm({
     if (!formData.selection.trim()) {
       newErrors.selection = "Selection is required";
     }
+    if (
+      !formData.matchId &&
+      formData.unlinkedMatchDate &&
+      Number.isNaN(Date.parse(formData.unlinkedMatchDate))
+    ) {
+      newErrors.unlinkedMatchDate = "Enter a valid match date";
+    }
     const validBackLegs = backLegs.every(
       (leg) =>
         leg.odds &&
@@ -396,6 +405,10 @@ export function QuickAddForm({
           market: formData.market.trim(),
           selection: formData.selection.trim(),
           matchId: formData.matchId || undefined,
+          unlinkedMatchDate:
+            !formData.matchId && formData.unlinkedMatchDate
+              ? new Date(formData.unlinkedMatchDate).toISOString()
+              : undefined,
           normalizedSelection: formData.normalizedSelection || undefined,
           promoType: formData.promoType || undefined,
           freeBetId: formData.freeBetId || undefined,
@@ -512,6 +525,34 @@ export function QuickAddForm({
                   Linking to a match enables automatic result lookup
                 </p>
               </div>
+
+              {!formData.matchId && (
+                <div className="space-y-2">
+                  <Label htmlFor="unlinkedMatchDate">
+                    Match Date (optional)
+                  </Label>
+                  <Input
+                    className={
+                      errors.unlinkedMatchDate ? "border-destructive" : ""
+                    }
+                    id="unlinkedMatchDate"
+                    onChange={(e) =>
+                      updateField("unlinkedMatchDate", e.target.value)
+                    }
+                    type="datetime-local"
+                    value={formData.unlinkedMatchDate}
+                  />
+                  {errors.unlinkedMatchDate && (
+                    <p className="text-destructive text-xs">
+                      {errors.unlinkedMatchDate}
+                    </p>
+                  )}
+                  <p className="text-muted-foreground text-xs">
+                    Auto-settlement for unlinked bets will wait until this time
+                    has passed.
+                  </p>
+                </div>
+              )}
 
               {/* Normalized Selection - shown when match is linked */}
               {selectedMatchInfo && (

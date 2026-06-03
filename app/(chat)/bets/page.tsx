@@ -128,6 +128,8 @@ function buildCopyMatchedBetHref(
     params.set("matchId", bet.footballMatch.id);
     params.set("homeTeam", bet.footballMatch.homeTeam);
     params.set("awayTeam", bet.footballMatch.awayTeam);
+  } else if (bet.unlinkedMatchDate) {
+    params.set("unlinkedMatchDate", bet.unlinkedMatchDate.toISOString());
   }
   if (bet.back) {
     params.set("backOdds", String(bet.back.odds));

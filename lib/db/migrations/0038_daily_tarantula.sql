@@ -1,0 +1,1 @@
+ALTER TABLE "MatchedBet" ADD COLUMN "unlinkedMatchDate" timestamp;
