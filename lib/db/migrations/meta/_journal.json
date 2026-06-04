@@ -267,6 +267,13 @@
       "when": 1779912486784,
       "tag": "0037_medical_talos",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1780471806537,
+      "tag": "0038_daily_tarantula",
+      "breakpoints": true
     }
   ]
 }

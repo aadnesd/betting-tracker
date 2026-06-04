@@ -1800,6 +1800,65 @@ describe("bets API routes (unit)", () => {
       expect(json.details).toBeDefined();
     });
 
+    it("stores unlinked match date for unlinked quick-add bets", async () => {
+      (dbQueries.createManualScreenshot as vi.Mock).mockResolvedValueOnce({
+        id: "manual-back-1",
+      });
+      (dbQueries.createManualScreenshot as vi.Mock).mockResolvedValueOnce({
+        id: "manual-lay-1",
+      });
+      (dbQueries.getOrCreateAccount as vi.Mock).mockResolvedValueOnce({
+        id: "acc-back",
+      });
+      (dbQueries.getOrCreateAccount as vi.Mock).mockResolvedValueOnce({
+        id: "acc-lay",
+      });
+      (dbQueries.saveBackBet as vi.Mock).mockResolvedValue({ id: "bb1" });
+      (dbQueries.saveLayBet as vi.Mock).mockResolvedValue({ id: "lb1" });
+      (dbQueries.createMatchedBetRecord as vi.Mock).mockResolvedValue({
+        id: "mb1",
+        status: "matched",
+      });
+      (dbQueries.createAuditEntry as vi.Mock).mockResolvedValue({
+        id: "audit-1",
+      });
+
+      const unlinkedMatchDate = "2026-06-30T19:45:00.000Z";
+
+      const payload = {
+        market: "Premier League",
+        selection: "Arsenal to Win",
+        unlinkedMatchDate,
+        back: {
+          odds: 2.5,
+          stake: 100,
+          bookmaker: "bet365",
+          currency: "NOK",
+        },
+        lay: {
+          odds: 2.52,
+          stake: 99.2,
+          exchange: "bfb247",
+          currency: "NOK",
+        },
+      };
+
+      const res = await quickAddRoute(
+        new Request("http://localhost/api/bets/quick-add", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        })
+      );
+
+      expect(res.status).toBe(200);
+      expect(dbQueries.createMatchedBetRecord).toHaveBeenCalledWith(
+        expect.objectContaining({
+          matchId: null,
+          unlinkedMatchDate: new Date(unlinkedMatchDate),
+        })
+      );
+    });
+
     it("rejects unauthenticated requests", async () => {
       (authModule.auth as vi.Mock).mockResolvedValueOnce(null);
 

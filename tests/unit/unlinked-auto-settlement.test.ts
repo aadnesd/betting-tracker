@@ -43,6 +43,7 @@ const dummyUnlinkedBet = {
   status: "matched",
   promoType: null,
   matchId: null,
+  unlinkedMatchDate: new Date("2026-05-16T12:00:00Z"),
   backBetId: "back-1",
   backOdds: "2.50",
   backStake: "100.00",
