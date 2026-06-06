@@ -1,6 +1,6 @@
 import "server-only";
 
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { db } from "@/lib/db/connection";
 import { fxRate } from "@/lib/db/schema";
 
@@ -12,7 +12,7 @@ const TARGET_CURRENCY = "NOK";
 const cache = new Map<string, { rate: number; expiresAt: number }>();
 const inFlightRateFetches = new Map<string, Promise<number>>();
 const CACHE_TTL_MS = 5 * 60 * 1000;
-const STORED_RATE_FRESH_MS = 30 * 60 * 1000;
+const STORED_RATE_FRESH_MS = 24 * 60 * 60 * 1000;
 const MAX_RETRIES = 3;
 const BASE_RETRY_DELAY_MS = 300;
 const STALE_FALLBACK_MS = 72 * 60 * 60 * 1000;
@@ -151,6 +151,61 @@ async function getStoredRate(
   }
 }
 
+async function getStoredRates(
+  bases: string[]
+): Promise<Map<string, { rate: number; updatedAt: Date }>> {
+  const result = new Map<string, { rate: number; updatedAt: Date }>();
+  if (bases.length === 0) {
+    return result;
+  }
+  try {
+    const rows = await db
+      .select({
+        base: fxRate.baseCurrency,
+        rate: fxRate.rateToNok,
+        updatedAt: fxRate.updatedAt,
+      })
+      .from(fxRate)
+      .where(inArray(fxRate.baseCurrency, bases));
+    for (const row of rows) {
+      result.set(row.base, {
+        rate: Number.parseFloat(String(row.rate)),
+        updatedAt: row.updatedAt,
+      });
+    }
+  } catch (error) {
+    console.error("[FX] Failed to batch-read stored FX rates:", error);
+  }
+  return result;
+}
+
+/**
+ * Seed the in-memory rate cache from a single batched DB read.
+ *
+ * Why: getRatesToNok resolves many currencies per request. Without this, each
+ * convertAmountToNok(1, code) call would issue its own getStoredRate query on
+ * a cold lambda (N round-trips). Priming the cache up front collapses those
+ * into one IN(...) query; only currencies with a fresh stored rate are seeded,
+ * so missing/stale ones still fall through to the normal API fetch path.
+ */
+async function primeCacheFromStored(effectiveBases: string[]): Promise<void> {
+  const now = Date.now();
+  const missing = effectiveBases.filter((base) => {
+    const cached = cache.get(base);
+    return !(cached && cached.expiresAt > now);
+  });
+  if (missing.length === 0) {
+    return;
+  }
+
+  const stored = await getStoredRates(missing);
+  for (const [base, { rate, updatedAt }] of stored) {
+    if (now - updatedAt.getTime() <= STORED_RATE_FRESH_MS) {
+      cache.set(base, { rate, expiresAt: now + CACHE_TTL_MS });
+    }
+  }
+}
+
 async function fetchRate(fromCurrency: string): Promise<number> {
   const base = fromCurrency.toUpperCase();
 
@@ -283,6 +338,81 @@ export async function convertAmountToNokStrict(
     `[FX] Converted ${amount} ${currency} → ${converted.toFixed(2)} NOK (rate: ${rate})`
   );
   return converted;
+}
+
+/**
+ * Resolve NOK conversion rates for a set of currencies in one pass.
+ *
+ * Why: Aggregations over many rows (wallet balances, bonus/fee transactions)
+ * previously called convertAmountToNok per row, producing a sequential FX
+ * waterfall (N awaits) on every request. This resolves each *distinct*
+ * currency once, in parallel, returning a lookup map so callers can convert
+ * synchronously with convertWithRates.
+ *
+ * NOK resolves to 1 without any lookup. Failures fall back to a rate of 1
+ * (amount unchanged) via convertAmountToNok, matching existing behavior.
+ *
+ * Returns a Map keyed by upper-cased currency code → rate to NOK.
+ */
+export async function getRatesToNok(
+  currencies: Iterable<string | null | undefined>
+): Promise<Map<string, number>> {
+  const distinct = new Set<string>();
+  for (const currency of currencies) {
+    const code = (currency ?? TARGET_CURRENCY).toUpperCase();
+    distinct.add(code);
+  }
+
+  const rates = new Map<string, number>();
+  const toFetch: string[] = [];
+  for (const code of distinct) {
+    if (code === TARGET_CURRENCY) {
+      rates.set(code, 1);
+    } else {
+      toFetch.push(code);
+    }
+  }
+
+  // Cold lambdas start with an empty in-memory cache, so each per-currency
+  // resolution below would otherwise issue its own stored-rate query. Prime
+  // the cache from a single batched DB read keyed by effective base (USD
+  // stablecoins collapse to USD) before resolving.
+  const effectiveBases = new Set<string>();
+  for (const code of toFetch) {
+    effectiveBases.add(USD_STABLECOINS.has(code) ? "USD" : code);
+  }
+  await primeCacheFromStored([...effectiveBases]);
+
+  await Promise.all(
+    toFetch.map(async (code) => {
+      // convertAmountToNok(1, code) yields the rate and never throws
+      // (falls back to 1 on FX failure).
+      const rate = await convertAmountToNok(1, code);
+      rates.set(code, rate);
+    })
+  );
+
+  return rates;
+}
+
+/**
+ * Convert an amount to NOK using a pre-resolved rate map from getRatesToNok.
+ *
+ * Synchronous by design: all FX lookups happen up front in getRatesToNok so
+ * row-level conversion adds no latency. Unknown currencies fall back to the
+ * amount unchanged (rate of 1), matching convertAmountToNok's failure mode.
+ */
+export function convertWithRates(
+  amount: number,
+  currency: string | null | undefined,
+  rates: Map<string, number>
+): number {
+  const code = (currency ?? TARGET_CURRENCY).toUpperCase();
+  if (code === TARGET_CURRENCY) {
+    return amount;
+  }
+  const rate = rates.get(code) ?? 1;
+  return amount * rate;
 }
 
 /**

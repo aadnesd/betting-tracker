@@ -23,7 +23,12 @@ import {
   computeNetExposureInputs,
 } from "../bet-calculations";
 import { ChatSDKError } from "../errors";
-import { convertAmountToNok, convertAmountToNokStrict } from "../fx-rates";
+import {
+  convertAmountToNok,
+  convertAmountToNokStrict,
+  convertWithRates,
+  getRatesToNok,
+} from "../fx-rates";
 import { isFreeBetPromoType } from "../settlement";
 import { generateUUID } from "../utils";
 import { db } from "./connection";
@@ -5116,23 +5121,36 @@ export async function getTotalBonusesForUser({
         .where(and(...walletConditions)),
     ]);
 
+    // Resolve FX rates once for every currency that still needs conversion:
+    // legacy account rows without a precomputed amountNok, plus all wallet rows.
+    const currenciesToResolve: Array<string | null> = [];
+    for (const tx of accountTransactions) {
+      if (tx.amountNok == null) {
+        currenciesToResolve.push(tx.currency ?? "NOK");
+      }
+    }
+    for (const tx of walletTransactions) {
+      currenciesToResolve.push(tx.currency ?? "NOK");
+    }
+    const rates = await getRatesToNok(currenciesToResolve);
+
     // Sum using pre-computed amountNok (with fallback for legacy rows)
     let total = 0;
     for (const tx of accountTransactions) {
       if (tx.amountNok != null) {
         total += Number.parseFloat(tx.amountNok);
       } else {
-        // Legacy row without amountNok - convert on the fly
+        // Legacy row without amountNok - convert using resolved rates
         const amount = tx.amount ? Number.parseFloat(tx.amount) : 0;
         const currency = tx.currency ?? "NOK";
-        const amountNok = await convertAmountToNok(amount, currency);
-        total += amountNok;
+        total += convertWithRates(amount, currency, rates);
       }
     }
     for (const tx of walletTransactions) {
-      total += await convertAmountToNok(
+      total += convertWithRates(
         Number.parseFloat(tx.amount ?? "0"),
-        tx.currency ?? "NOK"
+        tx.currency ?? "NOK",
+        rates
       );
     }
 
@@ -5195,13 +5213,24 @@ export async function getBonusProfitEvents({
     ]);
 
     const events: ReportingProfitEvent[] = [];
+
+    // Resolve every distinct currency's NOK rate once, then convert per-row.
+    // Account rows with a precomputed amountNok skip conversion entirely.
+    const rates = await getRatesToNok([
+      ...accountTransactions
+        .filter((transaction) => transaction.amountNok == null)
+        .map((transaction) => transaction.currency),
+      ...walletTransactions.map((transaction) => transaction.currency),
+    ]);
+
     for (const transaction of accountTransactions) {
       const amountNok =
         transaction.amountNok != null
           ? Number.parseFloat(transaction.amountNok)
-          : await convertAmountToNok(
+          : convertWithRates(
               Number.parseFloat(transaction.amount ?? "0"),
-              transaction.currency ?? "NOK"
+              transaction.currency ?? "NOK",
+              rates
             );
 
       events.push({
@@ -5211,9 +5240,10 @@ export async function getBonusProfitEvents({
       });
     }
     for (const transaction of walletTransactions) {
-      const amountNok = await convertAmountToNok(
+      const amountNok = convertWithRates(
         Number.parseFloat(transaction.amount ?? "0"),
-        transaction.currency ?? "NOK"
+        transaction.currency ?? "NOK",
+        rates
       );
 
       events.push({
@@ -5263,11 +5293,15 @@ export async function getWalletFeeSummary({
       .innerJoin(wallet, eq(walletTransaction.walletId, wallet.id))
       .where(and(...conditions));
 
+    // Resolve each distinct currency's NOK rate once, then convert per-row.
+    const rates = await getRatesToNok(rows.map((row) => row.currency));
+
     let total = 0;
     for (const row of rows) {
-      total += await convertAmountToNok(
+      total += convertWithRates(
         Number.parseFloat(row.amount),
-        row.currency ?? "NOK"
+        row.currency ?? "NOK",
+        rates
       );
     }
 
@@ -5315,11 +5349,15 @@ export async function getWalletFeeProfitEvents({
       .innerJoin(wallet, eq(walletTransaction.walletId, wallet.id))
       .where(and(...conditions));
 
+    // Resolve each distinct currency's NOK rate once, then convert per-row.
+    const rates = await getRatesToNok(rows.map((row) => row.currency));
+
     const events: ReportingProfitEvent[] = [];
     for (const row of rows) {
-      const feeNok = await convertAmountToNok(
+      const feeNok = convertWithRates(
         Number.parseFloat(row.amount),
-        row.currency ?? "NOK"
+        row.currency ?? "NOK",
+        rates
       );
 
       events.push({
@@ -10007,8 +10045,12 @@ export async function getWalletTotals(userId: string): Promise<{
     let fiatBalanceNok = 0;
     let cryptoBalanceNok = 0;
 
+    // Resolve each distinct currency's NOK rate once, then convert per-row
+    // synchronously to avoid a sequential FX waterfall.
+    const rates = await getRatesToNok(activeWallets.map((w) => w.currency));
+
     for (const w of activeWallets) {
-      const balanceNok = await convertAmountToNok(w.balance, w.currency);
+      const balanceNok = convertWithRates(w.balance, w.currency, rates);
       totalBalanceNok += balanceNok;
 
       if (w.type === "crypto") {
