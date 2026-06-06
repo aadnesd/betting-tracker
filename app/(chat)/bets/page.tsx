@@ -129,7 +129,12 @@ function buildCopyMatchedBetHref(
     params.set("homeTeam", bet.footballMatch.homeTeam);
     params.set("awayTeam", bet.footballMatch.awayTeam);
   } else if (bet.unlinkedMatchDate) {
-    params.set("unlinkedMatchDate", bet.unlinkedMatchDate.toISOString());
+    // unlinkedMatchDate may arrive as a string when the bet list is served
+    // from unstable_cache (JSON-serialized), so normalize to a Date first.
+    params.set(
+      "unlinkedMatchDate",
+      new Date(bet.unlinkedMatchDate).toISOString()
+    );
   }
   if (bet.back) {
     params.set("backOdds", String(bet.back.odds));
