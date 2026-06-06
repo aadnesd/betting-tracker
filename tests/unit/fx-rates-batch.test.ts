@@ -2,17 +2,26 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
-const { mockLimit } = vi.hoisted(() => ({
+const { mockLimit, mockBatchRows } = vi.hoisted(() => ({
   mockLimit: vi.fn(),
+  mockBatchRows: vi.fn(),
 }));
 
 vi.mock("@/lib/db/connection", () => ({
   db: {
     select: vi.fn(() => ({
       from: vi.fn(() => ({
-        where: vi.fn(() => ({
-          limit: mockLimit,
-        })),
+        // `where` resolves to the batched rows (getStoredRates awaits it
+        // directly) while also exposing `.limit` for single-row getStoredRate.
+        where: vi.fn(() => {
+          const builder = Promise.resolve(
+            mockBatchRows()
+          ) as Promise<unknown> & {
+            limit: typeof mockLimit;
+          };
+          builder.limit = mockLimit;
+          return builder;
+        }),
       })),
     })),
     insert: vi.fn(() => ({
@@ -49,6 +58,7 @@ describe("getRatesToNok / convertWithRates", () => {
     process.env.FXRATES_API_KEY = "test-key";
     // No stored rate by default → forces an API fetch.
     mockLimit.mockResolvedValue([]);
+    mockBatchRows.mockReturnValue([]);
   });
 
   afterEach(() => {
@@ -99,8 +109,10 @@ describe("getRatesToNok / convertWithRates", () => {
   });
 
   it("uses a stored rate ~60min old without hitting the FX API (24h freshness)", async () => {
-    mockLimit.mockResolvedValue([
+    // Stored rate served from the single batched read primed up front.
+    mockBatchRows.mockReturnValue([
       {
+        base: "EUR",
         rate: "9.99",
         updatedAt: new Date(Date.now() - 60 * 60 * 1000),
       },
@@ -114,5 +126,60 @@ describe("getRatesToNok / convertWithRates", () => {
 
     expect(fetchMock).not.toHaveBeenCalled();
     expect(rates.get("EUR")).toBeCloseTo(9.99);
+  });
+
+  it("primes many currencies from one batched read and skips the FX API", async () => {
+    mockBatchRows.mockReturnValue([
+      { base: "EUR", rate: "11.5", updatedAt: new Date() },
+      { base: "GBP", rate: "13.2", updatedAt: new Date() },
+      { base: "USD", rate: "10.7", updatedAt: new Date() },
+    ]);
+    const fetchMock = vi.fn();
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const { getRatesToNok, convertWithRates } = await loadModule();
+
+    // USDT is a USD stablecoin → resolves from the primed USD rate.
+    const rates = await getRatesToNok(["EUR", "GBP", "USDT", "NOK"]);
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(rates.get("EUR")).toBeCloseTo(11.5);
+    expect(rates.get("GBP")).toBeCloseTo(13.2);
+    expect(rates.get("USDT")).toBeCloseTo(10.7);
+    expect(convertWithRates(2, "USDT", rates)).toBeCloseTo(21.4);
+  });
+
+  it("ignores a stale stored rate from the batch (older than 24h) and fetches", async () => {
+    mockBatchRows.mockReturnValue([
+      {
+        base: "EUR",
+        rate: "8.0",
+        updatedAt: new Date(Date.now() - 25 * 60 * 60 * 1000),
+      },
+    ]);
+    // getStoredRate fallback also returns the stale row; force API fetch.
+    mockLimit.mockResolvedValue([
+      {
+        rate: "8.0",
+        updatedAt: new Date(Date.now() - 25 * 60 * 60 * 1000),
+      },
+    ]);
+    const fetchMock = vi.fn(() =>
+      Promise.resolve({
+        ok: true,
+        status: 200,
+        statusText: "OK",
+        headers: { get: () => null },
+        json: () => Promise.resolve({ rates: { NOK: 11.9 } }),
+      } as unknown as Response)
+    );
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const { getRatesToNok } = await loadModule();
+
+    const rates = await getRatesToNok(["EUR"]);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(rates.get("EUR")).toBeCloseTo(11.9);
   });
 });

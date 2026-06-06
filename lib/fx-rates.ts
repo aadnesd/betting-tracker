@@ -1,6 +1,6 @@
 import "server-only";
 
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { db } from "@/lib/db/connection";
 import { fxRate } from "@/lib/db/schema";
 
@@ -148,6 +148,61 @@ async function getStoredRate(
   } catch (error) {
     console.error(`[FX] Failed to read stored FX rate for ${base}:`, error);
     return null;
+  }
+}
+
+async function getStoredRates(
+  bases: string[]
+): Promise<Map<string, { rate: number; updatedAt: Date }>> {
+  const result = new Map<string, { rate: number; updatedAt: Date }>();
+  if (bases.length === 0) {
+    return result;
+  }
+  try {
+    const rows = await db
+      .select({
+        base: fxRate.baseCurrency,
+        rate: fxRate.rateToNok,
+        updatedAt: fxRate.updatedAt,
+      })
+      .from(fxRate)
+      .where(inArray(fxRate.baseCurrency, bases));
+    for (const row of rows) {
+      result.set(row.base, {
+        rate: Number.parseFloat(String(row.rate)),
+        updatedAt: row.updatedAt,
+      });
+    }
+  } catch (error) {
+    console.error("[FX] Failed to batch-read stored FX rates:", error);
+  }
+  return result;
+}
+
+/**
+ * Seed the in-memory rate cache from a single batched DB read.
+ *
+ * Why: getRatesToNok resolves many currencies per request. Without this, each
+ * convertAmountToNok(1, code) call would issue its own getStoredRate query on
+ * a cold lambda (N round-trips). Priming the cache up front collapses those
+ * into one IN(...) query; only currencies with a fresh stored rate are seeded,
+ * so missing/stale ones still fall through to the normal API fetch path.
+ */
+async function primeCacheFromStored(effectiveBases: string[]): Promise<void> {
+  const now = Date.now();
+  const missing = effectiveBases.filter((base) => {
+    const cached = cache.get(base);
+    return !(cached && cached.expiresAt > now);
+  });
+  if (missing.length === 0) {
+    return;
+  }
+
+  const stored = await getStoredRates(missing);
+  for (const [base, { rate, updatedAt }] of stored) {
+    if (now - updatedAt.getTime() <= STORED_RATE_FRESH_MS) {
+      cache.set(base, { rate, expiresAt: now + CACHE_TTL_MS });
+    }
   }
 }
 
@@ -317,6 +372,16 @@ export async function getRatesToNok(
       toFetch.push(code);
     }
   }
+
+  // Cold lambdas start with an empty in-memory cache, so each per-currency
+  // resolution below would otherwise issue its own stored-rate query. Prime
+  // the cache from a single batched DB read keyed by effective base (USD
+  // stablecoins collapse to USD) before resolving.
+  const effectiveBases = new Set<string>();
+  for (const code of toFetch) {
+    effectiveBases.add(USD_STABLECOINS.has(code) ? "USD" : code);
+  }
+  await primeCacheFromStored([...effectiveBases]);
 
   await Promise.all(
     toFetch.map(async (code) => {

@@ -5213,13 +5213,24 @@ export async function getBonusProfitEvents({
     ]);
 
     const events: ReportingProfitEvent[] = [];
+
+    // Resolve every distinct currency's NOK rate once, then convert per-row.
+    // Account rows with a precomputed amountNok skip conversion entirely.
+    const rates = await getRatesToNok([
+      ...accountTransactions
+        .filter((transaction) => transaction.amountNok == null)
+        .map((transaction) => transaction.currency),
+      ...walletTransactions.map((transaction) => transaction.currency),
+    ]);
+
     for (const transaction of accountTransactions) {
       const amountNok =
         transaction.amountNok != null
           ? Number.parseFloat(transaction.amountNok)
-          : await convertAmountToNok(
+          : convertWithRates(
               Number.parseFloat(transaction.amount ?? "0"),
-              transaction.currency ?? "NOK"
+              transaction.currency ?? "NOK",
+              rates
             );
 
       events.push({
@@ -5229,9 +5240,10 @@ export async function getBonusProfitEvents({
       });
     }
     for (const transaction of walletTransactions) {
-      const amountNok = await convertAmountToNok(
+      const amountNok = convertWithRates(
         Number.parseFloat(transaction.amount ?? "0"),
-        transaction.currency ?? "NOK"
+        transaction.currency ?? "NOK",
+        rates
       );
 
       events.push({
@@ -5337,11 +5349,15 @@ export async function getWalletFeeProfitEvents({
       .innerJoin(wallet, eq(walletTransaction.walletId, wallet.id))
       .where(and(...conditions));
 
+    // Resolve each distinct currency's NOK rate once, then convert per-row.
+    const rates = await getRatesToNok(rows.map((row) => row.currency));
+
     const events: ReportingProfitEvent[] = [];
     for (const row of rows) {
-      const feeNok = await convertAmountToNok(
+      const feeNok = convertWithRates(
         Number.parseFloat(row.amount),
-        row.currency ?? "NOK"
+        row.currency ?? "NOK",
+        rates
       );
 
       events.push({
