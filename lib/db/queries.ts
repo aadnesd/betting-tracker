@@ -2316,6 +2316,7 @@ type UnlinkedAutoSettlementChanges = {
   backProfitLoss?: number;
   layProfitLoss?: number;
   matchResult?: string;
+  settlementReasoning?: unknown;
 };
 
 export type UnlinkedAutoSettledMatchedBetListItem = {
@@ -3570,6 +3571,8 @@ export type ApplyAutoSettlementParams = {
   selection: string;
   /** Match result description for audit notes */
   matchResult: string;
+  /** Optional explanation of how the settlement result was determined */
+  settlementReasoning?: Record<string, unknown>;
 };
 
 /**
@@ -3695,6 +3698,9 @@ export async function applyAutoSettlement(
         layProfitLoss: params.layProfitLoss,
         settledProfitNok,
         matchResult: params.matchResult,
+        ...(params.settlementReasoning
+          ? { settlementReasoning: params.settlementReasoning }
+          : {}),
       },
       notes: `Auto-settled: ${params.outcome} on ${params.market} - ${params.selection}`,
     });
