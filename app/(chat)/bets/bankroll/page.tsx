@@ -11,6 +11,7 @@ import {
   TrendingUp,
   Wallet,
 } from "lucide-react";
+import { unstable_cache } from "next/cache";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -18,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getCachedSession } from "@/lib/auth";
+import { dashboardTag } from "@/lib/cache";
 import {
   getBankrollSummary,
   getOpenBetStakesByAccount,
@@ -32,6 +34,20 @@ import { formatCurrency, formatNOK } from "@/lib/reporting";
 export const metadata = {
   title: "Bankroll",
 };
+
+// Cache bankroll data per user, invalidated by dashboard mutations via
+// revalidateDashboard(userId). Mirrors the /bets dashboard caching so the
+// FX-heavy aggregations don't run on every request.
+function cacheBankroll<T>(
+  userId: string,
+  key: string,
+  loader: () => Promise<T>
+) {
+  return unstable_cache(loader, ["bankroll", userId, key], {
+    tags: [dashboardTag(userId)],
+    revalidate: false,
+  })();
+}
 
 const BankrollTransactionChart = dynamic(
   () =>
@@ -52,7 +68,9 @@ export default async function BankrollPage() {
 
   const userId = session.user.id;
 
-  // Fetch all data in parallel
+  // Fetch all data in parallel. Aggregations are cached per user (tag-
+  // invalidated on writes); getDisplayRates stays uncached so its
+  // lastUpdated timestamp reflects the actual request time.
   const [
     summary,
     accounts,
@@ -63,21 +81,29 @@ export default async function BankrollPage() {
     trends90,
     fxRates,
   ] = await Promise.all([
-    getBankrollSummary({ userId }),
-    listAccountsWithBalances({ userId, status: "active" }),
-    getOpenBetStakesByAccount({ userId }),
-    listWalletsByUser(userId),
-    getWalletTotals(userId),
-    getTransactionTrends({
-      userId,
-      startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
-      groupBy: "day",
-    }),
-    getTransactionTrends({
-      userId,
-      startDate: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000),
-      groupBy: "week",
-    }),
+    cacheBankroll(userId, "summary", () => getBankrollSummary({ userId })),
+    cacheBankroll(userId, "accounts", () =>
+      listAccountsWithBalances({ userId, status: "active" })
+    ),
+    cacheBankroll(userId, "openBetStakes", () =>
+      getOpenBetStakesByAccount({ userId })
+    ),
+    cacheBankroll(userId, "wallets", () => listWalletsByUser(userId)),
+    cacheBankroll(userId, "walletTotals", () => getWalletTotals(userId)),
+    cacheBankroll(userId, "trends30", () =>
+      getTransactionTrends({
+        userId,
+        startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+        groupBy: "day",
+      })
+    ),
+    cacheBankroll(userId, "trends90", () =>
+      getTransactionTrends({
+        userId,
+        startDate: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000),
+        groupBy: "week",
+      })
+    ),
     getDisplayRates(),
   ]);
 

@@ -12,7 +12,7 @@ const TARGET_CURRENCY = "NOK";
 const cache = new Map<string, { rate: number; expiresAt: number }>();
 const inFlightRateFetches = new Map<string, Promise<number>>();
 const CACHE_TTL_MS = 5 * 60 * 1000;
-const STORED_RATE_FRESH_MS = 30 * 60 * 1000;
+const STORED_RATE_FRESH_MS = 24 * 60 * 60 * 1000;
 const MAX_RETRIES = 3;
 const BASE_RETRY_DELAY_MS = 300;
 const STALE_FALLBACK_MS = 72 * 60 * 60 * 1000;
@@ -283,6 +283,71 @@ export async function convertAmountToNokStrict(
     `[FX] Converted ${amount} ${currency} → ${converted.toFixed(2)} NOK (rate: ${rate})`
   );
   return converted;
+}
+
+/**
+ * Resolve NOK conversion rates for a set of currencies in one pass.
+ *
+ * Why: Aggregations over many rows (wallet balances, bonus/fee transactions)
+ * previously called convertAmountToNok per row, producing a sequential FX
+ * waterfall (N awaits) on every request. This resolves each *distinct*
+ * currency once, in parallel, returning a lookup map so callers can convert
+ * synchronously with convertWithRates.
+ *
+ * NOK resolves to 1 without any lookup. Failures fall back to a rate of 1
+ * (amount unchanged) via convertAmountToNok, matching existing behavior.
+ *
+ * Returns a Map keyed by upper-cased currency code → rate to NOK.
+ */
+export async function getRatesToNok(
+  currencies: Iterable<string | null | undefined>
+): Promise<Map<string, number>> {
+  const distinct = new Set<string>();
+  for (const currency of currencies) {
+    const code = (currency ?? TARGET_CURRENCY).toUpperCase();
+    distinct.add(code);
+  }
+
+  const rates = new Map<string, number>();
+  const toFetch: string[] = [];
+  for (const code of distinct) {
+    if (code === TARGET_CURRENCY) {
+      rates.set(code, 1);
+    } else {
+      toFetch.push(code);
+    }
+  }
+
+  await Promise.all(
+    toFetch.map(async (code) => {
+      // convertAmountToNok(1, code) yields the rate and never throws
+      // (falls back to 1 on FX failure).
+      const rate = await convertAmountToNok(1, code);
+      rates.set(code, rate);
+    })
+  );
+
+  return rates;
+}
+
+/**
+ * Convert an amount to NOK using a pre-resolved rate map from getRatesToNok.
+ *
+ * Synchronous by design: all FX lookups happen up front in getRatesToNok so
+ * row-level conversion adds no latency. Unknown currencies fall back to the
+ * amount unchanged (rate of 1), matching convertAmountToNok's failure mode.
+ */
+export function convertWithRates(
+  amount: number,
+  currency: string | null | undefined,
+  rates: Map<string, number>
+): number {
+  const code = (currency ?? TARGET_CURRENCY).toUpperCase();
+  if (code === TARGET_CURRENCY) {
+    return amount;
+  }
+  const rate = rates.get(code) ?? 1;
+  return amount * rate;
 }
 
 /**
