@@ -104,6 +104,16 @@ describe("unlinked auto-settlement cron", () => {
         matchResult: expect.stringContaining(
           "Houston Dynamo FC 1-0 Vancouver Whitecaps FC"
         ),
+        settlementReasoning: {
+          source: "unlinked_web_lookup",
+          lookupStatus: "finished",
+          lookupConfidence: "high",
+          lookupReason:
+            "MLS match on May 16, 2026 finished Houston Dynamo FC 1-0 Vancouver Whitecaps FC.",
+          outcomeReason: expect.any(String),
+          normalizedSelection: "AWAY_TEAM",
+          sourceUrls: ["https://example.com/houston-vancouver-score"],
+        },
       })
     );
     expect(applyAutoSettlement).toHaveBeenCalledWith(

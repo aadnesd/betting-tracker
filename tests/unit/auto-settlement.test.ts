@@ -351,8 +351,14 @@ describe("auto-settlement detection queries", () => {
         market: "Match Odds",
         selection: "Home Win",
         matchResult: "Arsenal 2-1 Chelsea",
+        settlementReasoning: {
+          source: "unlinked_web_lookup",
+          lookupReason: "Final score found from result lookup.",
+          outcomeReason: "Home team won.",
+        },
       };
       expect(params.matchedBetId).toBeDefined();
+      expect(params.settlementReasoning).toBeDefined();
     });
 
     it("returns result with success status and transaction count", () => {

@@ -299,6 +299,15 @@ async function processUnlinkedBet(
     market: bet.market,
     selection: bet.selection,
     matchResult: `${settlementMatchResult}${sourceNote}`,
+    settlementReasoning: {
+      source: "unlinked_web_lookup",
+      lookupStatus: lookup.status,
+      lookupConfidence: lookup.confidence,
+      lookupReason: lookup.reason,
+      outcomeReason: outcomeResult.reason,
+      normalizedSelection,
+      sourceUrls: lookup.sourceUrls,
+    },
   });
 
   if (bet.backAccountId && bet.backBetPlacedAt) {
