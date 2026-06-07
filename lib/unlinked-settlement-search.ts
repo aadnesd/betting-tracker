@@ -11,6 +11,7 @@ export type UnlinkedSettlementLookupStatus =
   | "not_found"
   | "ambiguous"
   | "not_configured"
+  | "transient_error"
   | "error";
 
 export type UnlinkedSettlementLookupResult = {
@@ -26,8 +27,60 @@ export type UnlinkedSettlementLookupResult = {
 };
 
 const DEFAULT_GATEWAY_MODEL = "openai/gpt-5.4-mini";
+// Backup models tried in order if the primary model fails or is rate-limited.
+// Lets the gateway settle on the first pass instead of flagging the bet for
+// review when the primary model hits a (per-model) free-tier rate limit.
+const DEFAULT_FALLBACK_MODELS = [
+  "openai/gpt-5.1-thinking",
+  "openai/gpt-5.3-codex",
+  "openai/gpt-5.1-codex",
+];
 const OPENAI_GATEWAY_MODEL_PREFIX = "openai/";
 const MARKET_TEAM_SPLIT_PATTERN = /\s+(?:v|vs|vs\.|-|\u2013|@)\s+/i;
+
+export function getFallbackModels(primaryModel: string): string[] {
+  const configured = process.env.UNLINKED_SETTLEMENT_SEARCH_FALLBACK_MODELS;
+  const models = configured
+    ? configured
+        .split(",")
+        .map((entry) => entry.trim())
+        .filter((entry) => entry.length > 0)
+    : DEFAULT_FALLBACK_MODELS;
+
+  // Never list the primary model as its own fallback.
+  return models.filter((entry) => entry !== primaryModel);
+}
+
+// Messages/codes that indicate a temporary failure: the lookup could likely
+// succeed on a later run, so the bet should stay eligible rather than being
+// flagged for manual review.
+const TRANSIENT_ERROR_PATTERN =
+  /rate.?limit|rate.?limited|free tier|too many requests|quota|overloaded|temporar|timed? ?out|timeout|econn|enotfound|etimedout|socket hang up|network|fetch failed|service unavailable|gateway timeout|\b(429|500|502|503|504)\b/i;
+
+function getErrorStatusCode(error: unknown): number | undefined {
+  if (!error || typeof error !== "object") {
+    return;
+  }
+  const candidate = error as { statusCode?: unknown; status?: unknown };
+  const raw = candidate.statusCode ?? candidate.status;
+  return typeof raw === "number" ? raw : undefined;
+}
+
+export function isTransientLookupError(error: unknown): boolean {
+  const statusCode = getErrorStatusCode(error);
+  if (statusCode !== undefined) {
+    if (statusCode === 429 || statusCode >= 500) {
+      return true;
+    }
+    // An explicit non-transient 4xx (e.g. 400/401/403) is a hard failure.
+    if (statusCode >= 400 && statusCode < 500) {
+      return false;
+    }
+  }
+
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  return TRANSIENT_ERROR_PATTERN.test(message);
+}
 
 const lookupOutputSchema = z.object({
   status: z.enum(["finished", "not_finished", "not_found", "ambiguous"]),
@@ -154,6 +207,9 @@ export async function resolveUnlinkedMatchedBetResult({
       output: Output.object({ schema: lookupOutputSchema }),
       stopWhen: tools ? stepCountIs(2) : undefined,
       tools,
+      providerOptions: {
+        gateway: { models: getFallbackModels(model) },
+      },
     });
 
     const { output, sources } = await agent.generate({
@@ -184,13 +240,15 @@ export async function resolveUnlinkedMatchedBetResult({
       sourceUrls,
     };
   } catch (error) {
+    const message =
+      error instanceof Error
+        ? `AI Gateway result lookup failed: ${error.message}`
+        : "AI Gateway result lookup failed.";
+
     return {
-      status: "error",
+      status: isTransientLookupError(error) ? "transient_error" : "error",
       confidence: "low",
-      reason:
-        error instanceof Error
-          ? `AI Gateway result lookup failed: ${error.message}`
-          : "AI Gateway result lookup failed.",
+      reason: message,
       sourceUrls: [],
     };
   }

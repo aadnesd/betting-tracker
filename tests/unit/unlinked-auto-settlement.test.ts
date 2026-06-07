@@ -151,6 +151,35 @@ describe("unlinked auto-settlement cron", () => {
     expect(flagBetForReview).not.toHaveBeenCalled();
   });
 
+  it("skips unlinked bets when a transient lookup error occurs so they stay eligible next run", async () => {
+    vi.mocked(resolveUnlinkedMatchedBetResult).mockResolvedValue({
+      status: "transient_error",
+      confidence: "low",
+      reason:
+        "AI Gateway result lookup failed: Free tier requests on this model are rate-limited.",
+      sourceUrls: [],
+    });
+
+    const response = await POST(
+      new Request("http://localhost/api/cron/auto-settle")
+    );
+    const json = await response.json();
+
+    expect(json.results).toMatchObject({
+      processed: 1,
+      settled: 0,
+      flaggedForReview: 0,
+      errors: 0,
+    });
+    expect(json.results.details[0]).toMatchObject({
+      matchedBetId: "matched-1",
+      action: "skipped",
+    });
+    // Not flagged → status stays "matched" → retried on the next cron run.
+    expect(flagBetForReview).not.toHaveBeenCalled();
+    expect(applyAutoSettlement).not.toHaveBeenCalled();
+  });
+
   it("flags ambiguous unlinked result lookups for review", async () => {
     vi.mocked(resolveUnlinkedMatchedBetResult).mockResolvedValue({
       status: "ambiguous",

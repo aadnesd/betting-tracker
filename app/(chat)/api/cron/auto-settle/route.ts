@@ -196,7 +196,11 @@ async function processUnlinkedBet(
     placedAt: bet.backBetPlacedAt,
   });
 
-  if (lookup.status === "not_configured" || lookup.status === "not_finished") {
+  if (
+    lookup.status === "not_configured" ||
+    lookup.status === "not_finished" ||
+    lookup.status === "transient_error"
+  ) {
     return {
       matchedBetId: bet.id,
       action: "skipped",
