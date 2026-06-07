@@ -57,6 +57,7 @@ These routes are part of the current screenshot intake flow:
    FOOTBALL_DATA_API_TOKEN=
    UNLINKED_SETTLEMENT_SEARCH_MODEL=
    UNLINKED_SETTLEMENT_SEARCH_MODE=
+   UNLINKED_SETTLEMENT_SEARCH_FALLBACK_MODELS=
    AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT=
    AZURE_DOCUMENT_INTELLIGENCE_KEY=
    AUTH_SECRET=
@@ -71,6 +72,12 @@ These routes are part of the current screenshot intake flow:
    (`openai/gpt-5.4-mini` by default) to look up final scores from the
    manually entered market/selection. Set
    `UNLINKED_SETTLEMENT_SEARCH_MODE=disabled` to skip this lookup.
+   `UNLINKED_SETTLEMENT_SEARCH_FALLBACK_MODELS` is an optional
+   comma-separated list of backup AI Gateway models tried in order when the
+   primary model fails or is rate-limited (defaults to a few `openai/`
+   models so the OpenAI `web_search` tool stays valid). Transient failures
+   (rate limits, 5xx, network errors) leave the bet `matched` so the cron
+   retries it on the next run instead of flagging it for manual review.
 
    Optional settled-bet edit allowlists:
 
