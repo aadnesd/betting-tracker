@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   combineSplitBetLegs,
   computeMatchedNetExposure,
+  computeSingleLegOutcome,
 } from "@/lib/bet-calculations";
 
 describe("computeMatchedNetExposure", () => {
@@ -46,6 +47,60 @@ describe("computeMatchedNetExposure", () => {
     expect(result.profitIfBackWins).toBe(72);
     expect(result.profitIfLayWins).toBe(78.4);
     expect(result.netExposure).toBe(72);
+  });
+});
+
+describe("computeSingleLegOutcome", () => {
+  it("computes a cash back leg: wins stake*(odds-1), loses the stake", () => {
+    const result = computeSingleLegOutcome({
+      kind: "back",
+      stake: 80,
+      odds: 26,
+    });
+
+    expect(result.profitIfWins).toBeCloseTo(2000);
+    expect(result.profitIfLoses).toBeCloseTo(-80);
+    expect(result.netExposure).toBeCloseTo(-80);
+  });
+
+  it("treats a free-bet back leg as risk-free on the losing side", () => {
+    const result = computeSingleLegOutcome({
+      kind: "back",
+      stake: 50,
+      odds: 25,
+      isFreeBet: true,
+    });
+
+    // Stake-not-returned free bet: keep only the profit, lose nothing.
+    expect(result.profitIfWins).toBeCloseTo(1200);
+    expect(result.profitIfLoses).toBe(0);
+    expect(result.netExposure).toBe(0);
+  });
+
+  it("adds the stake back for a stake-returned free-bet back leg", () => {
+    const result = computeSingleLegOutcome({
+      kind: "back",
+      stake: 50,
+      odds: 25,
+      isFreeBet: true,
+      freeBetStakeReturned: true,
+    });
+
+    expect(result.profitIfWins).toBeCloseTo(1250);
+    expect(result.profitIfLoses).toBe(0);
+  });
+
+  it("computes a lay leg: loses the liability, wins stake net of commission", () => {
+    const result = computeSingleLegOutcome({
+      kind: "lay",
+      stake: 100,
+      odds: 3,
+      commissionRate: 0.02,
+    });
+
+    expect(result.profitIfWins).toBeCloseTo(-200);
+    expect(result.profitIfLoses).toBeCloseTo(98);
+    expect(result.netExposure).toBeCloseTo(-200);
   });
 });
 

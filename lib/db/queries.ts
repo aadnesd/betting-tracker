@@ -21,6 +21,7 @@ import {
 import {
   computeMatchedNetExposure,
   computeNetExposureInputs,
+  computeSingleLegOutcome,
 } from "../bet-calculations";
 import { ChatSDKError } from "../errors";
 import {
@@ -3037,6 +3038,98 @@ export type MatchedGroupMember = {
 };
 
 /**
+ * Compute a NOK outcome preview for a single bet-group member, handling both
+ * complete two-leg matched sets and single-leg legs (e.g. a standalone hedge
+ * linked into the group). Outcomes are framed by selection result
+ * (profitIfBackWins = selection wins, profitIfLayWins = selection loses) so
+ * callers can sum them across the group.
+ */
+function calculateGroupMemberOutcomePreview(row: {
+  netExposure: string | null;
+  promoType: string | null;
+  backStake: string | null;
+  backStakeNok: string | null;
+  backOdds: string | null;
+  layStake: string | null;
+  layStakeNok: string | null;
+  layOdds: string | null;
+  layAccountCommission: string | null;
+  freeBetId: string | null;
+  freeBetStakeReturned: boolean | null;
+}): MatchedOutcomePreview | null {
+  const backStakeValue =
+    parseNumeric(row.backStakeNok) ?? parseNumeric(row.backStake);
+  const backOddsValue = parseNumeric(row.backOdds);
+  const layStakeValue =
+    parseNumeric(row.layStakeNok) ?? parseNumeric(row.layStake);
+  const layOddsValue = parseNumeric(row.layOdds);
+
+  const hasBack = backStakeValue !== null && backOddsValue !== null;
+  const hasLay = layStakeValue !== null && layOddsValue !== null;
+
+  // Complete two-leg matched set: reuse the matched-set calculation.
+  if (hasBack && hasLay) {
+    return calculateMatchedOutcomePreview({
+      storedNetExposure: row.netExposure,
+      promoType: row.promoType,
+      backStake: row.backStake,
+      backStakeNok: row.backStakeNok,
+      backOdds: row.backOdds,
+      layStake: row.layStake,
+      layStakeNok: row.layStakeNok,
+      layOdds: row.layOdds,
+      layAccountCommission: row.layAccountCommission,
+      freeBetId: row.freeBetId,
+      freeBetStakeReturned: row.freeBetStakeReturned,
+    });
+  }
+
+  const isFreeBet =
+    !!row.freeBetId || isFreeBetPromoType(row.promoType ?? null);
+  const commissionRate = parseNumeric(row.layAccountCommission) ?? 0;
+
+  if (hasBack) {
+    const outcome = computeSingleLegOutcome({
+      kind: "back",
+      stake: backStakeValue,
+      odds: backOddsValue,
+      isFreeBet,
+      freeBetStakeReturned: row.freeBetStakeReturned ?? false,
+    });
+    return {
+      profitIfBackWins: roundCurrency(outcome.profitIfWins),
+      profitIfLayWins: roundCurrency(outcome.profitIfLoses),
+      netExposure: roundCurrency(outcome.netExposure),
+    };
+  }
+
+  if (hasLay) {
+    const outcome = computeSingleLegOutcome({
+      kind: "lay",
+      stake: layStakeValue,
+      odds: layOddsValue,
+      isFreeBet,
+      commissionRate,
+    });
+    return {
+      profitIfBackWins: roundCurrency(outcome.profitIfWins),
+      profitIfLayWins: roundCurrency(outcome.profitIfLoses),
+      netExposure: roundCurrency(outcome.netExposure),
+    };
+  }
+
+  const fallback = parseNumeric(row.netExposure);
+  if (fallback === null) {
+    return null;
+  }
+  return {
+    profitIfBackWins: roundCurrency(fallback),
+    profitIfLayWins: roundCurrency(fallback),
+    netExposure: roundCurrency(fallback),
+  };
+}
+
+/**
  * Fetch all matched sets (and standalone promo legs) that share a betGroupId.
  * Each member includes a NOK outcome preview so callers can aggregate the
  * combined exposure/profit across the group.
@@ -3088,19 +3181,7 @@ export async function getMatchedSetGroupMembers({
       promoType: row.promoType,
       netExposure: row.netExposure,
       createdAt: row.createdAt,
-      outcomePreview: calculateMatchedOutcomePreview({
-        storedNetExposure: row.netExposure,
-        promoType: row.promoType,
-        backStake: row.backStake,
-        backStakeNok: row.backStakeNok,
-        backOdds: row.backOdds,
-        layStake: row.layStake,
-        layStakeNok: row.layStakeNok,
-        layOdds: row.layOdds,
-        layAccountCommission: row.layAccountCommission,
-        freeBetId: row.freeBetId,
-        freeBetStakeReturned: row.freeBetStakeReturned,
-      }),
+      outcomePreview: calculateGroupMemberOutcomePreview(row),
     }));
   } catch (_error) {
     throw new ChatSDKError(
