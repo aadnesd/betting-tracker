@@ -12,12 +12,14 @@ import { notFound, redirect } from "next/navigation";
 import { BetStatusBadge } from "@/components/bets/bet-status-badge";
 import { ValueWithTooltip } from "@/components/bets/calculation-tooltip";
 import { MatchedBetDetailActions } from "@/components/bets/matched-bet-detail-actions";
+import { MatchedBetGroupCard } from "@/components/bets/matched-bet-group-card";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getCachedSession } from "@/lib/auth";
 import { computeMatchedBetOutcomes } from "@/lib/bet-calculations";
 import {
   getMatchedBetWithParts,
+  getMatchedSetGroupMembers,
   listAuditEntriesByEntity,
 } from "@/lib/db/queries";
 import type {
@@ -72,6 +74,48 @@ export default async function Page({ params }: PageProps) {
     entityId: matched.id,
     limit: 50,
   });
+
+  // Fetch group members (other matched sets linked to this one) and aggregate
+  // their NOK outcomes for a combined exposure/profit view.
+  const groupMembersRaw = matched.betGroupId
+    ? await getMatchedSetGroupMembers({
+        userId,
+        groupId: matched.betGroupId,
+      })
+    : [];
+
+  const groupMembers = groupMembersRaw.map((member) => ({
+    id: member.id,
+    market: member.market,
+    selection: member.selection,
+    status: member.status,
+    promoType: member.promoType,
+    profitIfWins: member.outcomePreview?.profitIfBackWins ?? null,
+    profitIfLoses: member.outcomePreview?.profitIfLayWins ?? null,
+    isCurrent: member.id === matched.id,
+  }));
+
+  const groupAggregate =
+    groupMembers.length > 1 &&
+    groupMembers.every(
+      (m) => m.profitIfWins !== null && m.profitIfLoses !== null
+    )
+      ? (() => {
+          const ifWins = groupMembers.reduce(
+            (sum, m) => sum + (m.profitIfWins ?? 0),
+            0
+          );
+          const ifLoses = groupMembers.reduce(
+            (sum, m) => sum + (m.profitIfLoses ?? 0),
+            0
+          );
+          return {
+            ifWins,
+            ifLoses,
+            guaranteed: Math.min(ifWins, ifLoses),
+          };
+        })()
+      : null;
 
   // Detect mismatches
   const mismatches = detectMismatches(back, lay);
@@ -300,6 +344,14 @@ export default async function Page({ params }: PageProps) {
           </CardContent>
         </Card>
       )}
+
+      {/* Linked bets / group */}
+      <MatchedBetGroupCard
+        aggregate={groupAggregate}
+        betGroupId={matched.betGroupId}
+        currentId={matched.id}
+        members={groupMembers}
+      />
 
       {/* Actions */}
       <MatchedBetDetailActions

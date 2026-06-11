@@ -159,30 +159,32 @@ export async function POST(request: Request) {
         : await saveLayBet(betData);
 
     let standalonePromoWrapperId: string | null = null;
-    if (body.kind === "back" && effectivePromoType) {
-      const matchedBet = await createMatchedBetRecord({
-        userId: session.user.id,
-        backBetId: bet.id,
-        layBetId: null,
-        matchId: body.matchId ?? null,
-        market: body.market,
-        selection: body.selection,
-        promoId: promo?.id ?? null,
-        promoType: effectivePromoType,
-        status: "draft",
-        notes: body.notes
-          ? `[Standalone Bet] Promo wrapper for single-leg bet. ${body.notes}`
-          : "[Standalone Bet] Promo wrapper for single-leg bet",
-      });
-      standalonePromoWrapperId = matchedBet.id;
+    // Always wrap standalone bets in a single-leg MatchedBet container so they
+    // can be linked into a bet group. Reporting treats single-leg containers as
+    // standalone (only complete two-leg sets count as matched-set profit), so
+    // this is reporting-neutral.
+    const containerMatchedBet = await createMatchedBetRecord({
+      userId: session.user.id,
+      backBetId: body.kind === "back" ? bet.id : null,
+      layBetId: body.kind === "lay" ? bet.id : null,
+      matchId: body.matchId ?? null,
+      market: body.market,
+      selection: body.selection,
+      promoId: promo?.id ?? null,
+      promoType: effectivePromoType ?? null,
+      status: "draft",
+      notes: body.notes
+        ? `[Standalone Bet] Single-leg container. ${body.notes}`
+        : "[Standalone Bet] Single-leg container",
+    });
+    standalonePromoWrapperId = containerMatchedBet.id;
 
-      if (body.freeBetId) {
-        await markFreeBetAsUsed({
-          id: body.freeBetId,
-          userId: session.user.id,
-          matchedBetId: matchedBet.id,
-        });
-      }
+    if (body.kind === "back" && body.freeBetId) {
+      await markFreeBetAsUsed({
+        id: body.freeBetId,
+        userId: session.user.id,
+        matchedBetId: containerMatchedBet.id,
+      });
     }
 
     // Create audit entry

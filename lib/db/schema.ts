@@ -260,6 +260,11 @@ export const matchedBet = pgTable(
       .references(() => user.id),
     backBetId: uuid("backBetId").references(() => backBet.id),
     layBetId: uuid("layBetId").references(() => layBet.id),
+    // Soft grouping key to link several matched sets / standalone legs that
+    // together hedge the same underlying outcome (e.g. a free bet matched set
+    // plus an extra back placed elsewhere). Members share one betGroupId and
+    // their outcomes are aggregated for a combined exposure/profit view.
+    betGroupId: uuid("betGroupId"),
     // Link to a football match for auto-settlement (optional until match picker is implemented)
     matchId: uuid("matchId"),
     // Optional kickoff time for unlinked matched bets created manually.
@@ -295,6 +300,10 @@ export const matchedBet = pgTable(
     matchedBetUserCreatedIdx: index("matched_bet_user_created_idx").on(
       table.userId,
       table.createdAt
+    ),
+    matchedBetGroupIdx: index("matched_bet_group_idx").on(
+      table.userId,
+      table.betGroupId
     ),
   })
 );

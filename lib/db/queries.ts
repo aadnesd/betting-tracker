@@ -3025,6 +3025,240 @@ export async function getMatchedBetWithParts({
   }
 }
 
+export type MatchedGroupMember = {
+  id: string;
+  market: string;
+  selection: string;
+  status: "draft" | "matched" | "settled" | "needs_review";
+  promoType: string | null;
+  netExposure: string | null;
+  outcomePreview: MatchedOutcomePreview | null;
+  createdAt: Date;
+};
+
+/**
+ * Fetch all matched sets (and standalone promo legs) that share a betGroupId.
+ * Each member includes a NOK outcome preview so callers can aggregate the
+ * combined exposure/profit across the group.
+ */
+export async function getMatchedSetGroupMembers({
+  userId,
+  groupId,
+}: {
+  userId: string;
+  groupId: string;
+}): Promise<MatchedGroupMember[]> {
+  try {
+    const layAccount = aliasedTable(account, "groupLayAccount");
+
+    const rows = await db
+      .select({
+        id: matchedBet.id,
+        market: matchedBet.market,
+        selection: matchedBet.selection,
+        status: matchedBet.status,
+        promoType: matchedBet.promoType,
+        netExposure: matchedBet.netExposure,
+        createdAt: matchedBet.createdAt,
+        backStake: backBet.stake,
+        backStakeNok: backBet.stakeNok,
+        backOdds: backBet.odds,
+        layStake: layBet.stake,
+        layStakeNok: layBet.stakeNok,
+        layOdds: layBet.odds,
+        layAccountCommission: layAccount.commission,
+        freeBetId: freeBet.id,
+        freeBetStakeReturned: freeBet.stakeReturned,
+      })
+      .from(matchedBet)
+      .leftJoin(backBet, eq(matchedBet.backBetId, backBet.id))
+      .leftJoin(layBet, eq(matchedBet.layBetId, layBet.id))
+      .leftJoin(layAccount, eq(layBet.accountId, layAccount.id))
+      .leftJoin(freeBet, eq(freeBet.usedInMatchedBetId, matchedBet.id))
+      .where(
+        and(eq(matchedBet.userId, userId), eq(matchedBet.betGroupId, groupId))
+      )
+      .orderBy(asc(matchedBet.createdAt));
+
+    return rows.map((row) => ({
+      id: row.id,
+      market: row.market,
+      selection: row.selection,
+      status: row.status,
+      promoType: row.promoType,
+      netExposure: row.netExposure,
+      createdAt: row.createdAt,
+      outcomePreview: calculateMatchedOutcomePreview({
+        storedNetExposure: row.netExposure,
+        promoType: row.promoType,
+        backStake: row.backStake,
+        backStakeNok: row.backStakeNok,
+        backOdds: row.backOdds,
+        layStake: row.layStake,
+        layStakeNok: row.layStakeNok,
+        layOdds: row.layOdds,
+        layAccountCommission: row.layAccountCommission,
+        freeBetId: row.freeBetId,
+        freeBetStakeReturned: row.freeBetStakeReturned,
+      }),
+    }));
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to fetch matched set group"
+    );
+  }
+}
+
+/**
+ * Link two matched sets into a shared group. Reuses an existing group id when
+ * either side already belongs to one, and merges groups if both already differ.
+ * Returns the resolved betGroupId.
+ */
+export async function linkMatchedBetsIntoGroup({
+  userId,
+  sourceId,
+  targetId,
+}: {
+  userId: string;
+  sourceId: string;
+  targetId: string;
+}): Promise<string> {
+  if (sourceId === targetId) {
+    throw new ChatSDKError(
+      "bad_request:api",
+      "Cannot link a matched set to itself"
+    );
+  }
+
+  try {
+    const rows = await db
+      .select({ id: matchedBet.id, betGroupId: matchedBet.betGroupId })
+      .from(matchedBet)
+      .where(
+        and(
+          eq(matchedBet.userId, userId),
+          inArray(matchedBet.id, [sourceId, targetId])
+        )
+      );
+
+    const source = rows.find((r) => r.id === sourceId);
+    const target = rows.find((r) => r.id === targetId);
+
+    if (!(source && target)) {
+      throw new ChatSDKError(
+        "not_found:api",
+        "One or both matched sets were not found"
+      );
+    }
+
+    const groupId = source.betGroupId ?? target.betGroupId ?? generateUUID();
+
+    await db.transaction(async (tx) => {
+      // If the target already belonged to a different group, fold that whole
+      // group into the resolved group so nothing is orphaned.
+      if (target.betGroupId && target.betGroupId !== groupId) {
+        await tx
+          .update(matchedBet)
+          .set({ betGroupId: groupId })
+          .where(
+            and(
+              eq(matchedBet.userId, userId),
+              eq(matchedBet.betGroupId, target.betGroupId)
+            )
+          );
+      }
+      if (source.betGroupId && source.betGroupId !== groupId) {
+        await tx
+          .update(matchedBet)
+          .set({ betGroupId: groupId })
+          .where(
+            and(
+              eq(matchedBet.userId, userId),
+              eq(matchedBet.betGroupId, source.betGroupId)
+            )
+          );
+      }
+      await tx
+        .update(matchedBet)
+        .set({ betGroupId: groupId })
+        .where(
+          and(
+            eq(matchedBet.userId, userId),
+            inArray(matchedBet.id, [sourceId, targetId])
+          )
+        );
+    });
+
+    return groupId;
+  } catch (error) {
+    if (error instanceof ChatSDKError) {
+      throw error;
+    }
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to link matched sets"
+    );
+  }
+}
+
+/**
+ * Remove a matched set from its group. If only one member would remain, the
+ * group is dissolved entirely (a group of one is meaningless).
+ */
+export async function unlinkMatchedBetFromGroup({
+  userId,
+  id,
+}: {
+  userId: string;
+  id: string;
+}): Promise<void> {
+  try {
+    const [row] = await db
+      .select({ betGroupId: matchedBet.betGroupId })
+      .from(matchedBet)
+      .where(and(eq(matchedBet.userId, userId), eq(matchedBet.id, id)))
+      .limit(1);
+
+    if (!row?.betGroupId) {
+      return;
+    }
+
+    const groupId = row.betGroupId;
+
+    await db.transaction(async (tx) => {
+      await tx
+        .update(matchedBet)
+        .set({ betGroupId: null })
+        .where(and(eq(matchedBet.userId, userId), eq(matchedBet.id, id)));
+
+      const remaining = await tx
+        .select({ id: matchedBet.id })
+        .from(matchedBet)
+        .where(
+          and(eq(matchedBet.userId, userId), eq(matchedBet.betGroupId, groupId))
+        );
+
+      if (remaining.length <= 1) {
+        await tx
+          .update(matchedBet)
+          .set({ betGroupId: null })
+          .where(
+            and(
+              eq(matchedBet.userId, userId),
+              eq(matchedBet.betGroupId, groupId)
+            )
+          );
+      }
+    });
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to unlink matched set"
+    );
+  }
+}
+
 /**
  * Result type for pending settlement query.
  * Includes matched bet info with optional linked football match data.
@@ -3977,6 +4211,10 @@ export async function getSettledMatchedBetsForReporting({
     const conditions: SQL<unknown>[] = [
       eq(matchedBet.userId, userId),
       eq(matchedBet.status, "settled"),
+      // Only complete two-leg matched sets count as matched-set profit.
+      // Single-leg containers (standalone wrappers) are reported as standalone.
+      isNotNull(matchedBet.backBetId),
+      isNotNull(matchedBet.layBetId),
     ];
 
     if (startDate) {
@@ -4145,6 +4383,10 @@ export async function getProfitByPromoType({
     const conditions: SQL<unknown>[] = [
       eq(matchedBet.userId, userId),
       eq(matchedBet.status, "settled"),
+      // Only complete two-leg matched sets count as matched-set profit.
+      // Single-leg containers (standalone wrappers) are reported as standalone.
+      isNotNull(matchedBet.backBetId),
+      isNotNull(matchedBet.layBetId),
     ];
 
     if (startDate) {
@@ -4221,6 +4463,10 @@ export async function getProfitByBookmaker({
     const conditions: SQL<unknown>[] = [
       eq(matchedBet.userId, userId),
       eq(matchedBet.status, "settled"),
+      // Only complete two-leg matched sets count as matched-set profit.
+      // Single-leg containers (standalone wrappers) are reported as standalone.
+      isNotNull(matchedBet.backBetId),
+      isNotNull(matchedBet.layBetId),
     ];
 
     if (startDate) {
@@ -4348,6 +4594,10 @@ export async function getProfitByExchange({
     const conditions: SQL<unknown>[] = [
       eq(matchedBet.userId, userId),
       eq(matchedBet.status, "settled"),
+      // Only complete two-leg matched sets count as matched-set profit.
+      // Single-leg containers (standalone wrappers) are reported as standalone.
+      isNotNull(matchedBet.backBetId),
+      isNotNull(matchedBet.layBetId),
     ];
 
     if (startDate) {
@@ -4400,6 +4650,7 @@ export async function getProfitByExchange({
       sql`NOT EXISTS (
         SELECT 1 FROM "MatchedBet" mb
         WHERE mb."layBetId" = ${layBet.id}
+          AND mb."backBetId" IS NOT NULL
       )`,
     ];
 
@@ -4592,6 +4843,7 @@ export async function getStandaloneSettledProfitSummary({
       sql`NOT EXISTS (
         SELECT 1 FROM "MatchedBet" mb
         WHERE mb."backBetId" = ${backBet.id}
+          AND mb."layBetId" IS NOT NULL
       )`,
     ];
     const layConditions: SQL<unknown>[] = [
@@ -4600,6 +4852,7 @@ export async function getStandaloneSettledProfitSummary({
       sql`NOT EXISTS (
         SELECT 1 FROM "MatchedBet" mb
         WHERE mb."layBetId" = ${layBet.id}
+          AND mb."backBetId" IS NOT NULL
       )`,
     ];
 
@@ -4667,6 +4920,7 @@ export async function getStandaloneSettledProfitEvents({
       sql`NOT EXISTS (
         SELECT 1 FROM "MatchedBet" mb
         WHERE mb."backBetId" = ${backBet.id}
+          AND mb."layBetId" IS NOT NULL
       )`,
     ];
     const layConditions: SQL<unknown>[] = [
@@ -4675,6 +4929,7 @@ export async function getStandaloneSettledProfitEvents({
       sql`NOT EXISTS (
         SELECT 1 FROM "MatchedBet" mb
         WHERE mb."layBetId" = ${layBet.id}
+          AND mb."backBetId" IS NOT NULL
       )`,
     ];
 
@@ -4753,6 +5008,9 @@ export async function getBookmakerProfitWithBonuses({
     const bettingConditions: SQL<unknown>[] = [
       eq(matchedBet.userId, userId),
       eq(matchedBet.status, "settled"),
+      // Only complete two-leg matched sets count as matched-set profit.
+      isNotNull(matchedBet.backBetId),
+      isNotNull(matchedBet.layBetId),
     ];
 
     if (startDate) {
@@ -4834,6 +5092,7 @@ export async function getBookmakerProfitWithBonuses({
       sql`NOT EXISTS (
         SELECT 1 FROM "MatchedBet" mb
         WHERE mb."backBetId" = ${backBet.id}
+          AND mb."layBetId" IS NOT NULL
       )`,
     ];
 
@@ -6085,7 +6344,14 @@ export async function getDashboardSummary({
         .leftJoin(backBet, eq(matchedBet.backBetId, backBet.id))
         .leftJoin(layBet, eq(matchedBet.layBetId, layBet.id))
         .where(
-          and(eq(matchedBet.userId, userId), eq(matchedBet.status, "settled"))
+          and(
+            eq(matchedBet.userId, userId),
+            eq(matchedBet.status, "settled"),
+            // Count only complete two-leg matched sets; single-leg containers
+            // are reported via the standalone summary below.
+            isNotNull(matchedBet.backBetId),
+            isNotNull(matchedBet.layBetId)
+          )
         ),
 
       // Standalone settled bets capture seized funds/account closures.
