@@ -2163,6 +2163,10 @@ describe("bets API routes (unit)", () => {
       (dbQueries.createAuditEntry as vi.Mock).mockResolvedValue({
         id: "audit-1",
       });
+      (dbQueries.createMatchedBetRecord as vi.Mock).mockResolvedValue({
+        id: "matched-standalone-back",
+        status: "draft",
+      });
 
       const payload = {
         kind: "back",
@@ -2191,6 +2195,14 @@ describe("bets API routes (unit)", () => {
           status: "placed",
         })
       );
+      // Standalone bets are wrapped in a single-leg container for grouping.
+      expect(dbQueries.createMatchedBetRecord).toHaveBeenCalledWith(
+        expect.objectContaining({
+          backBetId: "bet-1",
+          layBetId: null,
+          status: "draft",
+        })
+      );
       expect(dbQueries.createAuditEntry).toHaveBeenCalledWith(
         expect.objectContaining({
           entityType: "back_bet",
@@ -2216,6 +2228,10 @@ describe("bets API routes (unit)", () => {
       });
       (dbQueries.getFootballMatchById as vi.Mock).mockResolvedValue({
         id: matchId,
+      });
+      (dbQueries.createMatchedBetRecord as vi.Mock).mockResolvedValue({
+        id: "matched-standalone-match",
+        status: "draft",
       });
       (dbQueries.saveBackBet as vi.Mock).mockResolvedValue({
         id: "bet-1",
@@ -2285,6 +2301,10 @@ describe("bets API routes (unit)", () => {
       (dbQueries.createAuditEntry as vi.Mock).mockResolvedValue({
         id: "audit-2",
       });
+      (dbQueries.createMatchedBetRecord as vi.Mock).mockResolvedValue({
+        id: "matched-standalone-lay",
+        status: "draft",
+      });
 
       const payload = {
         kind: "lay",
@@ -2308,6 +2328,14 @@ describe("bets API routes (unit)", () => {
       expect(json.success).toBe(true);
       expect(json.bet.kind).toBe("lay");
       expect(dbQueries.saveLayBet).toHaveBeenCalled();
+      // Standalone lay bets are wrapped in a single-leg container for grouping.
+      expect(dbQueries.createMatchedBetRecord).toHaveBeenCalledWith(
+        expect.objectContaining({
+          backBetId: null,
+          layBetId: "bet-2",
+          status: "draft",
+        })
+      );
       expect(dbQueries.createAuditEntry).toHaveBeenCalledWith(
         expect.objectContaining({
           entityType: "lay_bet",
