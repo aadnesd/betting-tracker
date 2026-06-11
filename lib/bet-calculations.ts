@@ -103,6 +103,64 @@ export function computeMatchedNetExposure({
 }
 
 /**
+ * Calculate the win/lose contribution of a single bet leg toward a shared
+ * outcome (used when a back-only or lay-only leg is part of a bet group).
+ *
+ * `stake` and the returned values are in the reporting currency (NOK).
+ * Results are framed by the selection outcome so they can be summed across a
+ * group alongside two-leg matched sets:
+ * - profitIfWins  = profit if the backed selection wins
+ * - profitIfLoses = profit if the backed selection loses
+ *
+ * Back leg:
+ * - selection wins  -> back wins: stake * (odds - 1), plus stake if a free bet
+ *   returns the stake; a free bet that does not return the stake just keeps the profit
+ * - selection loses -> back loses: -stake (0 for a free bet, since no stake is risked)
+ *
+ * Lay leg:
+ * - selection wins  -> lay loses: -liability = -stake * (odds - 1)
+ * - selection loses -> lay wins:  stake * (1 - commission)
+ */
+export function computeSingleLegOutcome({
+  kind,
+  stake,
+  odds,
+  isFreeBet = false,
+  freeBetStakeReturned = false,
+  commissionRate = 0,
+}: {
+  kind: "back" | "lay";
+  stake: number;
+  odds: number;
+  isFreeBet?: boolean;
+  freeBetStakeReturned?: boolean;
+  /** Exchange commission rate as a decimal (e.g. 0.02 for 2%). Defaults to 0. */
+  commissionRate?: number;
+}) {
+  if (kind === "back") {
+    const profit = stake * (odds - 1);
+    const profitIfWins =
+      isFreeBet && freeBetStakeReturned ? profit + stake : profit;
+    const profitIfLoses = isFreeBet ? 0 : -stake;
+    return {
+      profitIfWins,
+      profitIfLoses,
+      netExposure: Math.min(profitIfWins, profitIfLoses),
+    };
+  }
+
+  const safeCommissionRate = Math.min(Math.max(commissionRate, 0), 1);
+  const liability = stake * (odds - 1);
+  const profitIfWins = -liability;
+  const profitIfLoses = stake * (1 - safeCommissionRate);
+  return {
+    profitIfWins,
+    profitIfLoses,
+    netExposure: Math.min(profitIfWins, profitIfLoses),
+  };
+}
+
+/**
  * Calculate profit for both outcomes of a matched bet.
  *
  * For a NORMAL bet:
