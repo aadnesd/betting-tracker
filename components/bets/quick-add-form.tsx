@@ -407,7 +407,9 @@ export function QuickAddForm({
           matchId: formData.matchId || undefined,
           unlinkedMatchDate:
             !formData.matchId && formData.unlinkedMatchDate
-              ? new Date(formData.unlinkedMatchDate).toISOString()
+              ? // Default to end of the match day (23:59 local) so auto-settle
+                // runs the day after the match has been played.
+                new Date(`${formData.unlinkedMatchDate}T23:59:00`).toISOString()
               : undefined,
           normalizedSelection: formData.normalizedSelection || undefined,
           promoType: formData.promoType || undefined,
@@ -539,7 +541,7 @@ export function QuickAddForm({
                     onChange={(e) =>
                       updateField("unlinkedMatchDate", e.target.value)
                     }
-                    type="datetime-local"
+                    type="date"
                     value={formData.unlinkedMatchDate}
                   />
                   {errors.unlinkedMatchDate && (
@@ -548,8 +550,8 @@ export function QuickAddForm({
                     </p>
                   )}
                   <p className="text-muted-foreground text-xs">
-                    Auto-settlement for unlinked bets will wait until this time
-                    has passed.
+                    Auto-settlement for unlinked bets runs the day after this
+                    date (defaults to 23:59 on the match day).
                   </p>
                 </div>
               )}
