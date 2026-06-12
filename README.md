@@ -55,6 +55,9 @@ These routes are part of the current screenshot intake flow:
    AI_GATEWAY_API_KEY=
    FXRATES_API_KEY=
    FOOTBALL_DATA_API_TOKEN=
+   ODDS_API_API_KEY=
+   MATCH_PROVIDER=
+   ODDS_API_LEAGUES=
    UNLINKED_SETTLEMENT_SEARCH_MODEL=
    UNLINKED_SETTLEMENT_SEARCH_MODE=
    UNLINKED_SETTLEMENT_SEARCH_FALLBACK_MODELS=
@@ -66,6 +69,15 @@ These routes are part of the current screenshot intake flow:
    GITHUB_CLIENT_ID=
    GITHUB_CLIENT_SECRET=
    ```
+
+   The match data source is pluggable (see `lib/matches`). Set
+   `ODDS_API_API_KEY` to use [odds-api.io](https://odds-api.io) (395+ football
+   leagues plus other sports); otherwise the sync falls back to
+   football-data.org (`FOOTBALL_DATA_API_TOKEN`). Force a source with
+   `MATCH_PROVIDER` (`odds-api` | `football-data`), and optionally restrict the
+   odds-api target leagues with `ODDS_API_LEAGUES` (comma-separated slugs, e.g.
+   `norway-eliteserien,usa-mls`). odds-api leagues are discovered dynamically,
+   so competitions that are out of season are skipped until fixtures publish.
 
    `AI_GATEWAY_API_KEY` enables auto-settlement fallback for matched sets that
    are not linked to a synced football match. The cron uses AI Gateway
