@@ -3,7 +3,7 @@
 import { ArrowLeft, Gift, Loader2, Plus, Trash2, Trophy } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { ValueWithTooltip } from "@/components/bets/calculation-tooltip";
 import { type MatchOption, MatchPicker } from "@/components/bets/match-picker";
@@ -96,6 +96,14 @@ type SelectedMatchInfo = {
   awayTeam: string;
 };
 
+type MatchResultOdds = {
+  bookmaker: string;
+  home: number | null;
+  draw: number | null;
+  away: number | null;
+  updatedAt: string | null;
+};
+
 export type QuickAddInitialValues = Partial<FormData>;
 export type QuickAddInitialMatchInfo = SelectedMatchInfo;
 
@@ -154,6 +162,40 @@ export function QuickAddForm({
   );
   const [selectedMatchInfo, setSelectedMatchInfo] =
     useState<SelectedMatchInfo | null>(initialMatchInfo);
+  const [matchOdds, setMatchOdds] = useState<MatchResultOdds | null>(null);
+  const [matchOddsLoading, setMatchOddsLoading] = useState(false);
+
+  // Fetch the bookmaker's match-result odds (Stake) for a linked match.
+  const fetchMatchOdds = useCallback(async (matchId: string) => {
+    setMatchOdds(null);
+    setMatchOddsLoading(true);
+    try {
+      const response = await fetch(`/api/bets/matches/${matchId}/odds`);
+      if (!response.ok) {
+        return;
+      }
+      const data = (await response.json()) as { odds: MatchResultOdds | null };
+      setMatchOdds(data.odds ?? null);
+    } catch (error) {
+      console.error("[QuickAdd] Error fetching match odds:", error);
+    } finally {
+      setMatchOddsLoading(false);
+    }
+  }, []);
+
+  // Apply a fetched odds value to the (first) back-bet odds field.
+  const applyBackOdds = (value: number) => {
+    const odds = value.toFixed(2);
+    updateField("backOdds", odds);
+    updateSplitLeg("back", 0, "odds", odds);
+  };
+
+  // Load odds when the form mounts with a pre-linked match (e.g. copy flow).
+  useEffect(() => {
+    if (initialMatchInfo) {
+      fetchMatchOdds(initialMatchInfo.id);
+    }
+  }, [initialMatchInfo, fetchMatchOdds]);
 
   const updateField = (field: keyof FormData, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -269,11 +311,14 @@ export function QuickAddForm({
         homeTeam: match.homeTeam,
         awayTeam: match.awayTeam,
       });
+      fetchMatchOdds(match.id);
     } else {
       updateField("matchId", "");
       updateField("normalizedSelection", "");
       updateField("selection", "");
       setSelectedMatchInfo(null);
+      setMatchOdds(null);
+      setMatchOddsLoading(false);
     }
   };
 
@@ -289,6 +334,17 @@ export function QuickAddForm({
         updateField("selection", `${selectedMatchInfo.awayTeam} to Win`);
       } else {
         updateField("selection", "Draw");
+      }
+    }
+    if (matchOdds) {
+      const outcomeOdds =
+        value === "HOME_TEAM"
+          ? matchOdds.home
+          : value === "AWAY_TEAM"
+            ? matchOdds.away
+            : matchOdds.draw;
+      if (outcomeOdds) {
+        applyBackOdds(outcomeOdds);
       }
     }
   };
@@ -606,6 +662,59 @@ export function QuickAddForm({
                   <p className="text-muted-foreground text-xs">
                     Select your bet pick for reliable auto-settlement
                   </p>
+                </div>
+              )}
+
+              {/* Stake odds for the linked match (from odds-api.io) */}
+              {selectedMatchInfo && (matchOddsLoading || matchOdds) && (
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    {matchOdds?.bookmaker ?? "Stake"} odds
+                    {matchOddsLoading && (
+                      <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+                    )}
+                  </Label>
+                  {matchOdds ? (
+                    <>
+                      <div className="flex flex-wrap gap-2">
+                        {(
+                          [
+                            {
+                              label: selectedMatchInfo.homeTeam,
+                              value: matchOdds.home,
+                            },
+                            { label: "Draw", value: matchOdds.draw },
+                            {
+                              label: selectedMatchInfo.awayTeam,
+                              value: matchOdds.away,
+                            },
+                          ] as const
+                        ).map((outcome) => (
+                          <Button
+                            className="min-w-[100px] flex-1 flex-col items-center gap-0.5 py-2"
+                            disabled={!outcome.value}
+                            key={outcome.label}
+                            onClick={() =>
+                              outcome.value && applyBackOdds(outcome.value)
+                            }
+                            size="sm"
+                            type="button"
+                            variant="outline"
+                          >
+                            <span className="text-muted-foreground text-xs">
+                              {outcome.label}
+                            </span>
+                            <span className="font-semibold">
+                              {outcome.value ? outcome.value.toFixed(2) : "—"}
+                            </span>
+                          </Button>
+                        ))}
+                      </div>
+                      <p className="text-muted-foreground text-xs">
+                        Tap an outcome to use it as the back-bet odds.
+                      </p>
+                    </>
+                  ) : null}
                 </div>
               )}
 
