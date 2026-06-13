@@ -78,6 +78,8 @@ These routes are part of the current screenshot intake flow:
    odds-api target leagues with `ODDS_API_LEAGUES` (comma-separated slugs, e.g.
    `norway-eliteserien,usa-mls`). odds-api leagues are discovered dynamically,
    so competitions that are out of season are skipped until fixtures publish.
+   When `ODDS_API_API_KEY` is set, Quick Add also surfaces the Stake match-result
+   (1X2) odds for a linked match so you can apply them to the back bet with one tap.
 
    `AI_GATEWAY_API_KEY` enables auto-settlement fallback for matched sets that
    are not linked to a synced football match. The cron uses AI Gateway

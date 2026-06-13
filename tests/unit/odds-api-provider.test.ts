@@ -15,6 +15,7 @@ vi.mock("postgres", () => ({ default: vi.fn(() => ({})) }));
 import {
   DEFAULT_ODDS_API_LEAGUES,
   mapOddsApiStatus,
+  parseMatchResultOdds,
   parseOddsApiEvent,
 } from "@/lib/matches/providers/odds-api";
 
@@ -126,6 +127,79 @@ describe("DEFAULT_ODDS_API_LEAGUES", () => {
     ]) {
       expect(DEFAULT_ODDS_API_LEAGUES).toContain(slug);
     }
+  });
+});
+
+describe("parseMatchResultOdds", () => {
+  const oddsResponse = {
+    id: 69_455_182,
+    home: "Manchester City",
+    away: "Arsenal",
+    date: "2026-01-15T15:00:00Z",
+    status: "pending",
+    bookmakers: {
+      Stake: [
+        {
+          name: "ML",
+          odds: [{ home: "1.85", draw: "3.60", away: "4.20" }],
+          updatedAt: "2026-01-14T10:30:00Z",
+        },
+        { name: "Over/Under", odds: [{ home: "1.90", away: "1.90" }] },
+      ],
+      Bet365: [
+        { name: "ML", odds: [{ home: "1.80", draw: "3.50", away: "4.00" }] },
+      ],
+    },
+  };
+
+  it("extracts the ML odds for the requested bookmaker", () => {
+    const result = parseMatchResultOdds(oddsResponse, "Stake");
+    expect(result).toEqual({
+      bookmaker: "Stake",
+      home: 1.85,
+      draw: 3.6,
+      away: 4.2,
+      updatedAt: "2026-01-14T10:30:00Z",
+    });
+  });
+
+  it("matches the bookmaker name case-insensitively", () => {
+    const result = parseMatchResultOdds(oddsResponse, "stake");
+    expect(result?.bookmaker).toBe("Stake");
+    expect(result?.home).toBe(1.85);
+  });
+
+  it("returns null when the bookmaker is absent", () => {
+    expect(parseMatchResultOdds(oddsResponse, "Pinnacle")).toBeNull();
+  });
+
+  it("returns null when the bookmaker has no ML market", () => {
+    const noMl = {
+      ...oddsResponse,
+      bookmakers: {
+        Stake: [{ name: "Over/Under", odds: [{ home: "1.9" }] }],
+      },
+    };
+    expect(parseMatchResultOdds(noMl, "Stake")).toBeNull();
+  });
+
+  it("nulls out invalid or non-positive prices", () => {
+    const result = parseMatchResultOdds(
+      {
+        ...oddsResponse,
+        bookmakers: {
+          Stake: [{ name: "ML", odds: [{ home: "1.95", draw: "x", away: 1 }] }],
+        },
+      },
+      "Stake"
+    );
+    expect(result).toEqual({
+      bookmaker: "Stake",
+      home: 1.95,
+      draw: null,
+      away: null,
+      updatedAt: null,
+    });
   });
 });
 

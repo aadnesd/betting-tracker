@@ -139,6 +139,102 @@ export function parseOddsApiEvent(event: OddsApiEvent): ProviderMatch {
   };
 }
 
+/** Default bookmaker used for the back-bet odds suggestion in Quick Add. */
+export const DEFAULT_ODDS_BOOKMAKER = "Stake";
+
+type OddsApiMarketOdds = {
+  home?: string | number | null;
+  draw?: string | number | null;
+  away?: string | number | null;
+};
+
+type OddsApiMarket = {
+  name?: string;
+  odds?: OddsApiMarketOdds[];
+  updatedAt?: string;
+};
+
+type OddsApiOddsResponse = {
+  id: number;
+  home: string;
+  away: string;
+  date: string;
+  status?: string;
+  bookmakers?: Record<string, OddsApiMarket[]>;
+};
+
+/** Normalized match-result (1X2) odds for a single bookmaker. */
+export type MatchResultOdds = {
+  bookmaker: string;
+  home: number | null;
+  draw: number | null;
+  away: number | null;
+  updatedAt: string | null;
+};
+
+function toOdds(value: string | number | null | undefined): number | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  const parsed = typeof value === "number" ? value : Number.parseFloat(value);
+  return Number.isFinite(parsed) && parsed > 1 ? parsed : null;
+}
+
+/**
+ * Extract the match-result (1X2 / "ML") odds for a specific bookmaker from an
+ * odds-api.io /odds response.
+ *
+ * Bookmaker keys are matched case-insensitively. Returns null when the
+ * bookmaker is absent or exposes no ML market for the event.
+ */
+export function parseMatchResultOdds(
+  response: OddsApiOddsResponse,
+  bookmaker: string
+): MatchResultOdds | null {
+  const bookmakers = response.bookmakers ?? {};
+  const target = bookmaker.trim().toLowerCase();
+  const entry = Object.entries(bookmakers).find(
+    ([key]) => key.trim().toLowerCase() === target
+  );
+  if (!entry) {
+    return null;
+  }
+
+  const [bookmakerName, markets] = entry;
+  const mlMarket = markets.find((m) => (m.name ?? "").toLowerCase() === "ml");
+  const line = mlMarket?.odds?.[0];
+  if (!line) {
+    return null;
+  }
+
+  return {
+    bookmaker: bookmakerName,
+    home: toOdds(line.home),
+    draw: toOdds(line.draw),
+    away: toOdds(line.away),
+    updatedAt: mlMarket?.updatedAt ?? null,
+  };
+}
+
+/**
+ * Fetch the match-result odds for a single odds-api.io event from a given
+ * bookmaker. `eventId` is the odds-api event id stored as FootballMatch
+ * externalId (only valid when odds-api is the active match provider).
+ */
+export async function fetchMatchResultOdds({
+  eventId,
+  bookmaker = DEFAULT_ODDS_BOOKMAKER,
+}: {
+  eventId: string | number;
+  bookmaker?: string;
+}): Promise<MatchResultOdds | null> {
+  const response = await oddsApiGet<OddsApiOddsResponse>("/odds", {
+    eventId: String(eventId),
+    bookmakers: bookmaker,
+  });
+  return parseMatchResultOdds(response, bookmaker);
+}
+
 function getApiKey(): string {
   const apiKey = process.env.ODDS_API_API_KEY;
   if (!apiKey) {
