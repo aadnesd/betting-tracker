@@ -244,7 +244,46 @@ export default async function Page({ params }: PageProps) {
 
       {/* Summary row */}
       <div className="flex flex-wrap gap-4">
-        {betOutcomes ? (
+        {groupAggregate ? (
+          <>
+            <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3">
+              <p className="flex items-center gap-1 text-muted-foreground text-xs uppercase tracking-wide">
+                <Gift className="h-3 w-3 text-green-600" />
+                Guaranteed profit · group
+              </p>
+              <p
+                className={`font-semibold text-lg ${groupAggregate.guaranteed >= 0 ? "text-green-700" : "text-red-600"}`}
+              >
+                NOK {groupAggregate.guaranteed.toFixed(2)}
+              </p>
+              <p className="text-muted-foreground text-xs">
+                Combined across {groupMembers.length} linked bets
+              </p>
+            </div>
+            <div className="rounded-lg border bg-muted/50 px-4 py-3">
+              <p className="flex items-center gap-1 text-muted-foreground text-xs uppercase tracking-wide">
+                <TrendingUp className="h-3 w-3" />
+                If selection wins · group
+              </p>
+              <p
+                className={`font-semibold text-lg ${groupAggregate.ifWins >= 0 ? "text-green-600" : "text-red-600"}`}
+              >
+                NOK {groupAggregate.ifWins.toFixed(2)}
+              </p>
+            </div>
+            <div className="rounded-lg border bg-muted/50 px-4 py-3">
+              <p className="flex items-center gap-1 text-muted-foreground text-xs uppercase tracking-wide">
+                <TrendingDown className="h-3 w-3" />
+                If selection loses · group
+              </p>
+              <p
+                className={`font-semibold text-lg ${groupAggregate.ifLoses >= 0 ? "text-green-600" : "text-red-600"}`}
+              >
+                NOK {groupAggregate.ifLoses.toFixed(2)}
+              </p>
+            </div>
+          </>
+        ) : betOutcomes ? (
           <>
             {betOutcomes.isFreeBet && (
               <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3">
