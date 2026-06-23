@@ -2,8 +2,10 @@ import { ArrowLeft, Building2, CreditCard, Pencil, Plus } from "lucide-react";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { AccountEditForm } from "@/components/bets/account-edit-form";
-import { MonthDivider, monthKey } from "@/components/bets/month-divider";
-import { TransactionRow } from "@/components/bets/transaction-row";
+import {
+  type AccountTransactionItem,
+  AccountTransactionTable,
+} from "@/components/bets/account-transaction-table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,8 +19,6 @@ import {
 export const metadata = {
   title: "Account Details",
 };
-
-type AccountTransactionType = "deposit" | "withdrawal" | "bonus" | "adjustment";
 
 function getTransactionBalanceImpact({
   amount,
@@ -69,25 +69,39 @@ export default async function AccountDetailPage({
   const transactions = await listTransactionsByAccount({
     userId: session.user.id,
     accountId: id,
-    limit: 50,
+    limit: 200,
   });
   let balanceCursor = balance;
-  const transactionsWithRunningBalance = transactions.map((tx) => {
-    const runningBalance = balanceCursor;
-    balanceCursor -= getTransactionBalanceImpact({
-      amount: tx.amount,
-      type: tx.type,
-    });
+  const transactionsWithRunningBalance: AccountTransactionItem[] =
+    transactions.map((tx) => {
+      const runningBalance = balanceCursor;
+      balanceCursor -= getTransactionBalanceImpact({
+        amount: tx.amount,
+        type: tx.type,
+      });
 
-    return { ...tx, runningBalance };
-  });
+      return {
+        id: tx.id,
+        type: tx.type as AccountTransactionItem["type"],
+        amount: tx.amount,
+        currency: tx.currency,
+        occurredAt: tx.occurredAt.toISOString(),
+        createdAt: tx.createdAt.toISOString(),
+        notes: tx.notes,
+        amountNok: tx.amountNok,
+        bonusSubcategory: tx.bonusSubcategory,
+        linkedWalletTransactionId: tx.linkedWalletTransactionId,
+        runningBalance,
+        runningBalanceCurrency: account.currency ?? tx.currency,
+      };
+    });
 
   const commission = account.commission
     ? Number.parseFloat(account.commission) * 100
     : null;
 
   return (
-    <div className="container mx-auto max-w-2xl px-4 py-8">
+    <div className="container mx-auto max-w-4xl px-4 py-8">
       <div className="mb-6">
         <Link
           className="inline-flex items-center gap-2 text-muted-foreground text-sm transition-colors hover:text-foreground"
@@ -173,55 +187,10 @@ export default async function AccountDetailPage({
           </div>
         </CardHeader>
         <CardContent>
-          {transactions.length === 0 ? (
-            <div className="py-8 text-center text-muted-foreground">
-              <p className="mb-2">No transactions recorded yet</p>
-              <p className="text-sm">
-                Record deposits, withdrawals, and bonuses to track your balance.
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              <div className="hidden grid-cols-[minmax(0,1fr)_8rem_8rem_auto] gap-3 px-3 text-muted-foreground text-xs sm:grid">
-                <span>Transaction</span>
-                <span className="text-right">Amount</span>
-                <span className="text-right">Balance</span>
-                <span className="w-16" />
-              </div>
-              {transactionsWithRunningBalance.map((tx, idx) => {
-                const iso = tx.occurredAt.toISOString();
-                const month = monthKey(iso);
-                const prevMonth =
-                  idx > 0
-                    ? monthKey(
-                        transactionsWithRunningBalance[
-                          idx - 1
-                        ].occurredAt.toISOString()
-                      )
-                    : null;
-                const showDivider = idx === 0 || month !== prevMonth;
-
-                return (
-                  <div key={tx.id}>
-                    {showDivider && <MonthDivider label={month} />}
-                    <TransactionRow
-                      accountId={id}
-                      transaction={{
-                        id: tx.id,
-                        type: tx.type as AccountTransactionType,
-                        amount: tx.amount,
-                        currency: tx.currency,
-                        occurredAt: iso,
-                        notes: tx.notes,
-                        runningBalance: tx.runningBalance,
-                        runningBalanceCurrency: account.currency ?? tx.currency,
-                      }}
-                    />
-                  </div>
-                );
-              })}
-            </div>
-          )}
+          <AccountTransactionTable
+            accountId={id}
+            transactions={transactionsWithRunningBalance}
+          />
         </CardContent>
       </Card>
     </div>
