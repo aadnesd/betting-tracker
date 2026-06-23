@@ -1,12 +1,41 @@
 "use client";
 
-import { ArrowUpDown, Building2, Search, Wallet, X } from "lucide-react";
+import {
+  ArrowUpDown,
+  Building2,
+  Pencil,
+  Search,
+  Trash2,
+  Wallet,
+  X,
+} from "lucide-react";
 import Link from "next/link";
-import { useDeferredValue, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Badge, type BadgeProps } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -22,8 +51,387 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Textarea } from "@/components/ui/textarea";
 import type { UnifiedTransactionListItem } from "@/lib/db/queries";
+import type { WalletTransactionType } from "@/lib/db/schema";
 import { formatCurrency, formatNOK } from "@/lib/reporting";
+
+const ACCOUNT_TRANSACTION_TYPES = [
+  { value: "deposit", label: "Deposit" },
+  { value: "withdrawal", label: "Withdrawal" },
+  { value: "bonus", label: "Bonus" },
+  { value: "adjustment", label: "Adjustment" },
+] as const;
+
+const WALLET_TRANSACTION_TYPES: {
+  value: WalletTransactionType;
+  label: string;
+}[] = [
+  { value: "deposit", label: "Deposit" },
+  { value: "withdrawal", label: "Withdrawal" },
+  { value: "bonus", label: "Bonus" },
+  { value: "transfer_to_account", label: "Transfer to Account" },
+  { value: "transfer_from_account", label: "Transfer from Account" },
+  { value: "transfer_to_wallet", label: "Transfer to Wallet" },
+  { value: "transfer_from_wallet", label: "Transfer from Wallet" },
+  { value: "fee", label: "Fee" },
+  { value: "adjustment", label: "Adjustment" },
+];
+
+type RelatedEntity = { id: string; name: string };
+
+function UnifiedTransactionActions({
+  transaction,
+}: {
+  transaction: UnifiedTransactionListItem;
+}) {
+  const router = useRouter();
+  const [editOpen, setEditOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  // Form state
+  const [type, setType] = useState(transaction.type);
+  const [amount, setAmount] = useState(String(Math.abs(transaction.amount)));
+  const [currency, setCurrency] = useState(transaction.currency);
+  const [dateValue, setDateValue] = useState(
+    transaction.occurredAt
+      .toISOString()
+      .slice(0, transaction.source === "wallet" ? 16 : 10)
+  );
+  const [notes, setNotes] = useState(transaction.notes ?? "");
+  const [externalRef, setExternalRef] = useState(transaction.externalRef ?? "");
+  const [relatedAccountId, setRelatedAccountId] = useState("");
+  const [relatedWalletId, setRelatedWalletId] = useState("");
+  const [accounts, setAccounts] = useState<RelatedEntity[]>([]);
+  const [wallets, setWallets] = useState<RelatedEntity[]>([]);
+
+  const isWallet = transaction.source === "wallet";
+
+  const needsAccount = useMemo(
+    () => type === "transfer_to_account" || type === "transfer_from_account",
+    [type]
+  );
+  const needsWallet = useMemo(
+    () => type === "transfer_to_wallet" || type === "transfer_from_wallet",
+    [type]
+  );
+
+  useEffect(() => {
+    if (!editOpen || !isWallet) {
+      return;
+    }
+    fetch("/api/bets/accounts")
+      .then((res) => res.json())
+      .then((data) => setAccounts(Array.isArray(data) ? data : []))
+      .catch(() => setAccounts([]));
+    fetch("/api/bets/wallets")
+      .then((res) => res.json())
+      .then((data) => {
+        const all = Array.isArray(data) ? data : [];
+        setWallets(
+          all.filter((w: RelatedEntity) => w.id !== transaction.entityId)
+        );
+      })
+      .catch(() => setWallets([]));
+  }, [editOpen, isWallet, transaction.entityId]);
+
+  const resetForm = () => {
+    setType(transaction.type);
+    setAmount(String(Math.abs(transaction.amount)));
+    setCurrency(transaction.currency);
+    setDateValue(
+      transaction.occurredAt.toISOString().slice(0, isWallet ? 16 : 10)
+    );
+    setNotes(transaction.notes ?? "");
+    setExternalRef(transaction.externalRef ?? "");
+    setRelatedAccountId("");
+    setRelatedWalletId("");
+  };
+
+  const apiBase = isWallet
+    ? `/api/bets/wallets/${transaction.entityId}/transactions/${transaction.id}`
+    : `/api/bets/accounts/${transaction.entityId}/transactions/${transaction.id}`;
+
+  const handleSave = async () => {
+    const parsedAmount = Number.parseFloat(amount);
+    if (
+      Number.isNaN(parsedAmount) ||
+      (type === "adjustment" ? parsedAmount === 0 : parsedAmount <= 0)
+    ) {
+      toast.error(
+        type === "adjustment"
+          ? "Adjustment amount must be non-zero"
+          : "Amount must be a positive number"
+      );
+      return;
+    }
+    if (!dateValue) {
+      toast.error("Date is required");
+      return;
+    }
+    if (isWallet && needsAccount && !relatedAccountId) {
+      toast.error("Please select a betting account");
+      return;
+    }
+    if (isWallet && needsWallet && !relatedWalletId) {
+      toast.error("Please select a wallet");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const body: Record<string, unknown> = {
+        type,
+        amount: parsedAmount,
+        currency: currency.toUpperCase(),
+        notes: notes.trim() || null,
+      };
+      if (isWallet) {
+        body.date = new Date(dateValue).toISOString();
+        body.relatedAccountId = needsAccount ? relatedAccountId : null;
+        body.relatedWalletId = needsWallet ? relatedWalletId : null;
+        body.externalRef = externalRef.trim() || null;
+      } else {
+        body.occurredAt = new Date(dateValue).toISOString();
+      }
+
+      const response = await fetch(apiBase, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to update transaction");
+      }
+      toast.success("Transaction updated");
+      setEditOpen(false);
+      router.refresh();
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to update transaction"
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    setDeleting(true);
+    try {
+      const response = await fetch(apiBase, { method: "DELETE" });
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to delete transaction");
+      }
+      toast.success("Transaction deleted");
+      setDeleteOpen(false);
+      router.refresh();
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to delete transaction"
+      );
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const typeOptions = isWallet
+    ? WALLET_TRANSACTION_TYPES
+    : ACCOUNT_TRANSACTION_TYPES;
+  const displayAmount = Math.abs(transaction.amount);
+
+  return (
+    <div className="flex items-center gap-1">
+      <Dialog
+        onOpenChange={(next) => {
+          if (next) {
+            resetForm();
+          }
+          setEditOpen(next);
+        }}
+        open={editOpen}
+      >
+        <DialogTrigger asChild>
+          <Button
+            className="h-7 w-7 text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100"
+            size="icon"
+            variant="ghost"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+            <span className="sr-only">Edit transaction</span>
+          </Button>
+        </DialogTrigger>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              Edit {isWallet ? "Wallet" : "Account"} Transaction
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Type</Label>
+              <Select onValueChange={setType} value={type}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {typeOptions.map((t) => (
+                    <SelectItem key={t.value} value={t.value}>
+                      {t.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Amount</Label>
+                <Input
+                  min={type === "adjustment" ? undefined : "0.01"}
+                  onChange={(e) => setAmount(e.target.value)}
+                  step="0.01"
+                  type="number"
+                  value={amount}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Currency</Label>
+                <Input
+                  maxLength={isWallet ? 10 : 3}
+                  onChange={(e) => setCurrency(e.target.value.toUpperCase())}
+                  value={currency}
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>{isWallet ? "Date & time" : "Date"}</Label>
+              <Input
+                onChange={(e) => setDateValue(e.target.value)}
+                type={isWallet ? "datetime-local" : "date"}
+                value={dateValue}
+              />
+            </div>
+            {isWallet && needsAccount && (
+              <div className="space-y-2">
+                <Label>Betting Account</Label>
+                <Select
+                  onValueChange={setRelatedAccountId}
+                  value={relatedAccountId}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select account" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {accounts.map((a) => (
+                      <SelectItem key={a.id} value={a.id}>
+                        {a.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {isWallet && needsWallet && (
+              <div className="space-y-2">
+                <Label>Related Wallet</Label>
+                <Select
+                  onValueChange={setRelatedWalletId}
+                  value={relatedWalletId}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select wallet" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {wallets.map((w) => (
+                      <SelectItem key={w.id} value={w.id}>
+                        {w.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {isWallet && (
+              <div className="space-y-2">
+                <Label>External Reference</Label>
+                <Input
+                  onChange={(e) => setExternalRef(e.target.value)}
+                  value={externalRef}
+                />
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label>Notes</Label>
+              <Textarea
+                onChange={(e) => setNotes(e.target.value)}
+                rows={3}
+                value={notes}
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button
+                disabled={saving}
+                onClick={() => setEditOpen(false)}
+                variant="outline"
+              >
+                Cancel
+              </Button>
+              <Button disabled={saving} onClick={handleSave}>
+                {saving ? "Saving..." : "Save"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog onOpenChange={setDeleteOpen} open={deleteOpen}>
+        <AlertDialogTrigger asChild>
+          <Button
+            className="h-7 w-7 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
+            size="icon"
+            variant="ghost"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            <span className="sr-only">Delete transaction</span>
+          </Button>
+        </AlertDialogTrigger>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete transaction?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete this{" "}
+              {transaction.type.replaceAll("_", " ")} of{" "}
+              {formatCurrency(displayAmount, transaction.currency)} from{" "}
+              {transaction.entityName}. This action cannot be undone.
+              {transaction.linkedTransfer && (
+                <span className="mt-1 block font-medium text-amber-600">
+                  This is a linked transfer — the paired transaction will also
+                  be deleted.
+                </span>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleting}
+              onClick={(e) => {
+                e.preventDefault();
+                handleDelete();
+              }}
+            >
+              {deleting ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
 
 type SourceFilter = "all" | "account" | "wallet";
 type LinkedFilter = "all" | "linked" | "standalone";
@@ -603,6 +1011,7 @@ export function TransactionsPageClient({
                   <TableHead>Related</TableHead>
                   <TableHead>Notes</TableHead>
                   <TableHead className="text-right">Amount</TableHead>
+                  <TableHead className="w-20" />
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -610,7 +1019,10 @@ export function TransactionsPageClient({
                   const positive = isPositiveAmount(transaction);
 
                   return (
-                    <TableRow key={`${transaction.source}-${transaction.id}`}>
+                    <TableRow
+                      className="group"
+                      key={`${transaction.source}-${transaction.id}`}
+                    >
                       <TableCell className="whitespace-nowrap">
                         <div className="font-medium">
                           {formatDateTime(transaction.occurredAt)}
@@ -690,6 +1102,9 @@ export function TransactionsPageClient({
                           Math.abs(transaction.amount),
                           transaction.currency
                         )}
+                      </TableCell>
+                      <TableCell>
+                        <UnifiedTransactionActions transaction={transaction} />
                       </TableCell>
                     </TableRow>
                   );
