@@ -1531,6 +1531,11 @@ export async function listUnifiedTransactionsByUser({
   try {
     const relatedAccount = aliasedTable(account, "unifiedRelatedAccount");
     const relatedWallet = aliasedTable(wallet, "unifiedRelatedWallet");
+    const linkedWalletTx = aliasedTable(
+      walletTransaction,
+      "unifiedLinkedWalletTx"
+    );
+    const linkedWallet = aliasedTable(wallet, "unifiedLinkedWallet");
 
     const [accountRows, walletRows] = await Promise.all([
       db
@@ -1549,13 +1554,18 @@ export async function listUnifiedTransactionsByUser({
           notes: accountTransaction.notes,
           externalRef: sql<string | null>`NULL`,
           relatedAccountName: sql<string | null>`NULL`,
-          relatedWalletName: sql<string | null>`NULL`,
+          relatedWalletName: linkedWallet.name,
           linkedTransfer: isNotNull(
             accountTransaction.linkedWalletTransactionId
           ),
         })
         .from(accountTransaction)
         .innerJoin(account, eq(accountTransaction.accountId, account.id))
+        .leftJoin(
+          linkedWalletTx,
+          eq(accountTransaction.linkedWalletTransactionId, linkedWalletTx.id)
+        )
+        .leftJoin(linkedWallet, eq(linkedWalletTx.walletId, linkedWallet.id))
         .where(eq(accountTransaction.userId, userId)),
       db
         .select({
