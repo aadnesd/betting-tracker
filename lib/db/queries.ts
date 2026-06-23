@@ -2415,6 +2415,7 @@ export async function listMatchedBetsForList({
   fromDate,
   toDate,
   search,
+  accountId,
   limit = 100,
 }: {
   userId: string;
@@ -2422,6 +2423,7 @@ export async function listMatchedBetsForList({
   fromDate?: Date;
   toDate?: Date;
   search?: string;
+  accountId?: string;
   limit?: number;
 }): Promise<MatchedBetListItem[]> {
   try {
@@ -2441,6 +2443,11 @@ export async function listMatchedBetsForList({
       const pattern = `%${normalizedSearch}%`;
       conditions.push(
         sql`(LOWER(${matchedBet.market}) LIKE ${pattern} OR LOWER(${matchedBet.selection}) LIKE ${pattern})`
+      );
+    }
+    if (accountId) {
+      conditions.push(
+        sql`(${backBet.accountId} = ${accountId} OR ${layBet.accountId} = ${accountId})`
       );
     }
 

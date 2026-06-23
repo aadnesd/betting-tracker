@@ -1,6 +1,14 @@
-import { ArrowLeft, Building2, CreditCard, Pencil, Plus } from "lucide-react";
+import {
+  ArrowLeft,
+  Building2,
+  CreditCard,
+  Pencil,
+  Plus,
+  Trophy,
+} from "lucide-react";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { AccountBetHistory } from "@/components/bets/account-bet-history";
 import { AccountEditForm } from "@/components/bets/account-edit-form";
 import {
   type AccountTransactionItem,
@@ -13,6 +21,7 @@ import { getCachedSession } from "@/lib/auth";
 import {
   getAccountBalance,
   getAccountById,
+  listMatchedBetsForList,
   listTransactionsByAccount,
 } from "@/lib/db/queries";
 
@@ -61,16 +70,22 @@ export default async function AccountDetailPage({
     notFound();
   }
 
-  const balance = await getAccountBalance({
-    userId: session.user.id,
-    accountId: id,
-  });
-
-  const transactions = await listTransactionsByAccount({
-    userId: session.user.id,
-    accountId: id,
-    limit: 200,
-  });
+  const [balance, transactions, matchedBets] = await Promise.all([
+    getAccountBalance({
+      userId: session.user.id,
+      accountId: id,
+    }),
+    listTransactionsByAccount({
+      userId: session.user.id,
+      accountId: id,
+      limit: 200,
+    }),
+    listMatchedBetsForList({
+      userId: session.user.id,
+      accountId: id,
+      limit: 50,
+    }),
+  ]);
   let balanceCursor = balance;
   const transactionsWithRunningBalance: AccountTransactionItem[] =
     transactions.map((tx) => {
@@ -151,7 +166,44 @@ export default async function AccountDetailPage({
         </CardHeader>
       </Card>
 
-      {/* Edit Form */}
+      {/* Bet History */}
+      <Card className="mb-6">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <Trophy className="h-5 w-5" />
+              Bet History
+            </CardTitle>
+            <Badge variant="outline">{matchedBets.length} bets</Badge>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <AccountBetHistory accountId={id} bets={matchedBets} />
+        </CardContent>
+      </Card>
+
+      {/* Transaction History */}
+      <Card className="mb-6">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle>Transaction History</CardTitle>
+            <Button asChild size="sm">
+              <Link href={`/bets/settings/accounts/${id}/transactions/new`}>
+                <Plus className="mr-1 h-4 w-4" />
+                Add
+              </Link>
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <AccountTransactionTable
+            accountId={id}
+            transactions={transactionsWithRunningBalance}
+          />
+        </CardContent>
+      </Card>
+
+      {/* Edit Account */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -169,27 +221,6 @@ export default async function AccountDetailPage({
               commission,
               status: account.status as "active" | "archived",
             }}
-          />
-        </CardContent>
-      </Card>
-
-      {/* Transactions Section - Placeholder for future */}
-      <Card className="mt-6">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>Transaction History</CardTitle>
-            <Button asChild size="sm">
-              <Link href={`/bets/settings/accounts/${id}/transactions/new`}>
-                <Plus className="mr-1 h-4 w-4" />
-                Add
-              </Link>
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <AccountTransactionTable
-            accountId={id}
-            transactions={transactionsWithRunningBalance}
           />
         </CardContent>
       </Card>
