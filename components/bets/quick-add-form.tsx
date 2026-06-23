@@ -20,7 +20,9 @@ import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectSeparator,
   SelectTrigger,
   SelectValue,
@@ -88,6 +90,7 @@ type FormData = {
 type SplitLegFormData = {
   odds: string;
   stake: string;
+  accountName: string;
 };
 
 type SelectedMatchInfo = {
@@ -140,12 +143,14 @@ export function QuickAddForm({
     {
       odds: initialValues?.backOdds ?? "",
       stake: initialValues?.backStake ?? "",
+      accountName: initialValues?.backBookmaker ?? defaultBookmaker,
     },
   ]);
   const [layLegs, setLayLegs] = useState<SplitLegFormData[]>([
     {
       odds: initialValues?.layOdds ?? "",
       stake: initialValues?.layStake ?? "",
+      accountName: initialValues?.layExchange ?? defaultExchange,
     },
   ]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -179,7 +184,12 @@ export function QuickAddForm({
 
   const addSplitLeg = (kind: "back" | "lay") => {
     const setLegs = kind === "back" ? setBackLegs : setLayLegs;
-    setLegs((prev) => [...prev, { odds: "", stake: "" }]);
+    const defaultAccount =
+      kind === "back" ? formData.backBookmaker : formData.layExchange;
+    setLegs((prev) => [
+      ...prev,
+      { odds: "", stake: "", accountName: defaultAccount },
+    ]);
   };
 
   const removeSplitLeg = (kind: "back" | "lay", index: number) => {
@@ -209,17 +219,27 @@ export function QuickAddForm({
     return freeBets.find((fb) => fb.id === formData.freeBetId) ?? null;
   }, [formData.freeBetId, freeBets]);
 
-  // When bookmaker changes, update currency to match account's currency
+  // When bookmaker changes, update currency to match and sync first leg's account
   const handleBookmakerChange = (value: string) => {
     if (value === "__add_new__") {
       router.push("/bets/settings/accounts/new?return=/bets/quick-add");
       return;
     }
+    const prevBookmaker = formData.backBookmaker;
     updateField("backBookmaker", value);
-    const selected = bookmakers.find((b) => b.name === value);
+    const allBackAccounts = [...bookmakers, ...exchanges];
+    const selected = allBackAccounts.find((b) => b.name === value);
     if (selected?.currency) {
       updateField("backCurrency", selected.currency);
     }
+    // Sync leg accounts that still match the old section-level selection
+    setBackLegs((prev) =>
+      prev.map((leg) =>
+        leg.accountName === prevBookmaker || !leg.accountName
+          ? { ...leg, accountName: value }
+          : leg
+      )
+    );
     // Clear free bet selection when bookmaker changes
     if (formData.freeBetId) {
       const currentFreeBet = freeBets.find(
@@ -245,17 +265,21 @@ export function QuickAddForm({
     const fb = freeBets.find((f) => f.id === freeBetId);
     if (fb) {
       updateField("backStake", fb.value.toString());
-      setBackLegs([
-        { odds: backLegs[0]?.odds ?? "", stake: fb.value.toString() },
-      ]);
       updateField("backCurrency", fb.currency);
       // Also select the bookmaker if the free bet has an account
-      if (fb.accountName) {
-        const bookmaker = bookmakers.find((b) => b.name === fb.accountName);
-        if (bookmaker) {
-          updateField("backBookmaker", bookmaker.name);
-        }
+      const fbBookmaker = fb.accountName
+        ? bookmakers.find((b) => b.name === fb.accountName)
+        : undefined;
+      if (fbBookmaker) {
+        updateField("backBookmaker", fbBookmaker.name);
       }
+      setBackLegs([
+        {
+          odds: backLegs[0]?.odds ?? "",
+          stake: fb.value.toString(),
+          accountName: fbBookmaker?.name ?? formData.backBookmaker,
+        },
+      ]);
     }
   };
 
@@ -392,11 +416,34 @@ export function QuickAddForm({
       const parsedBackLegs = backLegs.map((leg) => ({
         odds: Number.parseFloat(leg.odds),
         stake: Number.parseFloat(leg.stake),
+        accountName: leg.accountName || formData.backBookmaker,
       }));
       const parsedLayLegs = layLegs.map((leg) => ({
         odds: Number.parseFloat(leg.odds),
         stake: Number.parseFloat(leg.stake),
       }));
+
+      // Use the first leg's account as the primary bookmaker for the combined bet
+      const primaryBookmaker =
+        parsedBackLegs[0]?.accountName ?? formData.backBookmaker.trim();
+
+      // Build split-account note when legs use different accounts
+      const uniqueBackAccounts = new Set(
+        parsedBackLegs.map((leg) => leg.accountName)
+      );
+      const splitAccountNote =
+        parsedBackLegs.length > 1 && uniqueBackAccounts.size > 1
+          ? `Back split accounts: ${parsedBackLegs
+              .map(
+                (leg) =>
+                  `${leg.accountName} ${formData.backCurrency} ${leg.stake.toFixed(2)} @ ${leg.odds.toFixed(4)}`
+              )
+              .join(", ")}`
+          : null;
+
+      const combinedNotes =
+        [formData.notes.trim(), splitAccountNote].filter(Boolean).join("\n") ||
+        undefined;
 
       const response = await fetch("/api/bets/quick-add", {
         method: "POST",
@@ -417,7 +464,7 @@ export function QuickAddForm({
           back: {
             odds: parsedBackLegs[0]?.odds ?? 0,
             stake: parsedBackLegs[0]?.stake ?? 0,
-            bookmaker: formData.backBookmaker.trim(),
+            bookmaker: primaryBookmaker,
             currency: formData.backCurrency,
             legs: parsedBackLegs,
           },
@@ -428,7 +475,7 @@ export function QuickAddForm({
             currency: formData.layCurrency,
             legs: parsedLayLegs,
           },
-          notes: formData.notes.trim() || undefined,
+          notes: combinedNotes,
         }),
       });
 
@@ -456,7 +503,7 @@ export function QuickAddForm({
 
   const layLiability = calculateLayLiability();
 
-  const hasNoBookmakers = bookmakers.length === 0;
+  const hasNoBookmakers = bookmakers.length === 0 && exchanges.length === 0;
   const hasNoExchanges = exchanges.length === 0;
 
   return (
@@ -488,9 +535,9 @@ export function QuickAddForm({
               </h3>
               <p className="mt-1 text-amber-800 text-sm">
                 {hasNoBookmakers && hasNoExchanges
-                  ? "Add at least one bookmaker and one exchange account before creating matched bets."
+                  ? "Add at least one bookmaker or exchange account before creating matched bets."
                   : hasNoBookmakers
-                    ? "Add at least one bookmaker account before creating matched bets."
+                    ? "Add at least one bookmaker or exchange account before creating matched bets."
                     : "Add at least one exchange account before creating matched bets."}
               </p>
               <Button asChild className="mt-3" size="sm">
@@ -747,10 +794,10 @@ export function QuickAddForm({
 
             {/* Back Bet */}
             <div className="space-y-4 rounded-lg border p-4">
-              <h3 className="font-medium text-sm">Back Bet (Bookmaker)</h3>
+              <h3 className="font-medium text-sm">Back Bet</h3>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="backBookmaker">Bookmaker</Label>
+                  <Label htmlFor="backBookmaker">Account</Label>
                   <Select
                     onValueChange={handleBookmakerChange}
                     value={formData.backBookmaker}
@@ -760,24 +807,46 @@ export function QuickAddForm({
                         errors.backBookmaker ? "border-destructive" : ""
                       }
                     >
-                      <SelectValue placeholder="Select bookmaker..." />
+                      <SelectValue placeholder="Select account..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {bookmakers.map((bm) => (
-                        <SelectItem key={bm.id} value={bm.name}>
-                          {bm.name}
-                          {bm.currency && (
-                            <span className="ml-2 text-muted-foreground text-xs">
-                              ({bm.currency})
-                            </span>
-                          )}
-                        </SelectItem>
-                      ))}
-                      {bookmakers.length > 0 && <SelectSeparator />}
+                      {bookmakers.length > 0 && (
+                        <SelectGroup>
+                          <SelectLabel>Bookmakers</SelectLabel>
+                          {bookmakers.map((bm) => (
+                            <SelectItem key={bm.id} value={bm.name}>
+                              {bm.name}
+                              {bm.currency && (
+                                <span className="ml-2 text-muted-foreground text-xs">
+                                  ({bm.currency})
+                                </span>
+                              )}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      )}
+                      {exchanges.length > 0 && (
+                        <SelectGroup>
+                          <SelectLabel>Exchanges</SelectLabel>
+                          {exchanges.map((ex) => (
+                            <SelectItem key={ex.id} value={ex.name}>
+                              {ex.name}
+                              {ex.currency && (
+                                <span className="ml-2 text-muted-foreground text-xs">
+                                  ({ex.currency})
+                                </span>
+                              )}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      )}
+                      {(bookmakers.length > 0 || exchanges.length > 0) && (
+                        <SelectSeparator />
+                      )}
                       <SelectItem value="__add_new__">
                         <span className="flex items-center gap-1 text-primary">
                           <Plus className="h-3 w-3" />
-                          Add new bookmaker
+                          Add new account
                         </span>
                       </SelectItem>
                     </SelectContent>
@@ -812,55 +881,131 @@ export function QuickAddForm({
               </div>
               <div className="space-y-3">
                 {backLegs.map((leg, index) => (
-                  <div
-                    className="grid gap-3 sm:grid-cols-[1fr_1fr_auto]"
-                    key={index}
-                  >
-                    <div className="space-y-2">
-                      <Label htmlFor={`backOdds-${index}`}>
-                        Odds{backLegs.length > 1 ? ` ${index + 1}` : ""}
-                      </Label>
-                      <Input
-                        className={errors.backOdds ? "border-destructive" : ""}
-                        id={`backOdds-${index}`}
-                        min="1.01"
-                        onChange={(e) =>
-                          updateSplitLeg("back", index, "odds", e.target.value)
-                        }
-                        placeholder="e.g., 2.50"
-                        step="any"
-                        type="number"
-                        value={leg.odds}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor={`backStake-${index}`}>
-                        Stake{backLegs.length > 1 ? ` ${index + 1}` : ""}
-                      </Label>
-                      <Input
-                        className={errors.backStake ? "border-destructive" : ""}
-                        id={`backStake-${index}`}
-                        min="0.01"
-                        onChange={(e) =>
-                          updateSplitLeg("back", index, "stake", e.target.value)
-                        }
-                        placeholder="e.g., 100"
-                        step="0.01"
-                        type="number"
-                        value={leg.stake}
-                      />
-                    </div>
-                    <div className="flex items-end">
-                      <Button
-                        aria-label="Remove back split"
-                        disabled={backLegs.length === 1}
-                        onClick={() => removeSplitLeg("back", index)}
-                        size="icon"
-                        type="button"
-                        variant="ghost"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                  <div className="space-y-2" key={index}>
+                    {backLegs.length > 1 && (
+                      <div className="space-y-1">
+                        <Label htmlFor={`backAccount-${index}`}>
+                          Account {index + 1}
+                        </Label>
+                        <Select
+                          onValueChange={(value) => {
+                            if (value === "__add_new__") {
+                              router.push(
+                                "/bets/settings/accounts/new?return=/bets/quick-add"
+                              );
+                              return;
+                            }
+                            updateSplitLeg("back", index, "accountName", value);
+                          }}
+                          value={leg.accountName}
+                        >
+                          <SelectTrigger id={`backAccount-${index}`}>
+                            <SelectValue placeholder="Select account..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {bookmakers.length > 0 && (
+                              <SelectGroup>
+                                <SelectLabel>Bookmakers</SelectLabel>
+                                {bookmakers.map((bm) => (
+                                  <SelectItem key={bm.id} value={bm.name}>
+                                    {bm.name}
+                                    {bm.currency && (
+                                      <span className="ml-2 text-muted-foreground text-xs">
+                                        ({bm.currency})
+                                      </span>
+                                    )}
+                                  </SelectItem>
+                                ))}
+                              </SelectGroup>
+                            )}
+                            {exchanges.length > 0 && (
+                              <SelectGroup>
+                                <SelectLabel>Exchanges</SelectLabel>
+                                {exchanges.map((ex) => (
+                                  <SelectItem key={ex.id} value={ex.name}>
+                                    {ex.name}
+                                    {ex.currency && (
+                                      <span className="ml-2 text-muted-foreground text-xs">
+                                        ({ex.currency})
+                                      </span>
+                                    )}
+                                  </SelectItem>
+                                ))}
+                              </SelectGroup>
+                            )}
+                            {(bookmakers.length > 0 ||
+                              exchanges.length > 0) && <SelectSeparator />}
+                            <SelectItem value="__add_new__">
+                              <span className="flex items-center gap-1 text-primary">
+                                <Plus className="h-3 w-3" />
+                                Add new account
+                              </span>
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+                    <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
+                      <div className="space-y-2">
+                        <Label htmlFor={`backOdds-${index}`}>
+                          Odds{backLegs.length > 1 ? ` ${index + 1}` : ""}
+                        </Label>
+                        <Input
+                          className={
+                            errors.backOdds ? "border-destructive" : ""
+                          }
+                          id={`backOdds-${index}`}
+                          min="1.01"
+                          onChange={(e) =>
+                            updateSplitLeg(
+                              "back",
+                              index,
+                              "odds",
+                              e.target.value
+                            )
+                          }
+                          placeholder="e.g., 2.50"
+                          step="any"
+                          type="number"
+                          value={leg.odds}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor={`backStake-${index}`}>
+                          Stake{backLegs.length > 1 ? ` ${index + 1}` : ""}
+                        </Label>
+                        <Input
+                          className={
+                            errors.backStake ? "border-destructive" : ""
+                          }
+                          id={`backStake-${index}`}
+                          min="0.01"
+                          onChange={(e) =>
+                            updateSplitLeg(
+                              "back",
+                              index,
+                              "stake",
+                              e.target.value
+                            )
+                          }
+                          placeholder="e.g., 100"
+                          step="0.01"
+                          type="number"
+                          value={leg.stake}
+                        />
+                      </div>
+                      <div className="flex items-end">
+                        <Button
+                          aria-label="Remove back split"
+                          disabled={backLegs.length === 1}
+                          onClick={() => removeSplitLeg("back", index)}
+                          size="icon"
+                          type="button"
+                          variant="ghost"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 ))}

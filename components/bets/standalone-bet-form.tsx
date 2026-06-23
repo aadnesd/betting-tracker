@@ -19,7 +19,9 @@ import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -112,7 +114,8 @@ export function StandaloneBetForm({
   const returnTo = getSafeReturnPath(searchParams.get("returnTo"));
 
   const initialKind = initialData?.kind ?? "back";
-  const initialAccounts = initialKind === "back" ? bookmakers : exchanges;
+  const initialAccounts =
+    initialKind === "back" ? [...bookmakers, ...exchanges] : exchanges;
   const fallbackAccountId = initialAccounts[0]?.id ?? "";
   const fallbackCurrency = initialAccounts[0]?.currency ?? "NOK";
   const initialPlacedAt = initialData?.placedAt
@@ -147,7 +150,9 @@ export function StandaloneBetForm({
   };
 
   // Get the accounts for the currently selected bet type
-  const accounts = formData.kind === "back" ? bookmakers : exchanges;
+  // Back bets can be placed at both bookmakers and exchanges
+  const accounts =
+    formData.kind === "back" ? [...bookmakers, ...exchanges] : exchanges;
   const selectedAccount = accounts.find(
     (account) => account.id === formData.accountId
   );
@@ -164,7 +169,8 @@ export function StandaloneBetForm({
 
   // When bet type changes, reset account to first available of that type
   const handleKindChange = (kind: "back" | "lay") => {
-    const newAccounts = kind === "back" ? bookmakers : exchanges;
+    const newAccounts =
+      kind === "back" ? [...bookmakers, ...exchanges] : exchanges;
     const newAccountId = newAccounts.length > 0 ? newAccounts[0].id : "";
     const newCurrency =
       newAccounts.length > 0 ? (newAccounts[0].currency ?? "NOK") : "NOK";
@@ -427,12 +433,15 @@ export function StandaloneBetForm({
               {/* Account Selection */}
               <div className="space-y-2">
                 <Label htmlFor="account">
-                  {formData.kind === "back" ? "Bookmaker" : "Exchange"}
+                  {formData.kind === "back" ? "Account" : "Exchange"}
                 </Label>
                 {noAccountsForType ? (
                   <div className="rounded-md border border-yellow-500/50 bg-yellow-500/10 p-3 text-sm">
                     <p>
-                      No {formData.kind === "back" ? "bookmaker" : "exchange"}{" "}
+                      No{" "}
+                      {formData.kind === "back"
+                        ? "bookmaker or exchange"
+                        : "exchange"}{" "}
                       accounts configured.{" "}
                       <Link
                         className="underline hover:text-foreground"
@@ -452,16 +461,51 @@ export function StandaloneBetForm({
                       <SelectValue placeholder="Select account" />
                     </SelectTrigger>
                     <SelectContent>
-                      {accounts.map((acc) => (
-                        <SelectItem key={acc.id} value={acc.id}>
-                          {acc.name}{" "}
-                          {acc.currency && (
-                            <span className="text-muted-foreground">
-                              ({acc.currency})
-                            </span>
+                      {formData.kind === "back" ? (
+                        <>
+                          {bookmakers.length > 0 && (
+                            <SelectGroup>
+                              <SelectLabel>Bookmakers</SelectLabel>
+                              {bookmakers.map((acc) => (
+                                <SelectItem key={acc.id} value={acc.id}>
+                                  {acc.name}{" "}
+                                  {acc.currency && (
+                                    <span className="text-muted-foreground">
+                                      ({acc.currency})
+                                    </span>
+                                  )}
+                                </SelectItem>
+                              ))}
+                            </SelectGroup>
                           )}
-                        </SelectItem>
-                      ))}
+                          {exchanges.length > 0 && (
+                            <SelectGroup>
+                              <SelectLabel>Exchanges</SelectLabel>
+                              {exchanges.map((acc) => (
+                                <SelectItem key={acc.id} value={acc.id}>
+                                  {acc.name}{" "}
+                                  {acc.currency && (
+                                    <span className="text-muted-foreground">
+                                      ({acc.currency})
+                                    </span>
+                                  )}
+                                </SelectItem>
+                              ))}
+                            </SelectGroup>
+                          )}
+                        </>
+                      ) : (
+                        accounts.map((acc) => (
+                          <SelectItem key={acc.id} value={acc.id}>
+                            {acc.name}{" "}
+                            {acc.currency && (
+                              <span className="text-muted-foreground">
+                                ({acc.currency})
+                              </span>
+                            )}
+                          </SelectItem>
+                        ))
+                      )}
                     </SelectContent>
                   </Select>
                 )}

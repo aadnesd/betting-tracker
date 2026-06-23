@@ -83,7 +83,9 @@ export async function POST(request: Request) {
     });
 
     // Resolve or create the account
-    const expectedKind = body.kind === "back" ? "bookmaker" : "exchange";
+    // Back bets can be placed at both bookmakers and exchanges;
+    // lay bets are exchange-only.
+    const expectedKind = body.kind === "back" ? null : "exchange";
     let account: {
       id: string;
       name: string | null;
@@ -103,7 +105,7 @@ export async function POST(request: Request) {
         );
       }
 
-      if (account.kind !== expectedKind) {
+      if (expectedKind && account.kind !== expectedKind) {
         return NextResponse.json(
           { error: "Account type does not match bet kind" },
           { status: 400 }
@@ -115,7 +117,7 @@ export async function POST(request: Request) {
       account = await getOrCreateAccount({
         userId: session.user.id,
         name: body.account ?? "",
-        kind: expectedKind,
+        kind: expectedKind ?? "bookmaker",
         currency: body.currency,
       });
     }
