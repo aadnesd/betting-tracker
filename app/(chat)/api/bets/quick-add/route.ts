@@ -12,6 +12,7 @@ import {
   createAuditEntry,
   createManualScreenshot,
   createMatchedBetRecord,
+  getAccountByName,
   getFreeBetById,
   getOrCreateAccount,
   getOrCreatePromoByType,
@@ -118,20 +119,35 @@ export async function POST(request: Request) {
     ]);
 
     // Resolve or create accounts
-    const [backAccount, layAccount] = await Promise.all([
-      getOrCreateAccount({
+    // Back bets can be placed at bookmakers or exchanges. Look up by name
+    // in both kinds before falling back to creating a new bookmaker.
+    const [backAsBookmaker, backAsExchange] = await Promise.all([
+      getAccountByName({
+        userId: session.user.id,
+        name: body.back.bookmaker,
+        kind: "bookmaker",
+      }),
+      getAccountByName({
+        userId: session.user.id,
+        name: body.back.bookmaker,
+        kind: "exchange",
+      }),
+    ]);
+    const backAccount =
+      backAsBookmaker ??
+      backAsExchange ??
+      (await getOrCreateAccount({
         userId: session.user.id,
         name: body.back.bookmaker,
         kind: "bookmaker",
         currency: body.back.currency,
-      }),
-      getOrCreateAccount({
-        userId: session.user.id,
-        name: body.lay.exchange,
-        kind: "exchange",
-        currency: body.lay.currency,
-      }),
-    ]);
+      }));
+    const layAccount = await getOrCreateAccount({
+      userId: session.user.id,
+      name: body.lay.exchange,
+      kind: "exchange",
+      currency: body.lay.currency,
+    });
 
     // Resolve promo if provided
     const promo = body.promoType
