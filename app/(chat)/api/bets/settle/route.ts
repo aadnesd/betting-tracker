@@ -13,6 +13,7 @@ import {
   getLayBetById,
   getMatchedBetByLegId,
   processFreeBetWageringProgressOnSettle,
+  processQualifyingBetsUnlockOnSettle,
   processWageringProgressOnSettle,
   updateBackBet,
   updateLayBet,
@@ -243,6 +244,16 @@ export async function POST(request: Request) {
           error
         );
       }
+    }
+
+    if (body.betKind === "back" && matchedBet?.id) {
+      // A settled back bet may complete the unlock requirement of a locked
+      // promo. Promos stay locked until their qualifying bets settle.
+      await processQualifyingBetsUnlockOnSettle({
+        userId: session.user.id,
+        matchedBetId: matchedBet.id,
+        settledAt: now,
+      });
     }
 
     if (body.betKind === "back" && matchedFreeBetId && body.outcome === "won") {

@@ -10,6 +10,7 @@ import {
   flagBetForReview,
   getFreeBetByMatchedBetId,
   processFreeBetWageringProgressOnSettle,
+  processQualifyingBetsUnlockOnSettle,
   processWageringProgressOnSettle,
   type UnlinkedBetReadyForSettlement,
 } from "@/lib/db/queries";
@@ -153,6 +154,13 @@ async function processBet(
       stake: backStake,
       odds: backOdds,
       placedAt: bet.backBetPlacedAt,
+    });
+
+    // A settled back bet may complete the unlock requirement of a locked promo.
+    await processQualifyingBetsUnlockOnSettle({
+      userId: bet.userId,
+      matchedBetId: bet.id,
+      settledAt: new Date(),
     });
 
     try {
@@ -333,6 +341,13 @@ async function processUnlinkedBet(
       stake: backStake,
       odds: backOdds,
       placedAt: bet.backBetPlacedAt,
+    });
+
+    // A settled back bet may complete the unlock requirement of a locked promo.
+    await processQualifyingBetsUnlockOnSettle({
+      userId: bet.userId,
+      matchedBetId: bet.id,
+      settledAt: new Date(),
     });
 
     try {

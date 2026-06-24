@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  DEFAULT_FREE_BET_EXPIRY_DAYS,
   DEFAULT_WIN_WAGERING_EXPIRES_IN_DAYS,
   DEFAULT_WIN_WAGERING_MIN_ODDS,
   DEFAULT_WIN_WAGERING_MULTIPLIER,
@@ -77,6 +78,13 @@ type FormData = {
 
 const CURRENCIES = ["NOK", "EUR", "GBP", "USD", "SEK", "DKK"] as const;
 
+/** Default expiry as a yyyy-mm-dd string: today + DEFAULT_FREE_BET_EXPIRY_DAYS. */
+function defaultExpiryDate(): string {
+  const d = new Date();
+  d.setDate(d.getDate() + DEFAULT_FREE_BET_EXPIRY_DAYS);
+  return d.toISOString().split("T")[0];
+}
+
 export function FreeBetForm({ accounts, initialData, mode }: FreeBetFormProps) {
   const router = useRouter();
   const hasExistingUnlock = initialData?.unlockType != null;
@@ -91,7 +99,8 @@ export function FreeBetForm({ accounts, initialData, mode }: FreeBetFormProps) {
     value: initialData?.value ?? "",
     currency: initialData?.currency ?? "NOK",
     minOdds: initialData?.minOdds ?? "",
-    expiresAt: initialData?.expiresAt ?? "",
+    expiresAt:
+      initialData?.expiresAt ?? (mode === "create" ? defaultExpiryDate() : ""),
     notes: initialData?.notes ?? "",
     hasUnlockRequirements: hasExistingUnlock,
     unlockType: initialData?.unlockType ?? "stake",
@@ -124,6 +133,12 @@ export function FreeBetForm({ accounts, initialData, mode }: FreeBetFormProps) {
   const [errors, setErrors] = useState<Partial<Record<keyof FormData, string>>>(
     {}
   );
+
+  // For locked promos, expiry is set automatically when the qualifying bet
+  // settles. Once unlocked (active), the user can edit the expiry normally.
+  const expiryManagedByUnlock =
+    formData.hasUnlockRequirements &&
+    (mode === "create" || initialData?.status === "locked");
 
   const updateField = <K extends keyof FormData>(
     field: K,
@@ -234,9 +249,13 @@ export function FreeBetForm({ accounts, initialData, mode }: FreeBetFormProps) {
         value: Number.parseFloat(formData.value),
         currency: formData.currency,
         minOdds: formData.minOdds ? Number.parseFloat(formData.minOdds) : null,
-        expiresAt: formData.expiresAt
-          ? new Date(formData.expiresAt).toISOString()
-          : null,
+        // Locked promos (with unlock requirements) get their expiry set when
+        // they unlock — 7 days from when the qualifying bet settles — so we
+        // don't send a creation-time expiry for them.
+        expiresAt:
+          expiryManagedByUnlock || !formData.expiresAt
+            ? null
+            : new Date(formData.expiresAt).toISOString(),
         notes: formData.notes.trim() || null,
         stakeReturned: formData.stakeReturned,
         ...(formData.hasWinWageringRequirements
@@ -446,13 +465,16 @@ export function FreeBetForm({ accounts, initialData, mode }: FreeBetFormProps) {
       <div className="space-y-2">
         <Label htmlFor="expiresAt">Expiry Date (optional)</Label>
         <Input
+          disabled={expiryManagedByUnlock}
           id="expiresAt"
           onChange={(e) => updateField("expiresAt", e.target.value)}
           type="date"
-          value={formData.expiresAt}
+          value={expiryManagedByUnlock ? "" : formData.expiresAt}
         />
         <p className="text-muted-foreground text-xs">
-          When does this free bet expire? Leave blank if no expiry.
+          {expiryManagedByUnlock
+            ? `Locked promos get a ${DEFAULT_FREE_BET_EXPIRY_DAYS}-day expiry starting when the qualifying bet settles.`
+            : "When does this free bet expire? Leave blank if no expiry."}
         </p>
       </div>
 

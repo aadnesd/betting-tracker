@@ -23,6 +23,7 @@ import {
   computeNetExposureInputs,
   computeSingleLegOutcome,
 } from "../bet-calculations";
+import { DEFAULT_FREE_BET_EXPIRY_DAYS } from "../bets/free-bet-defaults";
 import { ChatSDKError } from "../errors";
 import {
   convertAmountToNok,
@@ -7586,6 +7587,10 @@ export type QualifyingBetInfo = {
   selection: string | null;
   backStake: string | null;
   backOdds: string | null;
+  // Settlement state of the underlying back bet. Only settled qualifying bets
+  // count toward unlocking the promo.
+  backStatus: string | null;
+  backSettledAt: Date | null;
 };
 
 /**
@@ -7619,6 +7624,8 @@ export async function listQualifyingBetsForPromo({
         selection: matchedBet.selection,
         backStake: backBet.stake,
         backOdds: backBet.odds,
+        backStatus: backBet.status,
+        backSettledAt: backBet.settledAt,
       })
       .from(qualifyingBet)
       .innerJoin(matchedBet, eq(qualifyingBet.matchedBetId, matchedBet.id))
@@ -7635,6 +7642,8 @@ export async function listQualifyingBetsForPromo({
       selection: row.selection,
       backStake: row.backStake,
       backOdds: row.backOdds,
+      backStatus: row.backStatus,
+      backSettledAt: row.backSettledAt,
     }));
   } catch (error) {
     if (error instanceof ChatSDKError) {
@@ -7648,8 +7657,124 @@ export async function listQualifyingBetsForPromo({
 }
 
 /**
+ * Sum the contribution of qualifying bets for a locked promo whose underlying
+ * back bet has already settled. Pending (placed but unsettled) qualifying bets
+ * do not count toward unlocking.
+ */
+async function getSettledQualifyingContribution(freeBetId: string) {
+  const [row] = await db
+    .select({
+      total: sql<string>`COALESCE(SUM(${qualifyingBet.contribution}), 0)`,
+    })
+    .from(qualifyingBet)
+    .innerJoin(matchedBet, eq(matchedBet.id, qualifyingBet.matchedBetId))
+    .innerJoin(backBet, eq(backBet.id, matchedBet.backBetId))
+    .where(
+      and(eq(qualifyingBet.freeBetId, freeBetId), eq(backBet.status, "settled"))
+    );
+
+  return row?.total ? Number.parseFloat(row.total) : 0;
+}
+
+/**
+ * Batch version of getSettledQualifyingContribution: returns a map of
+ * freeBetId -> settled qualifying contribution for the given free bets.
+ * Used to show how much of a locked promo's progress is still pending
+ * settlement.
+ */
+export async function getSettledUnlockProgressByFreeBetIds(
+  freeBetIds: string[]
+): Promise<Record<string, number>> {
+  if (freeBetIds.length === 0) {
+    return {};
+  }
+
+  const rows = await db
+    .select({
+      freeBetId: qualifyingBet.freeBetId,
+      total: sql<string>`COALESCE(SUM(${qualifyingBet.contribution}), 0)`,
+    })
+    .from(qualifyingBet)
+    .innerJoin(matchedBet, eq(matchedBet.id, qualifyingBet.matchedBetId))
+    .innerJoin(backBet, eq(backBet.id, matchedBet.backBetId))
+    .where(
+      and(
+        inArray(qualifyingBet.freeBetId, freeBetIds),
+        eq(backBet.status, "settled")
+      )
+    )
+    .groupBy(qualifyingBet.freeBetId);
+
+  const map: Record<string, number> = {};
+  for (const row of rows) {
+    map[row.freeBetId] = row.total ? Number.parseFloat(row.total) : 0;
+  }
+  return map;
+}
+
+/**
+ * Evaluate whether a locked promo should unlock (become "active").
+ *
+ * A promo only unlocks once the qualifying bets that count toward its
+ * requirement have *settled* — placing them is not enough. When it unlocks,
+ * the expiry window starts from the settlement date of the bet that completed
+ * the requirement (DEFAULT_FREE_BET_EXPIRY_DAYS from `settledAt`).
+ */
+async function evaluateLockedPromoUnlock({
+  freeBetId,
+  userId,
+  settledAt,
+}: {
+  freeBetId: string;
+  userId: string;
+  settledAt: Date;
+}): Promise<{ unlocked: boolean; settledProgress: number; target: number }> {
+  const fb = await getFreeBetById({ id: freeBetId, userId });
+  if (!fb || fb.status !== "locked" || !fb.unlockTarget) {
+    return { unlocked: false, settledProgress: 0, target: 0 };
+  }
+
+  const target = Number.parseFloat(fb.unlockTarget);
+  const settledProgress = await getSettledQualifyingContribution(freeBetId);
+
+  if (settledProgress < target) {
+    return { unlocked: false, settledProgress, target };
+  }
+
+  const expiresAt = new Date(
+    settledAt.getTime() + DEFAULT_FREE_BET_EXPIRY_DAYS * 24 * 60 * 60 * 1000
+  );
+
+  await db
+    .update(freeBet)
+    .set({ status: "active", expiresAt })
+    .where(eq(freeBet.id, freeBetId));
+
+  await db.insert(auditLog).values({
+    createdAt: new Date(),
+    userId,
+    entityType: "free_bet",
+    entityId: freeBetId,
+    action: "update",
+    changes: {
+      unlocked: true,
+      settledProgress,
+      target,
+      expiresAt: expiresAt.toISOString(),
+    },
+    notes: `Promo unlocked after qualifying bet(s) settled. Progress: ${settledProgress}/${target}. Expires ${expiresAt.toISOString()}`,
+  });
+
+  return { unlocked: true, settledProgress, target };
+}
+
+/**
  * Add a qualifying bet to a promo, updating its progress.
  * This is called when a bet is placed that contributes to unlocking a promo.
+ *
+ * Note: placing a qualifying bet records progress but does NOT unlock the
+ * promo. The promo stays "locked" until the qualifying bet(s) settle — see
+ * `processQualifyingBetsUnlockOnSettle`.
  */
 export async function addQualifyingBet({
   freeBetId,
@@ -7690,22 +7815,17 @@ export async function addQualifyingBet({
       })
       .returning();
 
-    // Update progress
+    // Update placed progress (for display). Status stays "locked" — the promo
+    // only activates once the qualifying bet(s) settle.
     const currentProgress = fb.unlockProgress
       ? Number.parseFloat(fb.unlockProgress)
       : 0;
     const newProgress = currentProgress + contribution;
     const target = fb.unlockTarget ? Number.parseFloat(fb.unlockTarget) : 0;
 
-    // Check if unlocked
-    const isUnlocked = newProgress >= target;
-
     await db
       .update(freeBet)
-      .set({
-        unlockProgress: String(newProgress),
-        status: isUnlocked ? "active" : "locked",
-      })
+      .set({ unlockProgress: String(newProgress) })
       .where(eq(freeBet.id, freeBetId));
 
     // Create audit entry
@@ -7719,17 +7839,21 @@ export async function addQualifyingBet({
         qualifyingBetId: qb.id,
         contribution,
         newProgress,
-        unlocked: isUnlocked,
       },
-      notes: isUnlocked
-        ? `Promo unlocked! Progress: ${newProgress}/${target}`
-        : `Added qualifying bet. Progress: ${newProgress}/${target}`,
+      notes: `Added qualifying bet. Progress: ${newProgress}/${target} (unlocks once settled)`,
+    });
+
+    // In case the qualifying bet is already settled (e.g. backfill), re-check.
+    const unlockResult = await evaluateLockedPromoUnlock({
+      freeBetId,
+      userId,
+      settledAt: new Date(),
     });
 
     return {
       qualifyingBet: qb,
       newProgress,
-      isUnlocked,
+      isUnlocked: unlockResult.unlocked,
     };
   } catch (error) {
     if (error instanceof ChatSDKError) {
@@ -7739,6 +7863,53 @@ export async function addQualifyingBet({
       "bad_request:database",
       "Failed to add qualifying bet"
     );
+  }
+}
+
+/**
+ * Re-evaluate locked promos linked to a matched bet once one of its legs
+ * settles. Activates any promo whose settled qualifying contribution now meets
+ * its unlock target, starting the expiry window from `settledAt`.
+ *
+ * Only back bets count toward unlocking (lay bets on exchanges do not).
+ */
+export async function processQualifyingBetsUnlockOnSettle({
+  userId,
+  matchedBetId,
+  settledAt,
+}: {
+  userId: string;
+  matchedBetId?: string | null;
+  settledAt: Date;
+}) {
+  try {
+    if (!matchedBetId) {
+      return [];
+    }
+
+    // Find distinct locked promos that have a qualifying bet from this matched bet.
+    const lockedPromos = await db
+      .selectDistinct({ freeBetId: qualifyingBet.freeBetId })
+      .from(qualifyingBet)
+      .innerJoin(freeBet, eq(freeBet.id, qualifyingBet.freeBetId))
+      .where(
+        and(
+          eq(qualifyingBet.matchedBetId, matchedBetId),
+          eq(freeBet.userId, userId),
+          eq(freeBet.status, "locked")
+        )
+      );
+
+    const results: Awaited<ReturnType<typeof evaluateLockedPromoUnlock>>[] = [];
+    for (const { freeBetId } of lockedPromos) {
+      results.push(
+        await evaluateLockedPromoUnlock({ freeBetId, userId, settledAt })
+      );
+    }
+    return results;
+  } catch (error) {
+    console.error("[processQualifyingBetsUnlockOnSettle] Error:", error);
+    return [];
   }
 }
 

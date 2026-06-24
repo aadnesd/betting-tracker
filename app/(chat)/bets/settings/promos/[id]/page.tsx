@@ -91,9 +91,22 @@ export default async function FreeBetDetailPage({
   const unlockTarget = freeBet.unlockTarget
     ? Number.parseFloat(freeBet.unlockTarget)
     : 0;
+  // Only settled qualifying bets count toward unlocking. Anything placed but
+  // not yet settled is shown as pending.
+  const settledUnlockProgress = qualifyingBets.reduce(
+    (sum, qb) =>
+      qb.backStatus === "settled"
+        ? sum + Number.parseFloat(qb.contribution)
+        : sum,
+    0
+  );
+  const pendingUnlockProgress = Math.max(
+    0,
+    unlockProgress - settledUnlockProgress
+  );
   const progressPercent =
     unlockTarget > 0
-      ? Math.min((unlockProgress / unlockTarget) * 100, 100)
+      ? Math.min((settledUnlockProgress / unlockTarget) * 100, 100)
       : 100;
 
   const hasWinWageringConfig = freeBet.winWageringMultiplier != null;
@@ -222,18 +235,20 @@ export default async function FreeBetDetailPage({
             </CardTitle>
             <CardDescription>
               {freeBet.status === "locked"
-                ? "Complete the requirements below to unlock this free bet."
+                ? pendingUnlockProgress > 0
+                  ? "Qualifying bets placed — this unlocks once they settle."
+                  : "Complete the requirements below to unlock this free bet."
                 : "Requirements completed! This free bet is now available."}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* Progress bar */}
+            {/* Progress bar (settled progress only) */}
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">
                   {freeBet.unlockType === "stake"
-                    ? `${freeBet.currency} ${unlockProgress.toFixed(2)} of ${unlockTarget.toFixed(2)}`
-                    : `${unlockProgress.toFixed(0)} of ${unlockTarget.toFixed(0)} bets`}
+                    ? `${freeBet.currency} ${settledUnlockProgress.toFixed(2)} of ${unlockTarget.toFixed(2)}`
+                    : `${settledUnlockProgress.toFixed(0)} of ${unlockTarget.toFixed(0)} bets`}
                 </span>
                 <span className="font-medium">
                   {progressPercent.toFixed(0)}%
@@ -247,6 +262,16 @@ export default async function FreeBetDetailPage({
                 }
                 value={progressPercent}
               />
+              {pendingUnlockProgress > 0 && (
+                <p className="flex items-center gap-1 text-amber-700 text-xs">
+                  <Lock className="h-3 w-3" />
+                  {freeBet.unlockType === "stake"
+                    ? `${freeBet.currency} ${pendingUnlockProgress.toFixed(2)}`
+                    : `${pendingUnlockProgress.toFixed(0)} bet${pendingUnlockProgress === 1 ? "" : "s"}`}{" "}
+                  placed but not settled yet — unlocks once the qualifying
+                  bet(s) settle.
+                </p>
+              )}
             </div>
 
             {/* Requirements summary */}
@@ -284,9 +309,18 @@ export default async function FreeBetDetailPage({
                         <p className="font-medium text-sm">
                           {qb.market || "Unknown market"}
                         </p>
-                        <p className="text-muted-foreground text-xs">
+                        <p className="flex items-center gap-2 text-muted-foreground text-xs">
                           {qb.selection || "Unknown selection"} •{" "}
                           {format(new Date(qb.createdAt), "d MMM yyyy")}
+                          {qb.backStatus === "settled" ? (
+                            <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-[10px] text-emerald-700">
+                              Settled
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] text-amber-700">
+                              Pending
+                            </span>
+                          )}
                         </p>
                       </div>
                       <div className="text-right">
