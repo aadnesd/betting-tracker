@@ -165,13 +165,11 @@ export async function POST(request: Request) {
       payload.matchId === undefined ? (bet.matchId ?? null) : payload.matchId;
 
     if (isSettled) {
+      // Odds and stake CAN be corrected on settled bets — doing so recomputes
+      // profit/loss and posts a balancing account adjustment (below). Account
+      // and currency remain locked to avoid moving realized P&L between
+      // accounts / FX bases.
       const immutableFieldErrors: string[] = [];
-      if (Number(bet.odds) !== payload.odds) {
-        immutableFieldErrors.push("odds");
-      }
-      if (Number(bet.stake) !== payload.stake) {
-        immutableFieldErrors.push("stake");
-      }
       if ((bet.accountId ?? null) !== payload.accountId) {
         immutableFieldErrors.push("accountId");
       }
@@ -255,12 +253,18 @@ export async function POST(request: Request) {
       | "error"
       | null = null;
 
-    if (isSettled && payload.settlementOutcome) {
+    if (isSettled) {
       const oldProfitLoss = Number(bet.profitLoss ?? 0);
       const oldOutcome = deriveSettlementOutcomeFromProfitLoss({
         kind: payload.betKind,
         profitLoss: oldProfitLoss,
       });
+      // When no explicit settlement is requested (e.g. a pure odds/stake
+      // correction), keep the current outcome and just recompute P&L from the
+      // new stake/odds. The "push" fallback is unreachable (profitLoss is
+      // always a number here) and only satisfies the type.
+      const effectiveOutcome =
+        payload.settlementOutcome ?? oldOutcome ?? "push";
 
       const matchedBet = await getMatchedBetByLegId({
         betId: updated.id,
@@ -268,7 +272,7 @@ export async function POST(request: Request) {
         userId,
       });
 
-      if (payload.settlementOutcome === "unsettled") {
+      if (effectiveOutcome === "unsettled") {
         const nextStatus = matchedBet ? "matched" : "placed";
         reopenedStatus = nextStatus;
 
@@ -377,9 +381,9 @@ export async function POST(request: Request) {
         const newProfitLoss =
           payload.betKind === "back"
             ? calculateProfitLoss(
-                payload.settlementOutcome === "won"
+                effectiveOutcome === "won"
                   ? "win"
-                  : payload.settlementOutcome === "lost"
+                  : effectiveOutcome === "lost"
                     ? "loss"
                     : "push",
                 stake,
@@ -388,9 +392,9 @@ export async function POST(request: Request) {
                 freeBetStakeReturned
               )
             : calculateLayProfitLoss(
-                payload.settlementOutcome === "won"
+                effectiveOutcome === "won"
                   ? "loss"
-                  : payload.settlementOutcome === "lost"
+                  : effectiveOutcome === "lost"
                     ? "win"
                     : "push",
                 stake,
@@ -402,7 +406,7 @@ export async function POST(request: Request) {
           (newProfitLoss - oldProfitLoss).toFixed(2)
         );
 
-        if (deltaProfitLoss !== 0 || oldOutcome !== payload.settlementOutcome) {
+        if (deltaProfitLoss !== 0 || oldOutcome !== effectiveOutcome) {
           const currency = updated.currency ?? "NOK";
           const profitLossNok = await convertAmountToNok(
             newProfitLoss,
@@ -434,7 +438,7 @@ export async function POST(request: Request) {
               amount: deltaProfitLoss,
               currency,
               occurredAt: new Date(),
-              notes: `Settlement correction delta: ${payload.settlementOutcome} - ${updated.market} / ${updated.selection} @ ${odds}`,
+              notes: `Settlement correction delta: ${effectiveOutcome} - ${updated.market} / ${updated.selection} @ ${odds}`,
               linkedBackBetId: payload.betKind === "back" ? updated.id : null,
               linkedLayBetId: payload.betKind === "lay" ? updated.id : null,
             });
@@ -443,7 +447,7 @@ export async function POST(request: Request) {
 
         settlementCorrection = {
           fromOutcome: oldOutcome,
-          toOutcome: payload.settlementOutcome,
+          toOutcome: effectiveOutcome,
           fromProfitLoss: oldProfitLoss,
           toProfitLoss: newProfitLoss,
           deltaProfitLoss,

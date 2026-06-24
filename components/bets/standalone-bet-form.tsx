@@ -682,7 +682,6 @@ export function StandaloneBetForm({
                 <div className="space-y-2">
                   <Label htmlFor="odds">Odds</Label>
                   <Input
-                    disabled={isSettledEdit}
                     id="odds"
                     min="1.01"
                     onChange={(e) => updateField("odds", e.target.value)}
@@ -698,7 +697,6 @@ export function StandaloneBetForm({
                 <div className="space-y-2">
                   <Label htmlFor="stake">Stake ({formData.currency})</Label>
                   <Input
-                    disabled={isSettledEdit}
                     id="stake"
                     min="0.01"
                     onChange={(e) => updateField("stake", e.target.value)}
@@ -712,6 +710,13 @@ export function StandaloneBetForm({
                   )}
                 </div>
               </div>
+
+              {isSettledEdit && (
+                <p className="text-muted-foreground text-xs">
+                  Correcting odds or stake recalculates this bet's profit/loss
+                  and posts a balancing adjustment to your account.
+                </p>
+              )}
 
               {/* Potential Profit/Loss Display */}
               {odds > 0 && stake > 0 && (
