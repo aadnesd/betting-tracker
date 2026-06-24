@@ -102,6 +102,83 @@ export function computeMatchedNetExposure({
   };
 }
 
+export function calculateOptimalLayStake({
+  backStake,
+  backOdds,
+  layOdds,
+  backRateToBase = 1,
+  layRateToBase = 1,
+  isFreeBet = false,
+  freeBetStakeReturned = false,
+  commissionRate = 0,
+  strategy = "balanced",
+  biasPercent = 0,
+}: {
+  backStake: number;
+  backOdds: number;
+  layOdds: number;
+  /** Conversion rate from back stake currency into the shared comparison currency. */
+  backRateToBase?: number;
+  /** Conversion rate from lay stake currency into the shared comparison currency. */
+  layRateToBase?: number;
+  isFreeBet?: boolean;
+  freeBetStakeReturned?: boolean;
+  /** Exchange commission rate as a decimal (e.g. 0.025 for 2.5%). Defaults to 0. */
+  commissionRate?: number;
+  /** Underlay lays less; overlay lays more. Balanced gives equal outcome profit. */
+  strategy?: "balanced" | "underlay" | "overlay";
+  /** 0-100, where 100 shifts the lay stake 50% from the balanced stake. */
+  biasPercent?: number;
+}) {
+  const safeCommissionRate = Math.min(Math.max(commissionRate, 0), 1);
+  const effectiveLayOdds = layOdds - safeCommissionRate;
+
+  if (
+    backStake <= 0 ||
+    backOdds <= 1 ||
+    layOdds <= 1 ||
+    backRateToBase <= 0 ||
+    layRateToBase <= 0 ||
+    effectiveLayOdds <= 0
+  ) {
+    return null;
+  }
+
+  const safeBiasPercent = Math.min(Math.max(biasPercent, 0), 100);
+  const backReturnMultiplier =
+    isFreeBet && !freeBetStakeReturned ? backOdds - 1 : backOdds;
+  const balancedLayStake =
+    (backStake * backRateToBase * backReturnMultiplier) /
+    (layRateToBase * effectiveLayOdds);
+  const stakeShift = balancedLayStake * 0.5 * (safeBiasPercent / 100);
+  const layStake =
+    strategy === "underlay"
+      ? Math.max(0, balancedLayStake - stakeShift)
+      : strategy === "overlay"
+        ? balancedLayStake + stakeShift
+        : balancedLayStake;
+
+  const backStakeBase = backStake * backRateToBase;
+  const layStakeBase = layStake * layRateToBase;
+  const layLiabilityBase = layStakeBase * (layOdds - 1);
+  const backWinBeforeLay =
+    isFreeBet && freeBetStakeReturned
+      ? backStakeBase * backOdds
+      : backStakeBase * (backOdds - 1);
+  const layWinBeforeBackLoss = isFreeBet ? 0 : -backStakeBase;
+  const profitIfBackWins = backWinBeforeLay - layLiabilityBase;
+  const profitIfLayWins =
+    layWinBeforeBackLoss + layStakeBase * (1 - safeCommissionRate);
+
+  return {
+    layStake,
+    layLiability: layStake * (layOdds - 1),
+    balancedLayStake,
+    profitIfBackWins,
+    profitIfLayWins,
+  };
+}
+
 /**
  * Calculate the win/lose contribution of a single bet leg toward a shared
  * outcome (used when a back-only or lay-only leg is part of a bet group).

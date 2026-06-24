@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  calculateOptimalLayStake,
   combineSplitBetLegs,
   computeMatchedNetExposure,
   computeSingleLegOutcome,
@@ -47,6 +48,93 @@ describe("computeMatchedNetExposure", () => {
     expect(result.profitIfBackWins).toBe(72);
     expect(result.profitIfLayWins).toBe(78.4);
     expect(result.netExposure).toBe(72);
+  });
+});
+
+describe("calculateOptimalLayStake", () => {
+  it("calculates the equal-profit stake for a qualifying bet", () => {
+    const result = calculateOptimalLayStake({
+      backStake: 100,
+      backOdds: 2,
+      layOdds: 2.02,
+      commissionRate: 0.02,
+    });
+
+    expect(result?.layStake).toBeCloseTo(100);
+    expect(result?.layLiability).toBeCloseTo(102);
+  });
+
+  it("converts the back stake into the lay currency before calculating", () => {
+    const result = calculateOptimalLayStake({
+      backStake: 100,
+      backOdds: 2,
+      layOdds: 2,
+      backRateToBase: 12,
+      layRateToBase: 10,
+    });
+
+    expect(result?.layStake).toBeCloseTo(120);
+    expect(result?.layLiability).toBeCloseTo(120);
+  });
+
+  it("uses only winnings for stake-not-returned free bets", () => {
+    const result = calculateOptimalLayStake({
+      backStake: 50,
+      backOdds: 5,
+      layOdds: 5,
+      isFreeBet: true,
+      freeBetStakeReturned: false,
+    });
+
+    expect(result?.layStake).toBeCloseTo(40);
+    expect(result?.layLiability).toBeCloseTo(160);
+  });
+
+  it("uses full returns for stake-returned free bets", () => {
+    const result = calculateOptimalLayStake({
+      backStake: 50,
+      backOdds: 5,
+      layOdds: 5,
+      isFreeBet: true,
+      freeBetStakeReturned: true,
+    });
+
+    expect(result?.layStake).toBeCloseTo(50);
+    expect(result?.layLiability).toBeCloseTo(200);
+  });
+
+  it("underlays by reducing the balanced lay stake", () => {
+    const result = calculateOptimalLayStake({
+      backStake: 100,
+      backOdds: 2,
+      layOdds: 2.02,
+      commissionRate: 0.02,
+      strategy: "underlay",
+      biasPercent: 50,
+    });
+
+    expect(result?.balancedLayStake).toBeCloseTo(100);
+    expect(result?.layStake).toBeCloseTo(75);
+    expect(result?.profitIfBackWins).toBeGreaterThan(
+      result?.profitIfLayWins ?? 0
+    );
+  });
+
+  it("overlays by increasing the balanced lay stake", () => {
+    const result = calculateOptimalLayStake({
+      backStake: 100,
+      backOdds: 2,
+      layOdds: 2.02,
+      commissionRate: 0.02,
+      strategy: "overlay",
+      biasPercent: 50,
+    });
+
+    expect(result?.balancedLayStake).toBeCloseTo(100);
+    expect(result?.layStake).toBeCloseTo(125);
+    expect(result?.profitIfLayWins).toBeGreaterThan(
+      result?.profitIfBackWins ?? 0
+    );
   });
 });
 

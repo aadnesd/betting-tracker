@@ -1,0 +1,923 @@
+{
+  "account": {
+    "id": "b14f91fc-4d15-463f-8838-d00f0aac166c",
+    "name": "Sharkbetx"
+  },
+  "checked_at": "2026-06-04T09:12:18.620Z",
+  "window": {
+    "min": "2026-05-05T00:36:08.507Z",
+    "max": "2026-06-02T21:25:25.156Z"
+  },
+  "csv_count": 58,
+  "db_count": 48,
+  "matched": 6,
+  "missing_count": 52,
+  "unmatched_db_count": 42,
+  "tiers": {
+    "A": 0,
+    "B": 2,
+    "C": 4
+  },
+  "missing": [
+    {
+      "bet_id": "cmpwi906c00s2humklqk22l4n",
+      "settled_at": "2026-06-02T21:25:25.156Z",
+      "side": "LAY",
+      "event": "Georgia vs. Romania",
+      "net": 109.76,
+      "pnl": 112,
+      "commission": 2.24,
+      "tx": "0x8ba32f8ce61f620445d9d21d2381a6698ca6f2e4e1840e9d5e088577014230d7"
+    },
+    {
+      "bet_id": "cmpwhu37p00p3humk0i3cqgwq",
+      "settled_at": "2026-06-02T18:08:03.043Z",
+      "side": "LAY",
+      "event": "Roland Garros ATP: Rafael Jodar vs Alexander Zverev",
+      "net": -31.632911,
+      "pnl": -31.632911,
+      "commission": 0,
+      "tx": "0x3b25e4228a751b9cd755e43add59cdd5db41d039afdb0a188e4e85549564173f"
+    },
+    {
+      "bet_id": "cmpvg00h704lfhurqsvju2sa8",
+      "settled_at": "2026-06-02T05:36:07.066Z",
+      "side": "LAY",
+      "event": "Canada vs. Uzbekistan",
+      "net": -53.333333,
+      "pnl": -53.333333,
+      "commission": 0,
+      "tx": "0x969b0eb9fc9d943e5c65a18c921766984202368cdd939603d0ef19142f305980"
+    },
+    {
+      "bet_id": "cmpvfys7n04k0hurqgpgza9ld",
+      "settled_at": "2026-06-02T05:36:07.053Z",
+      "side": "LAY",
+      "event": "Canada vs. Uzbekistan",
+      "net": -500,
+      "pnl": -500,
+      "commission": 0,
+      "tx": "0x969b0eb9fc9d943e5c65a18c921766984202368cdd939603d0ef19142f305980"
+    },
+    {
+      "bet_id": "cmpvinod504wmhurqnvoetwyz",
+      "settled_at": "2026-06-01T23:31:09.491Z",
+      "side": "LAY",
+      "event": "Türkiye vs. North Macedonia",
+      "net": -20.408163,
+      "pnl": -20.408163,
+      "commission": 0,
+      "tx": "0x74d617d952343b1e4589bb42e3855a5ad369b3da6d83c56bfd9efd41ca8eae32"
+    },
+    {
+      "bet_id": "cmpvin5wm04vhhurqluxtdx6u",
+      "settled_at": "2026-06-01T23:31:09.501Z",
+      "side": "LAY",
+      "event": "Türkiye vs. North Macedonia",
+      "net": -32.653061,
+      "pnl": -32.653061,
+      "commission": 0,
+      "tx": "0x74d617d952343b1e4589bb42e3855a5ad369b3da6d83c56bfd9efd41ca8eae32"
+    },
+    {
+      "bet_id": "cmpv8wvsa037ghurqgs90e6gw",
+      "settled_at": "2026-06-01T23:31:09.508Z",
+      "side": "LAY",
+      "event": "Türkiye vs. North Macedonia",
+      "net": -51.365854,
+      "pnl": -51.365854,
+      "commission": 0,
+      "tx": "0x74d617d952343b1e4589bb42e3855a5ad369b3da6d83c56bfd9efd41ca8eae32"
+    },
+    {
+      "bet_id": "cmpr45uez0g25huo40exhda9t",
+      "settled_at": "2026-05-31T06:11:15.575Z",
+      "side": "LAY",
+      "event": "Molde FK vs. Sandefjord Fotball",
+      "net": -347.457627,
+      "pnl": -347.457627,
+      "commission": 0,
+      "tx": "0x5f1d1b7e26eb6a1c13f6b8cd6bb41984e5c1d731e8f5cb510dc51b105d85b212"
+    },
+    {
+      "bet_id": "cmpo6jd9g04j2huy0gxa1gqbs",
+      "settled_at": "2026-05-31T06:11:15.568Z",
+      "side": "LAY",
+      "event": "Molde FK vs. Sandefjord Fotball",
+      "net": -50.210489,
+      "pnl": -50.210489,
+      "commission": 0,
+      "tx": "0x5f1d1b7e26eb6a1c13f6b8cd6bb41984e5c1d731e8f5cb510dc51b105d85b212"
+    },
+    {
+      "bet_id": "cmpskbic60474hutpw340aufv",
+      "settled_at": "2026-05-30T22:22:48.081Z",
+      "side": "LAY",
+      "event": "UEFA Champions League Winner",
+      "net": -2773.684211,
+      "pnl": -2773.684211,
+      "commission": 0,
+      "tx": "0x4dc85a80b908327086e6c3328ce68a78203a3c58f12782ccc2e93aa1e7464717"
+    },
+    {
+      "bet_id": "cmpsfib1b00jbhubcl0f2r9l5",
+      "settled_at": "2026-05-30T19:21:01.655Z",
+      "side": "LAY",
+      "event": "Paris Saint-Germain FC vs. Arsenal FC",
+      "net": 219.52,
+      "pnl": 224,
+      "commission": 4.48,
+      "tx": "0x589762a350ead173cd473c713b4ccc336d61a4b1a23f8d8e00c45fb34dd5b43d"
+    },
+    {
+      "bet_id": "cmpseu66n03mjhuvhulw3e791",
+      "settled_at": "2026-05-30T19:21:01.643Z",
+      "side": "LAY",
+      "event": "Paris Saint-Germain FC vs. Arsenal FC",
+      "net": 109.76,
+      "pnl": 112,
+      "commission": 2.24,
+      "tx": "0x589762a350ead173cd473c713b4ccc336d61a4b1a23f8d8e00c45fb34dd5b43d"
+    },
+    {
+      "bet_id": "cmpmo1j330orzhuuhg7b1km2g",
+      "settled_at": "2026-05-30T04:34:36.318Z",
+      "side": "LAY",
+      "event": "Rosenborg BK vs. FK Bodø/Glimt",
+      "net": 95.648,
+      "pnl": 97.6,
+      "commission": 1.952,
+      "tx": "0x7bdbdcef88c7d1451d2881982ccc8d8e179998f46582102930d3b40e329bc722"
+    },
+    {
+      "bet_id": "cmpmexo6d0n20huuhxo0so5pp",
+      "settled_at": "2026-05-30T04:34:36.299Z",
+      "side": "LAY",
+      "event": "Rosenborg BK vs. FK Bodø/Glimt",
+      "net": 95.648,
+      "pnl": 97.6,
+      "commission": 1.952,
+      "tx": "0x7bdbdcef88c7d1451d2881982ccc8d8e179998f46582102930d3b40e329bc722"
+    },
+    {
+      "bet_id": "cmpr54k640gdphuo4f48jjng5",
+      "settled_at": "2026-05-30T04:29:40.566Z",
+      "side": "LAY",
+      "event": "Vålerenga Fotball vs. Kristiansund BK",
+      "net": -325.862069,
+      "pnl": -325.862069,
+      "commission": 0,
+      "tx": "0x73381e5744090a4510f6768e306477897d90331c26d885df9bda74a9a0028058"
+    },
+    {
+      "bet_id": "cmpn4b1490qf2huuhuxkti1lk",
+      "settled_at": "2026-05-30T04:29:40.549Z",
+      "side": "LAY",
+      "event": "Vålerenga Fotball vs. Kristiansund BK",
+      "net": 87.981485,
+      "pnl": 87.981485,
+      "commission": 0,
+      "tx": "0x23cbedd3d65892aaba97017f8b2e9ab1192193a02bd805a3c02f1918633a537a"
+    },
+    {
+      "bet_id": "cmpmgdbaw0n9yhuuhxy8gx82t",
+      "settled_at": "2026-05-30T04:29:40.573Z",
+      "side": "LAY",
+      "event": "Vålerenga Fotball vs. Kristiansund BK",
+      "net": 41.48,
+      "pnl": 41.48,
+      "commission": 0,
+      "tx": "0x23cbedd3d65892aaba97017f8b2e9ab1192193a02bd805a3c02f1918633a537a"
+    },
+    {
+      "bet_id": "cmpmf57qf0n3zhuuh6svurzkt",
+      "settled_at": "2026-05-30T04:29:40.558Z",
+      "side": "LAY",
+      "event": "Vålerenga Fotball vs. Kristiansund BK",
+      "net": -79.739364,
+      "pnl": -79.739364,
+      "commission": 0,
+      "tx": "0x73381e5744090a4510f6768e306477897d90331c26d885df9bda74a9a0028058"
+    },
+    {
+      "bet_id": "cmpo5ou7y04d6huy0mthx7ips",
+      "settled_at": "2026-05-28T05:15:11.446Z",
+      "side": "LAY",
+      "event": "Crystal Palace FC vs. Rayo Vallecano de Madrid",
+      "net": -405,
+      "pnl": -405,
+      "commission": 0,
+      "tx": "0xa76790580e6d0a84b62d74be7df7646b9fc1cabe508126ffc768c080888496c5"
+    },
+    {
+      "bet_id": "cmpn42jse0qeehuuhm6ybmvjx",
+      "settled_at": "2026-05-28T05:15:11.454Z",
+      "side": "LAY",
+      "event": "Crystal Palace FC vs. Rayo Vallecano de Madrid",
+      "net": 83.4,
+      "pnl": 83.4,
+      "commission": 0,
+      "tx": "0x73c3c52235720299358fbdfc32745d636f34855a597342d2f11e1b2f4252c879"
+    },
+    {
+      "bet_id": "cmpn4gvez0qhthuuhbb50zu5v",
+      "settled_at": "2026-05-27T04:35:56.877Z",
+      "side": "LAY",
+      "event": "Avalanche vs. Golden Knights",
+      "net": 225.4,
+      "pnl": 230,
+      "commission": 4.6,
+      "tx": "0xb660e7b8b8eecae975074eefc4fa428f288d0aa973156f3c1a3997f6095f0fcc"
+    },
+    {
+      "bet_id": "cmpkvazo10grehuuhdm7lihc3",
+      "settled_at": "2026-05-25T22:11:48.444Z",
+      "side": "LAY",
+      "event": "Sandefjord Fotball vs. Fredrikstad FK",
+      "net": 225.4,
+      "pnl": 230,
+      "commission": 4.6,
+      "tx": "0xcec6fd57a71e6eab73d3f7402c47d2b385c7f1727b4dbba697f8e7c8ffad709d"
+    },
+    {
+      "bet_id": "cmplbqopx0jq4huuh29lljxkr",
+      "settled_at": "2026-05-25T20:22:20.872Z",
+      "side": "LAY",
+      "event": "Hamarkameratene vs. Lillestrøm SK",
+      "net": 40.18,
+      "pnl": 41,
+      "commission": 0.82,
+      "tx": "0x824a469b3d15e96a41779fceb9997a0822d336c04767ed437e848338a24a2cf9"
+    },
+    {
+      "bet_id": "cmplbq8lm0jpmhuuh3355csky",
+      "settled_at": "2026-05-25T20:22:20.864Z",
+      "side": "LAY",
+      "event": "Hamarkameratene vs. Lillestrøm SK",
+      "net": 480.2,
+      "pnl": 490,
+      "commission": 9.8,
+      "tx": "0x824a469b3d15e96a41779fceb9997a0822d336c04767ed437e848338a24a2cf9"
+    },
+    {
+      "bet_id": "cmpku8hz30goxhuuhvgsnietz",
+      "settled_at": "2026-05-25T17:11:48.414Z",
+      "side": "LAY",
+      "event": "IK Start vs. Vålerenga Fotball",
+      "net": 341.04,
+      "pnl": 348,
+      "commission": 6.96,
+      "tx": "0x5b2b39550b676bf45382b8b146743f754f2bcc61e8ca97f451b7778104fc207e"
+    },
+    {
+      "bet_id": "cmpk9e7o90dkjhuuht1yae607",
+      "settled_at": "2026-05-25T02:01:47.087Z",
+      "side": "LAY",
+      "event": "Columbus Crew vs. Atlanta United FC",
+      "net": -84.393443,
+      "pnl": -84.393443,
+      "commission": 0,
+      "tx": "0xeac19e2f76915e11464b0584cf4ffa16ff5564ec6ecde396c29786d78377bbef"
+    },
+    {
+      "bet_id": "cmpk9djfg0djyhuuh9a0kgvgr",
+      "settled_at": "2026-05-25T02:01:47.078Z",
+      "side": "LAY",
+      "event": "Columbus Crew vs. Atlanta United FC",
+      "net": -671.311475,
+      "pnl": -671.311475,
+      "commission": 0,
+      "tx": "0xeac19e2f76915e11464b0584cf4ffa16ff5564ec6ecde396c29786d78377bbef"
+    },
+    {
+      "bet_id": "cmpk9a7rh0diphuuhvjhvpb3i",
+      "settled_at": "2026-05-25T02:01:47.063Z",
+      "side": "LAY",
+      "event": "Columbus Crew vs. Atlanta United FC",
+      "net": -25.57377,
+      "pnl": -25.57377,
+      "commission": 0,
+      "tx": "0xeac19e2f76915e11464b0584cf4ffa16ff5564ec6ecde396c29786d78377bbef"
+    },
+    {
+      "bet_id": "cmpk99e8u0dgthuuhv9xtvui0",
+      "settled_at": "2026-05-25T02:01:47.071Z",
+      "side": "LAY",
+      "event": "Columbus Crew vs. Atlanta United FC",
+      "net": -306.885246,
+      "pnl": -306.885246,
+      "commission": 0,
+      "tx": "0xeac19e2f76915e11464b0584cf4ffa16ff5564ec6ecde396c29786d78377bbef"
+    },
+    {
+      "bet_id": "cmpivozit01afhux9awlf9t6s",
+      "settled_at": "2026-05-25T00:22:32.577Z",
+      "side": "LAY",
+      "event": "Hellas Verona FC vs. AS Roma",
+      "net": 86.24,
+      "pnl": 88,
+      "commission": 1.76,
+      "tx": "0x21b2a601722a5c45559a70e25628fa724c7ee9af02cf513e482770d968afd7e1"
+    },
+    {
+      "bet_id": "cmpivf7oo013nhux9qal2kjzp",
+      "settled_at": "2026-05-25T00:22:32.566Z",
+      "side": "LAY",
+      "event": "Hellas Verona FC vs. AS Roma",
+      "net": 86.24,
+      "pnl": 88,
+      "commission": 1.76,
+      "tx": "0x21b2a601722a5c45559a70e25628fa724c7ee9af02cf513e482770d968afd7e1"
+    },
+    {
+      "bet_id": "cmpk8a5bo0d4thuuhf5jqrabn",
+      "settled_at": "2026-05-24T23:01:57.002Z",
+      "side": "LAY",
+      "event": "Torino FC vs. Juventus FC",
+      "net": 2940,
+      "pnl": 3000,
+      "commission": 60,
+      "tx": "0xf32eb659e91a506e2c1ba3a54c353608ebf5f4c12b8897282474187f71bb3f8d"
+    },
+    {
+      "bet_id": "cmpk8busq0d5whuuhwzx9319o",
+      "settled_at": "2026-05-24T23:01:56.995Z",
+      "side": "LAY",
+      "event": "Torino FC vs. Juventus FC",
+      "net": 49,
+      "pnl": 50,
+      "commission": 1,
+      "tx": "0xf32eb659e91a506e2c1ba3a54c353608ebf5f4c12b8897282474187f71bb3f8d"
+    },
+    {
+      "bet_id": "cmpivbo2m012fhux9an3pnl8n",
+      "settled_at": "2026-05-24T21:37:09.909Z",
+      "side": "LAY",
+      "event": "AC Milan vs. Cagliari Calcio",
+      "net": -1239.557143,
+      "pnl": -1239.557143,
+      "commission": 0,
+      "tx": "0x939e4ce0a45606d6a7988c4cf2ca0d0952499999317f460ad4d511c8c416b8fe"
+    },
+    {
+      "bet_id": "cmpjhav1d03czhux9vm0vvenv",
+      "settled_at": "2026-05-24T21:22:20.177Z",
+      "side": "LAY",
+      "event": "SSC Napoli vs. Udinese Calcio",
+      "net": 44,
+      "pnl": 44,
+      "commission": 0,
+      "tx": "0x7616e1142772f860113cf7e49ce011b45dbe6af211bd66175fb55a2a9141ab3a"
+    },
+    {
+      "bet_id": "cmpjh6nfz03amhux9bn8labtj",
+      "settled_at": "2026-05-24T21:22:20.183Z",
+      "side": "LAY",
+      "event": "SSC Napoli vs. Udinese Calcio",
+      "net": 44,
+      "pnl": 44,
+      "commission": 0,
+      "tx": "0x7616e1142772f860113cf7e49ce011b45dbe6af211bd66175fb55a2a9141ab3a"
+    },
+    {
+      "bet_id": "cmpjh0kkc039mhux9auz5pujb",
+      "settled_at": "2026-05-24T21:22:20.159Z",
+      "side": "LAY",
+      "event": "SSC Napoli vs. Udinese Calcio",
+      "net": 44,
+      "pnl": 44,
+      "commission": 0,
+      "tx": "0x7616e1142772f860113cf7e49ce011b45dbe6af211bd66175fb55a2a9141ab3a"
+    },
+    {
+      "bet_id": "cmpjfl5i9034fhux9qvvofw3r",
+      "settled_at": "2026-05-24T21:22:20.143Z",
+      "side": "LAY",
+      "event": "SSC Napoli vs. Udinese Calcio",
+      "net": -1715.625,
+      "pnl": -1715.625,
+      "commission": 0,
+      "tx": "0x87dd2c292bbcaf43f76df386ee300044b68c433b8f7f4e8e46012cac061d6b5c"
+    },
+    {
+      "bet_id": "cmpivihlp015bhux9whcm6eof",
+      "settled_at": "2026-05-24T21:22:20.134Z",
+      "side": "LAY",
+      "event": "SSC Napoli vs. Udinese Calcio",
+      "net": -124.923077,
+      "pnl": -124.923077,
+      "commission": 0,
+      "tx": "0x87dd2c292bbcaf43f76df386ee300044b68c433b8f7f4e8e46012cac061d6b5c"
+    },
+    {
+      "bet_id": "cmpjgwa3y038bhux9ierfaqt2",
+      "settled_at": "2026-05-24T19:47:49.769Z",
+      "side": "LAY",
+      "event": "Crystal Palace FC vs. Arsenal FC",
+      "net": 41.16,
+      "pnl": 42,
+      "commission": 0.84,
+      "tx": "0x93ff6b9854ea9b1dd09f2e37dcfb600f630c19bd0bfeec200a4294ce2341c099"
+    },
+    {
+      "bet_id": "cmpiuqan200yihux91dpo97zx",
+      "settled_at": "2026-05-24T19:47:34.787Z",
+      "side": "LAY",
+      "event": "Manchester City FC vs. Aston Villa FC",
+      "net": -465.111111,
+      "pnl": -465.111111,
+      "commission": 0,
+      "tx": "0xddf7243917d6a8731cec3f41178dbfa2b441ea4891d429ad1fc5e6839e9067eb"
+    },
+    {
+      "bet_id": "cmpjdt4gk02vvhux9uuhtllxk",
+      "settled_at": "2026-05-24T19:22:46.989Z",
+      "side": "LAY",
+      "event": "Brighton & Hove Albion FC vs. Manchester United FC",
+      "net": 3789.66,
+      "pnl": 3867,
+      "commission": 77.34,
+      "tx": "0x06e9cf099c6e005e11b8034b69e5ed8d5a1115c5a1f8e915e8ffa1c5ab91578c"
+    },
+    {
+      "bet_id": "cmpgm6rd205s2hul8a8lbp9wf",
+      "settled_at": "2026-05-22T23:58:16.695Z",
+      "side": "LAY",
+      "event": "Valencia vs. Real Madrid",
+      "net": 76.44,
+      "pnl": 78,
+      "commission": 1.56,
+      "tx": "0xdf50ebd2be7eea3275cf617a6eba3fbd565de995b420704c93d652df5fcd1048"
+    },
+    {
+      "bet_id": "cmpgm5owy05qvhul8ya5091p7",
+      "settled_at": "2026-05-22T23:58:16.729Z",
+      "side": "LAY",
+      "event": "Valencia vs. Real Madrid",
+      "net": 24.934341,
+      "pnl": 25.443205,
+      "commission": 0.508864,
+      "tx": "0xdf50ebd2be7eea3275cf617a6eba3fbd565de995b420704c93d652df5fcd1048"
+    },
+    {
+      "bet_id": "cmpglxxez05pbhul8jipborxr",
+      "settled_at": "2026-05-22T23:58:16.736Z",
+      "side": "LAY",
+      "event": "Valencia vs. Real Madrid",
+      "net": 121.512923,
+      "pnl": 123.992779,
+      "commission": 2.479856,
+      "tx": "0xdf50ebd2be7eea3275cf617a6eba3fbd565de995b420704c93d652df5fcd1048"
+    },
+    {
+      "bet_id": "cmpgl5lwm05omhul80xpm9r3b",
+      "settled_at": "2026-05-22T23:28:20.094Z",
+      "side": "LAY",
+      "event": "Racing Club de Lens vs. OGC Nice",
+      "net": -131.0625,
+      "pnl": -131.0625,
+      "commission": 0,
+      "tx": "0x99b2fde0aa98f1654b8f354c2786e2888c72711f86828c1d56aac0f7e923cb05"
+    },
+    {
+      "bet_id": "cmpcno1z200fghumt7vsh1b5h",
+      "settled_at": "2026-05-19T22:51:13.539Z",
+      "side": "LAY",
+      "event": "AFC Bournemouth vs. Manchester City FC",
+      "net": 4466.84,
+      "pnl": 4558,
+      "commission": 91.16,
+      "tx": "0xb201a11a44c09e88d193c1b7d090179b8662e0ffb8ccd9f2cb759cf6869e15d0"
+    },
+    {
+      "bet_id": "cmpbga4ny014chu7ufafa5txn",
+      "settled_at": "2026-05-18T22:14:32.332Z",
+      "side": "LAY",
+      "event": "Arsenal FC vs. Burnley FC",
+      "net": -76.636364,
+      "pnl": -76.636364,
+      "commission": 0,
+      "tx": "0x5a66d3a5d31cae18ebb072db8f46454a6d79dfd29a5ea51c858607a4cd4419d1"
+    },
+    {
+      "bet_id": "cmp0zv9a002bxhu5htuo13dpc",
+      "settled_at": "2026-05-12T22:43:59.993Z",
+      "side": "LAY",
+      "event": "Real Betis Balompié vs. Elche CF",
+      "net": 38.906,
+      "pnl": 39.7,
+      "commission": 0.794,
+      "tx": "0x84c9f8a59b1bacb27a70abe75377b25153f5bef6bce18487e04a75df3adb90d0"
+    },
+    {
+      "bet_id": "cmp1ilnmz00nrhu7y6hoj8icl",
+      "settled_at": "2026-05-12T01:13:08.805Z",
+      "side": "LAY",
+      "event": "SSC Napoli vs. Bologna FC 1909",
+      "net": 2271.0324,
+      "pnl": 2317.38,
+      "commission": 46.3476,
+      "tx": "0x2a151f4ed79de6f04ad96998e0679789f5d6b7c357f6aff1c84d7d7b17307e8f"
+    },
+    {
+      "bet_id": "cmp002z1e00fnhuczev44dt1k",
+      "settled_at": "2026-05-10T22:46:09.680Z",
+      "side": "LAY",
+      "event": "1. FSV Mainz 05 vs. 1. FC Union Berlin",
+      "net": 2479.4,
+      "pnl": 2530,
+      "commission": 50.6,
+      "tx": "0x3d3256cb4b1fea21f6a65b78c07cfb14a3e4c5ef9cb22fbad590c0b69d639d9b"
+    },
+    {
+      "bet_id": "cmopur4xy05lwhu8oh151zr3v",
+      "settled_at": "2026-05-05T00:36:08.507Z",
+      "side": "LAY",
+      "event": "Everton FC vs. Manchester City FC",
+      "net": 89.1425,
+      "pnl": 90.5,
+      "commission": 1.3575,
+      "tx": "0x42ccb27dd92b70c60954302a4856b2112d44851bb479643e30d8a0254cc33418"
+    }
+  ],
+  "unmatched_db": [
+    {
+      "id": "de124d16-cca3-4ccd-a4cd-ef2b9fb57be0",
+      "settled_at": "2026-05-05T04:22:35.792Z",
+      "selection": "Everton FC to Win",
+      "market": "Everton FC vs Manchester City FC",
+      "status": "settled",
+      "profit": 89.14,
+      "side": "LAY"
+    },
+    {
+      "id": "37d28e1d-7d2e-43e0-a8de-dc12065d8728",
+      "settled_at": "2026-05-11T04:16:45.641Z",
+      "selection": "1. FSV Mainz 05 to Win",
+      "market": "1. FSV Mainz 05 vs 1. FC Union Berlin",
+      "status": "settled",
+      "profit": 2492.05,
+      "side": "LAY"
+    },
+    {
+      "id": "0691cf37-a828-4457-a6bf-a5f8db69baa0",
+      "settled_at": "2026-05-12T04:02:57.888Z",
+      "selection": "SSC Napoli to Win",
+      "market": "SSC Napoli vs Bologna FC 1909",
+      "status": "settled",
+      "profit": 2282.24,
+      "side": "LAY"
+    },
+    {
+      "id": "65f9169d-a48d-474d-a3cd-95a3edfd648e",
+      "settled_at": "2026-05-13T04:02:51.909Z",
+      "selection": "Elche CF to Win",
+      "market": "Real Betis Balompié vs Elche CF",
+      "status": "settled",
+      "profit": 39.1,
+      "side": "LAY"
+    },
+    {
+      "id": "9c8d7396-62a1-448c-b492-81b9554f7f99",
+      "settled_at": "2026-05-19T04:55:56.964Z",
+      "selection": "Arsenal FC to Win",
+      "market": "Arsenal FC vs Burnley FC",
+      "status": "settled",
+      "profit": -76.43,
+      "side": "LAY"
+    },
+    {
+      "id": "fde53cdb-c604-49fc-9336-fb1430be39a0",
+      "settled_at": "2026-05-20T05:34:19.960Z",
+      "selection": "city",
+      "market": "bournemouth vs city",
+      "status": "settled",
+      "profit": 4466.84,
+      "side": "LAY"
+    },
+    {
+      "id": "91f4463b-87d2-43b1-ac7f-9d639113e5bc",
+      "settled_at": "2026-05-23T03:40:58.654Z",
+      "selection": "Lens",
+      "market": "Lens vs Nice",
+      "status": "settled",
+      "profit": -131.18,
+      "side": "LAY"
+    },
+    {
+      "id": "898843d0-af1d-4c02-8436-164f42770da7",
+      "settled_at": "2026-05-23T03:41:07.392Z",
+      "selection": "Valencia",
+      "market": "Valencia vs Real Madrid (basketball)",
+      "status": "settled",
+      "profit": 121.52,
+      "side": "LAY"
+    },
+    {
+      "id": "1340fd6f-46a0-40c9-b239-982b0942cf82",
+      "settled_at": "2026-05-23T03:41:12.313Z",
+      "selection": "Valencia",
+      "market": "Valencia vs Real Madrid (basket)",
+      "status": "settled",
+      "profit": 101.37,
+      "side": "LAY"
+    },
+    {
+      "id": "3acc2cf7-70fe-44cb-aaad-9820ab496d84",
+      "settled_at": "2026-05-25T04:39:58.936Z",
+      "selection": "Columbus",
+      "market": "Columbus vs Atalanta",
+      "status": "settled",
+      "profit": -755.3,
+      "side": "LAY"
+    },
+    {
+      "id": "51224fbb-1c00-40bd-8331-b38e75074e97",
+      "settled_at": "2026-05-24T18:48:09.911Z",
+      "selection": "Aston Villa FC to Win",
+      "market": "Manchester City FC vs Aston Villa FC",
+      "status": "settled",
+      "profit": -464.6,
+      "side": "LAY"
+    },
+    {
+      "id": "9083cea9-9453-415b-89f7-5f6d1bfcf60d",
+      "settled_at": "2026-05-24T18:49:30.303Z",
+      "selection": "Manchester United FC to Win",
+      "market": "Brighton & Hove Albion FC vs Manchester United FC",
+      "status": "settled",
+      "profit": -133.14,
+      "side": "LAY"
+    },
+    {
+      "id": "c5879fa5-1f1b-46e8-a860-b166bf5f073e",
+      "settled_at": "2026-05-25T04:39:42.768Z",
+      "selection": "SSC Napoli to Win",
+      "market": "SSC Napoli vs Udinese Calcio",
+      "status": "settled",
+      "profit": -124.82,
+      "side": "LAY"
+    },
+    {
+      "id": "621a2654-d128-439f-83f4-0229957ca6f0",
+      "settled_at": "2026-05-25T04:39:42.961Z",
+      "selection": "SSC Napoli to Win",
+      "market": "SSC Napoli vs Udinese Calcio",
+      "status": "settled",
+      "profit": -1717.15,
+      "side": "LAY"
+    },
+    {
+      "id": "3ad74cb4-fde7-470c-bc1d-806995713394",
+      "settled_at": "2026-05-25T04:39:43.023Z",
+      "selection": "Udinese Calcio to Win",
+      "market": "SSC Napoli vs Udinese Calcio",
+      "status": "settled",
+      "profit": 43.12,
+      "side": "LAY"
+    },
+    {
+      "id": "6e2efc70-e194-4265-a39e-27a5ac9f6718",
+      "settled_at": "2026-05-25T04:39:43.072Z",
+      "selection": "Udinese Calcio to Win",
+      "market": "SSC Napoli vs Udinese Calcio",
+      "status": "settled",
+      "profit": 43.12,
+      "side": "LAY"
+    },
+    {
+      "id": "803a6856-ee09-4125-8f85-1a1ec53acc4d",
+      "settled_at": "2026-05-25T04:39:43.122Z",
+      "selection": "Udinese Calcio to Win",
+      "market": "SSC Napoli vs Udinese Calcio",
+      "status": "settled",
+      "profit": 43.12,
+      "side": "LAY"
+    },
+    {
+      "id": "4f5c75b2-c506-409c-a204-5412c47a41aa",
+      "settled_at": "2026-05-25T04:39:43.177Z",
+      "selection": "Hellas Verona FC to Win",
+      "market": "Hellas Verona FC vs AS Roma",
+      "status": "settled",
+      "profit": 86.24,
+      "side": "LAY"
+    },
+    {
+      "id": "e9cf8464-bc35-4f09-add8-1713180ec321",
+      "settled_at": "2026-05-25T04:39:43.225Z",
+      "selection": "Cagliari Calcio to Win",
+      "market": "AC Milan vs Cagliari Calcio",
+      "status": "settled",
+      "profit": -1240.89,
+      "side": "LAY"
+    },
+    {
+      "id": "c494f8a8-fff2-4066-8948-bac9d3d4bac6",
+      "settled_at": "2026-05-25T04:39:43.286Z",
+      "selection": "Hellas Verona FC to Win",
+      "market": "Hellas Verona FC vs AS Roma",
+      "status": "settled",
+      "profit": 86.24,
+      "side": "LAY"
+    },
+    {
+      "id": "1755c339-e28a-4c4d-ba47-23c3a4660388",
+      "settled_at": "2026-05-25T04:39:43.331Z",
+      "selection": "Juventus FC to Win",
+      "market": "Torino FC vs Juventus FC",
+      "status": "settled",
+      "profit": 2989,
+      "side": "LAY"
+    },
+    {
+      "id": "423a276b-2b85-4ff3-a79c-436abd4d7b94",
+      "settled_at": "2026-05-25T04:39:52.695Z",
+      "selection": "Columbus",
+      "market": "Columbus vs Atalanta",
+      "status": "settled",
+      "profit": -332.28,
+      "side": "LAY"
+    },
+    {
+      "id": "0503786a-4a1c-48ca-844d-67d947d3b72f",
+      "settled_at": "2026-05-25T05:06:36.903Z",
+      "selection": "brighton",
+      "market": "Brighton v united",
+      "status": "settled",
+      "profit": 3789.66,
+      "side": "LAY"
+    },
+    {
+      "id": "0583db20-b47c-4504-92e7-2bced49c8829",
+      "settled_at": "2026-05-26T04:39:47.334Z",
+      "selection": "Vålerenga",
+      "market": "Start vs Vålerenga",
+      "status": "settled",
+      "profit": 341.04,
+      "side": "LAY"
+    },
+    {
+      "id": "8e100b37-dfdb-42c4-a256-dd47f0246e1b",
+      "settled_at": "2026-05-26T04:39:50.936Z",
+      "selection": "Sandefjord",
+      "market": "Sandefjord vs Fredrikstad",
+      "status": "settled",
+      "profit": 225.4,
+      "side": "LAY"
+    },
+    {
+      "id": "8d51f5a1-8dd7-4cc1-9ca8-968353bbca22",
+      "settled_at": "2026-05-26T06:45:35.180Z",
+      "selection": "lillestrøm",
+      "market": "hamkam vs lillestrøm",
+      "status": "settled",
+      "profit": 520.38,
+      "side": "LAY"
+    },
+    {
+      "id": "6d88ce49-f3a6-41c4-a8c8-0a8f25eefa04",
+      "settled_at": "2026-05-28T04:04:52.103Z",
+      "selection": "palace",
+      "market": "Palace vs Vallecano",
+      "status": "settled",
+      "profit": -405.03,
+      "side": "LAY"
+    },
+    {
+      "id": "de1277e8-8bcb-4b45-a57c-21a08786d3ee",
+      "settled_at": "2026-05-27T09:41:12.894Z",
+      "selection": "Over 4,5 goals incl overtime",
+      "market": "Vegas golden knights vs avalanche",
+      "status": "settled",
+      "profit": 225.4,
+      "side": "LAY"
+    },
+    {
+      "id": "76d43eff-5eb8-4aa8-9b7c-459d6089513e",
+      "settled_at": "2026-05-31T17:55:29.816Z",
+      "selection": "rosenborg",
+      "market": "rosenborg vs bodø",
+      "status": "settled",
+      "profit": 95.65,
+      "side": "LAY"
+    },
+    {
+      "id": "29fe2da3-81ea-435f-8ae9-8d08619d9943",
+      "settled_at": "2026-05-28T08:30:40.986Z",
+      "selection": "Vallecano",
+      "market": "Palace vs vallecano",
+      "status": "settled",
+      "profit": 81.73,
+      "side": "LAY"
+    },
+    {
+      "id": "51fa1aad-8311-4dc8-a594-effd5c3124a6",
+      "settled_at": "2026-05-28T08:57:41.948Z",
+      "selection": "Palace",
+      "market": "Palace vs Arsenal",
+      "status": "settled",
+      "profit": 41.16,
+      "side": "LAY"
+    },
+    {
+      "id": "42c60d2f-3a53-4eba-a8cf-98ef77e3f7c5",
+      "settled_at": "2026-05-31T04:23:41.148Z",
+      "selection": "kristiansund",
+      "market": "vålerenga vs kristiansund",
+      "status": "settled",
+      "profit": 86.24,
+      "side": "LAY"
+    },
+    {
+      "id": "08353257-a35a-4943-9e68-a8cbe8ba43fe",
+      "settled_at": "2026-05-30T04:27:17.427Z",
+      "selection": "Vålerenga",
+      "market": "Vålerenga vs kristiansund",
+      "status": "settled",
+      "profit": -405.63,
+      "side": "LAY"
+    },
+    {
+      "id": "037c64ce-9110-4d3c-af79-9f859d8976ac",
+      "settled_at": "2026-05-31T04:27:02.992Z",
+      "selection": "Molde",
+      "market": "Molde vs Sandefjord",
+      "status": "settled",
+      "profit": -397.5,
+      "side": "LAY"
+    },
+    {
+      "id": "87dd79a6-cd23-4663-ae2b-09809dd9f462",
+      "settled_at": "2026-05-31T17:55:21.356Z",
+      "selection": "rosenborg",
+      "market": "rosenborg vs bodø",
+      "status": "settled",
+      "profit": 95.65,
+      "side": "LAY"
+    },
+    {
+      "id": "6bea3500-253c-49a0-a67b-db2a0fcf7f2f",
+      "settled_at": "2026-05-30T04:27:09.700Z",
+      "selection": "kristiansund",
+      "market": "vålerenga vs kristiansund",
+      "status": "settled",
+      "profit": 40.67,
+      "side": "LAY"
+    },
+    {
+      "id": "e37044b2-b27f-4df0-a897-a270abc010b6",
+      "settled_at": "2026-05-31T04:26:58.151Z",
+      "selection": "Arsenal FC to Win",
+      "market": "Paris Saint-Germain FC vs Arsenal FC",
+      "status": "settled",
+      "profit": 109.76,
+      "side": "LAY"
+    },
+    {
+      "id": "1043dbf6-7b75-4ae5-9f2f-272bc3484399",
+      "settled_at": "2026-05-31T04:26:58.243Z",
+      "selection": "Arsenal FC to Win",
+      "market": "Paris Saint-Germain FC vs Arsenal FC",
+      "status": "settled",
+      "profit": 219.52,
+      "side": "LAY"
+    },
+    {
+      "id": "957eead5-8993-4f31-8eb7-3a5e30aca09c",
+      "settled_at": "2026-06-01T11:28:04.961Z",
+      "selection": "Paris win trophy",
+      "market": "Paris Saint-Germain FC vs Arsenal FC",
+      "status": "settled",
+      "profit": -2774.4,
+      "side": "LAY"
+    },
+    {
+      "id": "f6eb922e-4ec2-45ae-9cba-d1aff9957dba",
+      "settled_at": "2026-06-02T04:27:03.368Z",
+      "selection": "Turkey",
+      "market": "Turkey vs north macedonia",
+      "status": "settled",
+      "profit": -51.48,
+      "side": "LAY"
+    },
+    {
+      "id": "8e6a9173-be13-4785-a162-28291c696aec",
+      "settled_at": "2026-06-02T04:27:08.764Z",
+      "selection": "Canada",
+      "market": "Canada vs uzbekistand",
+      "status": "settled",
+      "profit": -553.61,
+      "side": "LAY"
+    },
+    {
+      "id": "44cb2eb5-2935-4855-a080-fe547424571c",
+      "settled_at": "2026-06-02T06:16:05.631Z",
+      "selection": "Turkey",
+      "market": "Turkey vs north Macedonia",
+      "status": "settled",
+      "profit": -52,
+      "side": "LAY"
+    }
+  ]
+}
