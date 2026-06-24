@@ -22,6 +22,7 @@ import {
   countExpiringFreeBets,
   getActiveDepositBonusesSummary,
   getActiveFreeBetsSummary,
+  getSettledUnlockProgressByFreeBetIds,
   listDepositBonusesByUser,
   listFreeBetsByUser,
 } from "@/lib/db/queries";
@@ -128,6 +129,13 @@ export default async function PromosSettingsPage({
 
   let activeFreeBets = freeBets.filter((fb) => fb.status === "active");
   const lockedFreeBets = freeBets.filter((fb) => fb.status === "locked");
+
+  // For locked promos, work out how much progress has actually settled. A promo
+  // only unlocks once its qualifying bets settle, so any placed-but-unsettled
+  // progress is shown as "pending settlement".
+  const settledUnlockProgress = await getSettledUnlockProgressByFreeBetIds(
+    lockedFreeBets.map((fb) => fb.id)
+  );
 
   // Apply filter if requested - uses isExpiringSoon helper defined above
   if (filterExpiring) {
@@ -409,16 +417,25 @@ export default async function PromosSettingsPage({
           </CardHeader>
           <CardContent className="space-y-3">
             {lockedFreeBets.map((fb) => {
-              const unlockProgress = fb.unlockProgress
+              const placedProgress = fb.unlockProgress
                 ? Number.parseFloat(fb.unlockProgress)
                 : 0;
+              const settledProgress = settledUnlockProgress[fb.id] ?? 0;
+              const pendingProgress = Math.max(
+                0,
+                placedProgress - settledProgress
+              );
               const unlockTarget = fb.unlockTarget
                 ? Number.parseFloat(fb.unlockTarget)
                 : 0;
               const progressPercent =
                 unlockTarget > 0
-                  ? Math.min((unlockProgress / unlockTarget) * 100, 100)
+                  ? Math.min((settledProgress / unlockTarget) * 100, 100)
                   : 0;
+              const formatProgressAmount = (amount: number) =>
+                fb.unlockType === "stake"
+                  ? `${fb.currency} ${amount.toFixed(2)}`
+                  : `${amount.toFixed(0)} bets`;
 
               return (
                 <Link
@@ -429,9 +446,15 @@ export default async function PromosSettingsPage({
                   <div className="space-y-3">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <div className="space-y-1">
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           <span className="font-semibold">{fb.name}</span>
                           <FreeBetStatusBadge status={fb.status} />
+                          {pendingProgress > 0 && (
+                            <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-amber-700 text-xs">
+                              <AlertTriangle className="h-3 w-3" />
+                              Awaiting settlement
+                            </span>
+                          )}
                         </div>
                         <div className="flex flex-wrap items-center gap-3 text-muted-foreground text-sm">
                           {fb.accountName && (
@@ -458,20 +481,22 @@ export default async function PromosSettingsPage({
                         </p>
                       </div>
                     </div>
-                    {/* Progress bar */}
+                    {/* Progress bar (settled progress only) */}
                     <div className="space-y-1">
                       <div className="flex justify-between text-muted-foreground text-xs">
-                        <span>
-                          {fb.unlockType === "stake"
-                            ? `${fb.currency} ${unlockProgress.toFixed(2)}`
-                            : `${unlockProgress.toFixed(0)} bets`}
-                        </span>
+                        <span>{formatProgressAmount(settledProgress)}</span>
                         <span>{progressPercent.toFixed(0)}%</span>
                       </div>
                       <Progress
                         className="h-2 bg-amber-100"
                         value={progressPercent}
                       />
+                      {pendingProgress > 0 && (
+                        <p className="text-amber-700 text-xs">
+                          {formatProgressAmount(pendingProgress)} placed but not
+                          settled yet — unlocks once it settles.
+                        </p>
+                      )}
                     </div>
                   </div>
                 </Link>

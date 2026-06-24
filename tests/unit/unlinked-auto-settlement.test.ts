@@ -20,6 +20,7 @@ vi.mock("@/lib/db/queries", () => ({
   getFreeBetByMatchedBetId: vi.fn().mockResolvedValue(null),
   processFreeBetWageringProgressOnSettle: vi.fn(),
   processWageringProgressOnSettle: vi.fn(),
+  processQualifyingBetsUnlockOnSettle: vi.fn(),
 }));
 
 vi.mock("@/lib/unlinked-settlement-search", () => ({
