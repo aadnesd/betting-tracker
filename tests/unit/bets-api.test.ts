@@ -2894,6 +2894,108 @@ describe("bets API routes (unit)", () => {
       );
     });
 
+    it("corrects stake on a settled bet, recomputing P&L and posting a delta adjustment", async () => {
+      process.env.SETTLED_BET_EDIT_USER_IDS = user.id;
+
+      const betId = "66666666-6666-6666-6666-666666666666";
+      const accountId = "77777777-7777-7777-7777-777777777777";
+
+      // Settled "won" back bet: stake 120 @ 2.50 => P&L 180.
+      (dbQueries.getBackBetById as vi.Mock).mockResolvedValue({
+        id: betId,
+        status: "settled",
+        market: "Man Utd v Liverpool",
+        selection: "Man Utd",
+        odds: "2.50",
+        stake: "120.00",
+        accountId,
+        currency: "NOK",
+        placedAt: new Date("2025-01-01T00:00:00Z"),
+        profitLoss: "180.00",
+      });
+      (dbQueries.getAccountById as vi.Mock).mockResolvedValue({
+        id: accountId,
+        name: "Bet365",
+        kind: "bookmaker",
+      });
+      // Corrected stake 100 @ 2.50 (same outcome "won") => P&L should be 150.
+      (dbQueries.updateBackBetDetails as vi.Mock).mockResolvedValue({
+        id: betId,
+        status: "settled",
+        market: "Man Utd v Liverpool",
+        selection: "Man Utd",
+        odds: "2.50",
+        stake: "100.00",
+        accountId,
+        currency: "NOK",
+        placedAt: new Date("2025-01-01T00:00:00Z"),
+      });
+      (dbQueries.getMatchedBetByLegId as vi.Mock).mockResolvedValue(null);
+      (dbQueries.updateBackBet as vi.Mock).mockResolvedValue({
+        id: betId,
+        profitLoss: "150.00",
+      });
+      (dbQueries.createAccountTransaction as vi.Mock).mockResolvedValue({
+        id: "tx-1",
+      });
+      (dbQueries.createAuditEntry as vi.Mock).mockResolvedValue({
+        id: "audit-1",
+      });
+
+      const res = await updateIndividualRoute(
+        new Request("http://localhost/api/bets/individual/update", {
+          method: "POST",
+          body: JSON.stringify({
+            betId,
+            betKind: "back",
+            market: "Man Utd v Liverpool",
+            selection: "Man Utd",
+            odds: 2.5,
+            stake: 100,
+            accountId,
+            currency: "NOK",
+            settlementOutcome: "won",
+            notes: "Entered the wrong stake.",
+          }),
+        })
+      );
+
+      expect(res.status).toBe(200);
+      // Stake change must update the bet's recomputed P&L.
+      expect(dbQueries.updateBackBetDetails).toHaveBeenCalledWith(
+        expect.objectContaining({ id: betId, stake: 100 })
+      );
+      expect(dbQueries.updateBackBet).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: betId,
+          profitLoss: "150.00",
+        })
+      );
+      // Account balance kept correct via a -30 delta adjustment (180 -> 150).
+      expect(dbQueries.createAccountTransaction).toHaveBeenCalledWith(
+        expect.objectContaining({
+          accountId,
+          type: "adjustment",
+          amount: -30,
+          linkedBackBetId: betId,
+        })
+      );
+      expect(dbQueries.createAuditEntry).toHaveBeenCalledWith(
+        expect.objectContaining({
+          changes: expect.objectContaining({
+            settledBetEdit: true,
+            settlementCorrection: expect.objectContaining({
+              fromOutcome: "won",
+              toOutcome: "won",
+              fromProfitLoss: 180,
+              toProfitLoss: 150,
+              deltaProfitLoss: -30,
+            }),
+          }),
+        })
+      );
+    });
+
     it("allows authorized settled-bet edits to reopen a standalone bet", async () => {
       process.env.SETTLED_BET_EDIT_USER_IDS = user.id;
 
