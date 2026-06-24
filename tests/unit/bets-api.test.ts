@@ -95,6 +95,7 @@ vi.mock("@/lib/db/queries", () => ({
   getMatchedBetByLegId: vi.fn(),
   processFreeBetWageringProgressOnSettle: vi.fn(),
   processWageringProgressOnSettle: vi.fn(),
+  processQualifyingBetsUnlockOnSettle: vi.fn(),
   reverseBackBetSettlementSideEffects: vi.fn(),
   getFootballMatchById: vi.fn(),
 }));
