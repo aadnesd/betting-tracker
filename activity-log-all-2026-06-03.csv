@@ -1,0 +1,217 @@
+Time,Type,Event,Outcome,Side,Amount,Balance Before,Balance After,Status,Detail
+2026-06-02 23:25:25.156,Settled,Georgia vs. Romania,Georgia,LAY,109.76,,,SETTLED,"PnL $112.00, fee $2.24, net $109.76"
+2026-06-02 23:25:24.000,Pos. Settlement,,,,109.76,5014.21,5123.97,,Position settlement $109.76
+2026-06-02 20:08:03.043,Settled,Roland Garros ATP: Rafael Jodar vs Alexander Zverev,Alexander Zverev,LAY,-31.632911,,,SETTLED,"PnL $-31.63, fee $0.00, net $-31.63"
+2026-06-02 20:08:02.000,Pos. Settlement,,,,-31.632911,5045.84,5014.21,,Position settlement $-31.63
+2026-06-02 16:34:19.515,Filled,DR Congo vs. Denmark,DR Congo,LAY,44,,,FILLED,Fill $44.00 @ 7.14 (100%)
+2026-06-02 12:37:19.388,Bet,Mexico vs. South Africa,South Africa,LAY,29.71,,,FILLED,Order created
+2026-06-02 12:26:00.955,Bet,Mexico vs. South Africa,South Africa,LAY,49.2,,,FILLED,Order created
+2026-06-02 12:22:43.296,Filled,Netherlands vs. Algeria,Algeria,LAY,24,,,FILLED,Fill $24.00 @ 10.0 (100%)
+2026-06-02 12:17:25.620,Filled,Luxembourg vs. Italy,Luxembourg,LAY,44,,,FILLED,Fill $44.00 @ 7.14 (100%)
+2026-06-02 07:36:07.066,Settled,Canada vs. Uzbekistan,Canada,LAY,-53.333333,,,SETTLED,"PnL $-53.33, fee $0.00, net $-53.33"
+2026-06-02 07:36:07.053,Settled,Canada vs. Uzbekistan,Canada,LAY,-500,,,SETTLED,"PnL $-500.00, fee $0.00, net $-500.00"
+2026-06-02 07:36:05.000,Pos. Settlement,,,,-553.333333,5599.18,5045.84,,Position settlement $-553.33
+2026-06-02 01:31:09.508,Settled,Türkiye vs. North Macedonia,Türkiye,LAY,-51.365854,,,SETTLED,"PnL $-51.37, fee $0.00, net $-51.37"
+2026-06-02 01:31:09.501,Settled,Türkiye vs. North Macedonia,Türkiye,LAY,-32.653061,,,SETTLED,"PnL $-32.65, fee $0.00, net $-32.65"
+2026-06-02 01:31:09.491,Settled,Türkiye vs. North Macedonia,Türkiye,LAY,-20.408163,,,SETTLED,"PnL $-20.41, fee $0.00, net $-20.41"
+2026-06-02 01:31:07.000,Pos. Settlement,,,,-104.427078,5703.61,5599.18,,Position settlement $-104.43
+2026-05-31 08:11:15.575,Settled,Molde FK vs. Sandefjord Fotball,Molde FK,LAY,-347.457627,,,SETTLED,"PnL $-347.46, fee $0.00, net $-347.46"
+2026-05-31 08:11:15.568,Settled,Molde FK vs. Sandefjord Fotball,Molde FK,LAY,-50.210489,,,SETTLED,"PnL $-50.21, fee $0.00, net $-50.21"
+2026-05-31 08:11:14.000,Pos. Settlement,,,,-397.668116,6101.27,5703.61,,Position settlement $-397.67
+2026-05-31 00:22:48.081,Settled,UEFA Champions League Winner,PSG,LAY,-2773.684211,,,SETTLED,"PnL $-2773.68, fee $0.00, net $-2773.68"
+2026-05-31 00:22:47.000,Pos. Settlement,,,,-2773.684211,8874.96,6101.27,,Position settlement $-2773.68
+2026-05-30 21:21:01.655,Settled,Paris Saint-Germain FC vs. Arsenal FC,Arsenal FC,LAY,219.52,,,SETTLED,"PnL $224.00, fee $4.48, net $219.52"
+2026-05-30 21:21:01.643,Settled,Paris Saint-Germain FC vs. Arsenal FC,Arsenal FC,LAY,109.76,,,SETTLED,"PnL $112.00, fee $2.24, net $109.76"
+2026-05-30 21:20:59.000,Pos. Settlement,,,,329.28,8545.68,8874.96,,Position settlement $329.28
+2026-05-30 06:34:36.327,Settled,Rosenborg BK vs. FK Bodø/Glimt,Rosenborg BK,LAY,95.648,,,SETTLED,"PnL $97.60, fee $1.95, net $95.65"
+2026-05-30 06:34:36.318,Settled,Rosenborg BK vs. FK Bodø/Glimt,Rosenborg BK,LAY,95.648,,,SETTLED,"PnL $97.60, fee $1.95, net $95.65"
+2026-05-30 06:34:36.311,Settled,Rosenborg BK vs. FK Bodø/Glimt,FK Bodø/Glimt,LAY,277.34,,,SETTLED,"PnL $283.00, fee $5.66, net $277.34"
+2026-05-30 06:34:36.299,Settled,Rosenborg BK vs. FK Bodø/Glimt,Rosenborg BK,LAY,95.648,,,SETTLED,"PnL $97.60, fee $1.95, net $95.65"
+2026-05-30 06:34:35.000,Pos. Settlement,,,,277.34,8268.34,8545.68,,Position settlement $277.34
+2026-05-30 06:34:26.000,Pos. Settlement,,,,286.944,7981.39,8268.34,,Position settlement $286.94
+2026-05-30 06:29:40.573,Settled,Vålerenga Fotball vs. Kristiansund BK,Kristiansund BK,LAY,41.48,,,SETTLED,"PnL $41.48, fee $0.00, net $41.48"
+2026-05-30 06:29:40.566,Settled,Vålerenga Fotball vs. Kristiansund BK,Vålerenga Fotball,LAY,-325.862069,,,SETTLED,"PnL $-325.86, fee $0.00, net $-325.86"
+2026-05-30 06:29:40.558,Settled,Vålerenga Fotball vs. Kristiansund BK,Vålerenga Fotball,LAY,-79.739364,,,SETTLED,"PnL $-79.74, fee $0.00, net $-79.74"
+2026-05-30 06:29:40.549,Settled,Vålerenga Fotball vs. Kristiansund BK,Kristiansund BK,LAY,87.981485,,,SETTLED,"PnL $87.98, fee $0.00, net $87.98"
+2026-05-30 06:29:39.000,Pos. Settlement,,,,-405.601433,8386.99,7981.39,,Position settlement $-405.60
+2026-05-30 06:29:30.000,Pos. Settlement,,,,129.461485,8257.53,8386.99,,Position settlement $129.46
+2026-05-29 15:23:09.283,Canceled,Molde FK vs. Sandefjord Fotball,Molde FK,LAY,500,,,CANCELED,Bet cancelled
+2026-05-29 15:18:59.935,Canceled,Molde FK vs. Sandefjord Fotball,Molde FK,LAY,500,,,CANCELED,Bet cancelled
+2026-05-29 15:16:48.748,Canceled,Molde FK vs. Sandefjord Fotball,Molde FK,LAY,500,,,CANCELED,Bet cancelled
+2026-05-29 14:51:09.109,Canceled,Molde FK vs. Sandefjord Fotball,Molde FK,LAY,493,,,CANCELED,Bet cancelled
+2026-05-29 14:42:59.073,Canceled,Nice vs. Saint-Etienne,Nice,LAY,812,,,CANCELED,Bet cancelled
+2026-05-29 14:33:03.282,Canceled,Nice vs. Saint-Etienne,Nice,LAY,812,,,CANCELED,Bet cancelled
+2026-05-28 07:15:11.454,Settled,Crystal Palace FC vs. Rayo Vallecano de Madrid,Rayo Vallecano de Madrid,LAY,83.4,,,SETTLED,"PnL $83.40, fee $0.00, net $83.40"
+2026-05-28 07:15:11.446,Settled,Crystal Palace FC vs. Rayo Vallecano de Madrid,Crystal Palace FC,LAY,-405,,,SETTLED,"PnL $-405.00, fee $0.00, net $-405.00"
+2026-05-28 07:15:09.000,Pos. Settlement,,,,-405,8662.53,8257.53,,Position settlement $-405.00
+2026-05-28 07:15:05.000,Pos. Settlement,,,,83.4,8579.13,8662.53,,Position settlement $83.40
+2026-05-27 06:35:56.877,Settled,Avalanche vs. Golden Knights,Under,LAY,225.4,,,SETTLED,"PnL $230.00, fee $4.60, net $225.40"
+2026-05-27 06:31:07.000,Pos. Settlement,,,,225.4,8353.73,8579.13,,Position settlement $225.40
+2026-05-27 05:46:10.103,Settled,Spurs vs. Thunder,Thunder,LAY,-69.258065,,,SETTLED,"PnL $-69.26, fee $0.00, net $-69.26"
+2026-05-27 05:46:10.096,Settled,Spurs vs. Thunder,Thunder,LAY,-139.129032,,,SETTLED,"PnL $-139.13, fee $0.00, net $-139.13"
+2026-05-27 05:46:09.000,Pos. Settlement,,,,-208.387097,8562.12,8353.73,,Position settlement $-208.39
+2026-05-26 00:11:48.444,Settled,Sandefjord Fotball vs. Fredrikstad FK,Sandefjord Fotball,LAY,225.4,,,SETTLED,"PnL $230.00, fee $4.60, net $225.40"
+2026-05-26 00:11:47.000,Pos. Settlement,,,,225.4,8336.72,8562.12,,Position settlement $225.40
+2026-05-25 22:22:20.872,Settled,Hamarkameratene vs. Lillestrøm SK,Lillestrøm SK,LAY,40.18,,,SETTLED,"PnL $41.00, fee $0.82, net $40.18"
+2026-05-25 22:22:20.864,Settled,Hamarkameratene vs. Lillestrøm SK,Lillestrøm SK,LAY,480.2,,,SETTLED,"PnL $490.00, fee $9.80, net $480.20"
+2026-05-25 22:22:19.000,Pos. Settlement,,,,520.38,7816.34,8336.72,,Position settlement $520.38
+2026-05-25 19:11:48.414,Settled,IK Start vs. Vålerenga Fotball,Vålerenga Fotball,LAY,341.04,,,SETTLED,"PnL $348.00, fee $6.96, net $341.04"
+2026-05-25 19:11:46.000,Pos. Settlement,,,,341.04,7475.30,7816.34,,Position settlement $341.04
+2026-05-25 12:51:31.000,Withdraw,,,,5000,12475.30,7475.30,,Withdrawal $5000.00
+2026-05-25 04:01:47.087,Settled,Columbus Crew vs. Atlanta United FC,Columbus Crew,LAY,-84.393443,,,SETTLED,"PnL $-84.39, fee $0.00, net $-84.39"
+2026-05-25 04:01:47.078,Settled,Columbus Crew vs. Atlanta United FC,Columbus Crew,LAY,-671.311475,,,SETTLED,"PnL $-671.31, fee $0.00, net $-671.31"
+2026-05-25 04:01:47.071,Settled,Columbus Crew vs. Atlanta United FC,Columbus Crew,LAY,-306.885246,,,SETTLED,"PnL $-306.89, fee $0.00, net $-306.89"
+2026-05-25 04:01:47.063,Settled,Columbus Crew vs. Atlanta United FC,Columbus Crew,LAY,-25.57377,,,SETTLED,"PnL $-25.57, fee $0.00, net $-25.57"
+2026-05-25 04:01:44.000,Pos. Settlement,,,,-1088.163934,13563.46,12475.30,,Position settlement $-1088.16
+2026-05-25 02:22:32.577,Settled,Hellas Verona FC vs. AS Roma,Hellas Verona FC,LAY,86.24,,,SETTLED,"PnL $88.00, fee $1.76, net $86.24"
+2026-05-25 02:22:32.566,Settled,Hellas Verona FC vs. AS Roma,Hellas Verona FC,LAY,86.24,,,SETTLED,"PnL $88.00, fee $1.76, net $86.24"
+2026-05-25 02:22:31.000,Pos. Settlement,,,,172.48,13390.98,13563.46,,Position settlement $172.48
+2026-05-25 01:01:57.002,Settled,Torino FC vs. Juventus FC,Juventus FC,LAY,2940,,,SETTLED,"PnL $3000.00, fee $60.00, net $2940.00"
+2026-05-25 01:01:56.995,Settled,Torino FC vs. Juventus FC,Juventus FC,LAY,49,,,SETTLED,"PnL $50.00, fee $1.00, net $49.00"
+2026-05-25 01:01:56.000,Pos. Settlement,,,,2989,10401.98,13390.98,,Position settlement $2989.00
+2026-05-24 23:37:09.909,Settled,AC Milan vs. Cagliari Calcio,Cagliari Calcio,LAY,-1239.557143,,,SETTLED,"PnL $-1239.56, fee $0.00, net $-1239.56"
+2026-05-24 23:37:08.000,Pos. Settlement,,,,-1239.557143,11641.54,10401.98,,Position settlement $-1239.56
+2026-05-24 23:22:20.183,Settled,SSC Napoli vs. Udinese Calcio,Udinese Calcio,LAY,44,,,SETTLED,"PnL $44.00, fee $0.00, net $44.00"
+2026-05-24 23:22:20.177,Settled,SSC Napoli vs. Udinese Calcio,Udinese Calcio,LAY,44,,,SETTLED,"PnL $44.00, fee $0.00, net $44.00"
+2026-05-24 23:22:20.159,Settled,SSC Napoli vs. Udinese Calcio,Udinese Calcio,LAY,44,,,SETTLED,"PnL $44.00, fee $0.00, net $44.00"
+2026-05-24 23:22:20.143,Settled,SSC Napoli vs. Udinese Calcio,SSC Napoli,LAY,-1715.625,,,SETTLED,"PnL $-1715.63, fee $0.00, net $-1715.63"
+2026-05-24 23:22:20.134,Settled,SSC Napoli vs. Udinese Calcio,SSC Napoli,LAY,-124.923077,,,SETTLED,"PnL $-124.92, fee $0.00, net $-124.92"
+2026-05-24 23:22:18.000,Pos. Settlement,,,,-1840.548077,13482.09,11641.54,,Position settlement $-1840.55
+2026-05-24 23:22:14.000,Pos. Settlement,,,,132,13350.09,13482.09,,Position settlement $132.00
+2026-05-24 21:47:49.769,Settled,Crystal Palace FC vs. Arsenal FC,Crystal Palace FC,LAY,41.16,,,SETTLED,"PnL $42.00, fee $0.84, net $41.16"
+2026-05-24 21:47:49.762,Settled,Crystal Palace FC vs. Arsenal FC,Crystal Palace FC,LAY,40.18,,,SETTLED,"PnL $41.00, fee $0.82, net $40.18"
+2026-05-24 21:47:48.000,Pos. Settlement,,,,81.34,13268.75,13350.09,,Position settlement $81.34
+2026-05-24 21:47:34.787,Settled,Manchester City FC vs. Aston Villa FC,Aston Villa FC,LAY,-465.111111,,,SETTLED,"PnL $-465.11, fee $0.00, net $-465.11"
+2026-05-24 21:47:34.000,Pos. Settlement,,,,-465.111111,13733.86,13268.75,,Position settlement $-465.11
+2026-05-24 21:22:46.989,Settled,Brighton & Hove Albion FC vs. Manchester United FC,Brighton & Hove Albion FC,LAY,3789.66,,,SETTLED,"PnL $3867.00, fee $77.34, net $3789.66"
+2026-05-24 21:22:46.000,Pos. Settlement,,,,3789.66,9944.20,13733.86,,Position settlement $3789.66
+2026-05-24 08:26:37.000,Deposit,,,,2400,7544.20,9944.20,,Deposit $2400.00
+2026-05-24 08:10:52.000,Deposit,,,,3096,4448.20,7544.20,,Deposit $3096.00
+2026-05-24 04:32:08.438,Settled,Canadiens vs. Hurricanes,Hurricanes,LAY,-63,,,SETTLED,"PnL $-63.00, fee $0.00, net $-63.00"
+2026-05-24 04:32:07.000,Pos. Settlement,,,,-63,4511.20,4448.20,,Position settlement $-63.00
+2026-05-23 01:58:16.736,Settled,Valencia vs. Real Madrid,Valencia,LAY,121.512923,,,SETTLED,"PnL $123.99, fee $2.48, net $121.51"
+2026-05-23 01:58:16.729,Settled,Valencia vs. Real Madrid,Valencia,LAY,24.934341,,,SETTLED,"PnL $25.44, fee $0.51, net $24.93"
+2026-05-23 01:58:16.695,Settled,Valencia vs. Real Madrid,Valencia,LAY,76.44,,,SETTLED,"PnL $78.00, fee $1.56, net $76.44"
+2026-05-23 01:58:15.000,Pos. Settlement,,,,222.887264,4288.31,4511.20,,Position settlement $222.89
+2026-05-23 01:28:20.094,Settled,Racing Club de Lens vs. OGC Nice,Racing Club de Lens,LAY,-131.0625,,,SETTLED,"PnL $-131.06, fee $0.00, net $-131.06"
+2026-05-23 01:28:17.000,Pos. Settlement,,,,-131.0625,4419.38,4288.31,,Position settlement $-131.06
+2026-05-20 09:37:13.000,Withdraw,,,,3000,7419.38,4419.38,,Withdrawal $3000.00
+2026-05-20 00:51:13.539,Settled,AFC Bournemouth vs. Manchester City FC,Manchester City FC,LAY,4466.84,,,SETTLED,"PnL $4558.00, fee $91.16, net $4466.84"
+2026-05-20 00:51:12.000,Pos. Settlement,,,,4466.84,2952.54,7419.38,,Position settlement $4466.84
+2026-05-19 15:05:14.000,Deposit,,,,2764,188.54,2952.54,,Deposit $2764.00
+2026-05-19 00:14:32.332,Settled,Arsenal FC vs. Burnley FC,Arsenal FC,LAY,-76.636364,,,SETTLED,"PnL $-76.64, fee $0.00, net $-76.64"
+2026-05-19 00:14:31.000,Pos. Settlement,,,,-76.636364,265.17,188.54,,Position settlement $-76.64
+2026-05-13 00:43:59.993,Settled,Real Betis Balompié vs. Elche CF,Elche CF,LAY,38.906,,,SETTLED,"PnL $39.70, fee $0.79, net $38.91"
+2026-05-13 00:43:58.000,Pos. Settlement,,,,38.906,226.27,265.17,,Position settlement $38.91
+2026-05-12 11:05:35.000,Withdraw,,,,3600,3826.27,226.27,,Withdrawal $3600.00
+2026-05-12 03:13:08.805,Settled,SSC Napoli vs. Bologna FC 1909,SSC Napoli,LAY,2271.0324,,,SETTLED,"PnL $2317.38, fee $46.35, net $2271.03"
+2026-05-12 03:13:06.000,Pos. Settlement,,,,2271.0324,1555.23,3826.27,,Position settlement $2271.03
+2026-05-11 09:40:59.000,Withdraw,,,,3000,4555.23,1555.23,,Withdrawal $3000.00
+2026-05-11 00:46:09.680,Settled,1. FSV Mainz 05 vs. 1. FC Union Berlin,1. FSV Mainz 05,LAY,2479.4,,,SETTLED,"PnL $2530.00, fee $50.60, net $2479.40"
+2026-05-11 00:46:07.000,Pos. Settlement,,,,2479.4,2075.83,4555.23,,Position settlement $2479.40
+2026-05-10 18:14:39.000,Deposit,,,,1161,914.83,2075.83,,Deposit $1161.00
+2026-05-06 11:12:46.000,Withdraw,,,,1000,1914.83,914.83,,Withdrawal $1000.00
+2026-05-05 02:36:08.507,Settled,Everton FC vs. Manchester City FC,Everton FC,LAY,89.1425,,,SETTLED,"PnL $90.50, fee $1.36, net $89.14"
+2026-05-05 02:36:06.000,Pos. Settlement,,,,89.1425,1825.69,1914.83,,Position settlement $89.14
+2026-05-04 18:43:44.000,Withdraw,,,,1800,3625.69,1825.69,,Withdrawal $1800.00
+2026-05-03 16:11:46.000,Deposit,,,,2501,1124.69,3625.69,,Deposit $2501.00
+2026-05-02 23:58:29.475,Settled,Arsenal FC vs. Fulham FC,Arsenal FC,LAY,-2482.38806,,,SETTLED,"PnL $-2482.39, fee $0.00, net $-2482.39"
+2026-05-02 23:58:28.000,Pos. Settlement,,,,-2482.38806,3607.08,1124.69,,Position settlement $-2482.39
+2026-05-02 04:58:22.085,Settled,Pistons vs. Magic,Pistons,LAY,-303.333333,,,SETTLED,"PnL $-303.33, fee $0.00, net $-303.33"
+2026-05-02 04:58:22.000,Pos. Settlement,,,,-303.333333,3910.41,3607.08,,Position settlement $-303.33
+2026-05-01 10:34:11.312,Canceled,Arsenal FC vs. Fulham FC,Arsenal FC,LAY,5000,,,CANCELED,Cancelled by user
+2026-04-29 17:47:38.746,Settled,Paris Saint-Germain FC vs. FC Bayern München,Paris Saint-Germain FC,LAY,-490.238095,,,SETTLED,"PnL $-490.24, fee $0.00, net $-490.24"
+2026-04-29 17:47:38.734,Settled,Paris Saint-Germain FC vs. FC Bayern München,Paris Saint-Germain FC,LAY,-649.047619,,,SETTLED,"PnL $-649.05, fee $0.00, net $-649.05"
+2026-04-29 17:47:36.000,Pos. Settlement,,,,-1139.285714,5049.70,3910.41,,Position settlement $-1139.29
+2026-04-28 08:26:18.197,Settled,Timberwolves vs. Nuggets,Timberwolves,LAY,265.2605,,,SETTLED,"PnL $269.30, fee $4.04, net $265.26"
+2026-04-28 08:26:18.000,Pos. Settlement,,,,265.2605,4784.44,5049.70,,Position settlement $265.26
+2026-04-27 01:49:06.000,Pos. Settlement,,,,-345.134694,5129.57,4784.44,,Position settlement $-345.13
+2026-04-27 01:49:05.534,Settled,Villarreal CF vs. RC Celta de Vigo,Villarreal CF,LAY,-345.134694,,,SETTLED,"PnL $-345.13, fee $0.00, net $-345.13"
+2026-04-26 18:44:04.000,Pos. Settlement,,,,-193.37037,5322.94,5129.57,,Position settlement $-193.37
+2026-04-26 18:44:03.769,Settled,Madrid Open: Dino Prizmic vs Tomas Etcheverry,Tomas Etcheverry,LAY,-193.37037,,,SETTLED,"PnL $-193.37, fee $0.00, net $-193.37"
+2026-04-26 18:24:14.131,Settled,Rayo Vallecano de Madrid vs. Real Sociedad de Fútbol,Rayo Vallecano de Madrid,LAY,679.65,,,SETTLED,"PnL $690.00, fee $10.35, net $679.65"
+2026-04-26 18:24:14.000,Pos. Settlement,,,,679.65,4643.29,5322.94,,Position settlement $679.65
+2026-04-26 13:10:55.542,Canceled,Rayo Vallecano de Madrid vs. Real Sociedad de Fútbol,Rayo Vallecano de Madrid,LAY,1037,,,CANCELED,Cancelled by user
+2026-04-26 00:21:24.000,Pos. Settlement,,,,-225.136612,4868.43,4643.29,,Position settlement $-225.14
+2026-04-26 00:21:23.805,Settled,Manchester City FC vs. Southampton FC,Manchester City FC,LAY,-33.333333,,,SETTLED,"PnL $-33.33, fee $0.00, net $-33.33"
+2026-04-26 00:21:23.800,Settled,Manchester City FC vs. Southampton FC,Manchester City FC,LAY,-191.803279,,,SETTLED,"PnL $-191.80, fee $0.00, net $-191.80"
+2026-04-25 22:30:58.655,Settled,Getafe CF vs. FC Barcelona,FC Barcelona,LAY,-2000,,,SETTLED,"PnL $-2000.00, fee $0.00, net $-2000.00"
+2026-04-25 22:30:58.642,Settled,Getafe CF vs. FC Barcelona,FC Barcelona,LAY,-1257.79661,,,SETTLED,"PnL $-1257.80, fee $0.00, net $-1257.80"
+2026-04-25 22:30:58.000,Pos. Settlement,,,,-3257.79661,8126.23,4868.43,,Position settlement $-3257.80
+2026-04-25 19:34:48.047,Canceled,Manchester City FC vs. Southampton FC,Manchester City FC,LAY,50,,,CANCELED,Not filled at requested odds
+2026-04-25 18:28:38.000,Deposit,,,,4864,3262.23,8126.23,,Deposit $4864.00
+2026-04-25 14:48:42.000,Deposit,,,,2001,1261.23,3262.23,,Deposit $2001.00
+2026-04-25 08:08:44.788,Settled,Spurs vs. Trail Blazers,Spurs,LAY,-2774.79661,,,SETTLED,"PnL $-2774.80, fee $0.00, net $-2774.80"
+2026-04-25 08:08:44.000,Pos. Settlement,,,,-2774.79661,4036.02,1261.23,,Position settlement $-2774.80
+2026-04-25 03:25:47.743,Settled,SSC Napoli vs. US Cremonese,SSC Napoli,LAY,-86.178082,,,SETTLED,"PnL $-86.18, fee $0.00, net $-86.18"
+2026-04-25 03:25:46.000,Pos. Settlement,,,,-86.178082,4122.20,4036.02,,Position settlement $-86.18
+2026-04-24 15:33:48.000,Pos. Settlement,,,,55.16,4067.04,4122.20,,Position settlement $55.16
+2026-04-24 15:33:47.643,Settled,Madrid Open: Jan-Lennard Struff vs Alex Michelsen,Jan-Lennard Struff,LAY,55.16,,,SETTLED,"PnL $56.00, fee $0.84, net $55.16"
+2026-04-24 10:34:36.000,Deposit,,,,4067,0.04,4067.04,,Deposit $4067.00
+2026-04-23 01:23:11.638,Settled,Burnley FC vs. Manchester City FC,Manchester City FC,LAY,-1354.000588,,,SETTLED,"PnL $-1354.00, fee $0.00, net $-1354.00"
+2026-04-23 01:23:10.000,Pos. Settlement,,,,-1354.000588,1354.04,0.04,,Position settlement $-1354.00
+2026-04-22 10:52:51.178,Canceled,Burnley FC vs. Manchester City FC,Manchester City FC,LAY,5065,,,CANCELED,Cancelled by user
+2026-04-21 23:32:18.000,Deposit,,,,1013,341.04,1354.04,,Deposit $1013.00
+2026-04-19 23:03:10.315,Settled,Manchester City FC vs. Arsenal FC,Arsenal FC,LAY,77.5195,,,SETTLED,"PnL $78.70, fee $1.18, net $77.52"
+2026-04-19 23:03:10.000,Pos. Settlement,,,,77.5195,263.52,341.04,,Position settlement $77.52
+2026-04-19 22:46:54.113,Settled,FC Bayern München vs. VfB Stuttgart,FC Bayern München,LAY,-628,,,SETTLED,"PnL $-628.00, fee $0.00, net $-628.00"
+2026-04-19 22:46:54.000,Pos. Settlement,,,,-628,891.52,263.52,,Position settlement $-628.00
+2026-04-19 19:39:26.000,Pos. Settlement,,,,-79.819048,971.34,891.52,,Position settlement $-79.82
+2026-04-19 19:39:25.810,Settled,Everton FC vs. Liverpool FC,Liverpool FC,LAY,-79.819048,,,SETTLED,"PnL $-79.82, fee $0.00, net $-79.82"
+2026-04-18 21:34:14.000,Pos. Settlement,,,,-2861.704918,3833.05,971.34,,Position settlement $-2861.70
+2026-04-18 21:34:13.999,Settled,Leeds United FC vs. Wolverhampton Wanderers FC,Leeds United FC,LAY,-2861.704918,,,SETTLED,"PnL $-2861.70, fee $0.00, net $-2861.70"
+2026-04-17 02:42:37.540,Settled,Nottingham Forest FC vs. FC Porto,Nottingham Forest FC,LAY,-66.914634,,,SETTLED,"PnL $-66.91, fee $0.00, net $-66.91"
+2026-04-17 02:42:36.000,Pos. Settlement,,,,-66.914634,3899.96,3833.05,,Position settlement $-66.91
+2026-04-17 02:18:10.368,Settled,Aston Villa FC vs. Bologna FC 1909,Bologna FC 1909,LAY,100.47,,,SETTLED,"PnL $102.00, fee $1.53, net $100.47"
+2026-04-17 02:18:10.000,Pos. Settlement,,,,100.47,3799.49,3899.96,,Position settlement $100.47
+2026-04-16 09:03:41.820,Settled,FC Bayern München vs. Real Madrid CF,FC Bayern München,LAY,-1615.314579,,,SETTLED,"PnL $-1615.31, fee $0.00, net $-1615.31"
+2026-04-16 09:03:41.790,Settled,FC Bayern München vs. Real Madrid CF,Real Madrid CF,LAY,95.3,,,SETTLED,"PnL $95.30, fee $0.00, net $95.30"
+2026-04-16 09:03:40.000,Pos. Settlement,,,,-1520.014579,5319.51,3799.49,,Position settlement $-1520.01
+2026-04-16 08:19:27.478,Settled,Arsenal FC vs. Sporting CP,Sporting CP,LAY,94.954,,,SETTLED,"PnL $96.40, fee $1.45, net $94.95"
+2026-04-16 08:19:26.000,Pos. Settlement,,,,94.954,5224.55,5319.51,,Position settlement $94.95
+2026-04-15 14:23:33.898,Canceled,FC Bayern München vs. Real Madrid CF,FC Bayern München,LAY,4000,,,CANCELED,Cancelled by user
+2026-04-15 04:14:45.285,Settled,Liverpool FC vs. Paris Saint-Germain FC,Liverpool FC,LAY,94.4615,,,SETTLED,"PnL $95.90, fee $1.44, net $94.46"
+2026-04-15 04:14:40.000,Pos. Settlement,,,,94.4615,5130.09,5224.55,,Position settlement $94.46
+2026-04-15 02:44:26.316,Settled,Club Atlético de Madrid vs. FC Barcelona,Club Atlético de Madrid,LAY,96.0375,,,SETTLED,"PnL $97.50, fee $1.46, net $96.04"
+2026-04-15 02:44:26.000,Pos. Settlement,,,,96.0375,5034.05,5130.09,,Position settlement $96.04
+2026-04-14 03:27:09.000,Pos. Settlement,,,,-163.118919,5197.17,5034.05,,Position settlement $-163.12
+2026-04-14 03:27:07.922,Settled,Levante UD vs. Getafe CF,Levante UD,LAY,-163.118919,,,SETTLED,"PnL $-163.12, fee $0.00, net $-163.12"
+2026-04-14 03:08:51.546,Settled,Manchester United FC vs. Leeds United FC,Manchester United FC,LAY,2984.55,,,SETTLED,"PnL $3030.00, fee $45.45, net $2984.55"
+2026-04-14 03:08:49.000,Pos. Settlement,,,,2984.55,2212.62,5197.17,,Position settlement $2984.55
+2026-04-14 02:48:25.371,Settled,ACF Fiorentina vs. SS Lazio,ACF Fiorentina,LAY,-142.5,,,SETTLED,"PnL $-142.50, fee $0.00, net $-142.50"
+2026-04-14 02:48:23.000,Pos. Settlement,,,,-142.5,2355.12,2212.62,,Position settlement $-142.50
+2026-04-12 23:30:58.168,Settled,RC Celta de Vigo vs. Real Oviedo,RC Celta de Vigo,LAY,50.5305,,,SETTLED,"PnL $51.30, fee $0.77, net $50.53"
+2026-04-12 23:30:57.000,Pos. Settlement,,,,50.5305,2304.59,2355.12,,Position settlement $50.53
+2026-04-12 21:55:58.426,Settled,Aalesunds FK vs. KFUM-Kameratene Oslo,Draw (Aalesunds FK vs. KFUM-Kameratene Oslo),LAY,-0.793768,,,SETTLED,"PnL $-0.79, fee $0.00, net $-0.79"
+2026-04-12 21:55:58.421,Settled,Aalesunds FK vs. KFUM-Kameratene Oslo,Draw (Aalesunds FK vs. KFUM-Kameratene Oslo),LAY,-31,,,SETTLED,"PnL $-31.00, fee $0.00, net $-31.00"
+2026-04-12 21:55:58.414,Settled,Aalesunds FK vs. KFUM-Kameratene Oslo,Draw (Aalesunds FK vs. KFUM-Kameratene Oslo),LAY,-4.692308,,,SETTLED,"PnL $-4.69, fee $0.00, net $-4.69"
+2026-04-12 21:55:58.406,Settled,Aalesunds FK vs. KFUM-Kameratene Oslo,Draw (Aalesunds FK vs. KFUM-Kameratene Oslo),LAY,-130.192681,,,SETTLED,"PnL $-130.19, fee $0.00, net $-130.19"
+2026-04-12 21:55:57.000,Pos. Settlement,,,,-166.678757,2471.27,2304.59,,Position settlement $-166.68
+2026-04-12 18:11:00.069,Canceled,Aalesunds FK vs. KFUM-Kameratene Oslo,Draw (Aalesunds FK vs. KFUM-Kameratene Oslo),LAY,3,,,CANCELED,Cancelled by exchange
+2026-04-12 12:49:54.299,Canceled,Manchester United FC vs. Leeds United FC,Manchester United FC,LAY,3079,,,CANCELED,Cancelled by user
+2026-04-12 11:52:39.000,Withdraw,,,,1500,3971.27,2471.27,,Withdrawal $1500.00
+2026-04-11 20:39:59.000,Pos. Settlement,,,,1494.245,2477.02,3971.27,,Position settlement $1494.24
+2026-04-11 20:39:58.689,Settled,1. FC Heidenheim 1846 vs. 1. FC Union Berlin,1. FC Union Berlin,LAY,1494.245,,,SETTLED,"PnL $1517.00, fee $22.75, net $1494.24"
+2026-04-11 14:23:09.000,Withdraw,,,,3000,5477.02,2477.02,,Withdrawal $3000.00
+2026-04-11 01:34:33.000,Pos. Settlement,,,,2765.88,2711.14,5477.02,,Position settlement $2765.88
+2026-04-11 01:34:31.920,Settled,Real Madrid CF vs. Girona FC,Real Madrid CF,LAY,2765.88,,,SETTLED,"PnL $2808.00, fee $42.12, net $2765.88"
+2026-04-10 06:44:45.831,Settled,Pacers vs. Nets,Pacers,LAY,-166.229508,,,SETTLED,"PnL $-166.23, fee $0.00, net $-166.23"
+2026-04-10 06:44:45.827,Settled,Pacers vs. Nets,Pacers,LAY,-186.944262,,,SETTLED,"PnL $-186.94, fee $0.00, net $-186.94"
+2026-04-10 06:44:45.822,Settled,Pacers vs. Nets,Pacers,LAY,-186.688525,,,SETTLED,"PnL $-186.69, fee $0.00, net $-186.69"
+2026-04-10 06:44:45.000,Pos. Settlement,,,,-539.862295,3251.01,2711.14,,Position settlement $-539.86
+2026-04-09 10:33:09.000,Deposit,,,,1747,1504.01,3251.01,,Deposit $1747.00
+2026-04-09 10:23:07.000,Deposit,,,,800,704.01,1504.01,,Deposit $800.00
+2026-04-09 01:54:30.654,Settled,Paris Saint-Germain FC vs. Liverpool FC,Liverpool FC,LAY,137.9,,,SETTLED,"PnL $140.00, fee $2.10, net $137.90"
+2026-04-09 01:54:29.000,Pos. Settlement,,,,137.9,566.11,704.01,,Position settlement $137.90
+2026-04-08 02:52:16.001,Settled,Real Madrid CF vs. FC Bayern München,FC Bayern München,LAY,-77.885714,,,SETTLED,"PnL $-77.89, fee $0.00, net $-77.89"
+2026-04-08 02:52:15.984,Settled,Real Madrid CF vs. FC Bayern München,FC Bayern München,LAY,-77.885714,,,SETTLED,"PnL $-77.89, fee $0.00, net $-77.89"
+2026-04-08 02:52:15.000,Pos. Settlement,,,,-155.771429,721.88,566.11,,Position settlement $-155.77
+2026-04-08 02:50:57.569,Settled,Sporting CP vs. Arsenal FC,Arsenal FC,LAY,-1061.490566,,,SETTLED,"PnL $-1061.49, fee $0.00, net $-1061.49"
+2026-04-08 02:50:55.000,Pos. Settlement,,,,-1061.490566,1783.37,721.88,,Position settlement $-1061.49
+2026-04-07 06:09:40.794,Settled,Pistons vs. Magic,Pistons,LAY,283.98732,,,SETTLED,"PnL $288.31, fee $4.32, net $283.99"
+2026-04-07 06:09:39.000,Pos. Settlement,,,,283.98732,1499.38,1783.37,,Position settlement $283.99
+2026-04-05 22:42:37.000,Deposit,,,,1499,0.38,1499.38,,Deposit $1499.00
+2026-04-05 04:32:22.366,Settled,Club Atlético de Madrid vs. FC Barcelona,FC Barcelona,LAY,-102.618599,,,SETTLED,"PnL $-102.62, fee $0.00, net $-102.62"
+2026-04-05 04:32:21.000,Pos. Settlement,,,,-102.618599,103.00,0.38,,Position settlement $-102.62
+2026-04-04 20:24:19.000,Deposit,,,,94,9.00,103.00,,Deposit $94.00
+2026-04-04 19:12:47.000,Deposit,,,,9,0.00,9.00,,Deposit $9.00

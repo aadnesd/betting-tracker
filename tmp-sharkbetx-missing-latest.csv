@@ -1,0 +1,53 @@
+settled_at,side,net_usdc,client_pnl_usdc,commission_usdc,bet_id,event_title,settlement_tx_hash
+2026-06-02T21:25:25.156Z,LAY,109.76,112,2.24,cmpwi906c00s2humklqk22l4n,"Georgia vs. Romania",0x8ba32f8ce61f620445d9d21d2381a6698ca6f2e4e1840e9d5e088577014230d7
+2026-06-02T18:08:03.043Z,LAY,-31.632911,-31.632911,0,cmpwhu37p00p3humk0i3cqgwq,"Roland Garros ATP: Rafael Jodar vs Alexander Zverev",0x3b25e4228a751b9cd755e43add59cdd5db41d039afdb0a188e4e85549564173f
+2026-06-02T05:36:07.066Z,LAY,-53.333333,-53.333333,0,cmpvg00h704lfhurqsvju2sa8,"Canada vs. Uzbekistan",0x969b0eb9fc9d943e5c65a18c921766984202368cdd939603d0ef19142f305980
+2026-06-02T05:36:07.053Z,LAY,-500,-500,0,cmpvfys7n04k0hurqgpgza9ld,"Canada vs. Uzbekistan",0x969b0eb9fc9d943e5c65a18c921766984202368cdd939603d0ef19142f305980
+2026-06-01T23:31:09.491Z,LAY,-20.408163,-20.408163,0,cmpvinod504wmhurqnvoetwyz,"Türkiye vs. North Macedonia",0x74d617d952343b1e4589bb42e3855a5ad369b3da6d83c56bfd9efd41ca8eae32
+2026-06-01T23:31:09.501Z,LAY,-32.653061,-32.653061,0,cmpvin5wm04vhhurqluxtdx6u,"Türkiye vs. North Macedonia",0x74d617d952343b1e4589bb42e3855a5ad369b3da6d83c56bfd9efd41ca8eae32
+2026-06-01T23:31:09.508Z,LAY,-51.365854,-51.365854,0,cmpv8wvsa037ghurqgs90e6gw,"Türkiye vs. North Macedonia",0x74d617d952343b1e4589bb42e3855a5ad369b3da6d83c56bfd9efd41ca8eae32
+2026-05-31T06:11:15.575Z,LAY,-347.457627,-347.457627,0,cmpr45uez0g25huo40exhda9t,"Molde FK vs. Sandefjord Fotball",0x5f1d1b7e26eb6a1c13f6b8cd6bb41984e5c1d731e8f5cb510dc51b105d85b212
+2026-05-31T06:11:15.568Z,LAY,-50.210489,-50.210489,0,cmpo6jd9g04j2huy0gxa1gqbs,"Molde FK vs. Sandefjord Fotball",0x5f1d1b7e26eb6a1c13f6b8cd6bb41984e5c1d731e8f5cb510dc51b105d85b212
+2026-05-30T22:22:48.081Z,LAY,-2773.684211,-2773.684211,0,cmpskbic60474hutpw340aufv,"UEFA Champions League Winner",0x4dc85a80b908327086e6c3328ce68a78203a3c58f12782ccc2e93aa1e7464717
+2026-05-30T19:21:01.655Z,LAY,219.52,224,4.48,cmpsfib1b00jbhubcl0f2r9l5,"Paris Saint-Germain FC vs. Arsenal FC",0x589762a350ead173cd473c713b4ccc336d61a4b1a23f8d8e00c45fb34dd5b43d
+2026-05-30T19:21:01.643Z,LAY,109.76,112,2.24,cmpseu66n03mjhuvhulw3e791,"Paris Saint-Germain FC vs. Arsenal FC",0x589762a350ead173cd473c713b4ccc336d61a4b1a23f8d8e00c45fb34dd5b43d
+2026-05-30T04:34:36.318Z,LAY,95.648,97.6,1.952,cmpmo1j330orzhuuhg7b1km2g,"Rosenborg BK vs. FK Bodø/Glimt",0x7bdbdcef88c7d1451d2881982ccc8d8e179998f46582102930d3b40e329bc722
+2026-05-30T04:34:36.299Z,LAY,95.648,97.6,1.952,cmpmexo6d0n20huuhxo0so5pp,"Rosenborg BK vs. FK Bodø/Glimt",0x7bdbdcef88c7d1451d2881982ccc8d8e179998f46582102930d3b40e329bc722
+2026-05-30T04:29:40.566Z,LAY,-325.862069,-325.862069,0,cmpr54k640gdphuo4f48jjng5,"Vålerenga Fotball vs. Kristiansund BK",0x73381e5744090a4510f6768e306477897d90331c26d885df9bda74a9a0028058
+2026-05-30T04:29:40.549Z,LAY,87.981485,87.981485,0,cmpn4b1490qf2huuhuxkti1lk,"Vålerenga Fotball vs. Kristiansund BK",0x23cbedd3d65892aaba97017f8b2e9ab1192193a02bd805a3c02f1918633a537a
+2026-05-30T04:29:40.573Z,LAY,41.48,41.48,0,cmpmgdbaw0n9yhuuhxy8gx82t,"Vålerenga Fotball vs. Kristiansund BK",0x23cbedd3d65892aaba97017f8b2e9ab1192193a02bd805a3c02f1918633a537a
+2026-05-30T04:29:40.558Z,LAY,-79.739364,-79.739364,0,cmpmf57qf0n3zhuuh6svurzkt,"Vålerenga Fotball vs. Kristiansund BK",0x73381e5744090a4510f6768e306477897d90331c26d885df9bda74a9a0028058
+2026-05-28T05:15:11.446Z,LAY,-405,-405,0,cmpo5ou7y04d6huy0mthx7ips,"Crystal Palace FC vs. Rayo Vallecano de Madrid",0xa76790580e6d0a84b62d74be7df7646b9fc1cabe508126ffc768c080888496c5
+2026-05-28T05:15:11.454Z,LAY,83.4,83.4,0,cmpn42jse0qeehuuhm6ybmvjx,"Crystal Palace FC vs. Rayo Vallecano de Madrid",0x73c3c52235720299358fbdfc32745d636f34855a597342d2f11e1b2f4252c879
+2026-05-27T04:35:56.877Z,LAY,225.4,230,4.6,cmpn4gvez0qhthuuhbb50zu5v,"Avalanche vs. Golden Knights",0xb660e7b8b8eecae975074eefc4fa428f288d0aa973156f3c1a3997f6095f0fcc
+2026-05-25T22:11:48.444Z,LAY,225.4,230,4.6,cmpkvazo10grehuuhdm7lihc3,"Sandefjord Fotball vs. Fredrikstad FK",0xcec6fd57a71e6eab73d3f7402c47d2b385c7f1727b4dbba697f8e7c8ffad709d
+2026-05-25T20:22:20.872Z,LAY,40.18,41,0.82,cmplbqopx0jq4huuh29lljxkr,"Hamarkameratene vs. Lillestrøm SK",0x824a469b3d15e96a41779fceb9997a0822d336c04767ed437e848338a24a2cf9
+2026-05-25T20:22:20.864Z,LAY,480.2,490,9.8,cmplbq8lm0jpmhuuh3355csky,"Hamarkameratene vs. Lillestrøm SK",0x824a469b3d15e96a41779fceb9997a0822d336c04767ed437e848338a24a2cf9
+2026-05-25T17:11:48.414Z,LAY,341.04,348,6.96,cmpku8hz30goxhuuhvgsnietz,"IK Start vs. Vålerenga Fotball",0x5b2b39550b676bf45382b8b146743f754f2bcc61e8ca97f451b7778104fc207e
+2026-05-25T02:01:47.087Z,LAY,-84.393443,-84.393443,0,cmpk9e7o90dkjhuuht1yae607,"Columbus Crew vs. Atlanta United FC",0xeac19e2f76915e11464b0584cf4ffa16ff5564ec6ecde396c29786d78377bbef
+2026-05-25T02:01:47.078Z,LAY,-671.311475,-671.311475,0,cmpk9djfg0djyhuuh9a0kgvgr,"Columbus Crew vs. Atlanta United FC",0xeac19e2f76915e11464b0584cf4ffa16ff5564ec6ecde396c29786d78377bbef
+2026-05-25T02:01:47.063Z,LAY,-25.57377,-25.57377,0,cmpk9a7rh0diphuuhvjhvpb3i,"Columbus Crew vs. Atlanta United FC",0xeac19e2f76915e11464b0584cf4ffa16ff5564ec6ecde396c29786d78377bbef
+2026-05-25T02:01:47.071Z,LAY,-306.885246,-306.885246,0,cmpk99e8u0dgthuuhv9xtvui0,"Columbus Crew vs. Atlanta United FC",0xeac19e2f76915e11464b0584cf4ffa16ff5564ec6ecde396c29786d78377bbef
+2026-05-25T00:22:32.577Z,LAY,86.24,88,1.76,cmpivozit01afhux9awlf9t6s,"Hellas Verona FC vs. AS Roma",0x21b2a601722a5c45559a70e25628fa724c7ee9af02cf513e482770d968afd7e1
+2026-05-25T00:22:32.566Z,LAY,86.24,88,1.76,cmpivf7oo013nhux9qal2kjzp,"Hellas Verona FC vs. AS Roma",0x21b2a601722a5c45559a70e25628fa724c7ee9af02cf513e482770d968afd7e1
+2026-05-24T23:01:57.002Z,LAY,2940,3000,60,cmpk8a5bo0d4thuuhf5jqrabn,"Torino FC vs. Juventus FC",0xf32eb659e91a506e2c1ba3a54c353608ebf5f4c12b8897282474187f71bb3f8d
+2026-05-24T23:01:56.995Z,LAY,49,50,1,cmpk8busq0d5whuuhwzx9319o,"Torino FC vs. Juventus FC",0xf32eb659e91a506e2c1ba3a54c353608ebf5f4c12b8897282474187f71bb3f8d
+2026-05-24T21:37:09.909Z,LAY,-1239.557143,-1239.557143,0,cmpivbo2m012fhux9an3pnl8n,"AC Milan vs. Cagliari Calcio",0x939e4ce0a45606d6a7988c4cf2ca0d0952499999317f460ad4d511c8c416b8fe
+2026-05-24T21:22:20.177Z,LAY,44,44,0,cmpjhav1d03czhux9vm0vvenv,"SSC Napoli vs. Udinese Calcio",0x7616e1142772f860113cf7e49ce011b45dbe6af211bd66175fb55a2a9141ab3a
+2026-05-24T21:22:20.183Z,LAY,44,44,0,cmpjh6nfz03amhux9bn8labtj,"SSC Napoli vs. Udinese Calcio",0x7616e1142772f860113cf7e49ce011b45dbe6af211bd66175fb55a2a9141ab3a
+2026-05-24T21:22:20.159Z,LAY,44,44,0,cmpjh0kkc039mhux9auz5pujb,"SSC Napoli vs. Udinese Calcio",0x7616e1142772f860113cf7e49ce011b45dbe6af211bd66175fb55a2a9141ab3a
+2026-05-24T21:22:20.143Z,LAY,-1715.625,-1715.625,0,cmpjfl5i9034fhux9qvvofw3r,"SSC Napoli vs. Udinese Calcio",0x87dd2c292bbcaf43f76df386ee300044b68c433b8f7f4e8e46012cac061d6b5c
+2026-05-24T21:22:20.134Z,LAY,-124.923077,-124.923077,0,cmpivihlp015bhux9whcm6eof,"SSC Napoli vs. Udinese Calcio",0x87dd2c292bbcaf43f76df386ee300044b68c433b8f7f4e8e46012cac061d6b5c
+2026-05-24T19:47:49.769Z,LAY,41.16,42,0.84,cmpjgwa3y038bhux9ierfaqt2,"Crystal Palace FC vs. Arsenal FC",0x93ff6b9854ea9b1dd09f2e37dcfb600f630c19bd0bfeec200a4294ce2341c099
+2026-05-24T19:47:34.787Z,LAY,-465.111111,-465.111111,0,cmpiuqan200yihux91dpo97zx,"Manchester City FC vs. Aston Villa FC",0xddf7243917d6a8731cec3f41178dbfa2b441ea4891d429ad1fc5e6839e9067eb
+2026-05-24T19:22:46.989Z,LAY,3789.66,3867,77.34,cmpjdt4gk02vvhux9uuhtllxk,"Brighton & Hove Albion FC vs. Manchester United FC",0x06e9cf099c6e005e11b8034b69e5ed8d5a1115c5a1f8e915e8ffa1c5ab91578c
+2026-05-22T23:58:16.695Z,LAY,76.44,78,1.56,cmpgm6rd205s2hul8a8lbp9wf,"Valencia vs. Real Madrid",0xdf50ebd2be7eea3275cf617a6eba3fbd565de995b420704c93d652df5fcd1048
+2026-05-22T23:58:16.729Z,LAY,24.934341,25.443205,0.508864,cmpgm5owy05qvhul8ya5091p7,"Valencia vs. Real Madrid",0xdf50ebd2be7eea3275cf617a6eba3fbd565de995b420704c93d652df5fcd1048
+2026-05-22T23:58:16.736Z,LAY,121.512923,123.992779,2.479856,cmpglxxez05pbhul8jipborxr,"Valencia vs. Real Madrid",0xdf50ebd2be7eea3275cf617a6eba3fbd565de995b420704c93d652df5fcd1048
+2026-05-22T23:28:20.094Z,LAY,-131.0625,-131.0625,0,cmpgl5lwm05omhul80xpm9r3b,"Racing Club de Lens vs. OGC Nice",0x99b2fde0aa98f1654b8f354c2786e2888c72711f86828c1d56aac0f7e923cb05
+2026-05-19T22:51:13.539Z,LAY,4466.84,4558,91.16,cmpcno1z200fghumt7vsh1b5h,"AFC Bournemouth vs. Manchester City FC",0xb201a11a44c09e88d193c1b7d090179b8662e0ffb8ccd9f2cb759cf6869e15d0
+2026-05-18T22:14:32.332Z,LAY,-76.636364,-76.636364,0,cmpbga4ny014chu7ufafa5txn,"Arsenal FC vs. Burnley FC",0x5a66d3a5d31cae18ebb072db8f46454a6d79dfd29a5ea51c858607a4cd4419d1
+2026-05-12T22:43:59.993Z,LAY,38.906,39.7,0.794,cmp0zv9a002bxhu5htuo13dpc,"Real Betis Balompié vs. Elche CF",0x84c9f8a59b1bacb27a70abe75377b25153f5bef6bce18487e04a75df3adb90d0
+2026-05-12T01:13:08.805Z,LAY,2271.0324,2317.38,46.3476,cmp1ilnmz00nrhu7y6hoj8icl,"SSC Napoli vs. Bologna FC 1909",0x2a151f4ed79de6f04ad96998e0679789f5d6b7c357f6aff1c84d7d7b17307e8f
+2026-05-10T22:46:09.680Z,LAY,2479.4,2530,50.6,cmp002z1e00fnhuczev44dt1k,"1. FSV Mainz 05 vs. 1. FC Union Berlin",0x3d3256cb4b1fea21f6a65b78c07cfb14a3e4c5ef9cb22fbad590c0b69d639d9b
+2026-05-05T00:36:08.507Z,LAY,89.1425,90.5,1.3575,cmopur4xy05lwhu8oh151zr3v,"Everton FC vs. Manchester City FC",0x42ccb27dd92b70c60954302a4856b2112d44851bb479643e30d8a0254cc33418

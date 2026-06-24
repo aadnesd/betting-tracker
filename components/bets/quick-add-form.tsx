@@ -3,7 +3,7 @@
 import { ArrowLeft, Gift, Loader2, Plus, Trash2, Trophy } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { ValueWithTooltip } from "@/components/bets/calculation-tooltip";
 import { type MatchOption, MatchPicker } from "@/components/bets/match-picker";
@@ -99,8 +99,30 @@ type SelectedMatchInfo = {
   awayTeam: string;
 };
 
+type LayStakeCalculation = {
+  layStake: number;
+  layLiability: number;
+  balancedLayStake: number;
+  profitIfBackWins: number;
+  profitIfLayWins: number;
+  commissionRate: number;
+  backRateToNok: number;
+  layRateToNok: number;
+};
+
+type LayStakeMode = "balanced" | "underlay" | "overlay";
+
 export type QuickAddInitialValues = Partial<FormData>;
 export type QuickAddInitialMatchInfo = SelectedMatchInfo;
+
+function parsePositiveDecimal(value: string) {
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+function formatStakeInput(value: number) {
+  return value.toFixed(2).replace(/\.?0+$/, "");
+}
 
 export function QuickAddForm({
   bookmakers,
@@ -159,6 +181,11 @@ export function QuickAddForm({
   );
   const [selectedMatchInfo, setSelectedMatchInfo] =
     useState<SelectedMatchInfo | null>(initialMatchInfo);
+  const [layStakeCalculation, setLayStakeCalculation] =
+    useState<LayStakeCalculation | null>(null);
+  const [isCalculatingLayStake, setIsCalculatingLayStake] = useState(false);
+  const [layStakeMode, setLayStakeMode] = useState<LayStakeMode>("balanced");
+  const [layStakeBias, setLayStakeBias] = useState(50);
 
   const updateField = (field: keyof FormData, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -218,6 +245,106 @@ export function QuickAddForm({
     }
     return freeBets.find((fb) => fb.id === formData.freeBetId) ?? null;
   }, [formData.freeBetId, freeBets]);
+
+  useEffect(() => {
+    if (backLegs.length !== 1 || layLegs.length !== 1) {
+      setLayStakeCalculation(null);
+      setIsCalculatingLayStake(false);
+      return;
+    }
+
+    const backOdds = parsePositiveDecimal(backLegs[0]?.odds ?? "");
+    const backStake = parsePositiveDecimal(backLegs[0]?.stake ?? "");
+    const layOdds = parsePositiveDecimal(layLegs[0]?.odds ?? "");
+
+    if (
+      backOdds === null ||
+      backStake === null ||
+      layOdds === null ||
+      backOdds <= 1 ||
+      layOdds <= 1 ||
+      !formData.backCurrency ||
+      !formData.layCurrency ||
+      !formData.layExchange
+    ) {
+      setLayStakeCalculation(null);
+      setIsCalculatingLayStake(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    setIsCalculatingLayStake(true);
+
+    const timeout = window.setTimeout(async () => {
+      try {
+        const response = await fetch("/api/bets/calculate-lay-stake", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          signal: controller.signal,
+          body: JSON.stringify({
+            backOdds,
+            backStake,
+            backCurrency: formData.backCurrency,
+            layOdds,
+            layCurrency: formData.layCurrency,
+            layExchange: formData.layExchange,
+            promoType: formData.promoType || undefined,
+            freeBetStakeReturned: selectedFreeBet?.stakeReturned ?? false,
+            strategy: layStakeMode,
+            biasPercent: layStakeMode === "balanced" ? 0 : layStakeBias,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to calculate lay stake");
+        }
+
+        const calculation = (await response.json()) as LayStakeCalculation;
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        const nextStake = formatStakeInput(calculation.layStake);
+        setLayLegs((prev) => {
+          if (prev.length !== 1 || prev[0].stake === nextStake) {
+            return prev;
+          }
+          return [{ ...prev[0], stake: nextStake }];
+        });
+        setFormData((prev) =>
+          prev.layStake === nextStake ? prev : { ...prev, layStake: nextStake }
+        );
+        setLayStakeCalculation(calculation);
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          console.error("Lay stake calculation failed:", error);
+          setLayStakeCalculation(null);
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setIsCalculatingLayStake(false);
+        }
+      }
+    }, 250);
+
+    return () => {
+      controller.abort();
+      window.clearTimeout(timeout);
+    };
+  }, [
+    backLegs.length,
+    backLegs[0]?.odds,
+    backLegs[0]?.stake,
+    layLegs.length,
+    layLegs[0]?.odds,
+    formData.backCurrency,
+    formData.layCurrency,
+    formData.layExchange,
+    formData.promoType,
+    layStakeBias,
+    layStakeMode,
+    selectedFreeBet?.stakeReturned,
+  ]);
 
   // When bookmaker changes, update currency to match and sync first leg's account
   const handleBookmakerChange = (value: string) => {
@@ -1126,6 +1253,19 @@ export function QuickAddForm({
                         type="number"
                         value={leg.stake}
                       />
+                      {layLegs.length === 1 && index === 0 && (
+                        <p className="text-muted-foreground text-xs">
+                          {isCalculatingLayStake
+                            ? "Calculating optimal lay stake..."
+                            : layStakeCalculation
+                              ? `${layStakeMode === "underlay" ? "Underlay" : layStakeMode === "overlay" ? "Overlay" : "Auto-calculated"} using ${formData.backCurrency}/${formData.layCurrency}${
+                                  layStakeCalculation.commissionRate > 0
+                                    ? ` and ${(layStakeCalculation.commissionRate * 100).toFixed(1)}% commission`
+                                    : ""
+                                }.`
+                              : "Enter back stake, back odds, and lay odds to auto-calculate."}
+                        </p>
+                      )}
                     </div>
                     <div className="flex items-end">
                       <Button
@@ -1141,6 +1281,95 @@ export function QuickAddForm({
                     </div>
                   </div>
                 ))}
+                {layLegs.length === 1 && (
+                  <div className="space-y-3 rounded-md border bg-muted/30 p-3">
+                    <div className="flex flex-wrap gap-2">
+                      {(
+                        [
+                          ["balanced", "Equal"],
+                          ["underlay", "Underlay"],
+                          ["overlay", "Overlay"],
+                        ] as const
+                      ).map(([mode, label]) => (
+                        <Button
+                          key={mode}
+                          onClick={() => setLayStakeMode(mode)}
+                          size="sm"
+                          type="button"
+                          variant={
+                            layStakeMode === mode ? "default" : "outline"
+                          }
+                        >
+                          {label}
+                        </Button>
+                      ))}
+                    </div>
+                    {layStakeMode !== "balanced" && (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between gap-3">
+                          <Label
+                            className="text-muted-foreground text-xs"
+                            htmlFor="layStakeBias"
+                          >
+                            {layStakeMode === "underlay"
+                              ? "Underlay strength"
+                              : "Overlay strength"}
+                          </Label>
+                          <span className="font-medium text-xs">
+                            {layStakeBias}%
+                          </span>
+                        </div>
+                        <Input
+                          id="layStakeBias"
+                          max="100"
+                          min="0"
+                          onChange={(e) =>
+                            setLayStakeBias(Number.parseInt(e.target.value, 10))
+                          }
+                          step="5"
+                          type="range"
+                          value={layStakeBias}
+                        />
+                        <p className="text-muted-foreground text-xs">
+                          0% keeps the equal-profit stake. 100% moves the lay
+                          stake 50%{" "}
+                          {layStakeMode === "underlay" ? "below" : "above"} the
+                          equal stake.
+                        </p>
+                      </div>
+                    )}
+                    {layStakeCalculation && (
+                      <div className="grid gap-2 text-xs sm:grid-cols-3">
+                        <div>
+                          <span className="text-muted-foreground">
+                            Equal stake
+                          </span>
+                          <div className="font-medium">
+                            {formData.layCurrency}{" "}
+                            {layStakeCalculation.balancedLayStake.toFixed(2)}
+                          </div>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">
+                            If back wins
+                          </span>
+                          <div className="font-medium">
+                            NOK{" "}
+                            {layStakeCalculation.profitIfBackWins.toFixed(2)}
+                          </div>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">
+                            If lay wins
+                          </span>
+                          <div className="font-medium">
+                            NOK {layStakeCalculation.profitIfLayWins.toFixed(2)}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
                 {(errors.layOdds || errors.layStake) && (
                   <p className="text-destructive text-xs">
                     {errors.layOdds ?? errors.layStake}

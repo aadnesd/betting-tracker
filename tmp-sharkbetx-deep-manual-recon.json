@@ -1,0 +1,1072 @@
+{
+  "checked_at": "2026-06-04T11:27:32.656Z",
+  "account": {
+    "id": "b14f91fc-4d15-463f-8838-d00f0aac166c",
+    "name": "Sharkbetx"
+  },
+  "csv_clusters": 32,
+  "db_rows": 54,
+  "matched_clusters": 21,
+  "unmatched_clusters": 11,
+  "unmatched": [
+    {
+      "key": "t rkiye vs north macedonia||LAY",
+      "event": "Türkiye vs. North Macedonia",
+      "side": "LAY",
+      "start": "2026-06-01T23:31:09.491Z",
+      "end": "2026-06-01T23:31:09.508Z",
+      "rows": [
+        {
+          "bet_id": "cmpvinod504wmhurqnvoetwyz",
+          "settled_at": "2026-06-01T23:31:09.491Z",
+          "side": "LAY",
+          "event": "Türkiye vs. North Macedonia",
+          "net": -20.408163,
+          "tx": "0x74d617d952343b1e4589bb42e3855a5ad369b3da6d83c56bfd9efd41ca8eae32"
+        },
+        {
+          "bet_id": "cmpvin5wm04vhhurqluxtdx6u",
+          "settled_at": "2026-06-01T23:31:09.501Z",
+          "side": "LAY",
+          "event": "Türkiye vs. North Macedonia",
+          "net": -32.653061,
+          "tx": "0x74d617d952343b1e4589bb42e3855a5ad369b3da6d83c56bfd9efd41ca8eae32"
+        },
+        {
+          "bet_id": "cmpv8wvsa037ghurqgs90e6gw",
+          "settled_at": "2026-06-01T23:31:09.508Z",
+          "side": "LAY",
+          "event": "Türkiye vs. North Macedonia",
+          "net": -51.365854,
+          "tx": "0x74d617d952343b1e4589bb42e3855a5ad369b3da6d83c56bfd9efd41ca8eae32"
+        }
+      ],
+      "net": -104.427078,
+      "bet_ids": [
+        "cmpvinod504wmhurqnvoetwyz",
+        "cmpvin5wm04vhhurqluxtdx6u",
+        "cmpv8wvsa037ghurqgs90e6gw"
+      ]
+    },
+    {
+      "key": "uefa champions league winner||LAY",
+      "event": "UEFA Champions League Winner",
+      "side": "LAY",
+      "start": "2026-05-30T22:22:48.081Z",
+      "end": "2026-05-30T22:22:48.081Z",
+      "rows": [
+        {
+          "bet_id": "cmpskbic60474hutpw340aufv",
+          "settled_at": "2026-05-30T22:22:48.081Z",
+          "side": "LAY",
+          "event": "UEFA Champions League Winner",
+          "net": -2773.684211,
+          "tx": "0x4dc85a80b908327086e6c3328ce68a78203a3c58f12782ccc2e93aa1e7464717"
+        }
+      ],
+      "net": -2773.684211,
+      "bet_ids": ["cmpskbic60474hutpw340aufv"]
+    },
+    {
+      "key": "rosenborg bk vs fk bod glimt||LAY",
+      "event": "Rosenborg BK vs. FK Bodø/Glimt",
+      "side": "LAY",
+      "start": "2026-05-30T04:34:36.299Z",
+      "end": "2026-05-30T04:34:36.327Z",
+      "rows": [
+        {
+          "bet_id": "cmpmexo6d0n20huuhxo0so5pp",
+          "settled_at": "2026-05-30T04:34:36.299Z",
+          "side": "LAY",
+          "event": "Rosenborg BK vs. FK Bodø/Glimt",
+          "net": 95.648,
+          "tx": "0x7bdbdcef88c7d1451d2881982ccc8d8e179998f46582102930d3b40e329bc722"
+        },
+        {
+          "bet_id": "cmpmfyrir0n8qhuuh4l35zb5n",
+          "settled_at": "2026-05-30T04:34:36.311Z",
+          "side": "LAY",
+          "event": "Rosenborg BK vs. FK Bodø/Glimt",
+          "net": 277.34,
+          "tx": "0x4c89d4a89bc457f982e25c5c6e5e184dd2a7de677d9f38353150976674a6c75a"
+        },
+        {
+          "bet_id": "cmpmo1j330orzhuuhg7b1km2g",
+          "settled_at": "2026-05-30T04:34:36.318Z",
+          "side": "LAY",
+          "event": "Rosenborg BK vs. FK Bodø/Glimt",
+          "net": 95.648,
+          "tx": "0x7bdbdcef88c7d1451d2881982ccc8d8e179998f46582102930d3b40e329bc722"
+        },
+        {
+          "bet_id": "cmpmol1410oushuuh51jsn4vk",
+          "settled_at": "2026-05-30T04:34:36.327Z",
+          "side": "LAY",
+          "event": "Rosenborg BK vs. FK Bodø/Glimt",
+          "net": 95.648,
+          "tx": "0x7bdbdcef88c7d1451d2881982ccc8d8e179998f46582102930d3b40e329bc722"
+        }
+      ],
+      "net": 564.284,
+      "bet_ids": [
+        "cmpmexo6d0n20huuhxo0so5pp",
+        "cmpmfyrir0n8qhuuh4l35zb5n",
+        "cmpmo1j330orzhuuhg7b1km2g",
+        "cmpmol1410oushuuh51jsn4vk"
+      ]
+    },
+    {
+      "key": "v lerenga fotball vs kristiansund bk||LAY",
+      "event": "Vålerenga Fotball vs. Kristiansund BK",
+      "side": "LAY",
+      "start": "2026-05-30T04:29:40.549Z",
+      "end": "2026-05-30T04:29:40.573Z",
+      "rows": [
+        {
+          "bet_id": "cmpn4b1490qf2huuhuxkti1lk",
+          "settled_at": "2026-05-30T04:29:40.549Z",
+          "side": "LAY",
+          "event": "Vålerenga Fotball vs. Kristiansund BK",
+          "net": 87.981485,
+          "tx": "0x23cbedd3d65892aaba97017f8b2e9ab1192193a02bd805a3c02f1918633a537a"
+        },
+        {
+          "bet_id": "cmpmf57qf0n3zhuuh6svurzkt",
+          "settled_at": "2026-05-30T04:29:40.558Z",
+          "side": "LAY",
+          "event": "Vålerenga Fotball vs. Kristiansund BK",
+          "net": -79.739364,
+          "tx": "0x73381e5744090a4510f6768e306477897d90331c26d885df9bda74a9a0028058"
+        },
+        {
+          "bet_id": "cmpr54k640gdphuo4f48jjng5",
+          "settled_at": "2026-05-30T04:29:40.566Z",
+          "side": "LAY",
+          "event": "Vålerenga Fotball vs. Kristiansund BK",
+          "net": -325.862069,
+          "tx": "0x73381e5744090a4510f6768e306477897d90331c26d885df9bda74a9a0028058"
+        },
+        {
+          "bet_id": "cmpmgdbaw0n9yhuuhxy8gx82t",
+          "settled_at": "2026-05-30T04:29:40.573Z",
+          "side": "LAY",
+          "event": "Vålerenga Fotball vs. Kristiansund BK",
+          "net": 41.48,
+          "tx": "0x23cbedd3d65892aaba97017f8b2e9ab1192193a02bd805a3c02f1918633a537a"
+        }
+      ],
+      "net": -276.139948,
+      "bet_ids": [
+        "cmpn4b1490qf2huuhuxkti1lk",
+        "cmpmf57qf0n3zhuuh6svurzkt",
+        "cmpr54k640gdphuo4f48jjng5",
+        "cmpmgdbaw0n9yhuuhxy8gx82t"
+      ]
+    },
+    {
+      "key": "crystal palace fc vs rayo vallecano de madrid||LAY",
+      "event": "Crystal Palace FC vs. Rayo Vallecano de Madrid",
+      "side": "LAY",
+      "start": "2026-05-28T05:15:11.446Z",
+      "end": "2026-05-28T05:15:11.454Z",
+      "rows": [
+        {
+          "bet_id": "cmpo5ou7y04d6huy0mthx7ips",
+          "settled_at": "2026-05-28T05:15:11.446Z",
+          "side": "LAY",
+          "event": "Crystal Palace FC vs. Rayo Vallecano de Madrid",
+          "net": -405,
+          "tx": "0xa76790580e6d0a84b62d74be7df7646b9fc1cabe508126ffc768c080888496c5"
+        },
+        {
+          "bet_id": "cmpn42jse0qeehuuhm6ybmvjx",
+          "settled_at": "2026-05-28T05:15:11.454Z",
+          "side": "LAY",
+          "event": "Crystal Palace FC vs. Rayo Vallecano de Madrid",
+          "net": 83.4,
+          "tx": "0x73c3c52235720299358fbdfc32745d636f34855a597342d2f11e1b2f4252c879"
+        }
+      ],
+      "net": -321.6,
+      "bet_ids": ["cmpo5ou7y04d6huy0mthx7ips", "cmpn42jse0qeehuuhm6ybmvjx"]
+    },
+    {
+      "key": "ac milan vs cagliari calcio||LAY",
+      "event": "AC Milan vs. Cagliari Calcio",
+      "side": "LAY",
+      "start": "2026-05-24T21:37:09.909Z",
+      "end": "2026-05-24T21:37:09.909Z",
+      "rows": [
+        {
+          "bet_id": "cmpivbo2m012fhux9an3pnl8n",
+          "settled_at": "2026-05-24T21:37:09.909Z",
+          "side": "LAY",
+          "event": "AC Milan vs. Cagliari Calcio",
+          "net": -1239.557143,
+          "tx": "0x939e4ce0a45606d6a7988c4cf2ca0d0952499999317f460ad4d511c8c416b8fe"
+        }
+      ],
+      "net": -1239.557143,
+      "bet_ids": ["cmpivbo2m012fhux9an3pnl8n"]
+    },
+    {
+      "key": "ssc napoli vs udinese calcio||LAY",
+      "event": "SSC Napoli vs. Udinese Calcio",
+      "side": "LAY",
+      "start": "2026-05-24T21:22:20.134Z",
+      "end": "2026-05-24T21:22:20.183Z",
+      "rows": [
+        {
+          "bet_id": "cmpivihlp015bhux9whcm6eof",
+          "settled_at": "2026-05-24T21:22:20.134Z",
+          "side": "LAY",
+          "event": "SSC Napoli vs. Udinese Calcio",
+          "net": -124.923077,
+          "tx": "0x87dd2c292bbcaf43f76df386ee300044b68c433b8f7f4e8e46012cac061d6b5c"
+        },
+        {
+          "bet_id": "cmpjfl5i9034fhux9qvvofw3r",
+          "settled_at": "2026-05-24T21:22:20.143Z",
+          "side": "LAY",
+          "event": "SSC Napoli vs. Udinese Calcio",
+          "net": -1715.625,
+          "tx": "0x87dd2c292bbcaf43f76df386ee300044b68c433b8f7f4e8e46012cac061d6b5c"
+        },
+        {
+          "bet_id": "cmpjh0kkc039mhux9auz5pujb",
+          "settled_at": "2026-05-24T21:22:20.159Z",
+          "side": "LAY",
+          "event": "SSC Napoli vs. Udinese Calcio",
+          "net": 44,
+          "tx": "0x7616e1142772f860113cf7e49ce011b45dbe6af211bd66175fb55a2a9141ab3a"
+        },
+        {
+          "bet_id": "cmpjhav1d03czhux9vm0vvenv",
+          "settled_at": "2026-05-24T21:22:20.177Z",
+          "side": "LAY",
+          "event": "SSC Napoli vs. Udinese Calcio",
+          "net": 44,
+          "tx": "0x7616e1142772f860113cf7e49ce011b45dbe6af211bd66175fb55a2a9141ab3a"
+        },
+        {
+          "bet_id": "cmpjh6nfz03amhux9bn8labtj",
+          "settled_at": "2026-05-24T21:22:20.183Z",
+          "side": "LAY",
+          "event": "SSC Napoli vs. Udinese Calcio",
+          "net": 44,
+          "tx": "0x7616e1142772f860113cf7e49ce011b45dbe6af211bd66175fb55a2a9141ab3a"
+        }
+      ],
+      "net": -1708.548077,
+      "bet_ids": [
+        "cmpivihlp015bhux9whcm6eof",
+        "cmpjfl5i9034fhux9qvvofw3r",
+        "cmpjh0kkc039mhux9auz5pujb",
+        "cmpjhav1d03czhux9vm0vvenv",
+        "cmpjh6nfz03amhux9bn8labtj"
+      ]
+    },
+    {
+      "key": "crystal palace fc vs arsenal fc||LAY",
+      "event": "Crystal Palace FC vs. Arsenal FC",
+      "side": "LAY",
+      "start": "2026-05-24T19:47:49.762Z",
+      "end": "2026-05-24T19:47:49.769Z",
+      "rows": [
+        {
+          "bet_id": "cmpiuuc6000z1hux9lw5tqgzp",
+          "settled_at": "2026-05-24T19:47:49.762Z",
+          "side": "LAY",
+          "event": "Crystal Palace FC vs. Arsenal FC",
+          "net": 40.18,
+          "tx": "0x93ff6b9854ea9b1dd09f2e37dcfb600f630c19bd0bfeec200a4294ce2341c099"
+        },
+        {
+          "bet_id": "cmpjgwa3y038bhux9ierfaqt2",
+          "settled_at": "2026-05-24T19:47:49.769Z",
+          "side": "LAY",
+          "event": "Crystal Palace FC vs. Arsenal FC",
+          "net": 41.16,
+          "tx": "0x93ff6b9854ea9b1dd09f2e37dcfb600f630c19bd0bfeec200a4294ce2341c099"
+        }
+      ],
+      "net": 81.34,
+      "bet_ids": ["cmpiuuc6000z1hux9lw5tqgzp", "cmpjgwa3y038bhux9ierfaqt2"]
+    },
+    {
+      "key": "manchester city fc vs aston villa fc||LAY",
+      "event": "Manchester City FC vs. Aston Villa FC",
+      "side": "LAY",
+      "start": "2026-05-24T19:47:34.787Z",
+      "end": "2026-05-24T19:47:34.787Z",
+      "rows": [
+        {
+          "bet_id": "cmpiuqan200yihux91dpo97zx",
+          "settled_at": "2026-05-24T19:47:34.787Z",
+          "side": "LAY",
+          "event": "Manchester City FC vs. Aston Villa FC",
+          "net": -465.111111,
+          "tx": "0xddf7243917d6a8731cec3f41178dbfa2b441ea4891d429ad1fc5e6839e9067eb"
+        }
+      ],
+      "net": -465.111111,
+      "bet_ids": ["cmpiuqan200yihux91dpo97zx"]
+    },
+    {
+      "key": "ssc napoli vs bologna fc 1909||LAY",
+      "event": "SSC Napoli vs. Bologna FC 1909",
+      "side": "LAY",
+      "start": "2026-05-12T01:13:08.805Z",
+      "end": "2026-05-12T01:13:08.805Z",
+      "rows": [
+        {
+          "bet_id": "cmp1ilnmz00nrhu7y6hoj8icl",
+          "settled_at": "2026-05-12T01:13:08.805Z",
+          "side": "LAY",
+          "event": "SSC Napoli vs. Bologna FC 1909",
+          "net": 2271.0324,
+          "tx": "0x2a151f4ed79de6f04ad96998e0679789f5d6b7c357f6aff1c84d7d7b17307e8f"
+        }
+      ],
+      "net": 2271.0324,
+      "bet_ids": ["cmp1ilnmz00nrhu7y6hoj8icl"]
+    },
+    {
+      "key": "1 fsv mainz 05 vs 1 fc union berlin||LAY",
+      "event": "1. FSV Mainz 05 vs. 1. FC Union Berlin",
+      "side": "LAY",
+      "start": "2026-05-10T22:46:09.680Z",
+      "end": "2026-05-10T22:46:09.680Z",
+      "rows": [
+        {
+          "bet_id": "cmp002z1e00fnhuczev44dt1k",
+          "settled_at": "2026-05-10T22:46:09.680Z",
+          "side": "LAY",
+          "event": "1. FSV Mainz 05 vs. 1. FC Union Berlin",
+          "net": 2479.4,
+          "tx": "0x3d3256cb4b1fea21f6a65b78c07cfb14a3e4c5ef9cb22fbad590c0b69d639d9b"
+        }
+      ],
+      "net": 2479.4,
+      "bet_ids": ["cmp002z1e00fnhuczev44dt1k"]
+    }
+  ],
+  "palace_csv_clusters": [
+    {
+      "key": "crystal palace fc vs rayo vallecano de madrid||LAY",
+      "event": "Crystal Palace FC vs. Rayo Vallecano de Madrid",
+      "side": "LAY",
+      "start": "2026-05-28T05:15:11.446Z",
+      "end": "2026-05-28T05:15:11.454Z",
+      "rows": [
+        {
+          "bet_id": "cmpo5ou7y04d6huy0mthx7ips",
+          "settled_at": "2026-05-28T05:15:11.446Z",
+          "side": "LAY",
+          "event": "Crystal Palace FC vs. Rayo Vallecano de Madrid",
+          "net": -405,
+          "tx": "0xa76790580e6d0a84b62d74be7df7646b9fc1cabe508126ffc768c080888496c5"
+        },
+        {
+          "bet_id": "cmpn42jse0qeehuuhm6ybmvjx",
+          "settled_at": "2026-05-28T05:15:11.454Z",
+          "side": "LAY",
+          "event": "Crystal Palace FC vs. Rayo Vallecano de Madrid",
+          "net": 83.4,
+          "tx": "0x73c3c52235720299358fbdfc32745d636f34855a597342d2f11e1b2f4252c879"
+        }
+      ],
+      "net": -321.6,
+      "bet_ids": ["cmpo5ou7y04d6huy0mthx7ips", "cmpn42jse0qeehuuhm6ybmvjx"]
+    }
+  ],
+  "palace_db_rows": [
+    {
+      "id": "cd30207e-4a33-4dcb-86c1-387e755df13a",
+      "settled_at": "2026-05-24T18:48:28.827Z",
+      "selection": "Crystal Palace FC to Win",
+      "market": "Crystal Palace FC vs Arsenal FC",
+      "profit": 40.18
+    },
+    {
+      "id": "6d88ce49-f3a6-41c4-a8c8-0a8f25eefa04",
+      "settled_at": "2026-05-28T04:04:52.103Z",
+      "selection": "palace",
+      "market": "Palace vs Vallecano",
+      "profit": -405.03
+    },
+    {
+      "id": "29fe2da3-81ea-435f-8ae9-8d08619d9943",
+      "settled_at": "2026-05-28T08:30:40.986Z",
+      "selection": "Vallecano",
+      "market": "Palace vs vallecano",
+      "profit": 81.73
+    },
+    {
+      "id": "51fa1aad-8311-4dc8-a594-effd5c3124a6",
+      "settled_at": "2026-05-28T08:57:41.948Z",
+      "selection": "Palace",
+      "market": "Palace vs Arsenal",
+      "profit": 41.16
+    }
+  ],
+  "matched_sample": [
+    {
+      "cluster": {
+        "key": "georgia vs romania||LAY",
+        "event": "Georgia vs. Romania",
+        "side": "LAY",
+        "start": "2026-06-02T21:25:25.156Z",
+        "end": "2026-06-02T21:25:25.156Z",
+        "rows": [
+          {
+            "bet_id": "cmpwi906c00s2humklqk22l4n",
+            "settled_at": "2026-06-02T21:25:25.156Z",
+            "side": "LAY",
+            "event": "Georgia vs. Romania",
+            "net": 109.76,
+            "tx": "0x8ba32f8ce61f620445d9d21d2381a6698ca6f2e4e1840e9d5e088577014230d7"
+          }
+        ],
+        "net": 109.76,
+        "bet_ids": ["cmpwi906c00s2humklqk22l4n"]
+      },
+      "mode": "forced",
+      "db_ids": ["839771cf-1075-4e5c-844b-d071066e21ea"]
+    },
+    {
+      "cluster": {
+        "key": "roland garros atp rafael jodar vs alexander zverev||LAY",
+        "event": "Roland Garros ATP: Rafael Jodar vs Alexander Zverev",
+        "side": "LAY",
+        "start": "2026-06-02T18:08:03.043Z",
+        "end": "2026-06-02T18:08:03.043Z",
+        "rows": [
+          {
+            "bet_id": "cmpwhu37p00p3humk0i3cqgwq",
+            "settled_at": "2026-06-02T18:08:03.043Z",
+            "side": "LAY",
+            "event": "Roland Garros ATP: Rafael Jodar vs Alexander Zverev",
+            "net": -31.632911,
+            "tx": "0x3b25e4228a751b9cd755e43add59cdd5db41d039afdb0a188e4e85549564173f"
+          }
+        ],
+        "net": -31.632911,
+        "bet_ids": ["cmpwhu37p00p3humk0i3cqgwq"]
+      },
+      "mode": "forced",
+      "db_ids": ["bb75fc23-d897-4da4-a7c6-7201ceece480"]
+    },
+    {
+      "cluster": {
+        "key": "canada vs uzbekistan||LAY",
+        "event": "Canada vs. Uzbekistan",
+        "side": "LAY",
+        "start": "2026-06-02T05:36:07.053Z",
+        "end": "2026-06-02T05:36:07.066Z",
+        "rows": [
+          {
+            "bet_id": "cmpvfys7n04k0hurqgpgza9ld",
+            "settled_at": "2026-06-02T05:36:07.053Z",
+            "side": "LAY",
+            "event": "Canada vs. Uzbekistan",
+            "net": -500,
+            "tx": "0x969b0eb9fc9d943e5c65a18c921766984202368cdd939603d0ef19142f305980"
+          },
+          {
+            "bet_id": "cmpvg00h704lfhurqsvju2sa8",
+            "settled_at": "2026-06-02T05:36:07.066Z",
+            "side": "LAY",
+            "event": "Canada vs. Uzbekistan",
+            "net": -53.333333,
+            "tx": "0x969b0eb9fc9d943e5c65a18c921766984202368cdd939603d0ef19142f305980"
+          }
+        ],
+        "net": -553.333333,
+        "bet_ids": ["cmpvfys7n04k0hurqgpgza9ld", "cmpvg00h704lfhurqsvju2sa8"]
+      },
+      "mode": "forced",
+      "db_ids": ["8e6a9173-be13-4785-a162-28291c696aec"]
+    },
+    {
+      "cluster": {
+        "key": "molde fk vs sandefjord fotball||LAY",
+        "event": "Molde FK vs. Sandefjord Fotball",
+        "side": "LAY",
+        "start": "2026-05-31T06:11:15.568Z",
+        "end": "2026-05-31T06:11:15.575Z",
+        "rows": [
+          {
+            "bet_id": "cmpo6jd9g04j2huy0gxa1gqbs",
+            "settled_at": "2026-05-31T06:11:15.568Z",
+            "side": "LAY",
+            "event": "Molde FK vs. Sandefjord Fotball",
+            "net": -50.210489,
+            "tx": "0x5f1d1b7e26eb6a1c13f6b8cd6bb41984e5c1d731e8f5cb510dc51b105d85b212"
+          },
+          {
+            "bet_id": "cmpr45uez0g25huo40exhda9t",
+            "settled_at": "2026-05-31T06:11:15.575Z",
+            "side": "LAY",
+            "event": "Molde FK vs. Sandefjord Fotball",
+            "net": -347.457627,
+            "tx": "0x5f1d1b7e26eb6a1c13f6b8cd6bb41984e5c1d731e8f5cb510dc51b105d85b212"
+          }
+        ],
+        "net": -397.668116,
+        "bet_ids": ["cmpo6jd9g04j2huy0gxa1gqbs", "cmpr45uez0g25huo40exhda9t"]
+      },
+      "mode": "auto",
+      "db_ids": ["037c64ce-9110-4d3c-af79-9f859d8976ac"],
+      "sum": -397.5,
+      "amt_diff": 0.1681159999999977,
+      "time_diff_sec": 6252.576
+    },
+    {
+      "cluster": {
+        "key": "paris saint germain fc vs arsenal fc||LAY",
+        "event": "Paris Saint-Germain FC vs. Arsenal FC",
+        "side": "LAY",
+        "start": "2026-05-30T19:21:01.643Z",
+        "end": "2026-05-30T19:21:01.655Z",
+        "rows": [
+          {
+            "bet_id": "cmpseu66n03mjhuvhulw3e791",
+            "settled_at": "2026-05-30T19:21:01.643Z",
+            "side": "LAY",
+            "event": "Paris Saint-Germain FC vs. Arsenal FC",
+            "net": 109.76,
+            "tx": "0x589762a350ead173cd473c713b4ccc336d61a4b1a23f8d8e00c45fb34dd5b43d"
+          },
+          {
+            "bet_id": "cmpsfib1b00jbhubcl0f2r9l5",
+            "settled_at": "2026-05-30T19:21:01.655Z",
+            "side": "LAY",
+            "event": "Paris Saint-Germain FC vs. Arsenal FC",
+            "net": 219.52,
+            "tx": "0x589762a350ead173cd473c713b4ccc336d61a4b1a23f8d8e00c45fb34dd5b43d"
+          }
+        ],
+        "net": 329.28000000000003,
+        "bet_ids": ["cmpseu66n03mjhuvhulw3e791", "cmpsfib1b00jbhubcl0f2r9l5"]
+      },
+      "mode": "auto",
+      "db_ids": [
+        "e37044b2-b27f-4df0-a897-a270abc010b6",
+        "1043dbf6-7b75-4ae5-9f2f-272bc3484399"
+      ],
+      "sum": 329.28000000000003,
+      "amt_diff": 0,
+      "time_diff_sec": 32756.508
+    },
+    {
+      "cluster": {
+        "key": "avalanche vs golden knights||LAY",
+        "event": "Avalanche vs. Golden Knights",
+        "side": "LAY",
+        "start": "2026-05-27T04:35:56.877Z",
+        "end": "2026-05-27T04:35:56.877Z",
+        "rows": [
+          {
+            "bet_id": "cmpn4gvez0qhthuuhbb50zu5v",
+            "settled_at": "2026-05-27T04:35:56.877Z",
+            "side": "LAY",
+            "event": "Avalanche vs. Golden Knights",
+            "net": 225.4,
+            "tx": "0xb660e7b8b8eecae975074eefc4fa428f288d0aa973156f3c1a3997f6095f0fcc"
+          }
+        ],
+        "net": 225.4,
+        "bet_ids": ["cmpn4gvez0qhthuuhbb50zu5v"]
+      },
+      "mode": "auto",
+      "db_ids": ["de1277e8-8bcb-4b45-a57c-21a08786d3ee"],
+      "sum": 225.4,
+      "amt_diff": 0,
+      "time_diff_sec": 18316.017
+    },
+    {
+      "cluster": {
+        "key": "spurs vs thunder||LAY",
+        "event": "Spurs vs. Thunder",
+        "side": "LAY",
+        "start": "2026-05-27T03:46:10.096Z",
+        "end": "2026-05-27T03:46:10.103Z",
+        "rows": [
+          {
+            "bet_id": "cmpmf1iwe0n3fhuuhsi9x6f5n",
+            "settled_at": "2026-05-27T03:46:10.096Z",
+            "side": "LAY",
+            "event": "Spurs vs. Thunder",
+            "net": -139.129032,
+            "tx": "0x2d06d4a7cf5f7d33e1f24ba2bcdd81ab79f61a4f08e4477fb89f5c83033c7343"
+          },
+          {
+            "bet_id": "cmpmggo600nathuuhwu2fvj4z",
+            "settled_at": "2026-05-27T03:46:10.103Z",
+            "side": "LAY",
+            "event": "Spurs vs. Thunder",
+            "net": -69.258065,
+            "tx": "0x2d06d4a7cf5f7d33e1f24ba2bcdd81ab79f61a4f08e4477fb89f5c83033c7343"
+          }
+        ],
+        "net": -208.38709699999998,
+        "bet_ids": ["cmpmf1iwe0n3fhuuhsi9x6f5n", "cmpmggo600nathuuhwu2fvj4z"]
+      },
+      "mode": "auto",
+      "db_ids": [
+        "78ef5170-e493-4a8f-a3ef-5ce0f5da0055",
+        "0495255f-78aa-472f-9b51-9b6e2e8d6b91"
+      ],
+      "sum": -208.42000000000002,
+      "amt_diff": 0.03290300000003299,
+      "time_diff_sec": 3102.902
+    },
+    {
+      "cluster": {
+        "key": "sandefjord fotball vs fredrikstad fk||LAY",
+        "event": "Sandefjord Fotball vs. Fredrikstad FK",
+        "side": "LAY",
+        "start": "2026-05-25T22:11:48.444Z",
+        "end": "2026-05-25T22:11:48.444Z",
+        "rows": [
+          {
+            "bet_id": "cmpkvazo10grehuuhdm7lihc3",
+            "settled_at": "2026-05-25T22:11:48.444Z",
+            "side": "LAY",
+            "event": "Sandefjord Fotball vs. Fredrikstad FK",
+            "net": 225.4,
+            "tx": "0xcec6fd57a71e6eab73d3f7402c47d2b385c7f1727b4dbba697f8e7c8ffad709d"
+          }
+        ],
+        "net": 225.4,
+        "bet_ids": ["cmpkvazo10grehuuhdm7lihc3"]
+      },
+      "mode": "auto",
+      "db_ids": ["8e100b37-dfdb-42c4-a256-dd47f0246e1b"],
+      "sum": 225.4,
+      "amt_diff": 0,
+      "time_diff_sec": 23282.492
+    },
+    {
+      "cluster": {
+        "key": "hamarkameratene vs lillestr m sk||LAY",
+        "event": "Hamarkameratene vs. Lillestrøm SK",
+        "side": "LAY",
+        "start": "2026-05-25T20:22:20.864Z",
+        "end": "2026-05-25T20:22:20.872Z",
+        "rows": [
+          {
+            "bet_id": "cmplbq8lm0jpmhuuh3355csky",
+            "settled_at": "2026-05-25T20:22:20.864Z",
+            "side": "LAY",
+            "event": "Hamarkameratene vs. Lillestrøm SK",
+            "net": 480.2,
+            "tx": "0x824a469b3d15e96a41779fceb9997a0822d336c04767ed437e848338a24a2cf9"
+          },
+          {
+            "bet_id": "cmplbqopx0jq4huuh29lljxkr",
+            "settled_at": "2026-05-25T20:22:20.872Z",
+            "side": "LAY",
+            "event": "Hamarkameratene vs. Lillestrøm SK",
+            "net": 40.18,
+            "tx": "0x824a469b3d15e96a41779fceb9997a0822d336c04767ed437e848338a24a2cf9"
+          }
+        ],
+        "net": 520.38,
+        "bet_ids": ["cmplbq8lm0jpmhuuh3355csky", "cmplbqopx0jq4huuh29lljxkr"]
+      },
+      "mode": "auto",
+      "db_ids": ["8d51f5a1-8dd7-4cc1-9ca8-968353bbca22"],
+      "sum": 520.38,
+      "amt_diff": 0,
+      "time_diff_sec": 37394.316
+    },
+    {
+      "cluster": {
+        "key": "ik start vs v lerenga fotball||LAY",
+        "event": "IK Start vs. Vålerenga Fotball",
+        "side": "LAY",
+        "start": "2026-05-25T17:11:48.414Z",
+        "end": "2026-05-25T17:11:48.414Z",
+        "rows": [
+          {
+            "bet_id": "cmpku8hz30goxhuuhvgsnietz",
+            "settled_at": "2026-05-25T17:11:48.414Z",
+            "side": "LAY",
+            "event": "IK Start vs. Vålerenga Fotball",
+            "net": 341.04,
+            "tx": "0x5b2b39550b676bf45382b8b146743f754f2bcc61e8ca97f451b7778104fc207e"
+          }
+        ],
+        "net": 341.04,
+        "bet_ids": ["cmpku8hz30goxhuuhvgsnietz"]
+      },
+      "mode": "auto",
+      "db_ids": ["0583db20-b47c-4504-92e7-2bced49c8829"],
+      "sum": 341.04,
+      "amt_diff": 0,
+      "time_diff_sec": 41278.92
+    },
+    {
+      "cluster": {
+        "key": "columbus crew vs atlanta united fc||LAY",
+        "event": "Columbus Crew vs. Atlanta United FC",
+        "side": "LAY",
+        "start": "2026-05-25T02:01:47.063Z",
+        "end": "2026-05-25T02:01:47.087Z",
+        "rows": [
+          {
+            "bet_id": "cmpk9a7rh0diphuuhvjhvpb3i",
+            "settled_at": "2026-05-25T02:01:47.063Z",
+            "side": "LAY",
+            "event": "Columbus Crew vs. Atlanta United FC",
+            "net": -25.57377,
+            "tx": "0xeac19e2f76915e11464b0584cf4ffa16ff5564ec6ecde396c29786d78377bbef"
+          },
+          {
+            "bet_id": "cmpk99e8u0dgthuuhv9xtvui0",
+            "settled_at": "2026-05-25T02:01:47.071Z",
+            "side": "LAY",
+            "event": "Columbus Crew vs. Atlanta United FC",
+            "net": -306.885246,
+            "tx": "0xeac19e2f76915e11464b0584cf4ffa16ff5564ec6ecde396c29786d78377bbef"
+          },
+          {
+            "bet_id": "cmpk9djfg0djyhuuh9a0kgvgr",
+            "settled_at": "2026-05-25T02:01:47.078Z",
+            "side": "LAY",
+            "event": "Columbus Crew vs. Atlanta United FC",
+            "net": -671.311475,
+            "tx": "0xeac19e2f76915e11464b0584cf4ffa16ff5564ec6ecde396c29786d78377bbef"
+          },
+          {
+            "bet_id": "cmpk9e7o90dkjhuuht1yae607",
+            "settled_at": "2026-05-25T02:01:47.087Z",
+            "side": "LAY",
+            "event": "Columbus Crew vs. Atlanta United FC",
+            "net": -84.393443,
+            "tx": "0xeac19e2f76915e11464b0584cf4ffa16ff5564ec6ecde396c29786d78377bbef"
+          }
+        ],
+        "net": -1088.163934,
+        "bet_ids": [
+          "cmpk9a7rh0diphuuhvjhvpb3i",
+          "cmpk99e8u0dgthuuhv9xtvui0",
+          "cmpk9djfg0djyhuuh9a0kgvgr",
+          "cmpk9e7o90dkjhuuht1yae607"
+        ]
+      },
+      "mode": "auto",
+      "db_ids": [
+        "423a276b-2b85-4ff3-a79c-436abd4d7b94",
+        "3acc2cf7-70fe-44cb-aaad-9820ab496d84"
+      ],
+      "sum": -1087.58,
+      "amt_diff": 0.5839339999999993,
+      "time_diff_sec": 9485.632
+    },
+    {
+      "cluster": {
+        "key": "hellas verona fc vs as roma||LAY",
+        "event": "Hellas Verona FC vs. AS Roma",
+        "side": "LAY",
+        "start": "2026-05-25T00:22:32.566Z",
+        "end": "2026-05-25T00:22:32.577Z",
+        "rows": [
+          {
+            "bet_id": "cmpivf7oo013nhux9qal2kjzp",
+            "settled_at": "2026-05-25T00:22:32.566Z",
+            "side": "LAY",
+            "event": "Hellas Verona FC vs. AS Roma",
+            "net": 86.24,
+            "tx": "0x21b2a601722a5c45559a70e25628fa724c7ee9af02cf513e482770d968afd7e1"
+          },
+          {
+            "bet_id": "cmpivozit01afhux9awlf9t6s",
+            "settled_at": "2026-05-25T00:22:32.577Z",
+            "side": "LAY",
+            "event": "Hellas Verona FC vs. AS Roma",
+            "net": 86.24,
+            "tx": "0x21b2a601722a5c45559a70e25628fa724c7ee9af02cf513e482770d968afd7e1"
+          }
+        ],
+        "net": 172.48,
+        "bet_ids": ["cmpivf7oo013nhux9qal2kjzp", "cmpivozit01afhux9awlf9t6s"]
+      },
+      "mode": "auto",
+      "db_ids": [
+        "4f5c75b2-c506-409c-a204-5412c47a41aa",
+        "c494f8a8-fff2-4066-8948-bac9d3d4bac6"
+      ],
+      "sum": 172.48,
+      "amt_diff": 0,
+      "time_diff_sec": 15430.611
+    },
+    {
+      "cluster": {
+        "key": "torino fc vs juventus fc||LAY",
+        "event": "Torino FC vs. Juventus FC",
+        "side": "LAY",
+        "start": "2026-05-24T23:01:56.995Z",
+        "end": "2026-05-24T23:01:57.002Z",
+        "rows": [
+          {
+            "bet_id": "cmpk8busq0d5whuuhwzx9319o",
+            "settled_at": "2026-05-24T23:01:56.995Z",
+            "side": "LAY",
+            "event": "Torino FC vs. Juventus FC",
+            "net": 49,
+            "tx": "0xf32eb659e91a506e2c1ba3a54c353608ebf5f4c12b8897282474187f71bb3f8d"
+          },
+          {
+            "bet_id": "cmpk8a5bo0d4thuuhf5jqrabn",
+            "settled_at": "2026-05-24T23:01:57.002Z",
+            "side": "LAY",
+            "event": "Torino FC vs. Juventus FC",
+            "net": 2940,
+            "tx": "0xf32eb659e91a506e2c1ba3a54c353608ebf5f4c12b8897282474187f71bb3f8d"
+          }
+        ],
+        "net": 2989,
+        "bet_ids": ["cmpk8busq0d5whuuhwzx9319o", "cmpk8a5bo0d4thuuhf5jqrabn"]
+      },
+      "mode": "auto",
+      "db_ids": ["1755c339-e28a-4c4d-ba47-23c3a4660388"],
+      "sum": 2989,
+      "amt_diff": 0,
+      "time_diff_sec": 20266.336
+    },
+    {
+      "cluster": {
+        "key": "brighton hove albion fc vs manchester united fc||LAY",
+        "event": "Brighton & Hove Albion FC vs. Manchester United FC",
+        "side": "LAY",
+        "start": "2026-05-24T19:22:46.989Z",
+        "end": "2026-05-24T19:22:46.989Z",
+        "rows": [
+          {
+            "bet_id": "cmpjdt4gk02vvhux9uuhtllxk",
+            "settled_at": "2026-05-24T19:22:46.989Z",
+            "side": "LAY",
+            "event": "Brighton & Hove Albion FC vs. Manchester United FC",
+            "net": 3789.66,
+            "tx": "0x06e9cf099c6e005e11b8034b69e5ed8d5a1115c5a1f8e915e8ffa1c5ab91578c"
+          }
+        ],
+        "net": 3789.66,
+        "bet_ids": ["cmpjdt4gk02vvhux9uuhtllxk"]
+      },
+      "mode": "auto",
+      "db_ids": ["0503786a-4a1c-48ca-844d-67d947d3b72f"],
+      "sum": 3789.66,
+      "amt_diff": 0,
+      "time_diff_sec": 35029.914
+    },
+    {
+      "cluster": {
+        "key": "canadiens vs hurricanes||LAY",
+        "event": "Canadiens vs. Hurricanes",
+        "side": "LAY",
+        "start": "2026-05-24T02:32:08.438Z",
+        "end": "2026-05-24T02:32:08.438Z",
+        "rows": [
+          {
+            "bet_id": "cmpiv5dc8011rhux98bikze28",
+            "settled_at": "2026-05-24T02:32:08.438Z",
+            "side": "LAY",
+            "event": "Canadiens vs. Hurricanes",
+            "net": -63,
+            "tx": "0xf202552bc42d6d37c41b7f5b5e23ab0ed2bbe617651fe973ddefc09545867913"
+          }
+        ],
+        "net": -63,
+        "bet_ids": ["cmpiv5dc8011rhux98bikze28"]
+      },
+      "mode": "auto",
+      "db_ids": ["f99992fe-6e81-4b6a-9507-518bfeeb95e0"],
+      "sum": -63.06,
+      "amt_diff": 0.060000000000002274,
+      "time_diff_sec": 3483.963
+    },
+    {
+      "cluster": {
+        "key": "valencia vs real madrid||LAY",
+        "event": "Valencia vs. Real Madrid",
+        "side": "LAY",
+        "start": "2026-05-22T23:58:16.695Z",
+        "end": "2026-05-22T23:58:16.736Z",
+        "rows": [
+          {
+            "bet_id": "cmpgm6rd205s2hul8a8lbp9wf",
+            "settled_at": "2026-05-22T23:58:16.695Z",
+            "side": "LAY",
+            "event": "Valencia vs. Real Madrid",
+            "net": 76.44,
+            "tx": "0xdf50ebd2be7eea3275cf617a6eba3fbd565de995b420704c93d652df5fcd1048"
+          },
+          {
+            "bet_id": "cmpgm5owy05qvhul8ya5091p7",
+            "settled_at": "2026-05-22T23:58:16.729Z",
+            "side": "LAY",
+            "event": "Valencia vs. Real Madrid",
+            "net": 24.934341,
+            "tx": "0xdf50ebd2be7eea3275cf617a6eba3fbd565de995b420704c93d652df5fcd1048"
+          },
+          {
+            "bet_id": "cmpglxxez05pbhul8jipborxr",
+            "settled_at": "2026-05-22T23:58:16.736Z",
+            "side": "LAY",
+            "event": "Valencia vs. Real Madrid",
+            "net": 121.512923,
+            "tx": "0xdf50ebd2be7eea3275cf617a6eba3fbd565de995b420704c93d652df5fcd1048"
+          }
+        ],
+        "net": 222.88726400000002,
+        "bet_ids": [
+          "cmpgm6rd205s2hul8a8lbp9wf",
+          "cmpgm5owy05qvhul8ya5091p7",
+          "cmpglxxez05pbhul8jipborxr"
+        ]
+      },
+      "mode": "auto",
+      "db_ids": [
+        "898843d0-af1d-4c02-8436-164f42770da7",
+        "1340fd6f-46a0-40c9-b239-982b0942cf82"
+      ],
+      "sum": 222.89,
+      "amt_diff": 0.0027359999999703177,
+      "time_diff_sec": 13370.697
+    },
+    {
+      "cluster": {
+        "key": "racing club de lens vs ogc nice||LAY",
+        "event": "Racing Club de Lens vs. OGC Nice",
+        "side": "LAY",
+        "start": "2026-05-22T23:28:20.094Z",
+        "end": "2026-05-22T23:28:20.094Z",
+        "rows": [
+          {
+            "bet_id": "cmpgl5lwm05omhul80xpm9r3b",
+            "settled_at": "2026-05-22T23:28:20.094Z",
+            "side": "LAY",
+            "event": "Racing Club de Lens vs. OGC Nice",
+            "net": -131.0625,
+            "tx": "0x99b2fde0aa98f1654b8f354c2786e2888c72711f86828c1d56aac0f7e923cb05"
+          }
+        ],
+        "net": -131.0625,
+        "bet_ids": ["cmpgl5lwm05omhul80xpm9r3b"]
+      },
+      "mode": "auto",
+      "db_ids": ["91f4463b-87d2-43b1-ac7f-9d639113e5bc"],
+      "sum": -131.18,
+      "amt_diff": 0.11750000000000682,
+      "time_diff_sec": 15158.56
+    },
+    {
+      "cluster": {
+        "key": "afc bournemouth vs manchester city fc||LAY",
+        "event": "AFC Bournemouth vs. Manchester City FC",
+        "side": "LAY",
+        "start": "2026-05-19T22:51:13.539Z",
+        "end": "2026-05-19T22:51:13.539Z",
+        "rows": [
+          {
+            "bet_id": "cmpcno1z200fghumt7vsh1b5h",
+            "settled_at": "2026-05-19T22:51:13.539Z",
+            "side": "LAY",
+            "event": "AFC Bournemouth vs. Manchester City FC",
+            "net": 4466.84,
+            "tx": "0xb201a11a44c09e88d193c1b7d090179b8662e0ffb8ccd9f2cb759cf6869e15d0"
+          }
+        ],
+        "net": 4466.84,
+        "bet_ids": ["cmpcno1z200fghumt7vsh1b5h"]
+      },
+      "mode": "auto",
+      "db_ids": ["fde53cdb-c604-49fc-9336-fb1430be39a0"],
+      "sum": 4466.84,
+      "amt_diff": 0,
+      "time_diff_sec": 24186.421
+    },
+    {
+      "cluster": {
+        "key": "arsenal fc vs burnley fc||LAY",
+        "event": "Arsenal FC vs. Burnley FC",
+        "side": "LAY",
+        "start": "2026-05-18T22:14:32.332Z",
+        "end": "2026-05-18T22:14:32.332Z",
+        "rows": [
+          {
+            "bet_id": "cmpbga4ny014chu7ufafa5txn",
+            "settled_at": "2026-05-18T22:14:32.332Z",
+            "side": "LAY",
+            "event": "Arsenal FC vs. Burnley FC",
+            "net": -76.636364,
+            "tx": "0x5a66d3a5d31cae18ebb072db8f46454a6d79dfd29a5ea51c858607a4cd4419d1"
+          }
+        ],
+        "net": -76.636364,
+        "bet_ids": ["cmpbga4ny014chu7ufafa5txn"]
+      },
+      "mode": "auto",
+      "db_ids": ["9c8d7396-62a1-448c-b492-81b9554f7f99"],
+      "sum": -76.43,
+      "amt_diff": 0.20636399999999355,
+      "time_diff_sec": 24084.632
+    },
+    {
+      "cluster": {
+        "key": "real betis balompi vs elche cf||LAY",
+        "event": "Real Betis Balompié vs. Elche CF",
+        "side": "LAY",
+        "start": "2026-05-12T22:43:59.993Z",
+        "end": "2026-05-12T22:43:59.993Z",
+        "rows": [
+          {
+            "bet_id": "cmp0zv9a002bxhu5htuo13dpc",
+            "settled_at": "2026-05-12T22:43:59.993Z",
+            "side": "LAY",
+            "event": "Real Betis Balompié vs. Elche CF",
+            "net": 38.906,
+            "tx": "0x84c9f8a59b1bacb27a70abe75377b25153f5bef6bce18487e04a75df3adb90d0"
+          }
+        ],
+        "net": 38.906,
+        "bet_ids": ["cmp0zv9a002bxhu5htuo13dpc"]
+      },
+      "mode": "auto",
+      "db_ids": ["65f9169d-a48d-474d-a3cd-95a3edfd648e"],
+      "sum": 39.1,
+      "amt_diff": 0.19400000000000261,
+      "time_diff_sec": 19131.916
+    },
+    {
+      "cluster": {
+        "key": "everton fc vs manchester city fc||LAY",
+        "event": "Everton FC vs. Manchester City FC",
+        "side": "LAY",
+        "start": "2026-05-05T00:36:08.507Z",
+        "end": "2026-05-05T00:36:08.507Z",
+        "rows": [
+          {
+            "bet_id": "cmopur4xy05lwhu8oh151zr3v",
+            "settled_at": "2026-05-05T00:36:08.507Z",
+            "side": "LAY",
+            "event": "Everton FC vs. Manchester City FC",
+            "net": 89.1425,
+            "tx": "0x42ccb27dd92b70c60954302a4856b2112d44851bb479643e30d8a0254cc33418"
+          }
+        ],
+        "net": 89.1425,
+        "bet_ids": ["cmopur4xy05lwhu8oh151zr3v"]
+      },
+      "mode": "auto",
+      "db_ids": ["de124d16-cca3-4ccd-a4cd-ef2b9fb57be0"],
+      "sum": 89.14,
+      "amt_diff": 0.0024999999999977263,
+      "time_diff_sec": 13587.285
+    }
+  ]
+}
