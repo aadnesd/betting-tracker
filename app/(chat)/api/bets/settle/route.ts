@@ -23,6 +23,7 @@ import { convertAmountToNokStrict } from "@/lib/fx-rates";
 import {
   calculateLayProfitLoss,
   calculateProfitLoss,
+  computePerAccountAdjustments,
   isFreeBetPromoType,
 } from "@/lib/settlement";
 
@@ -178,13 +179,41 @@ export async function POST(request: Request) {
       profitLossNok: profitLossNok.toFixed(2),
     });
 
-    // Create account balance adjustment if account is linked
-    if (bet.accountId) {
+    // Create account balance adjustment if account is linked. When the stake
+    // was split across accounts, deduct the correct amount from each so every
+    // account balance stays accurate. The bet's stored P&L (used for reporting)
+    // remains attributed to the primary account.
+    const betOutcome =
+      body.outcome === "won"
+        ? "win"
+        : body.outcome === "lost"
+          ? "loss"
+          : "push";
+    // Lay P&L is computed from the back/selection perspective flipped; match it.
+    const splitOutcome =
+      body.betKind === "back"
+        ? betOutcome
+        : betOutcome === "win"
+          ? "loss"
+          : betOutcome === "loss"
+            ? "win"
+            : "push";
+    const adjustments = computePerAccountAdjustments({
+      kind: body.betKind,
+      outcome: splitOutcome,
+      totalProfitLoss: profitLoss,
+      primaryAccountId: bet.accountId,
+      legs: bet.splitLegs ?? null,
+      isFreeBet,
+      freeBetStakeReturned,
+      commissionRate,
+    });
+    for (const adjustment of adjustments) {
       await createAccountTransaction({
         userId: session.user.id,
-        accountId: bet.accountId,
+        accountId: adjustment.accountId,
         type: "adjustment",
-        amount: profitLoss,
+        amount: adjustment.amount,
         currency,
         occurredAt: now,
         notes: `Settlement: ${body.outcome} - ${bet.market} / ${bet.selection} @ ${odds}`,

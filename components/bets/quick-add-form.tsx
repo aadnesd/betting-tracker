@@ -548,6 +548,7 @@ export function QuickAddForm({
       const parsedLayLegs = layLegs.map((leg) => ({
         odds: Number.parseFloat(leg.odds),
         stake: Number.parseFloat(leg.stake),
+        accountName: leg.accountName || formData.layExchange,
       }));
 
       // Use the first leg's account as the primary bookmaker for the combined bet
@@ -568,9 +569,23 @@ export function QuickAddForm({
               .join(", ")}`
           : null;
 
+      const uniqueLayAccounts = new Set(
+        parsedLayLegs.map((leg) => leg.accountName)
+      );
+      const laySplitAccountNote =
+        parsedLayLegs.length > 1 && uniqueLayAccounts.size > 1
+          ? `Lay split accounts: ${parsedLayLegs
+              .map(
+                (leg) =>
+                  `${leg.accountName} ${formData.layCurrency} ${leg.stake.toFixed(2)} @ ${leg.odds.toFixed(4)}`
+              )
+              .join(", ")}`
+          : null;
+
       const combinedNotes =
-        [formData.notes.trim(), splitAccountNote].filter(Boolean).join("\n") ||
-        undefined;
+        [formData.notes.trim(), splitAccountNote, laySplitAccountNote]
+          .filter(Boolean)
+          .join("\n") || undefined;
 
       const response = await fetch("/api/bets/quick-add", {
         method: "POST",
@@ -1216,68 +1231,121 @@ export function QuickAddForm({
               </div>
               <div className="space-y-3">
                 {layLegs.map((leg, index) => (
-                  <div
-                    className="grid gap-3 sm:grid-cols-[1fr_1fr_auto]"
-                    key={index}
-                  >
-                    <div className="space-y-2">
-                      <Label htmlFor={`layOdds-${index}`}>
-                        Odds{layLegs.length > 1 ? ` ${index + 1}` : ""}
-                      </Label>
-                      <Input
-                        className={errors.layOdds ? "border-destructive" : ""}
-                        id={`layOdds-${index}`}
-                        min="1.01"
-                        onChange={(e) =>
-                          updateSplitLeg("lay", index, "odds", e.target.value)
-                        }
-                        placeholder="e.g., 2.52"
-                        step="any"
-                        type="number"
-                        value={leg.odds}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor={`layStake-${index}`}>
-                        Stake{layLegs.length > 1 ? ` ${index + 1}` : ""}
-                      </Label>
-                      <Input
-                        className={errors.layStake ? "border-destructive" : ""}
-                        id={`layStake-${index}`}
-                        min="0.01"
-                        onChange={(e) =>
-                          updateSplitLeg("lay", index, "stake", e.target.value)
-                        }
-                        placeholder="e.g., 99.20"
-                        step="0.01"
-                        type="number"
-                        value={leg.stake}
-                      />
-                      {layLegs.length === 1 && index === 0 && (
-                        <p className="text-muted-foreground text-xs">
-                          {isCalculatingLayStake
-                            ? "Calculating optimal lay stake..."
-                            : layStakeCalculation
-                              ? `${layStakeMode === "underlay" ? "Underlay" : layStakeMode === "overlay" ? "Overlay" : "Auto-calculated"} using ${formData.backCurrency}/${formData.layCurrency}${
-                                  layStakeCalculation.commissionRate > 0
-                                    ? ` and ${(layStakeCalculation.commissionRate * 100).toFixed(1)}% commission`
-                                    : ""
-                                }.`
-                              : "Enter back stake, back odds, and lay odds to auto-calculate."}
-                        </p>
-                      )}
-                    </div>
-                    <div className="flex items-end">
-                      <Button
-                        aria-label="Remove lay split"
-                        disabled={layLegs.length === 1}
-                        onClick={() => removeSplitLeg("lay", index)}
-                        size="icon"
-                        type="button"
-                        variant="ghost"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                  <div className="space-y-2" key={index}>
+                    {layLegs.length > 1 && (
+                      <div className="space-y-1">
+                        <Label htmlFor={`layAccount-${index}`}>
+                          Account {index + 1}
+                        </Label>
+                        <Select
+                          onValueChange={(value) => {
+                            if (value === "__add_new__") {
+                              router.push(
+                                "/bets/settings/accounts/new?return=/bets/quick-add"
+                              );
+                              return;
+                            }
+                            updateSplitLeg("lay", index, "accountName", value);
+                          }}
+                          value={leg.accountName}
+                        >
+                          <SelectTrigger id={`layAccount-${index}`}>
+                            <SelectValue placeholder="Select exchange..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {exchanges.length > 0 && (
+                              <SelectGroup>
+                                <SelectLabel>Exchanges</SelectLabel>
+                                {exchanges.map((ex) => (
+                                  <SelectItem key={ex.id} value={ex.name}>
+                                    {ex.name}
+                                    {ex.currency && (
+                                      <span className="ml-2 text-muted-foreground text-xs">
+                                        ({ex.currency})
+                                      </span>
+                                    )}
+                                  </SelectItem>
+                                ))}
+                              </SelectGroup>
+                            )}
+                            {exchanges.length > 0 && <SelectSeparator />}
+                            <SelectItem value="__add_new__">
+                              <span className="flex items-center gap-1 text-primary">
+                                <Plus className="h-3 w-3" />
+                                Add new exchange
+                              </span>
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+                    <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
+                      <div className="space-y-2">
+                        <Label htmlFor={`layOdds-${index}`}>
+                          Odds{layLegs.length > 1 ? ` ${index + 1}` : ""}
+                        </Label>
+                        <Input
+                          className={errors.layOdds ? "border-destructive" : ""}
+                          id={`layOdds-${index}`}
+                          min="1.01"
+                          onChange={(e) =>
+                            updateSplitLeg("lay", index, "odds", e.target.value)
+                          }
+                          placeholder="e.g., 2.52"
+                          step="any"
+                          type="number"
+                          value={leg.odds}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor={`layStake-${index}`}>
+                          Stake{layLegs.length > 1 ? ` ${index + 1}` : ""}
+                        </Label>
+                        <Input
+                          className={
+                            errors.layStake ? "border-destructive" : ""
+                          }
+                          id={`layStake-${index}`}
+                          min="0.01"
+                          onChange={(e) =>
+                            updateSplitLeg(
+                              "lay",
+                              index,
+                              "stake",
+                              e.target.value
+                            )
+                          }
+                          placeholder="e.g., 99.20"
+                          step="0.01"
+                          type="number"
+                          value={leg.stake}
+                        />
+                        {layLegs.length === 1 && index === 0 && (
+                          <p className="text-muted-foreground text-xs">
+                            {isCalculatingLayStake
+                              ? "Calculating optimal lay stake..."
+                              : layStakeCalculation
+                                ? `${layStakeMode === "underlay" ? "Underlay" : layStakeMode === "overlay" ? "Overlay" : "Auto-calculated"} using ${formData.backCurrency}/${formData.layCurrency}${
+                                    layStakeCalculation.commissionRate > 0
+                                      ? ` and ${(layStakeCalculation.commissionRate * 100).toFixed(1)}% commission`
+                                      : ""
+                                  }.`
+                                : "Enter back stake, back odds, and lay odds to auto-calculate."}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex items-end">
+                        <Button
+                          aria-label="Remove lay split"
+                          disabled={layLegs.length === 1}
+                          onClick={() => removeSplitLeg("lay", index)}
+                          size="icon"
+                          type="button"
+                          variant="ghost"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 ))}

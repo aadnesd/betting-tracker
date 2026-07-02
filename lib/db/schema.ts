@@ -184,6 +184,23 @@ export const normalizedSelectionEnum = [
 ] as const;
 export type NormalizedSelection = (typeof normalizedSelectionEnum)[number];
 
+/**
+ * A single leg of a back/lay bet that was split across multiple accounts.
+ * The parent BackBet/LayBet row stores the combined odds/stake for reporting,
+ * while these legs preserve the real per-account stake/odds so settlement can
+ * deduct the correct amount from each account (see applyAutoSettlement).
+ */
+export type BetSplitLeg = {
+  /** Account this portion of the stake was placed on. */
+  accountId: string | null;
+  stake: number;
+  odds: number;
+  /** Currency of this leg (matches the parent bet currency in practice). */
+  currency: string | null;
+  /** Lay only: exchange liability, when captured directly. */
+  liability?: number | null;
+};
+
 export const backBet = pgTable("BackBet", {
   id: uuid("id").primaryKey().notNull().defaultRandom(),
   createdAt: timestamp("createdAt").notNull(),
@@ -211,6 +228,9 @@ export const backBet = pgTable("BackBet", {
   profitLoss: numeric("profitLoss", { precision: 14, scale: 2 }),
   profitLossNok: numeric("profitLossNok", { precision: 14, scale: 2 }),
   confidence: jsonb("confidence"),
+  // Per-account breakdown when the back stake was split across accounts.
+  // Null/empty for single-account bets. Combined odds/stake above stay authoritative for reporting.
+  splitLegs: jsonb("splitLegs").$type<BetSplitLeg[]>(),
   status: varchar("status", { enum: betStatusEnum }).notNull().default("draft"),
   error: text("error"),
 });
@@ -244,6 +264,9 @@ export const layBet = pgTable("LayBet", {
   profitLoss: numeric("profitLoss", { precision: 14, scale: 2 }),
   profitLossNok: numeric("profitLossNok", { precision: 14, scale: 2 }),
   confidence: jsonb("confidence"),
+  // Per-account breakdown when the lay stake was split across exchange accounts.
+  // Null/empty for single-account bets. Combined odds/stake above stay authoritative for reporting.
+  splitLegs: jsonb("splitLegs").$type<BetSplitLeg[]>(),
   status: varchar("status", { enum: betStatusEnum }).notNull().default("draft"),
   error: text("error"),
 });
