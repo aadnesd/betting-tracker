@@ -281,6 +281,13 @@
       "when": 1781164546272,
       "tag": "0039_vengeful_anthem",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1782999602915,
+      "tag": "0040_parched_lockjaw",
+      "breakpoints": true
     }
   ]
 }

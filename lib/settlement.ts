@@ -690,3 +690,114 @@ export function calculateMatchedBetProfitLoss(
     netProfitLoss: backProfitLoss + layProfitLoss,
   };
 }
+
+/**
+ * A settlement leg used to split a bet's realized P&L across the accounts it
+ * was actually placed on. `odds`/`stake` mirror the real per-account amounts.
+ */
+export type SettlementSplitLeg = {
+  accountId: string | null;
+  stake: number;
+  odds: number;
+};
+
+/** A resolved per-account balance adjustment created at settlement time. */
+export type AccountAdjustment = {
+  accountId: string;
+  amount: number;
+};
+
+function roundTo2(value: number): number {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
+/**
+ * Split a bet's total settlement P&L across the accounts its legs were placed
+ * on.
+ *
+ * Matched-betting bets can be split across several bookmaker/exchange accounts
+ * (e.g. 3000 + 1500 on Stake, 1500 on Sharkbetx). The parent bet row stores the
+ * combined stake/odds and the total P&L (used for reporting, attributed to the
+ * primary account), but the money must leave each account it was placed on.
+ *
+ * Guarantees:
+ * - The returned amounts sum exactly to `totalProfitLoss` (any rounding
+ *   remainder is absorbed by the primary account), so account balances stay
+ *   consistent with the bet's stored `profitLoss`.
+ * - With no usable split info (missing/single account), returns a single
+ *   adjustment against `primaryAccountId` — identical to legacy behavior.
+ * - Zero-amount adjustments are omitted (mirrors the `!== 0` settlement guard).
+ *
+ * @param outcome - Bet outcome in the SAME perspective used to compute the
+ *   total P&L (for lay bets that means the layer's/back perspective already
+ *   flipped by the caller).
+ */
+export function computePerAccountAdjustments({
+  kind,
+  outcome,
+  totalProfitLoss,
+  primaryAccountId,
+  legs,
+  isFreeBet = false,
+  freeBetStakeReturned = false,
+  commissionRate = 0,
+}: {
+  kind: "back" | "lay";
+  outcome: BetOutcome;
+  totalProfitLoss: number;
+  primaryAccountId: string | null;
+  legs: SettlementSplitLeg[] | null | undefined;
+  isFreeBet?: boolean;
+  freeBetStakeReturned?: boolean;
+  commissionRate?: number;
+}): AccountAdjustment[] {
+  const usableLegs = (legs ?? []).filter(
+    (leg): leg is SettlementSplitLeg & { accountId: string } =>
+      Boolean(leg.accountId) && leg.stake > 0 && leg.odds > 1
+  );
+  const distinctAccounts = new Set(usableLegs.map((leg) => leg.accountId));
+
+  // No usable split, or the whole stake sat on one account: single adjustment.
+  // The amount is returned as-is (including zero) so callers can decide whether
+  // to record a zero-impact settlement row; the auto-settlement path skips
+  // zero amounts, while manual settlement records them.
+  if (usableLegs.length <= 1 || distinctAccounts.size <= 1) {
+    if (!primaryAccountId) {
+      return [];
+    }
+    return [{ accountId: primaryAccountId, amount: totalProfitLoss }];
+  }
+
+  const byAccount = new Map<string, number>();
+  for (const leg of usableLegs) {
+    const legPl =
+      kind === "back"
+        ? calculateProfitLoss(
+            outcome,
+            leg.stake,
+            leg.odds,
+            isFreeBet,
+            freeBetStakeReturned
+          )
+        : calculateLayProfitLoss(outcome, leg.stake, leg.odds, commissionRate);
+    byAccount.set(leg.accountId, (byAccount.get(leg.accountId) ?? 0) + legPl);
+  }
+
+  const adjustments: AccountAdjustment[] = Array.from(byAccount.entries()).map(
+    ([accountId, amount]) => ({ accountId, amount: roundTo2(amount) })
+  );
+
+  // Reconcile rounding drift so the split matches the stored total exactly.
+  const summed = roundTo2(
+    adjustments.reduce((total, adj) => total + adj.amount, 0)
+  );
+  const remainder = roundTo2(totalProfitLoss - summed);
+  if (remainder !== 0 && adjustments.length > 0) {
+    const target =
+      adjustments.find((adj) => adj.accountId === primaryAccountId) ??
+      adjustments[0];
+    target.amount = roundTo2(target.amount + remainder);
+  }
+
+  return adjustments.filter((adj) => adj.amount !== 0);
+}

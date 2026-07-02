@@ -20,12 +20,14 @@ import {
   saveBackBet,
   saveLayBet,
 } from "@/lib/db/queries";
+import type { BetSplitLeg } from "@/lib/db/schema";
 import { convertAmountToNok } from "@/lib/fx-rates";
 import { isFreeBetPromoType } from "@/lib/settlement";
 
 const splitLegSchema = z.object({
   odds: z.number().positive(),
   stake: z.number().positive(),
+  accountName: z.string().optional().nullable(),
 });
 
 const quickAddSchema = z.object({
@@ -149,6 +151,68 @@ export async function POST(request: Request) {
       currency: body.lay.currency,
     });
 
+    // Resolve the account each split leg was placed on so settlement can deduct
+    // the correct amount from every account. Legs default to their section's
+    // primary account when no per-leg account was chosen.
+    const resolveLegAccountId = async (
+      name: string | null | undefined,
+      fallbackId: string,
+      currency: string
+    ): Promise<string> => {
+      const trimmed = name?.trim();
+      if (!trimmed) {
+        return fallbackId;
+      }
+      const [asBookmaker, asExchange] = await Promise.all([
+        getAccountByName({
+          userId: session.user.id,
+          name: trimmed,
+          kind: "bookmaker",
+        }),
+        getAccountByName({
+          userId: session.user.id,
+          name: trimmed,
+          kind: "exchange",
+        }),
+      ]);
+      const resolved =
+        asBookmaker ??
+        asExchange ??
+        (await getOrCreateAccount({
+          userId: session.user.id,
+          name: trimmed,
+          kind: "bookmaker",
+          currency,
+        }));
+      return resolved.id;
+    };
+
+    const buildSplitLegs = async (
+      legs: { odds: number; stake: number; accountName?: string | null }[],
+      fallbackId: string,
+      currency: string
+    ): Promise<BetSplitLeg[] | null> => {
+      if (legs.length <= 1) {
+        return null;
+      }
+      const accountIds = await Promise.all(
+        legs.map((leg) =>
+          resolveLegAccountId(leg.accountName, fallbackId, currency)
+        )
+      );
+      return legs.map((leg, index) => ({
+        accountId: accountIds[index],
+        stake: leg.stake,
+        odds: leg.odds,
+        currency,
+      }));
+    };
+
+    const [backSplitLegs, laySplitLegs] = await Promise.all([
+      buildSplitLegs(backLegs, backAccount.id, body.back.currency),
+      buildSplitLegs(layLegs, layAccount.id, body.lay.currency),
+    ]);
+
     // Resolve promo if provided
     const promo = body.promoType
       ? await getOrCreatePromoByType({
@@ -176,6 +240,7 @@ export async function POST(request: Request) {
         profitLoss: null,
         confidence: null,
         status: "matched",
+        splitLegs: backSplitLegs,
       }),
       saveLayBet({
         userId: session.user.id,
@@ -194,6 +259,7 @@ export async function POST(request: Request) {
         profitLoss: null,
         confidence: null,
         status: "matched",
+        splitLegs: laySplitLegs,
       }),
     ]);
 

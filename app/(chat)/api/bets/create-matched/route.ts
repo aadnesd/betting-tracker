@@ -20,6 +20,7 @@ import {
   saveBackBet,
   saveLayBet,
 } from "@/lib/db/queries";
+import type { BetSplitLeg } from "@/lib/db/schema";
 import { convertAmountToNok } from "@/lib/fx-rates";
 import { isFreeBetPromoType } from "@/lib/settlement";
 
@@ -342,6 +343,63 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Promo not found" }, { status: 404 });
     }
 
+    // Build per-account split legs so settlement deducts the right amount from
+    // each account. Only relevant when a leg was split across 2+ accounts.
+    const buildSplitLegs = async (
+      parts: z.infer<typeof betPartSchema>[],
+      exchange: string,
+      kind: "bookmaker" | "exchange",
+      fallbackCurrency: string | undefined,
+      fallbackAccountId: string | null
+    ): Promise<BetSplitLeg[] | null> => {
+      if (parts.length <= 1) {
+        return null;
+      }
+      const accountIds = await Promise.all(
+        parts.map(async (part) => {
+          if (!part.accountId) {
+            return fallbackAccountId;
+          }
+          const resolved = await resolveAccountId({
+            userId: session.user.id,
+            accountId: part.accountId,
+            exchange: part.exchange?.trim() || exchange,
+            kind,
+            currency: part.currency?.toUpperCase() ?? fallbackCurrency ?? null,
+          });
+          return resolved.id ?? fallbackAccountId;
+        })
+      );
+      return parts.map((part, index) => ({
+        accountId: accountIds[index],
+        stake: part.stake,
+        odds: part.odds,
+        currency: part.currency?.toUpperCase() ?? fallbackCurrency ?? null,
+        liability: kind === "exchange" ? (part.liability ?? null) : null,
+      }));
+    };
+
+    const [backSplitLegs, laySplitLegs] = await Promise.all([
+      hasBack
+        ? buildSplitLegs(
+            backParts,
+            backExchange,
+            "bookmaker",
+            backCurrency,
+            backAccountId
+          )
+        : Promise.resolve(null),
+      hasLay
+        ? buildSplitLegs(
+            layParts,
+            layExchange,
+            "exchange",
+            layCurrency,
+            layAccountId
+          )
+        : Promise.resolve(null),
+    ]);
+
     const backBetRow =
       hasBack && backPart && backShot
         ? await saveBackBet({
@@ -361,6 +419,7 @@ export async function POST(request: Request) {
             profitLoss: backPart.profitLoss ?? null,
             confidence: backPart.confidence ?? null,
             status: backPart.status ?? betStatusFallback,
+            splitLegs: backSplitLegs,
           })
         : null;
 
@@ -383,6 +442,7 @@ export async function POST(request: Request) {
             profitLoss: layPart.profitLoss ?? null,
             confidence: layPart.confidence ?? null,
             status: layPart.status ?? betStatusFallback,
+            splitLegs: laySplitLegs,
           })
         : null;
 

@@ -81,6 +81,7 @@ function createMockMatchedBet(
           profitLossNok:
             backOverrides.profitLossNok ?? backOverrides.profitLoss ?? "50.00",
           confidence: null,
+          splitLegs: null,
           status: "settled",
           error: null,
           ...backOverrides,
@@ -111,6 +112,7 @@ function createMockMatchedBet(
           profitLossNok:
             layOverrides.profitLossNok ?? layOverrides.profitLoss ?? "-45.00",
           confidence: null,
+          splitLegs: null,
           status: "settled",
           error: null,
           ...layOverrides,

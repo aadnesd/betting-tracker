@@ -131,6 +131,9 @@ async function processBet(
     market: bet.market,
     selection: bet.selection,
     matchResult,
+    isFreeBet: freeBet,
+    freeBetStakeReturned,
+    layCommissionRate: exchangeCommission,
   });
 
   // Process deposit bonus wagering progress for back bets
@@ -311,6 +314,9 @@ async function processUnlinkedBet(
     market: bet.market,
     selection: bet.selection,
     matchResult: `${settlementMatchResult}${sourceNote}`,
+    isFreeBet: freeBet,
+    freeBetStakeReturned,
+    layCommissionRate: exchangeCommission,
     settlementReasoning: {
       source: "unlinked_web_lookup",
       lookupStatus: lookup.status,

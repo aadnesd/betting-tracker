@@ -31,13 +31,17 @@ import {
   convertWithRates,
   getRatesToNok,
 } from "../fx-rates";
-import { isFreeBetPromoType } from "../settlement";
+import {
+  computePerAccountAdjustments,
+  isFreeBetPromoType,
+} from "../settlement";
 import { generateUUID } from "../utils";
 import { db } from "./connection";
 import {
   account,
   accountTransaction,
   auditLog,
+  type BetSplitLeg,
   backBet,
   balanceSnapshot,
   bonusQualifyingBet,
@@ -1659,6 +1663,8 @@ type BetInputBase = {
   profitLoss?: number | null;
   confidence?: Record<string, number> | null;
   error?: string | null;
+  /** Per-account breakdown when the stake was split across multiple accounts. */
+  splitLegs?: BetSplitLeg[] | null;
   status?:
     | "draft"
     | "placed"
@@ -1807,6 +1813,7 @@ export async function saveBackBet({
           : bet.profitLoss.toString(),
       profitLossNok: profitLossNok === null ? null : profitLossNok.toFixed(2),
       confidence: bet.confidence ?? null,
+      splitLegs: bet.splitLegs ?? null,
       status: bet.status ?? "draft",
       error: bet.error ?? null,
     };
@@ -1855,6 +1862,7 @@ export async function saveLayBet({
           : bet.profitLoss.toString(),
       profitLossNok: profitLossNok === null ? null : profitLossNok.toFixed(2),
       confidence: bet.confidence ?? null,
+      splitLegs: bet.splitLegs ?? null,
       status: bet.status ?? "draft",
       error: bet.error ?? null,
     };
@@ -3909,6 +3917,12 @@ export type ApplyAutoSettlementParams = {
   selection: string;
   /** Match result description for audit notes */
   matchResult: string;
+  /** Whether the back leg was placed as a free bet (affects per-leg P&L split). */
+  isFreeBet?: boolean;
+  /** Whether a free bet returns the stake on win (affects per-leg P&L split). */
+  freeBetStakeReturned?: boolean;
+  /** Exchange commission rate as a decimal, for splitting lay P&L per account. */
+  layCommissionRate?: number;
   /** Optional explanation of how the settlement result was determined */
   settlementReasoning?: Record<string, unknown>;
 };
@@ -3965,6 +3979,11 @@ export async function applyAutoSettlement(
 
     // 2. Update back bet if exists
     if (params.backBetId) {
+      const [backRow] = await db
+        .select({ splitLegs: backBet.splitLegs })
+        .from(backBet)
+        .where(eq(backBet.id, params.backBetId));
+
       await db
         .update(backBet)
         .set({
@@ -3975,16 +3994,33 @@ export async function applyAutoSettlement(
         })
         .where(eq(backBet.id, params.backBetId));
 
-      // Create account adjustment transaction for back bet
-      if (params.backAccountId && params.backProfitLoss !== 0) {
+      // Create account adjustment transaction(s) for back bet. When the stake
+      // was split across accounts, deduct the correct amount from each.
+      const backAdjustments = computePerAccountAdjustments({
+        kind: "back",
+        outcome: params.outcome,
+        totalProfitLoss: params.backProfitLoss,
+        primaryAccountId: params.backAccountId,
+        legs: backRow?.splitLegs ?? null,
+        isFreeBet: params.isFreeBet ?? false,
+        freeBetStakeReturned: params.freeBetStakeReturned ?? false,
+      });
+      for (const adjustment of backAdjustments) {
+        if (adjustment.amount === 0) {
+          continue;
+        }
+        const adjustmentNok = await convertAmountToNokStrict(
+          adjustment.amount,
+          params.backCurrency ?? "NOK"
+        );
         await db.insert(accountTransaction).values({
           createdAt: now,
           userId: params.userId,
-          accountId: params.backAccountId,
+          accountId: adjustment.accountId,
           type: "adjustment",
-          amount: params.backProfitLoss.toFixed(2),
+          amount: adjustment.amount.toFixed(2),
           currency: (params.backCurrency ?? "NOK").toUpperCase(),
-          amountNok: backProfitLossNok.toFixed(2),
+          amountNok: adjustmentNok.toFixed(2),
           occurredAt: now,
           notes: `Auto-settlement: ${params.market} - ${params.selection} (${params.matchResult})`,
           linkedBackBetId: params.backBetId,
@@ -3995,6 +4031,11 @@ export async function applyAutoSettlement(
 
     // 3. Update lay bet if exists
     if (params.layBetId) {
+      const [layRow] = await db
+        .select({ splitLegs: layBet.splitLegs })
+        .from(layBet)
+        .where(eq(layBet.id, params.layBetId));
+
       await db
         .update(layBet)
         .set({
@@ -4005,16 +4046,31 @@ export async function applyAutoSettlement(
         })
         .where(eq(layBet.id, params.layBetId));
 
-      // Create account adjustment transaction for lay bet
-      if (params.layAccountId && params.layProfitLoss !== 0) {
+      // Create account adjustment transaction(s) for lay bet, split per account.
+      const layAdjustments = computePerAccountAdjustments({
+        kind: "lay",
+        outcome: params.outcome,
+        totalProfitLoss: params.layProfitLoss,
+        primaryAccountId: params.layAccountId,
+        legs: layRow?.splitLegs ?? null,
+        commissionRate: params.layCommissionRate ?? 0,
+      });
+      for (const adjustment of layAdjustments) {
+        if (adjustment.amount === 0) {
+          continue;
+        }
+        const adjustmentNok = await convertAmountToNokStrict(
+          adjustment.amount,
+          params.layCurrency ?? "NOK"
+        );
         await db.insert(accountTransaction).values({
           createdAt: now,
           userId: params.userId,
-          accountId: params.layAccountId,
+          accountId: adjustment.accountId,
           type: "adjustment",
-          amount: params.layProfitLoss.toFixed(2),
+          amount: adjustment.amount.toFixed(2),
           currency: (params.layCurrency ?? "NOK").toUpperCase(),
-          amountNok: layProfitLossNok.toFixed(2),
+          amountNok: adjustmentNok.toFixed(2),
           occurredAt: now,
           notes: `Auto-settlement: ${params.market} - ${params.selection} (${params.matchResult})`,
           linkedLayBetId: params.layBetId,
