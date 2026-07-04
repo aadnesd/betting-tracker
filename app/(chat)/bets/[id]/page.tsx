@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getCachedSession } from "@/lib/auth";
 import { computeMatchedBetOutcomes } from "@/lib/bet-calculations";
+import { deriveMatchedBetDisplayStatus } from "@/lib/bets/matched-status";
 import {
   getMatchedBetWithParts,
   getMatchedSetGroupMembers,
@@ -67,6 +68,11 @@ export default async function Page({ params }: PageProps) {
     freeBet,
     layAccountCommission,
   } = data;
+  const displayStatus = deriveMatchedBetDisplayStatus({
+    matchedStatus: matched.status,
+    backStatus: back?.status,
+    layStatus: lay?.status,
+  });
 
   // Fetch audit history for this matched bet
   const auditEntries = await listAuditEntriesByEntity({
@@ -211,7 +217,7 @@ export default async function Page({ params }: PageProps) {
           </p>
           <div className="flex items-center gap-3">
             <h1 className="font-semibold text-2xl">{matched.selection}</h1>
-            <BetStatusBadge status={matched.status} />
+            <BetStatusBadge status={displayStatus} />
           </div>
           <p className="text-muted-foreground text-sm">{matched.market}</p>
         </div>

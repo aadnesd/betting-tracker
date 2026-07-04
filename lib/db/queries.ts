@@ -3385,6 +3385,15 @@ export type PendingSettlementBet = {
   } | null;
 };
 
+function buildMatchedBetStillNeedsSettlementCondition() {
+  return or(
+    isNull(backBet.id),
+    ne(backBet.status, "settled"),
+    isNull(layBet.id),
+    ne(layBet.status, "settled")
+  )!;
+}
+
 /**
  * Get matched bets awaiting settlement, optionally filtered by match date range.
  * Bets are considered pending settlement when status is 'matched' (not draft, settled, or needs_review).
@@ -3411,6 +3420,7 @@ export async function getPendingSettlementBets({
     const conditions: SQL<unknown>[] = [
       eq(matchedBet.userId, userId),
       eq(matchedBet.status, "matched"),
+      buildMatchedBetStillNeedsSettlementCondition(),
     ];
 
     if (filter === "today") {
@@ -3563,8 +3573,14 @@ export async function countPendingSettlementBets({
     const [result] = await db
       .select({ count: count(matchedBet.id) })
       .from(matchedBet)
+      .leftJoin(backBet, eq(matchedBet.backBetId, backBet.id))
+      .leftJoin(layBet, eq(matchedBet.layBetId, layBet.id))
       .where(
-        and(eq(matchedBet.userId, userId), eq(matchedBet.status, "matched"))
+        and(
+          eq(matchedBet.userId, userId),
+          eq(matchedBet.status, "matched"),
+          buildMatchedBetStillNeedsSettlementCondition()
+        )
       );
     return result?.count ?? 0;
   } catch (_error) {
@@ -3691,6 +3707,7 @@ export async function findBetsReadyForAutoSettlement({
       .where(
         and(
           eq(matchedBet.status, "matched"),
+          buildMatchedBetStillNeedsSettlementCondition(),
           isNotNull(matchedBet.matchId),
           eq(footballMatch.status, "FINISHED"),
           isNotNull(footballMatch.homeScore),
@@ -3802,6 +3819,7 @@ export async function findUnlinkedBetsReadyForAutoSettlement({
       .where(
         and(
           eq(matchedBet.status, "matched"),
+          buildMatchedBetStillNeedsSettlementCondition(),
           isNull(matchedBet.matchId),
           or(
             isNull(matchedBet.unlinkedMatchDate),
@@ -3862,6 +3880,7 @@ export async function countBetsReadyForAutoSettlement(): Promise<number> {
       .where(
         and(
           eq(matchedBet.status, "matched"),
+          buildMatchedBetStillNeedsSettlementCondition(),
           isNotNull(matchedBet.matchId),
           eq(footballMatch.status, "FINISHED"),
           isNotNull(footballMatch.homeScore),
