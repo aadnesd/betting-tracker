@@ -136,11 +136,12 @@ export function QuickAddForm({
 
   // Pick default selections based on available accounts
   const defaultBookmaker = bookmakers.length > 0 ? bookmakers[0].name : "";
-  const defaultExchange = exchanges.length > 0 ? exchanges[0].name : "";
+  const preferredExchange =
+    exchanges.find((exchange) => exchange.name === "SharkBetX") ?? exchanges[0];
+  const defaultExchange = preferredExchange?.name ?? "";
   const defaultBackCurrency =
     bookmakers.length > 0 ? (bookmakers[0].currency ?? "NOK") : "NOK";
-  const defaultLayCurrency =
-    exchanges.length > 0 ? (exchanges[0].currency ?? "NOK") : "NOK";
+  const defaultLayCurrency = preferredExchange?.currency ?? "NOK";
 
   const [formData, setFormData] = useState<FormData>({
     market: "",
