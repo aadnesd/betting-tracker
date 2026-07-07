@@ -23,6 +23,7 @@ import {
   computeNetExposureInputs,
   computeSingleLegOutcome,
 } from "../bet-calculations";
+import { deriveMatchedBetDisplayStatus } from "../bets/matched-status";
 import { DEFAULT_FREE_BET_EXPIRY_DAYS } from "../bets/free-bet-defaults";
 import { ChatSDKError } from "../errors";
 import {
@@ -2595,7 +2596,12 @@ export async function listMatchedBetsForList({
         selection: row.selection,
         unlinkedMatchDate: row.unlinkedMatchDate ?? null,
         normalizedSelection: row.normalizedSelection ?? null,
-        status: row.status,
+        status: deriveMatchedBetDisplayStatus({
+          matchedStatus: row.status,
+          backStatus: back?.status,
+          layStatus: lay?.status,
+          notes: row.notes ?? null,
+        }),
         promoType: row.promoType ?? null,
         netExposure: parseNumber(row.netExposure),
         outcomePreview: calculateMatchedOutcomePreview({
@@ -3394,12 +3400,29 @@ export type PendingSettlementBet = {
 };
 
 function buildMatchedBetStillNeedsSettlementCondition() {
-  return or(
+  const stillHasUnsettledLeg = or(
     isNull(backBet.id),
     ne(backBet.status, "settled"),
     isNull(layBet.id),
     ne(layBet.status, "settled")
   )!;
+
+  const isResolvedSingleLegContainer = or(
+    and(
+      isNotNull(backBet.id),
+      eq(backBet.status, "settled"),
+      isNull(layBet.id),
+      sql`COALESCE(${matchedBet.notes}, '') LIKE ${"Marked resolved.%"}`
+    ),
+    and(
+      isNotNull(layBet.id),
+      eq(layBet.status, "settled"),
+      isNull(backBet.id),
+      sql`COALESCE(${matchedBet.notes}, '') LIKE ${"Marked resolved.%"}`
+    )
+  )!;
+
+  return and(stillHasUnsettledLeg, sql`NOT (${isResolvedSingleLegContainer})`)!;
 }
 
 /**

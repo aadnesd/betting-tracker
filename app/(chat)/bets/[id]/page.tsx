@@ -72,6 +72,7 @@ export default async function Page({ params }: PageProps) {
     matchedStatus: matched.status,
     backStatus: back?.status,
     layStatus: lay?.status,
+    notes: matched.notes,
   });
 
   // Fetch audit history for this matched bet
