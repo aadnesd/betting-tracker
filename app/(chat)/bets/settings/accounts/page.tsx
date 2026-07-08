@@ -1,10 +1,11 @@
 import { Building2, CreditCard, Plus, Settings } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { DefaultExchangeSelector } from "@/components/bets/default-exchange-selector";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getCachedSession } from "@/lib/auth";
-import { listAccountsWithBalances } from "@/lib/db/queries";
+import { getUserSettings, listAccountsWithBalances } from "@/lib/db/queries";
 
 export const metadata = {
   title: "Account Settings",
@@ -56,10 +57,14 @@ export default async function AccountSettingsPage() {
 
   const userId = session.user.id;
 
-  const accounts = await listAccountsWithBalances({ userId });
+  const [accounts, settings] = await Promise.all([
+    listAccountsWithBalances({ userId }),
+    getUserSettings({ userId }),
+  ]);
 
   const bookmakers = accounts.filter((a) => a.kind === "bookmaker");
   const exchanges = accounts.filter((a) => a.kind === "exchange");
+  const activeExchanges = exchanges.filter((a) => a.status === "active");
 
   const totalBookmakerBalance = bookmakers.reduce(
     (sum, a) => sum + a.currentBalance,
@@ -148,6 +153,29 @@ export default async function AccountSettingsPage() {
         </Card>
       </div>
 
+      <Card>
+        <CardHeader>
+          <CardTitle>Quick Add Defaults</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <DefaultExchangeSelector
+            exchanges={activeExchanges.map((exchange) => ({
+              id: exchange.id,
+              name: exchange.name,
+              currency: exchange.currency,
+            }))}
+            selectedExchangeId={
+              activeExchanges.some(
+                (exchange) =>
+                  exchange.id === settings?.defaultLayExchangeAccountId
+              )
+                ? (settings?.defaultLayExchangeAccountId ?? null)
+                : null
+            }
+          />
+        </CardContent>
+      </Card>
+
       {/* Accounts List */}
       <Card>
         <CardHeader>
@@ -185,6 +213,11 @@ export default async function AccountSettingsPage() {
                     <span className="font-semibold">{acct.name}</span>
                     <AccountKindBadge kind={acct.kind} />
                     <AccountStatusBadge status={acct.status} />
+                    {acct.id === settings?.defaultLayExchangeAccountId && (
+                      <span className="rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-violet-700 text-xs">
+                        Default exchange
+                      </span>
+                    )}
                   </div>
                   <div className="flex flex-wrap items-center gap-3 text-muted-foreground text-sm">
                     {acct.currency && <span>Currency: {acct.currency}</span>}

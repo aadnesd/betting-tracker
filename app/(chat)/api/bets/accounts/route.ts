@@ -6,8 +6,10 @@ import {
   createAccount,
   createAuditEntry,
   getAccountById,
+  getUserSettings,
   listAccountsByUser,
   updateAccount,
+  upsertUserSettings,
 } from "@/lib/db/queries";
 
 const createAccountSchema = z.object({
@@ -136,6 +138,19 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "Account not found" }, { status: 404 });
     }
 
+    const settings = await getUserSettings({ userId: session.user.id });
+    const shouldClearDefaultExchange =
+      settings?.defaultLayExchangeAccountId === body.id &&
+      ((body.kind !== undefined && body.kind !== "exchange") ||
+        (body.status !== undefined && body.status !== "active"));
+
+    if (shouldClearDefaultExchange) {
+      await upsertUserSettings({
+        userId: session.user.id,
+        defaultLayExchangeAccountId: null,
+      });
+    }
+
     // Build changes object for audit
     const changes: Record<string, unknown> = {};
     if (body.name !== undefined && body.name !== original.name) {
@@ -157,6 +172,12 @@ export async function PATCH(request: Request) {
     }
     if (body.status !== undefined && body.status !== original.status) {
       changes.status = { from: original.status, to: body.status };
+    }
+    if (shouldClearDefaultExchange) {
+      changes.defaultLayExchangeAccountId = {
+        from: body.id,
+        to: null,
+      };
     }
 
     if (Object.keys(changes).length > 0) {

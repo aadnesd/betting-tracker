@@ -254,6 +254,150 @@ export function computeSingleLegOutcome({
  *
  * All values should be in the same currency for comparison.
  */
+export type SequentialLayMode = "standard" | "lockin_final" | "underlay";
+
+export type SequentialLayLegInput = {
+  odds: number;
+  commissionRate?: number;
+};
+
+export type SequentialLayOutcome = {
+  losingLegIndex: number | null;
+  profit: number;
+};
+
+export type SequentialLayPlan = {
+  recommendedStakes: number[];
+  liabilities: number[];
+  outcomes: SequentialLayOutcome[];
+  totalLiability: number;
+  combinedLayOdds: number;
+};
+
+export function calculateSequentialLayPlan({
+  backStake,
+  backOdds,
+  backCommissionRate = 0,
+  layLegs,
+  mode = "standard",
+  isFreeBet = false,
+}: {
+  backStake: number;
+  backOdds: number;
+  backCommissionRate?: number;
+  layLegs: SequentialLayLegInput[];
+  mode?: SequentialLayMode;
+  isFreeBet?: boolean;
+}): SequentialLayPlan | null {
+  const safeBackCommissionRate = Math.min(Math.max(backCommissionRate, 0), 1);
+  const normalizedLegs = layLegs.map((leg) => ({
+    odds: leg.odds,
+    commissionRate: Math.min(Math.max(leg.commissionRate ?? 0, 0), 1),
+  }));
+
+  if (
+    backStake <= 0 ||
+    backOdds <= 1 ||
+    normalizedLegs.length === 0 ||
+    normalizedLegs.some(
+      (leg) => leg.odds <= 1 || leg.odds - leg.commissionRate <= 0
+    )
+  ) {
+    return null;
+  }
+
+  const recommendedStakes: number[] = [];
+
+  if (mode === "standard") {
+    let exchangeGrowth = 1;
+    for (const leg of normalizedLegs) {
+      exchangeGrowth *=
+        (leg.odds - leg.commissionRate) / (1 - leg.commissionRate);
+    }
+
+    if (exchangeGrowth <= 0) {
+      return null;
+    }
+
+    const bookieWinnings =
+      backStake * (backOdds - 1) * (1 - safeBackCommissionRate);
+    const lockedProfit = isFreeBet
+      ? bookieWinnings / exchangeGrowth
+      : (bookieWinnings - (exchangeGrowth - 1) * backStake) / exchangeGrowth;
+
+    let accumulator = isFreeBet ? lockedProfit : lockedProfit + backStake;
+
+    for (const leg of normalizedLegs) {
+      const denominator = 1 - leg.commissionRate;
+      if (denominator <= 0) {
+        return null;
+      }
+      recommendedStakes.push(accumulator / denominator);
+      accumulator *= (leg.odds - leg.commissionRate) / denominator;
+    }
+  } else {
+    let cumulativeLiability = 0;
+    for (let index = 0; index < normalizedLegs.length; index++) {
+      const leg = normalizedLegs[index];
+      const denominator = 1 - leg.commissionRate;
+      if (denominator <= 0) {
+        return null;
+      }
+
+      let stake: number;
+      if (mode === "lockin_final" && index === normalizedLegs.length - 1) {
+        const numerator = isFreeBet
+          ? backStake * (backOdds - 1) * (1 - safeBackCommissionRate)
+          : backStake * (backOdds - 1) * (1 - safeBackCommissionRate) +
+            backStake;
+        stake = numerator / (leg.odds - leg.commissionRate);
+      } else {
+        stake = (backStake + cumulativeLiability) / denominator;
+      }
+
+      recommendedStakes.push(stake);
+      cumulativeLiability += stake * (leg.odds - 1);
+    }
+  }
+
+  const liabilities = recommendedStakes.map(
+    (stake, index) => stake * (normalizedLegs[index]!.odds - 1)
+  );
+  const bookieLoss = isFreeBet ? 0 : -backStake;
+  const bookieWin = backStake * (backOdds - 1) * (1 - safeBackCommissionRate);
+
+  const outcomes: SequentialLayOutcome[] = normalizedLegs.map((leg, index) => {
+    let exchangeResult = 0;
+
+    for (let previousIndex = 0; previousIndex < index; previousIndex++) {
+      exchangeResult -= liabilities[previousIndex] ?? 0;
+    }
+
+    exchangeResult += recommendedStakes[index]! * (1 - leg.commissionRate);
+
+    return {
+      losingLegIndex: index,
+      profit: bookieLoss + exchangeResult,
+    };
+  });
+
+  outcomes.push({
+    losingLegIndex: null,
+    profit: bookieWin - liabilities.reduce((sum, value) => sum + value, 0),
+  });
+
+  return {
+    recommendedStakes,
+    liabilities,
+    outcomes,
+    totalLiability: liabilities.reduce((sum, value) => sum + value, 0),
+    combinedLayOdds: normalizedLegs.reduce(
+      (product, leg) => product * leg.odds,
+      1
+    ),
+  };
+}
+
 export function computeMatchedBetOutcomes({
   backStake,
   backOdds,
