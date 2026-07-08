@@ -274,6 +274,75 @@ export type SequentialLayPlan = {
   combinedLayOdds: number;
 };
 
+export function calculateSequentialLayOutcomes({
+  backStake,
+  backOdds,
+  backCommissionRate = 0,
+  layLegs,
+  layStakes,
+  isFreeBet = false,
+}: {
+  backStake: number;
+  backOdds: number;
+  backCommissionRate?: number;
+  layLegs: SequentialLayLegInput[];
+  layStakes: number[];
+  isFreeBet?: boolean;
+}): Omit<SequentialLayPlan, "recommendedStakes"> | null {
+  const safeBackCommissionRate = Math.min(Math.max(backCommissionRate, 0), 1);
+  const normalizedLegs = layLegs.map((leg) => ({
+    odds: leg.odds,
+    commissionRate: Math.min(Math.max(leg.commissionRate ?? 0, 0), 1),
+  }));
+
+  if (
+    backStake <= 0 ||
+    backOdds <= 1 ||
+    normalizedLegs.length === 0 ||
+    normalizedLegs.length !== layStakes.length ||
+    normalizedLegs.some((leg) => leg.odds <= 1) ||
+    layStakes.some((stake) => !Number.isFinite(stake) || stake < 0)
+  ) {
+    return null;
+  }
+
+  const liabilities = layStakes.map(
+    (stake, index) => stake * (normalizedLegs[index]!.odds - 1)
+  );
+  const bookieLoss = isFreeBet ? 0 : -backStake;
+  const bookieWin = backStake * (backOdds - 1) * (1 - safeBackCommissionRate);
+
+  const outcomes: SequentialLayOutcome[] = normalizedLegs.map((leg, index) => {
+    let exchangeResult = 0;
+
+    for (let previousIndex = 0; previousIndex < index; previousIndex++) {
+      exchangeResult -= liabilities[previousIndex] ?? 0;
+    }
+
+    exchangeResult += layStakes[index]! * (1 - leg.commissionRate);
+
+    return {
+      losingLegIndex: index,
+      profit: bookieLoss + exchangeResult,
+    };
+  });
+
+  outcomes.push({
+    losingLegIndex: null,
+    profit: bookieWin - liabilities.reduce((sum, value) => sum + value, 0),
+  });
+
+  return {
+    liabilities,
+    outcomes,
+    totalLiability: liabilities.reduce((sum, value) => sum + value, 0),
+    combinedLayOdds: normalizedLegs.reduce(
+      (product, leg) => product * leg.odds,
+      1
+    ),
+  };
+}
+
 export function calculateSequentialLayPlan({
   backStake,
   backOdds,
@@ -360,41 +429,22 @@ export function calculateSequentialLayPlan({
     }
   }
 
-  const liabilities = recommendedStakes.map(
-    (stake, index) => stake * (normalizedLegs[index]!.odds - 1)
-  );
-  const bookieLoss = isFreeBet ? 0 : -backStake;
-  const bookieWin = backStake * (backOdds - 1) * (1 - safeBackCommissionRate);
-
-  const outcomes: SequentialLayOutcome[] = normalizedLegs.map((leg, index) => {
-    let exchangeResult = 0;
-
-    for (let previousIndex = 0; previousIndex < index; previousIndex++) {
-      exchangeResult -= liabilities[previousIndex] ?? 0;
-    }
-
-    exchangeResult += recommendedStakes[index]! * (1 - leg.commissionRate);
-
-    return {
-      losingLegIndex: index,
-      profit: bookieLoss + exchangeResult,
-    };
+  const outcomesPlan = calculateSequentialLayOutcomes({
+    backStake,
+    backOdds,
+    backCommissionRate: safeBackCommissionRate,
+    layLegs: normalizedLegs,
+    layStakes: recommendedStakes,
+    isFreeBet,
   });
 
-  outcomes.push({
-    losingLegIndex: null,
-    profit: bookieWin - liabilities.reduce((sum, value) => sum + value, 0),
-  });
+  if (!outcomesPlan) {
+    return null;
+  }
 
   return {
     recommendedStakes,
-    liabilities,
-    outcomes,
-    totalLiability: liabilities.reduce((sum, value) => sum + value, 0),
-    combinedLayOdds: normalizedLegs.reduce(
-      (product, leg) => product * leg.odds,
-      1
-    ),
+    ...outcomesPlan,
   };
 }
 

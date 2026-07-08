@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  calculateSequentialLayOutcomes,
   calculateSequentialLayPlan,
   type SequentialLayMode,
 } from "@/lib/bet-calculations";
@@ -109,6 +110,7 @@ type SelectedMatchInfo = {
 type SequentialLayFutureLegFormData = {
   odds: string;
   commission: string;
+  actualStake: string;
 };
 
 type LayStakeCalculation = {
@@ -131,6 +133,11 @@ export type QuickAddInitialMatchInfo = SelectedMatchInfo;
 function parsePositiveDecimal(value: string) {
   const parsed = Number.parseFloat(value);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+function parseNonNegativeDecimal(value: string) {
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
 }
 
 function formatStakeInput(value: number) {
@@ -204,6 +211,7 @@ export function QuickAddForm({
   const [hedgeMode, setHedgeMode] = useState<HedgeMode>("standard");
   const [sequentialLayMode, setSequentialLayMode] =
     useState<SequentialLayMode>("standard");
+  const [sequentialAdvancedMode, setSequentialAdvancedMode] = useState(false);
   const [sequentialBackCommission, setSequentialBackCommission] = useState("0");
   const [sequentialFirstLegCommission, setSequentialFirstLegCommission] =
     useState(defaultExchangeCommission);
@@ -274,7 +282,11 @@ export function QuickAddForm({
   const addSequentialFutureLeg = () => {
     setSequentialFutureLegs((prev) => [
       ...prev,
-      { odds: "", commission: sequentialFirstLegCommission || "0" },
+      {
+        odds: "",
+        commission: sequentialFirstLegCommission || "0",
+        actualStake: "",
+      },
     ]);
   };
 
@@ -346,6 +358,7 @@ export function QuickAddForm({
       .map((leg) => ({
         odds: parsePositiveDecimal(leg.odds),
         commission: Number.parseFloat(leg.commission),
+        actualStake: parseNonNegativeDecimal(leg.actualStake),
       }))
       .filter(
         (leg) =>
@@ -356,19 +369,25 @@ export function QuickAddForm({
       .map((leg) => ({
         odds: leg.odds as number,
         commissionRate: leg.commission / 100,
+        actualStake: leg.actualStake,
       }));
+
+    const allLayLegs = [
+      {
+        odds: firstLayOdds,
+        commissionRate: firstLayCommission / 100,
+      },
+      ...futureLegs.map((leg) => ({
+        odds: leg.odds,
+        commissionRate: leg.commissionRate,
+      })),
+    ];
 
     const plan = calculateSequentialLayPlan({
       backStake,
       backOdds,
       backCommissionRate: backCommission / 100,
-      layLegs: [
-        {
-          odds: firstLayOdds,
-          commissionRate: firstLayCommission / 100,
-        },
-        ...futureLegs,
-      ],
+      layLegs: allLayLegs,
       mode: sequentialLayMode,
       isFreeBet:
         !!selectedFreeBet ||
@@ -380,9 +399,43 @@ export function QuickAddForm({
       return null;
     }
 
+    const effectiveStakes = plan.recommendedStakes.map(
+      (recommendedStake, index) => {
+        if (!sequentialAdvancedMode) {
+          return recommendedStake;
+        }
+
+        if (index === 0) {
+          return (
+            parsePositiveDecimal(layLegs[0]?.stake ?? "") ?? recommendedStake
+          );
+        }
+
+        return futureLegs[index - 1]?.actualStake ?? recommendedStake;
+      }
+    );
+
+    const effectiveOutcomes = calculateSequentialLayOutcomes({
+      backStake,
+      backOdds,
+      backCommissionRate: backCommission / 100,
+      layLegs: allLayLegs,
+      layStakes: effectiveStakes,
+      isFreeBet:
+        !!selectedFreeBet ||
+        formData.promoType === "Free Bet" ||
+        formData.promoType === "Risk-Free Bet",
+    });
+
+    if (!effectiveOutcomes) {
+      return null;
+    }
+
     return {
       ...plan,
-      totalLegs: 1 + futureLegs.length,
+      effectiveStakes,
+      effectiveOutcomes,
+      totalLegs: allLayLegs.length,
       firstLayCommission,
       backCommission,
       futureLegs,
@@ -395,6 +448,7 @@ export function QuickAddForm({
     hedgeMode,
     layLegs,
     selectedFreeBet,
+    sequentialAdvancedMode,
     sequentialBackCommission,
     sequentialFirstLegCommission,
     sequentialFutureLegs,
@@ -773,9 +827,9 @@ export function QuickAddForm({
       const sequentialPlanNote =
         hedgeMode === "sequential_lay"
           ? [
-              `${SEQUENTIAL_LAY_TAG} Mode: ${sequentialLayMode}`,
+              `${SEQUENTIAL_LAY_TAG} Mode: ${sequentialLayMode}${sequentialAdvancedMode ? " (manual stakes enabled)" : ""}`,
               sequentialLayPlan
-                ? `Sequential lay plan (${formData.layCurrency}): ${sequentialLayPlan.recommendedStakes
+                ? `Sequential lay recommended (${formData.layCurrency}): ${sequentialLayPlan.recommendedStakes
                     .map((stake, index) => {
                       const legNumber = index + 1;
                       const odds =
@@ -790,8 +844,26 @@ export function QuickAddForm({
                       return `Leg ${legNumber} @ ${odds} (${commission}% comm) = ${stake.toFixed(2)}`;
                     })
                     .join(", ")}`
+                : null,
+              sequentialLayPlan
+                ? `Sequential lay actual (${formData.layCurrency}): ${sequentialLayPlan.effectiveStakes
+                    .map(
+                      (stake, index) => `Leg ${index + 1} = ${stake.toFixed(2)}`
+                    )
+                    .join(", ")}`
+                : null,
+              sequentialLayPlan
+                ? `Sequential lay outcomes (${formData.layCurrency}): ${sequentialLayPlan.effectiveOutcomes.outcomes
+                    .map((outcome) =>
+                      outcome.losingLegIndex === null
+                        ? `All win ${outcome.profit.toFixed(2)}`
+                        : `Leg ${outcome.losingLegIndex + 1} loses ${outcome.profit.toFixed(2)}`
+                    )
+                    .join(", ")}`
                 : "Sequential lay plan pending full odds/commission input.",
-            ].join("\n")
+            ]
+              .filter(Boolean)
+              .join("\n")
           : null;
       const combinedNotes =
         [
@@ -1506,6 +1578,24 @@ export function QuickAddForm({
                       />
                     </div>
                   </div>
+                  <div className="flex items-center justify-between rounded-md border bg-background/70 px-3 py-2">
+                    <div>
+                      <p className="font-medium text-sm">Manual lay stakes</p>
+                      <p className="text-muted-foreground text-xs">
+                        Override recommended stakes to model your real exits.
+                      </p>
+                    </div>
+                    <Button
+                      onClick={() =>
+                        setSequentialAdvancedMode((current) => !current)
+                      }
+                      size="sm"
+                      type="button"
+                      variant={sequentialAdvancedMode ? "default" : "outline"}
+                    >
+                      {sequentialAdvancedMode ? "Enabled" : "Disabled"}
+                    </Button>
+                  </div>
                   {formData.backCurrency !== formData.layCurrency ? (
                     <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-amber-900 text-xs">
                       Sequential lay planning currently assumes the back and lay
@@ -1536,7 +1626,7 @@ export function QuickAddForm({
                         ) : (
                           sequentialFutureLegs.map((leg, index) => (
                             <div
-                              className="grid gap-3 rounded-md border bg-background/70 p-3 sm:grid-cols-[1fr_1fr_auto]"
+                              className={`grid gap-3 rounded-md border bg-background/70 p-3 ${sequentialAdvancedMode ? "sm:grid-cols-[1fr_1fr_1fr_auto]" : "sm:grid-cols-[1fr_1fr_auto]"}`}
                               key={index}
                             >
                               <div className="space-y-2">
@@ -1581,6 +1671,38 @@ export function QuickAddForm({
                                   value={leg.commission}
                                 />
                               </div>
+                              {sequentialAdvancedMode && (
+                                <div className="space-y-2">
+                                  <Label
+                                    htmlFor={`sequentialFutureActualStake-${index}`}
+                                  >
+                                    Actual stake (optional)
+                                  </Label>
+                                  <Input
+                                    id={`sequentialFutureActualStake-${index}`}
+                                    min="0.01"
+                                    onChange={(e) =>
+                                      updateSequentialFutureLeg(
+                                        index,
+                                        "actualStake",
+                                        e.target.value
+                                      )
+                                    }
+                                    placeholder={
+                                      sequentialLayPlan?.recommendedStakes[
+                                        index + 1
+                                      ]
+                                        ? sequentialLayPlan.recommendedStakes[
+                                            index + 1
+                                          ]?.toFixed(2)
+                                        : "Use recommended"
+                                    }
+                                    step="0.01"
+                                    type="number"
+                                    value={leg.actualStake}
+                                  />
+                                </div>
+                              )}
                               <div className="flex items-end">
                                 <Button
                                   aria-label={`Remove future leg ${index + 2}`}
@@ -1627,14 +1749,25 @@ export function QuickAddForm({
                         </div>
                         {sequentialLayPlan ? (
                           <>
-                            <div className="grid gap-3 sm:grid-cols-3">
+                            <div className="grid gap-3 sm:grid-cols-4">
                               <div>
                                 <p className="text-muted-foreground text-xs">
-                                  Leg 1 stake
+                                  Recommended leg 1
                                 </p>
                                 <p className="font-semibold text-sm">
                                   {formData.layCurrency}{" "}
                                   {sequentialLayPlan.recommendedStakes[0]?.toFixed(
+                                    2
+                                  )}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-muted-foreground text-xs">
+                                  Actual leg 1
+                                </p>
+                                <p className="font-semibold text-sm">
+                                  {formData.layCurrency}{" "}
+                                  {sequentialLayPlan.effectiveStakes[0]?.toFixed(
                                     2
                                   )}
                                 </p>
@@ -1653,13 +1786,17 @@ export function QuickAddForm({
                                 </p>
                                 <p className="font-semibold text-sm">
                                   {formData.layCurrency}{" "}
-                                  {sequentialLayPlan.totalLiability.toFixed(2)}
+                                  {sequentialLayPlan.effectiveOutcomes.totalLiability.toFixed(
+                                    2
+                                  )}
                                 </p>
                               </div>
                             </div>
                             <div className="space-y-2">
                               <p className="font-medium text-sm">
-                                Recommended lay stakes
+                                {sequentialAdvancedMode
+                                  ? "Lay stakes"
+                                  : "Recommended lay stakes"}
                               </p>
                               <div className="grid gap-2 sm:grid-cols-2">
                                 {sequentialLayPlan.recommendedStakes.map(
@@ -1672,8 +1809,14 @@ export function QuickAddForm({
                                         Leg {index + 1}
                                       </span>
                                       <div className="font-medium">
-                                        {formData.layCurrency}{" "}
+                                        Recommended: {formData.layCurrency}{" "}
                                         {stake.toFixed(2)}
+                                      </div>
+                                      <div className="text-muted-foreground">
+                                        Actual: {formData.layCurrency}{" "}
+                                        {sequentialLayPlan.effectiveStakes[
+                                          index
+                                        ]?.toFixed(2)}
                                       </div>
                                     </div>
                                   )
@@ -1685,7 +1828,7 @@ export function QuickAddForm({
                                 Exit outcomes
                               </p>
                               <div className="space-y-2">
-                                {sequentialLayPlan.outcomes.map(
+                                {sequentialLayPlan.effectiveOutcomes.outcomes.map(
                                   (outcome, index) => (
                                     <div
                                       className="flex items-center justify-between rounded-md border bg-muted/20 px-3 py-2 text-xs"
