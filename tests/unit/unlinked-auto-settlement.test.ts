@@ -21,6 +21,7 @@ vi.mock("@/lib/db/queries", () => ({
   processFreeBetWageringProgressOnSettle: vi.fn(),
   processWageringProgressOnSettle: vi.fn(),
   processQualifyingBetsUnlockOnSettle: vi.fn(),
+  syncMatchedContainerStatusesFromSettledLegs: vi.fn().mockResolvedValue(0),
 }));
 
 vi.mock("@/lib/unlinked-settlement-search", () => ({
