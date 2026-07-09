@@ -5,7 +5,11 @@ import {
   type QuickAddInitialValues,
 } from "@/components/bets/quick-add-form";
 import { getCachedSession } from "@/lib/auth";
-import { listAccountsByUser, listFreeBetsByUser } from "@/lib/db/queries";
+import {
+  getUserSettings,
+  listAccountsByUser,
+  listFreeBetsByUser,
+} from "@/lib/db/queries";
 
 export const metadata = {
   title: "Quick Add Matched Bet",
@@ -62,7 +66,7 @@ export default async function QuickAddPage(props: QuickAddPageProps) {
 
   const searchParams = await props.searchParams;
 
-  const [accounts, freeBets] = await Promise.all([
+  const [accounts, freeBets, settings] = await Promise.all([
     listAccountsByUser({
       userId: session.user.id,
     }),
@@ -70,6 +74,7 @@ export default async function QuickAddPage(props: QuickAddPageProps) {
       userId: session.user.id,
       status: "active",
     }),
+    getUserSettings({ userId: session.user.id }),
   ]);
 
   // Treat null/undefined status as active for backwards compatibility
@@ -84,6 +89,7 @@ export default async function QuickAddPage(props: QuickAddPageProps) {
       name: a.name,
       kind: a.kind as "bookmaker" | "exchange",
       currency: a.currency,
+      commission: a.commission ? Number(a.commission) : null,
     }));
 
   const exchanges = accounts
@@ -93,7 +99,13 @@ export default async function QuickAddPage(props: QuickAddPageProps) {
       name: a.name,
       kind: a.kind as "bookmaker" | "exchange",
       currency: a.currency,
+      commission: a.commission ? Number(a.commission) : null,
     }));
+
+  const preferredLayExchangeName =
+    exchanges.find(
+      (exchange) => exchange.id === settings?.defaultLayExchangeAccountId
+    )?.name ?? null;
 
   // Map free bets to options with account info
   const freeBetOptions = freeBets.map((fb) => ({
@@ -154,6 +166,7 @@ export default async function QuickAddPage(props: QuickAddPageProps) {
       freeBets={freeBetOptions}
       initialMatchInfo={initialMatchInfo}
       initialValues={initialValues}
+      preferredLayExchangeName={preferredLayExchangeName}
     />
   );
 }

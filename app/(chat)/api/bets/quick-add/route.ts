@@ -6,6 +6,7 @@ import {
   computeMatchedNetExposure,
   computeNetExposureInputs,
 } from "@/lib/bet-calculations";
+import { SEQUENTIAL_LAY_TAG } from "@/lib/bets/sequential-lay";
 import { revalidateDashboard } from "@/lib/cache";
 import {
   addQualifyingBetsForMatchedBet,
@@ -38,6 +39,7 @@ const quickAddSchema = z.object({
   normalizedSelection: z.enum(["HOME_TEAM", "AWAY_TEAM", "DRAW"]).optional(),
   promoType: z.string().optional(),
   freeBetId: z.string().uuid().optional(),
+  entryMode: z.enum(["standard", "sequential_lay"]).default("standard"),
   back: z.object({
     odds: z.number().positive("Back odds must be positive"),
     stake: z.number().positive("Back stake must be positive"),
@@ -319,7 +321,13 @@ export async function POST(request: Request) {
     ]
       .filter(Boolean)
       .join("\n");
-    const notes = [body.notes, splitNotes].filter(Boolean).join("\n\n");
+    const sequentialLayNotes =
+      body.entryMode === "sequential_lay"
+        ? "Sequential lay: first lay only recorded. Edit the lay leg later for subsequent lays."
+        : null;
+    const notes = [body.notes, splitNotes, sequentialLayNotes]
+      .filter(Boolean)
+      .join("\n\n");
 
     // Create the matched bet record
     const matched = await createMatchedBetRecord({
@@ -335,7 +343,11 @@ export async function POST(request: Request) {
       promoType: body.promoType ?? null,
       status: "matched",
       netExposure,
-      notes: notes ? `[Manual Entry] ${notes}` : "[Manual Entry]",
+      notes: notes
+        ? `${body.entryMode === "sequential_lay" ? `[Manual Entry] ${SEQUENTIAL_LAY_TAG}` : "[Manual Entry]"} ${notes}`
+        : body.entryMode === "sequential_lay"
+          ? `[Manual Entry] ${SEQUENTIAL_LAY_TAG}`
+          : "[Manual Entry]",
     });
 
     await addQualifyingBetsForMatchedBet({
@@ -371,8 +383,12 @@ export async function POST(request: Request) {
           currency: body.back.currency,
           splitCount: combinedBack.legs.length,
           source: "quick_add",
+          entryMode: body.entryMode,
         },
-        notes: "Created via Quick Add",
+        notes:
+          body.entryMode === "sequential_lay"
+            ? "Created via Quick Add (sequential lay)"
+            : "Created via Quick Add",
       }),
       createAuditEntry({
         userId: session.user.id,
@@ -388,8 +404,12 @@ export async function POST(request: Request) {
           currency: body.lay.currency,
           splitCount: combinedLay.legs.length,
           source: "quick_add",
+          entryMode: body.entryMode,
         },
-        notes: "Created via Quick Add",
+        notes:
+          body.entryMode === "sequential_lay"
+            ? "Created via Quick Add (sequential lay)"
+            : "Created via Quick Add",
       }),
       createAuditEntry({
         userId: session.user.id,
@@ -405,10 +425,13 @@ export async function POST(request: Request) {
           unlinkedMatchDate: unlinkedMatchDate?.toISOString() ?? null,
           source: "quick_add",
           freeBetId: body.freeBetId ?? null,
+          entryMode: body.entryMode,
         },
         notes: body.freeBetId
           ? `Created via Quick Add with free bet ${body.freeBetId}`
-          : (body.notes ?? "Created via Quick Add"),
+          : body.entryMode === "sequential_lay"
+            ? "Created via Quick Add (sequential lay)"
+            : (body.notes ?? "Created via Quick Add"),
       }),
     ]);
 

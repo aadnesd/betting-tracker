@@ -548,6 +548,11 @@ export const userSettings = pgTable("UserSettings", {
     .unique(),
   // Array of competition codes to sync (e.g., ["PL", "CL", "BL1"])
   enabledCompetitions: jsonb("enabledCompetitions").$type<string[]>(),
+  // Preferred exchange for lay bets in Quick Add and other lay-first flows.
+  defaultLayExchangeAccountId: uuid("defaultLayExchangeAccountId").references(
+    () => account.id,
+    { onDelete: "set null" }
+  ),
   // iOS Shortcut API key (SHA-256 hash of the actual key, 64 hex chars)
   shortcutApiKeyHash: varchar("shortcutApiKeyHash", { length: 64 }),
   // Last 8 characters of the API key for display purposes

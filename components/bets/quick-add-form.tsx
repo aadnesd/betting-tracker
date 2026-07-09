@@ -28,6 +28,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  calculateSequentialLayOutcomes,
+  calculateSequentialLayPlan,
+  type SequentialLayMode,
+} from "@/lib/bet-calculations";
+import { SEQUENTIAL_LAY_TAG } from "@/lib/bets/sequential-lay";
 
 const PROMO_TYPES = [
   "Free Bet",
@@ -45,6 +51,7 @@ export type AccountOption = {
   name: string;
   kind: "bookmaker" | "exchange";
   currency: string | null;
+  commission: number | null;
 };
 
 export type FreeBetOption = {
@@ -66,6 +73,7 @@ type QuickAddFormProps = {
   initialValues?: Partial<FormData>;
   copiedFromMatchedBetId?: string;
   initialMatchInfo?: SelectedMatchInfo | null;
+  preferredLayExchangeName?: string | null;
 };
 
 type FormData = {
@@ -99,6 +107,12 @@ type SelectedMatchInfo = {
   awayTeam: string;
 };
 
+type SequentialLayFutureLegFormData = {
+  odds: string;
+  commission: string;
+  actualStake: string;
+};
+
 type LayStakeCalculation = {
   layStake: number;
   layLiability: number;
@@ -111,6 +125,7 @@ type LayStakeCalculation = {
 };
 
 type LayStakeMode = "balanced" | "underlay" | "overlay";
+type HedgeMode = "standard" | "sequential_lay";
 
 export type QuickAddInitialValues = Partial<FormData>;
 export type QuickAddInitialMatchInfo = SelectedMatchInfo;
@@ -120,8 +135,18 @@ function parsePositiveDecimal(value: string) {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
 
+function parseNonNegativeDecimal(value: string) {
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+}
+
 function formatStakeInput(value: number) {
   return value.toFixed(2).replace(/\.?0+$/, "");
+}
+
+function formatProfit(value: number, currency: string) {
+  const prefix = value > 0 ? "+" : "";
+  return `${prefix}${currency} ${value.toFixed(2)}`;
 }
 
 export function QuickAddForm({
@@ -131,16 +156,24 @@ export function QuickAddForm({
   initialValues,
   copiedFromMatchedBetId,
   initialMatchInfo = null,
+  preferredLayExchangeName = null,
 }: QuickAddFormProps) {
   const router = useRouter();
 
   // Pick default selections based on available accounts
   const defaultBookmaker = bookmakers.length > 0 ? bookmakers[0].name : "";
-  const defaultExchange = exchanges.length > 0 ? exchanges[0].name : "";
+  const defaultExchangeOption =
+    exchanges.find((exchange) => exchange.name === preferredLayExchangeName) ??
+    exchanges[0];
+  const defaultExchange = defaultExchangeOption?.name ?? "";
   const defaultBackCurrency =
     bookmakers.length > 0 ? (bookmakers[0].currency ?? "NOK") : "NOK";
-  const defaultLayCurrency =
-    exchanges.length > 0 ? (exchanges[0].currency ?? "NOK") : "NOK";
+  const defaultLayCurrency = defaultExchangeOption?.currency ?? "NOK";
+  const defaultExchangeCommission =
+    defaultExchangeOption?.commission !== null &&
+    defaultExchangeOption?.commission !== undefined
+      ? (defaultExchangeOption.commission * 100).toFixed(1).replace(/\.0$/, "")
+      : "0";
 
   const [formData, setFormData] = useState<FormData>({
     market: "",
@@ -175,6 +208,16 @@ export function QuickAddForm({
       accountName: initialValues?.layExchange ?? defaultExchange,
     },
   ]);
+  const [hedgeMode, setHedgeMode] = useState<HedgeMode>("standard");
+  const [sequentialLayMode, setSequentialLayMode] =
+    useState<SequentialLayMode>("standard");
+  const [sequentialAdvancedMode, setSequentialAdvancedMode] = useState(false);
+  const [sequentialBackCommission, setSequentialBackCommission] = useState("0");
+  const [sequentialFirstLegCommission, setSequentialFirstLegCommission] =
+    useState(defaultExchangeCommission);
+  const [sequentialFutureLegs, setSequentialFutureLegs] = useState<
+    SequentialLayFutureLegFormData[]
+  >([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<Partial<Record<keyof FormData, string>>>(
     {}
@@ -224,6 +267,46 @@ export function QuickAddForm({
     setLegs((prev) => prev.filter((_, legIndex) => legIndex !== index));
   };
 
+  const updateSequentialFutureLeg = (
+    index: number,
+    field: keyof SequentialLayFutureLegFormData,
+    value: string
+  ) => {
+    setSequentialFutureLegs((prev) =>
+      prev.map((leg, legIndex) =>
+        legIndex === index ? { ...leg, [field]: value } : leg
+      )
+    );
+  };
+
+  const addSequentialFutureLeg = () => {
+    setSequentialFutureLegs((prev) => [
+      ...prev,
+      {
+        odds: "",
+        commission: sequentialFirstLegCommission || "0",
+        actualStake: "",
+      },
+    ]);
+  };
+
+  const removeSequentialFutureLeg = (index: number) => {
+    setSequentialFutureLegs((prev) =>
+      prev.filter((_, legIndex) => legIndex !== index)
+    );
+  };
+
+  const applyRecommendedSequentialStake = (value: number) => {
+    const formatted = formatStakeInput(value);
+    setLayLegs((prev) => {
+      if (prev.length !== 1) {
+        return prev;
+      }
+      return [{ ...prev[0], stake: formatted }];
+    });
+    setFormData((prev) => ({ ...prev, layStake: formatted }));
+  };
+
   // Filter available free bets based on selected bookmaker
   const availableFreeBets = useMemo(() => {
     const selectedBookmaker = bookmakers.find(
@@ -246,7 +329,139 @@ export function QuickAddForm({
     return freeBets.find((fb) => fb.id === formData.freeBetId) ?? null;
   }, [formData.freeBetId, freeBets]);
 
+  const sequentialLayPlan = useMemo(() => {
+    if (hedgeMode !== "sequential_lay") {
+      return null;
+    }
+
+    if (formData.backCurrency !== formData.layCurrency) {
+      return null;
+    }
+
+    const backStake = parsePositiveDecimal(backLegs[0]?.stake ?? "");
+    const backOdds = parsePositiveDecimal(backLegs[0]?.odds ?? "");
+    const firstLayOdds = parsePositiveDecimal(layLegs[0]?.odds ?? "");
+    const firstLayCommission = Number.parseFloat(sequentialFirstLegCommission);
+    const backCommission = Number.parseFloat(sequentialBackCommission);
+
+    if (
+      backStake === null ||
+      backOdds === null ||
+      firstLayOdds === null ||
+      Number.isNaN(firstLayCommission) ||
+      Number.isNaN(backCommission)
+    ) {
+      return null;
+    }
+
+    const futureLegs = sequentialFutureLegs
+      .map((leg) => ({
+        odds: parsePositiveDecimal(leg.odds),
+        commission: Number.parseFloat(leg.commission),
+        actualStake: parseNonNegativeDecimal(leg.actualStake),
+      }))
+      .filter(
+        (leg) =>
+          leg.odds !== null &&
+          !Number.isNaN(leg.commission) &&
+          leg.commission >= 0
+      )
+      .map((leg) => ({
+        odds: leg.odds as number,
+        commissionRate: leg.commission / 100,
+        actualStake: leg.actualStake,
+      }));
+
+    const allLayLegs = [
+      {
+        odds: firstLayOdds,
+        commissionRate: firstLayCommission / 100,
+      },
+      ...futureLegs.map((leg) => ({
+        odds: leg.odds,
+        commissionRate: leg.commissionRate,
+      })),
+    ];
+
+    const plan = calculateSequentialLayPlan({
+      backStake,
+      backOdds,
+      backCommissionRate: backCommission / 100,
+      layLegs: allLayLegs,
+      mode: sequentialLayMode,
+      isFreeBet:
+        !!selectedFreeBet ||
+        formData.promoType === "Free Bet" ||
+        formData.promoType === "Risk-Free Bet",
+    });
+
+    if (!plan) {
+      return null;
+    }
+
+    const effectiveStakes = plan.recommendedStakes.map(
+      (recommendedStake, index) => {
+        if (!sequentialAdvancedMode) {
+          return recommendedStake;
+        }
+
+        if (index === 0) {
+          return (
+            parsePositiveDecimal(layLegs[0]?.stake ?? "") ?? recommendedStake
+          );
+        }
+
+        return futureLegs[index - 1]?.actualStake ?? recommendedStake;
+      }
+    );
+
+    const effectiveOutcomes = calculateSequentialLayOutcomes({
+      backStake,
+      backOdds,
+      backCommissionRate: backCommission / 100,
+      layLegs: allLayLegs,
+      layStakes: effectiveStakes,
+      isFreeBet:
+        !!selectedFreeBet ||
+        formData.promoType === "Free Bet" ||
+        formData.promoType === "Risk-Free Bet",
+    });
+
+    if (!effectiveOutcomes) {
+      return null;
+    }
+
+    return {
+      ...plan,
+      effectiveStakes,
+      effectiveOutcomes,
+      totalLegs: allLayLegs.length,
+      firstLayCommission,
+      backCommission,
+      futureLegs,
+    };
+  }, [
+    backLegs,
+    formData.backCurrency,
+    formData.layCurrency,
+    formData.promoType,
+    hedgeMode,
+    layLegs,
+    selectedFreeBet,
+    sequentialAdvancedMode,
+    sequentialBackCommission,
+    sequentialFirstLegCommission,
+    sequentialFutureLegs,
+    sequentialLayMode,
+  ]);
+
   useEffect(() => {
+    if (hedgeMode === "sequential_lay") {
+      setLayStakeCalculation(null);
+      setIsCalculatingLayStake(false);
+      return;
+    }
+
     if (backLegs.length !== 1 || layLegs.length !== 1) {
       setLayStakeCalculation(null);
       setIsCalculatingLayStake(false);
@@ -332,6 +547,7 @@ export function QuickAddForm({
       window.clearTimeout(timeout);
     };
   }, [
+    hedgeMode,
     backLegs.length,
     backLegs[0]?.odds,
     backLegs[0]?.stake,
@@ -450,11 +666,37 @@ export function QuickAddForm({
       router.push("/bets/settings/accounts/new?return=/bets/quick-add");
       return;
     }
+    const previousExchange = formData.layExchange;
+    const previousAccount = exchanges.find(
+      (exchange) => exchange.name === previousExchange
+    );
+    const previousCommission =
+      previousAccount?.commission !== null &&
+      previousAccount?.commission !== undefined
+        ? (previousAccount.commission * 100).toFixed(1).replace(/\.0$/, "")
+        : "0";
     updateField("layExchange", value);
     const selected = exchanges.find((e) => e.name === value);
     if (selected?.currency) {
       updateField("layCurrency", selected.currency);
     }
+    const nextCommission =
+      selected?.commission !== null && selected?.commission !== undefined
+        ? (selected.commission * 100).toFixed(1).replace(/\.0$/, "")
+        : "0";
+    if (
+      !sequentialFirstLegCommission ||
+      sequentialFirstLegCommission === previousCommission
+    ) {
+      setSequentialFirstLegCommission(nextCommission);
+    }
+    setLayLegs((prev) =>
+      prev.map((leg) =>
+        leg.accountName === previousExchange || !leg.accountName
+          ? { ...leg, accountName: value }
+          : leg
+      )
+    );
   };
 
   const validateForm = (): boolean => {
@@ -582,8 +824,54 @@ export function QuickAddForm({
               .join(", ")}`
           : null;
 
+      const sequentialPlanNote =
+        hedgeMode === "sequential_lay"
+          ? [
+              `${SEQUENTIAL_LAY_TAG} Mode: ${sequentialLayMode}${sequentialAdvancedMode ? " (manual stakes enabled)" : ""}`,
+              sequentialLayPlan
+                ? `Sequential lay recommended (${formData.layCurrency}): ${sequentialLayPlan.recommendedStakes
+                    .map((stake, index) => {
+                      const legNumber = index + 1;
+                      const odds =
+                        index === 0
+                          ? (layLegs[0]?.odds ?? "")
+                          : (sequentialFutureLegs[index - 1]?.odds ?? "");
+                      const commission =
+                        index === 0
+                          ? sequentialFirstLegCommission
+                          : (sequentialFutureLegs[index - 1]?.commission ??
+                            "0");
+                      return `Leg ${legNumber} @ ${odds} (${commission}% comm) = ${stake.toFixed(2)}`;
+                    })
+                    .join(", ")}`
+                : null,
+              sequentialLayPlan
+                ? `Sequential lay actual (${formData.layCurrency}): ${sequentialLayPlan.effectiveStakes
+                    .map(
+                      (stake, index) => `Leg ${index + 1} = ${stake.toFixed(2)}`
+                    )
+                    .join(", ")}`
+                : null,
+              sequentialLayPlan
+                ? `Sequential lay outcomes (${formData.layCurrency}): ${sequentialLayPlan.effectiveOutcomes.outcomes
+                    .map((outcome) =>
+                      outcome.losingLegIndex === null
+                        ? `All win ${outcome.profit.toFixed(2)}`
+                        : `Leg ${outcome.losingLegIndex + 1} loses ${outcome.profit.toFixed(2)}`
+                    )
+                    .join(", ")}`
+                : "Sequential lay plan pending full odds/commission input.",
+            ]
+              .filter(Boolean)
+              .join("\n")
+          : null;
       const combinedNotes =
-        [formData.notes.trim(), splitAccountNote, laySplitAccountNote]
+        [
+          formData.notes.trim(),
+          sequentialPlanNote,
+          splitAccountNote,
+          laySplitAccountNote,
+        ]
           .filter(Boolean)
           .join("\n") || undefined;
 
@@ -618,6 +906,7 @@ export function QuickAddForm({
             legs: parsedLayLegs,
           },
           notes: combinedNotes,
+          entryMode: hedgeMode,
         }),
       });
 
@@ -628,9 +917,11 @@ export function QuickAddForm({
       }
 
       toast.success(
-        formData.freeBetId
-          ? "Matched bet created and free bet marked as used!"
-          : "Matched bet created successfully!"
+        hedgeMode === "sequential_lay"
+          ? "Sequential lay bet created. You can edit the lay leg later."
+          : formData.freeBetId
+            ? "Matched bet created and free bet marked as used!"
+            : "Matched bet created successfully!"
       );
       router.push("/bets");
     } catch (error) {
@@ -666,7 +957,9 @@ export function QuickAddForm({
           <CardDescription>
             {copiedFromMatchedBetId
               ? "Copied values from an existing matched bet. Review and adjust before creating."
-              : "Manually enter a matched bet without uploading screenshots"}
+              : hedgeMode === "sequential_lay"
+                ? "Log a combination back bet with the first lay only, then edit the lay leg later if the sequence continues."
+                : "Manually enter a matched bet without uploading screenshots"}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -692,6 +985,43 @@ export function QuickAddForm({
           )}
 
           <form className="space-y-6" onSubmit={handleSubmit}>
+            <div className="space-y-3 rounded-lg border p-4">
+              <div>
+                <h3 className="font-medium text-sm">Bet Structure</h3>
+                <p className="text-muted-foreground text-xs">
+                  Choose whether you are logging a standard matched bet or a
+                  sequential lay where only the first lay is known right now.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  onClick={() => setHedgeMode("standard")}
+                  size="sm"
+                  type="button"
+                  variant={hedgeMode === "standard" ? "default" : "outline"}
+                >
+                  Standard matched bet
+                </Button>
+                <Button
+                  onClick={() => setHedgeMode("sequential_lay")}
+                  size="sm"
+                  type="button"
+                  variant={
+                    hedgeMode === "sequential_lay" ? "default" : "outline"
+                  }
+                >
+                  Sequential lay
+                </Button>
+              </div>
+              {hedgeMode === "sequential_lay" && (
+                <div className="rounded-md border border-violet-200 bg-violet-50 p-3 text-sm text-violet-900">
+                  Log the combination back bet plus the <strong>first</strong>{" "}
+                  lay only. Once that leg settles, open the matched bet and edit
+                  the lay leg with the next hedge details.
+                </div>
+              )}
+            </div>
+
             {/* Market Details */}
             <div className="space-y-4">
               <h3 className="flex items-center gap-2 font-medium text-muted-foreground text-sm">
@@ -1170,7 +1500,368 @@ export function QuickAddForm({
 
             {/* Lay Bet */}
             <div className="space-y-4 rounded-lg border p-4">
-              <h3 className="font-medium text-sm">Lay Bet (Exchange)</h3>
+              <div className="space-y-1">
+                <h3 className="font-medium text-sm">
+                  {hedgeMode === "sequential_lay"
+                    ? "First Lay Bet (Exchange)"
+                    : "Lay Bet (Exchange)"}
+                </h3>
+                {hedgeMode === "sequential_lay" && (
+                  <p className="text-muted-foreground text-xs">
+                    Enter the first exchange lay only. Keep this matched bet
+                    open and edit the lay leg later if the accumulator
+                    continues.
+                  </p>
+                )}
+              </div>
+              {hedgeMode === "sequential_lay" && (
+                <div className="space-y-4 rounded-md border border-violet-200 bg-violet-50/50 p-4">
+                  <div className="space-y-1">
+                    <p className="font-medium text-sm">
+                      Sequential lay planner
+                    </p>
+                    <p className="text-muted-foreground text-xs">
+                      This follows the shared sequential-lay calculator logic
+                      and keeps only the first lay as the live bet you place
+                      now.
+                    </p>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <div className="space-y-2">
+                      <Label>Planner mode</Label>
+                      <Select
+                        onValueChange={(value: SequentialLayMode) =>
+                          setSequentialLayMode(value)
+                        }
+                        value={sequentialLayMode}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="standard">Standard</SelectItem>
+                          <SelectItem value="lockin_final">
+                            Lock in final leg
+                          </SelectItem>
+                          <SelectItem value="underlay">Underlay</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="sequentialBackCommission">
+                        Back commission %
+                      </Label>
+                      <Input
+                        id="sequentialBackCommission"
+                        min="0"
+                        onChange={(e) =>
+                          setSequentialBackCommission(e.target.value)
+                        }
+                        step="0.1"
+                        type="number"
+                        value={sequentialBackCommission}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="sequentialFirstLegCommission">
+                        Leg 1 commission %
+                      </Label>
+                      <Input
+                        id="sequentialFirstLegCommission"
+                        min="0"
+                        onChange={(e) =>
+                          setSequentialFirstLegCommission(e.target.value)
+                        }
+                        step="0.1"
+                        type="number"
+                        value={sequentialFirstLegCommission}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between rounded-md border bg-background/70 px-3 py-2">
+                    <div>
+                      <p className="font-medium text-sm">Manual lay stakes</p>
+                      <p className="text-muted-foreground text-xs">
+                        Override recommended stakes to model your real exits.
+                      </p>
+                    </div>
+                    <Button
+                      onClick={() =>
+                        setSequentialAdvancedMode((current) => !current)
+                      }
+                      size="sm"
+                      type="button"
+                      variant={sequentialAdvancedMode ? "default" : "outline"}
+                    >
+                      {sequentialAdvancedMode ? "Enabled" : "Disabled"}
+                    </Button>
+                  </div>
+                  {formData.backCurrency !== formData.layCurrency ? (
+                    <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-amber-900 text-xs">
+                      Sequential lay planning currently assumes the back and lay
+                      use the same currency. Set both legs to the same currency
+                      to see recommended stakes.
+                    </div>
+                  ) : (
+                    <>
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="font-medium text-sm">Future lay legs</p>
+                          <Button
+                            onClick={addSequentialFutureLeg}
+                            size="sm"
+                            type="button"
+                            variant="outline"
+                          >
+                            <Plus className="mr-1 h-4 w-4" />
+                            Add future leg
+                          </Button>
+                        </div>
+                        {sequentialFutureLegs.length === 0 ? (
+                          <p className="text-muted-foreground text-xs">
+                            No future legs yet. Add the next possible lays if
+                            you want the planner to size the first lay from the
+                            full sequence.
+                          </p>
+                        ) : (
+                          sequentialFutureLegs.map((leg, index) => (
+                            <div
+                              className={`grid gap-3 rounded-md border bg-background/70 p-3 ${sequentialAdvancedMode ? "sm:grid-cols-[1fr_1fr_1fr_auto]" : "sm:grid-cols-[1fr_1fr_auto]"}`}
+                              key={index}
+                            >
+                              <div className="space-y-2">
+                                <Label
+                                  htmlFor={`sequentialFutureOdds-${index}`}
+                                >
+                                  Leg {index + 2} lay odds
+                                </Label>
+                                <Input
+                                  id={`sequentialFutureOdds-${index}`}
+                                  min="1.01"
+                                  onChange={(e) =>
+                                    updateSequentialFutureLeg(
+                                      index,
+                                      "odds",
+                                      e.target.value
+                                    )
+                                  }
+                                  step="any"
+                                  type="number"
+                                  value={leg.odds}
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label
+                                  htmlFor={`sequentialFutureCommission-${index}`}
+                                >
+                                  Commission %
+                                </Label>
+                                <Input
+                                  id={`sequentialFutureCommission-${index}`}
+                                  min="0"
+                                  onChange={(e) =>
+                                    updateSequentialFutureLeg(
+                                      index,
+                                      "commission",
+                                      e.target.value
+                                    )
+                                  }
+                                  step="0.1"
+                                  type="number"
+                                  value={leg.commission}
+                                />
+                              </div>
+                              {sequentialAdvancedMode && (
+                                <div className="space-y-2">
+                                  <Label
+                                    htmlFor={`sequentialFutureActualStake-${index}`}
+                                  >
+                                    Actual stake (optional)
+                                  </Label>
+                                  <Input
+                                    id={`sequentialFutureActualStake-${index}`}
+                                    min="0.01"
+                                    onChange={(e) =>
+                                      updateSequentialFutureLeg(
+                                        index,
+                                        "actualStake",
+                                        e.target.value
+                                      )
+                                    }
+                                    placeholder={
+                                      sequentialLayPlan?.recommendedStakes[
+                                        index + 1
+                                      ]
+                                        ? sequentialLayPlan.recommendedStakes[
+                                            index + 1
+                                          ]?.toFixed(2)
+                                        : "Use recommended"
+                                    }
+                                    step="0.01"
+                                    type="number"
+                                    value={leg.actualStake}
+                                  />
+                                </div>
+                              )}
+                              <div className="flex items-end">
+                                <Button
+                                  aria-label={`Remove future leg ${index + 2}`}
+                                  onClick={() =>
+                                    removeSequentialFutureLeg(index)
+                                  }
+                                  size="icon"
+                                  type="button"
+                                  variant="ghost"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                      <div className="space-y-3 rounded-md border bg-background/70 p-3">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <div>
+                            <p className="font-medium text-sm">
+                              Recommended first lay
+                            </p>
+                            <p className="text-muted-foreground text-xs">
+                              Based on {1 + sequentialFutureLegs.length} total
+                              sequential lay leg
+                              {sequentialFutureLegs.length === 0 ? "" : "s"}.
+                            </p>
+                          </div>
+                          {sequentialLayPlan && (
+                            <Button
+                              onClick={() =>
+                                applyRecommendedSequentialStake(
+                                  sequentialLayPlan.recommendedStakes[0] ?? 0
+                                )
+                              }
+                              size="sm"
+                              type="button"
+                              variant="outline"
+                            >
+                              Use first lay stake
+                            </Button>
+                          )}
+                        </div>
+                        {sequentialLayPlan ? (
+                          <>
+                            <div className="grid gap-3 sm:grid-cols-4">
+                              <div>
+                                <p className="text-muted-foreground text-xs">
+                                  Recommended leg 1
+                                </p>
+                                <p className="font-semibold text-sm">
+                                  {formData.layCurrency}{" "}
+                                  {sequentialLayPlan.recommendedStakes[0]?.toFixed(
+                                    2
+                                  )}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-muted-foreground text-xs">
+                                  Actual leg 1
+                                </p>
+                                <p className="font-semibold text-sm">
+                                  {formData.layCurrency}{" "}
+                                  {sequentialLayPlan.effectiveStakes[0]?.toFixed(
+                                    2
+                                  )}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-muted-foreground text-xs">
+                                  Combined lay odds
+                                </p>
+                                <p className="font-semibold text-sm">
+                                  {sequentialLayPlan.combinedLayOdds.toFixed(2)}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-muted-foreground text-xs">
+                                  Total liability if all win
+                                </p>
+                                <p className="font-semibold text-sm">
+                                  {formData.layCurrency}{" "}
+                                  {sequentialLayPlan.effectiveOutcomes.totalLiability.toFixed(
+                                    2
+                                  )}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="space-y-2">
+                              <p className="font-medium text-sm">
+                                {sequentialAdvancedMode
+                                  ? "Lay stakes"
+                                  : "Recommended lay stakes"}
+                              </p>
+                              <div className="grid gap-2 sm:grid-cols-2">
+                                {sequentialLayPlan.recommendedStakes.map(
+                                  (stake, index) => (
+                                    <div
+                                      className="rounded-md border bg-muted/30 p-2 text-xs"
+                                      key={index}
+                                    >
+                                      <span className="text-muted-foreground">
+                                        Leg {index + 1}
+                                      </span>
+                                      <div className="font-medium">
+                                        Recommended: {formData.layCurrency}{" "}
+                                        {stake.toFixed(2)}
+                                      </div>
+                                      <div className="text-muted-foreground">
+                                        Actual: {formData.layCurrency}{" "}
+                                        {sequentialLayPlan.effectiveStakes[
+                                          index
+                                        ]?.toFixed(2)}
+                                      </div>
+                                    </div>
+                                  )
+                                )}
+                              </div>
+                            </div>
+                            <div className="space-y-2">
+                              <p className="font-medium text-sm">
+                                Exit outcomes
+                              </p>
+                              <div className="space-y-2">
+                                {sequentialLayPlan.effectiveOutcomes.outcomes.map(
+                                  (outcome, index) => (
+                                    <div
+                                      className="flex items-center justify-between rounded-md border bg-muted/20 px-3 py-2 text-xs"
+                                      key={index}
+                                    >
+                                      <span className="text-muted-foreground">
+                                        {outcome.losingLegIndex === null
+                                          ? "All legs win"
+                                          : `Leg ${outcome.losingLegIndex + 1} loses`}
+                                      </span>
+                                      <span className="font-medium">
+                                        {formatProfit(
+                                          outcome.profit,
+                                          formData.layCurrency
+                                        )}
+                                      </span>
+                                    </div>
+                                  )
+                                )}
+                              </div>
+                            </div>
+                          </>
+                        ) : (
+                          <p className="text-muted-foreground text-xs">
+                            Enter the back stake/odds, first lay odds, and any
+                            future leg odds to generate the sequential lay plan.
+                          </p>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="layExchange">Exchange</Label>
@@ -1322,15 +2013,19 @@ export function QuickAddForm({
                         />
                         {layLegs.length === 1 && index === 0 && (
                           <p className="text-muted-foreground text-xs">
-                            {isCalculatingLayStake
-                              ? "Calculating optimal lay stake..."
-                              : layStakeCalculation
-                                ? `${layStakeMode === "underlay" ? "Underlay" : layStakeMode === "overlay" ? "Overlay" : "Auto-calculated"} using ${formData.backCurrency}/${formData.layCurrency}${
-                                    layStakeCalculation.commissionRate > 0
-                                      ? ` and ${(layStakeCalculation.commissionRate * 100).toFixed(1)}% commission`
-                                      : ""
-                                  }.`
-                                : "Enter back stake, back odds, and lay odds to auto-calculate."}
+                            {hedgeMode === "sequential_lay"
+                              ? sequentialLayPlan
+                                ? `Planner recommends ${formData.layCurrency} ${sequentialLayPlan.recommendedStakes[0]?.toFixed(2)} for the first lay. You can apply it above or enter your own number.`
+                                : "Enter the first lay stake manually, or complete the sequential planner to generate a recommended first lay."
+                              : isCalculatingLayStake
+                                ? "Calculating optimal lay stake..."
+                                : layStakeCalculation
+                                  ? `${layStakeMode === "underlay" ? "Underlay" : layStakeMode === "overlay" ? "Overlay" : "Auto-calculated"} using ${formData.backCurrency}/${formData.layCurrency}${
+                                      layStakeCalculation.commissionRate > 0
+                                        ? ` and ${(layStakeCalculation.commissionRate * 100).toFixed(1)}% commission`
+                                        : ""
+                                    }.`
+                                  : "Enter back stake, back odds, and lay odds to auto-calculate."}
                           </p>
                         )}
                       </div>
@@ -1349,7 +2044,7 @@ export function QuickAddForm({
                     </div>
                   </div>
                 ))}
-                {layLegs.length === 1 && (
+                {hedgeMode === "standard" && layLegs.length === 1 && (
                   <div className="space-y-3 rounded-md border bg-muted/30 p-3">
                     <div className="flex flex-wrap gap-2">
                       {(
@@ -1450,7 +2145,9 @@ export function QuickAddForm({
                   variant="outline"
                 >
                   <Plus className="mr-1 h-4 w-4" />
-                  Add Lay Split
+                  {hedgeMode === "sequential_lay"
+                    ? "Add First Lay Split"
+                    : "Add Lay Split"}
                 </Button>
               </div>
               {layLiability !== null && (
@@ -1498,6 +2195,8 @@ export function QuickAddForm({
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Creating...
                   </>
+                ) : hedgeMode === "sequential_lay" ? (
+                  "Create Sequential Lay Bet"
                 ) : (
                   "Create Matched Bet"
                 )}

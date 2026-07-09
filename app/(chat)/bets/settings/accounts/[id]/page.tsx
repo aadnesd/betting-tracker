@@ -21,6 +21,7 @@ import { getCachedSession } from "@/lib/auth";
 import {
   getAccountBalance,
   getAccountById,
+  getUserSettings,
   listMatchedBetsForList,
   listTransactionsByAccount,
 } from "@/lib/db/queries";
@@ -70,7 +71,7 @@ export default async function AccountDetailPage({
     notFound();
   }
 
-  const [balance, transactions, matchedBets] = await Promise.all([
+  const [balance, transactions, matchedBets, settings] = await Promise.all([
     getAccountBalance({
       userId: session.user.id,
       accountId: id,
@@ -85,6 +86,7 @@ export default async function AccountDetailPage({
       accountId: id,
       limit: 50,
     }),
+    getUserSettings({ userId: session.user.id }),
   ]);
   let balanceCursor = balance;
   const transactionsWithRunningBalance: AccountTransactionItem[] =
@@ -146,6 +148,11 @@ export default async function AccountDetailPage({
                   {account.name}
                   {account.status === "archived" && (
                     <Badge variant="secondary">Archived</Badge>
+                  )}
+                  {account.id === settings?.defaultLayExchangeAccountId && (
+                    <Badge className="bg-violet-100 text-violet-800 hover:bg-violet-100">
+                      Default exchange
+                    </Badge>
                   )}
                 </CardTitle>
                 <p className="text-muted-foreground text-sm capitalize">

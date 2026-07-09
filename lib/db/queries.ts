@@ -23,8 +23,8 @@ import {
   computeNetExposureInputs,
   computeSingleLegOutcome,
 } from "../bet-calculations";
-import { deriveMatchedBetDisplayStatus } from "../bets/matched-status";
 import { DEFAULT_FREE_BET_EXPIRY_DAYS } from "../bets/free-bet-defaults";
+import { deriveMatchedBetDisplayStatus } from "../bets/matched-status";
 import { ChatSDKError } from "../errors";
 import {
   convertAmountToNok,
@@ -8724,27 +8724,39 @@ export async function getUserSettings({ userId }: { userId: string }) {
 export async function upsertUserSettings({
   userId,
   enabledCompetitions,
+  defaultLayExchangeAccountId,
 }: {
   userId: string;
   enabledCompetitions?: string[] | null;
+  defaultLayExchangeAccountId?: string | null;
 }) {
   try {
     const now = new Date();
+    const insertValues: typeof userSettings.$inferInsert = {
+      userId,
+      createdAt: now,
+      updatedAt: now,
+    };
+    const updateValues: Partial<typeof userSettings.$inferInsert> = {
+      updatedAt: now,
+    };
+
+    if (enabledCompetitions !== undefined) {
+      insertValues.enabledCompetitions = enabledCompetitions;
+      updateValues.enabledCompetitions = enabledCompetitions;
+    }
+
+    if (defaultLayExchangeAccountId !== undefined) {
+      insertValues.defaultLayExchangeAccountId = defaultLayExchangeAccountId;
+      updateValues.defaultLayExchangeAccountId = defaultLayExchangeAccountId;
+    }
 
     const [result] = await db
       .insert(userSettings)
-      .values({
-        userId,
-        enabledCompetitions,
-        createdAt: now,
-        updatedAt: now,
-      })
+      .values(insertValues)
       .onConflictDoUpdate({
         target: userSettings.userId,
-        set: {
-          enabledCompetitions,
-          updatedAt: now,
-        },
+        set: updateValues,
       })
       .returning();
 

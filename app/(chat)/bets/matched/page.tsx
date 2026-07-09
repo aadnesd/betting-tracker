@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { getCachedSession } from "@/lib/auth";
+import { isSequentialLayMatchedBet } from "@/lib/bets/sequential-lay";
 import { listMatchedBetsForList } from "@/lib/db/queries";
 import { formatNOK } from "@/lib/reporting";
 
@@ -22,6 +23,7 @@ type PageProps = {
     query?: string;
     from?: string;
     to?: string;
+    entryMode?: string;
   }>;
 };
 
@@ -39,6 +41,12 @@ const statusOptions = [
   { value: "matched", label: "Matched" },
   { value: "needs_review", label: "Needs review" },
   { value: "settled", label: "Settled" },
+] as const;
+
+const entryModeOptions = [
+  { value: "all", label: "All structures" },
+  { value: "standard", label: "Standard" },
+  { value: "sequential_lay", label: "Sequential lay" },
 ] as const;
 
 function resolveDateRange({
@@ -109,6 +117,11 @@ export default async function Page(props: PageProps) {
       : undefined;
   const range = searchParams.range ?? "30d";
   const searchQuery = searchParams.query?.trim() || undefined;
+  const entryMode =
+    searchParams.entryMode === "sequential_lay" ||
+    searchParams.entryMode === "standard"
+      ? searchParams.entryMode
+      : "all";
 
   const { fromDate, toDate } = resolveDateRange({
     range,
@@ -123,6 +136,17 @@ export default async function Page(props: PageProps) {
     toDate,
     search: searchQuery,
     limit: 100,
+  });
+
+  const filteredBets = bets.filter((bet) => {
+    const isSequential = isSequentialLayMatchedBet(bet.notes);
+    if (entryMode === "sequential_lay") {
+      return isSequential;
+    }
+    if (entryMode === "standard") {
+      return !isSequential;
+    }
+    return true;
   });
 
   return (
@@ -155,7 +179,7 @@ export default async function Page(props: PageProps) {
           <CardTitle>Filters</CardTitle>
         </CardHeader>
         <CardContent>
-          <form className="grid gap-3 md:grid-cols-4" method="get">
+          <form className="grid gap-3 md:grid-cols-5" method="get">
             <div className="space-y-1">
               <label className="font-medium text-sm" htmlFor="query">
                 Search
@@ -202,6 +226,23 @@ export default async function Page(props: PageProps) {
               </select>
             </div>
             <div className="space-y-1">
+              <label className="font-medium text-sm" htmlFor="entryMode">
+                Structure
+              </label>
+              <select
+                className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                defaultValue={entryMode}
+                id="entryMode"
+                name="entryMode"
+              >
+                {entryModeOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1 md:col-span-2">
               <label className="font-medium text-sm" htmlFor="from">
                 Custom range
               </label>
@@ -220,7 +261,7 @@ export default async function Page(props: PageProps) {
                 />
               </div>
             </div>
-            <div className="md:col-span-4">
+            <div className="md:col-span-5">
               <Button size="sm" type="submit" variant="outline">
                 Apply filters
               </Button>
@@ -230,14 +271,14 @@ export default async function Page(props: PageProps) {
       </Card>
 
       <div className="space-y-3">
-        {bets.length === 0 ? (
+        {filteredBets.length === 0 ? (
           <Card>
             <CardContent className="py-10 text-center text-muted-foreground text-sm">
               No matched bets found for these filters.
             </CardContent>
           </Card>
         ) : (
-          bets.map((bet) => {
+          filteredBets.map((bet) => {
             const missingLeg =
               bet.status === "draft" && (!bet.back || !bet.lay);
             const missingLabel = missingLeg
@@ -257,6 +298,11 @@ export default async function Page(props: PageProps) {
                       </span>
                       {bet.promoType && (
                         <Badge variant="secondary">{bet.promoType}</Badge>
+                      )}
+                      {isSequentialLayMatchedBet(bet.notes) && (
+                        <Badge className="bg-violet-100 text-violet-800 hover:bg-violet-100">
+                          Sequential lay
+                        </Badge>
                       )}
                     </div>
                     <p className="text-muted-foreground text-xs">

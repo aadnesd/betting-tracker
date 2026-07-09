@@ -18,6 +18,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getCachedSession } from "@/lib/auth";
 import { computeMatchedBetOutcomes } from "@/lib/bet-calculations";
 import { deriveMatchedBetDisplayStatus } from "@/lib/bets/matched-status";
+import { isSequentialLayMatchedBet } from "@/lib/bets/sequential-lay";
 import {
   getMatchedBetWithParts,
   getMatchedSetGroupMembers,
@@ -219,6 +220,11 @@ export default async function Page({ params }: PageProps) {
           <div className="flex items-center gap-3">
             <h1 className="font-semibold text-2xl">{matched.selection}</h1>
             <BetStatusBadge status={displayStatus} />
+            {isSequentialLayMatchedBet(matched.notes) && (
+              <span className="rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-violet-700 text-xs">
+                Sequential lay
+              </span>
+            )}
           </div>
           <p className="text-muted-foreground text-sm">{matched.market}</p>
         </div>
@@ -307,6 +313,14 @@ export default async function Page({ params }: PageProps) {
               Promo type
             </p>
             <p className="font-semibold text-purple-800">{matched.promoType}</p>
+          </div>
+        )}
+        {isSequentialLayMatchedBet(matched.notes) && (
+          <div className="rounded-lg border border-violet-200 bg-violet-50 px-4 py-3">
+            <p className="text-muted-foreground text-xs uppercase tracking-wide">
+              Bet structure
+            </p>
+            <p className="font-semibold text-violet-800">Sequential lay</p>
           </div>
         )}
         <div className="rounded-lg border bg-muted/50 px-4 py-3">
