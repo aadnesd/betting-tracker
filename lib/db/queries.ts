@@ -4391,6 +4391,192 @@ export type ReportingDateRange = {
   endDate: Date;
 };
 
+type SettledMatchedProfitRow = {
+  matchedId: string;
+  betGroupId: string | null;
+  backBetId: string | null;
+  layBetId: string | null;
+  settledProfitNok: string | null;
+  backProfitLoss: string | null;
+  backProfitLossNok: string | null;
+  backCurrency: string | null;
+  layProfitLoss: string | null;
+  layProfitLossNok: string | null;
+  layCurrency: string | null;
+};
+
+type MatchedProfitLegValues = Pick<
+  SettledMatchedProfitRow,
+  | "settledProfitNok"
+  | "backProfitLoss"
+  | "backProfitLossNok"
+  | "backCurrency"
+  | "layProfitLoss"
+  | "layProfitLossNok"
+  | "layCurrency"
+>;
+
+function buildSettledMatchedDateConditions({
+  startDate,
+  endDate,
+}: {
+  startDate?: Date | null;
+  endDate?: Date | null;
+}): SQL<unknown>[] {
+  const conditions: SQL<unknown>[] = [];
+
+  if (startDate) {
+    conditions.push(sql`COALESCE(
+      ${backBet.settledAt},
+      ${layBet.settledAt},
+      ${matchedBet.confirmedAt},
+      ${matchedBet.createdAt}
+    ) >= ${startDate.toISOString()}`);
+  }
+  if (endDate) {
+    conditions.push(sql`COALESCE(
+      ${backBet.settledAt},
+      ${layBet.settledAt},
+      ${matchedBet.confirmedAt},
+      ${matchedBet.createdAt}
+    ) <= ${endDate.toISOString()}`);
+  }
+
+  return conditions;
+}
+
+function resolveNokAmount({
+  valueNok,
+  value,
+  currency,
+}: {
+  valueNok?: string | null;
+  value?: string | null;
+  currency?: string | null;
+}): number {
+  const parsedNok = parseNumeric(valueNok);
+  if (parsedNok !== null) {
+    return parsedNok;
+  }
+
+  if ((currency ?? "NOK") === "NOK") {
+    return parseNumeric(value) ?? 0;
+  }
+
+  return 0;
+}
+
+function resolveMatchedProfitWithLegFallback(row: MatchedProfitLegValues): {
+  matchedProfitNok: number;
+  backProfitNok: number;
+  layProfitNok: number;
+} {
+  const backProfitNok = resolveNokAmount({
+    valueNok: row.backProfitLossNok,
+    value: row.backProfitLoss,
+    currency: row.backCurrency,
+  });
+  const layProfitNok = resolveNokAmount({
+    valueNok: row.layProfitLossNok,
+    value: row.layProfitLoss,
+    currency: row.layCurrency,
+  });
+
+  const settledProfitNok = parseNumeric(row.settledProfitNok);
+
+  return {
+    matchedProfitNok:
+      settledProfitNok !== null ? settledProfitNok : backProfitNok + layProfitNok,
+    backProfitNok,
+    layProfitNok,
+  };
+}
+
+/**
+ * Sequential lay chains may create a settled two-leg matched row plus one or
+ * more settled single-leg rows in the same betGroupId. Reporting functions that
+ * only scan complete rows should add these single-leg profits to the primary row
+ * to avoid stale/partial settledProfitNok dominating totals.
+ */
+async function getSequentialGroupProfitAdjustments({
+  userId,
+  startDate,
+  endDate,
+}: {
+  userId: string;
+  startDate?: Date | null;
+  endDate?: Date | null;
+}): Promise<Map<string, number>> {
+  const conditions: SQL<unknown>[] = [
+    eq(matchedBet.userId, userId),
+    eq(matchedBet.status, "settled"),
+    isNotNull(matchedBet.betGroupId),
+    ...buildSettledMatchedDateConditions({ startDate, endDate }),
+  ];
+
+  const rows = await db
+    .select({
+      matchedId: matchedBet.id,
+      betGroupId: matchedBet.betGroupId,
+      backBetId: matchedBet.backBetId,
+      layBetId: matchedBet.layBetId,
+      settledProfitNok: matchedBet.settledProfitNok,
+      backProfitLoss: backBet.profitLoss,
+      backProfitLossNok: backBet.profitLossNok,
+      backCurrency: backBet.currency,
+      layProfitLoss: layBet.profitLoss,
+      layProfitLossNok: layBet.profitLossNok,
+      layCurrency: layBet.currency,
+    })
+    .from(matchedBet)
+    .leftJoin(backBet, eq(matchedBet.backBetId, backBet.id))
+    .leftJoin(layBet, eq(matchedBet.layBetId, layBet.id))
+    .where(and(...conditions));
+
+  const grouped = new Map<string, SettledMatchedProfitRow[]>();
+
+  for (const row of rows) {
+    if (!row.betGroupId) {
+      continue;
+    }
+
+    const existing = grouped.get(row.betGroupId) ?? [];
+    existing.push(row);
+    grouped.set(row.betGroupId, existing);
+  }
+
+  const adjustments = new Map<string, number>();
+
+  for (const members of grouped.values()) {
+    const complete = members.filter((member) =>
+      Boolean(member.backBetId && member.layBetId)
+    );
+    const singleLeg = members.filter((member) => {
+      const hasBack = Boolean(member.backBetId);
+      const hasLay = Boolean(member.layBetId);
+      return Number(hasBack) + Number(hasLay) === 1;
+    });
+
+    // Only apply when there is exactly one complete row and one or more
+    // sequential single-leg rows in the same group.
+    if (complete.length !== 1 || singleLeg.length === 0) {
+      continue;
+    }
+
+    const extraProfit = singleLeg.reduce((sum, member) => {
+      const { backProfitNok, layProfitNok } =
+        resolveMatchedProfitWithLegFallback(member);
+      return sum + backProfitNok + layProfitNok;
+    }, 0);
+
+    if (extraProfit !== 0) {
+      adjustments.set(complete[0].matchedId, extraProfit);
+    }
+  }
+
+  return adjustments;
+}
+
 /**
  * Get all settled matched bets with their back/lay legs for reporting.
  * Includes all data needed for profit, ROI, and qualifying loss calculations.
@@ -4433,7 +4619,36 @@ export async function getSettledMatchedBetsForReporting({
       .where(and(...conditions))
       .orderBy(desc(matchedBet.createdAt));
 
-    return rows;
+    const sequentialAdjustments = await getSequentialGroupProfitAdjustments({
+      userId,
+      startDate,
+      endDate,
+    });
+
+    return rows.map((row) => {
+      const adjustment = sequentialAdjustments.get(row.matched.id) ?? 0;
+      if (adjustment === 0) {
+        return row;
+      }
+
+      const { matchedProfitNok } = resolveMatchedProfitWithLegFallback({
+        settledProfitNok: row.matched.settledProfitNok,
+        backProfitLoss: row.back?.profitLoss ?? null,
+        backProfitLossNok: row.back?.profitLossNok ?? null,
+        backCurrency: row.back?.currency ?? null,
+        layProfitLoss: row.lay?.profitLoss ?? null,
+        layProfitLossNok: row.lay?.profitLossNok ?? null,
+        layCurrency: row.lay?.currency ?? null,
+      });
+
+      return {
+        ...row,
+        matched: {
+          ...row.matched,
+          settledProfitNok: (matchedProfitNok + adjustment).toFixed(2),
+        },
+      };
+    });
   } catch (_error) {
     throw new ChatSDKError(
       "bad_request:database",
@@ -4493,7 +4708,46 @@ export async function getMatchedBetsForReporting({
       .where(and(...conditions))
       .orderBy(desc(matchedBet.createdAt));
 
-    return rows;
+    const includesSettled = !statuses || statuses.includes("settled");
+
+    if (!includesSettled) {
+      return rows;
+    }
+
+    const sequentialAdjustments = await getSequentialGroupProfitAdjustments({
+      userId,
+      startDate,
+      endDate,
+    });
+
+    return rows.map((row) => {
+      if (row.matched.status !== "settled") {
+        return row;
+      }
+
+      const adjustment = sequentialAdjustments.get(row.matched.id) ?? 0;
+      if (adjustment === 0) {
+        return row;
+      }
+
+      const { matchedProfitNok } = resolveMatchedProfitWithLegFallback({
+        settledProfitNok: row.matched.settledProfitNok,
+        backProfitLoss: row.back?.profitLoss ?? null,
+        backProfitLossNok: row.back?.profitLossNok ?? null,
+        backCurrency: row.back?.currency ?? null,
+        layProfitLoss: row.lay?.profitLoss ?? null,
+        layProfitLossNok: row.lay?.profitLossNok ?? null,
+        layCurrency: row.lay?.currency ?? null,
+      });
+
+      return {
+        ...row,
+        matched: {
+          ...row.matched,
+          settledProfitNok: (matchedProfitNok + adjustment).toFixed(2),
+        },
+      };
+    });
   } catch (_error) {
     throw new ChatSDKError(
       "bad_request:database",
@@ -4584,53 +4838,86 @@ export async function getProfitByPromoType({
       // Single-leg containers (standalone wrappers) are reported as standalone.
       isNotNull(matchedBet.backBetId),
       isNotNull(matchedBet.layBetId),
+      ...buildSettledMatchedDateConditions({ startDate, endDate }),
     ];
 
-    if (startDate) {
-      conditions.push(sql`COALESCE(
-        ${backBet.settledAt},
-        ${layBet.settledAt},
-        ${matchedBet.confirmedAt},
-        ${matchedBet.createdAt}
-      ) >= ${startDate.toISOString()}`);
-    }
-    if (endDate) {
-      conditions.push(sql`COALESCE(
-        ${backBet.settledAt},
-        ${layBet.settledAt},
-        ${matchedBet.confirmedAt},
-        ${matchedBet.createdAt}
-      ) <= ${endDate.toISOString()}`);
-    }
+    const sequentialAdjustments = await getSequentialGroupProfitAdjustments({
+      userId,
+      startDate,
+      endDate,
+    });
 
-    // Prefer matched-level realized profit, falling back to leg sums for legacy rows.
     const rows = await db
       .select({
+        matchedId: matchedBet.id,
         promoType: matchedBet.promoType,
-        count: count(matchedBet.id),
-        totalSettledProfitNok: sql<string>`COALESCE(SUM(COALESCE(
-          ${matchedBet.settledProfitNok},
-          COALESCE(${backBet.profitLossNok}, 0) + COALESCE(${layBet.profitLossNok}, 0)
-        )), 0)`,
-        totalBackStakeNok: sum(backBet.stakeNok),
-        totalLayStakeNok: sum(layBet.stakeNok),
+        settledProfitNok: matchedBet.settledProfitNok,
+        backProfitLoss: backBet.profitLoss,
+        backProfitLossNok: backBet.profitLossNok,
+        backCurrency: backBet.currency,
+        layProfitLoss: layBet.profitLoss,
+        layProfitLossNok: layBet.profitLossNok,
+        layCurrency: layBet.currency,
+        backStake: backBet.stake,
+        backStakeNok: backBet.stakeNok,
+        layStake: layBet.stake,
+        layStakeNok: layBet.stakeNok,
       })
       .from(matchedBet)
       .leftJoin(backBet, eq(matchedBet.backBetId, backBet.id))
       .leftJoin(layBet, eq(matchedBet.layBetId, layBet.id))
       .where(and(...conditions))
-      .groupBy(matchedBet.promoType);
+      .orderBy(desc(matchedBet.createdAt));
 
-    return rows.map((row) => ({
-      promoType: row.promoType ?? "Unspecified",
-      count: row.count,
-      totalProfitLoss: row.totalSettledProfitNok
-        ? Number.parseFloat(row.totalSettledProfitNok)
-        : 0,
-      totalStake:
-        (row.totalBackStakeNok ? Number.parseFloat(row.totalBackStakeNok) : 0) +
-        (row.totalLayStakeNok ? Number.parseFloat(row.totalLayStakeNok) : 0),
-    }));
+    const promoMap = new Map<
+      string,
+      {
+        promoType: string;
+        count: number;
+        totalProfitLoss: number;
+        totalStake: number;
+      }
+    >();
+
+    for (const row of rows) {
+      const promoType = row.promoType ?? "Unspecified";
+      const existing = promoMap.get(promoType) ?? {
+        promoType,
+        count: 0,
+        totalProfitLoss: 0,
+        totalStake: 0,
+      };
+
+      const { matchedProfitNok } = resolveMatchedProfitWithLegFallback({
+        settledProfitNok: row.settledProfitNok,
+        backProfitLoss: row.backProfitLoss,
+        backProfitLossNok: row.backProfitLossNok,
+        backCurrency: row.backCurrency,
+        layProfitLoss: row.layProfitLoss,
+        layProfitLossNok: row.layProfitLossNok,
+        layCurrency: row.layCurrency,
+      });
+
+      const adjustment = sequentialAdjustments.get(row.matchedId) ?? 0;
+      const backStakeNok = resolveNokAmount({
+        valueNok: row.backStakeNok,
+        value: row.backStake,
+        currency: row.backCurrency,
+      });
+      const layStakeNok = resolveNokAmount({
+        valueNok: row.layStakeNok,
+        value: row.layStake,
+        currency: row.layCurrency,
+      });
+
+      existing.count += 1;
+      existing.totalProfitLoss += matchedProfitNok + adjustment;
+      existing.totalStake += backStakeNok + layStakeNok;
+
+      promoMap.set(promoType, existing);
+    }
+
+    return Array.from(promoMap.values());
   } catch (_error) {
     throw new ChatSDKError(
       "bad_request:database",
@@ -4664,28 +4951,19 @@ export async function getProfitByBookmaker({
       // Single-leg containers (standalone wrappers) are reported as standalone.
       isNotNull(matchedBet.backBetId),
       isNotNull(matchedBet.layBetId),
+      ...buildSettledMatchedDateConditions({ startDate, endDate }),
     ];
 
-    if (startDate) {
-      conditions.push(sql`COALESCE(
-        ${backBet.settledAt},
-        ${layBet.settledAt},
-        ${matchedBet.confirmedAt},
-        ${matchedBet.createdAt}
-      ) >= ${startDate.toISOString()}`);
-    }
-    if (endDate) {
-      conditions.push(sql`COALESCE(
-        ${backBet.settledAt},
-        ${layBet.settledAt},
-        ${matchedBet.confirmedAt},
-        ${matchedBet.createdAt}
-      ) <= ${endDate.toISOString()}`);
-    }
+    const sequentialAdjustments = await getSequentialGroupProfitAdjustments({
+      userId,
+      startDate,
+      endDate,
+    });
 
     // Fetch individual matched bets with both legs for proper P/L calculation
     const rows = await db
       .select({
+        matchedId: matchedBet.id,
         accountId: backBet.accountId,
         accountName: account.name,
         settledProfitNok: matchedBet.settledProfitNok,
@@ -4733,17 +5011,16 @@ export async function getProfitByBookmaker({
         totalStake: 0,
       };
 
-      // Calculate matched set P/L using matched-level realized profit first.
-      const backPLNok = row.backProfitLossNok
-        ? Number.parseFloat(row.backProfitLossNok)
-        : row.backCurrency === "NOK" && row.backProfitLoss
-          ? Number.parseFloat(row.backProfitLoss)
-          : 0;
-      const layPLNok = row.layProfitLossNok
-        ? Number.parseFloat(row.layProfitLossNok)
-        : row.layCurrency === "NOK" && row.layProfitLoss
-          ? Number.parseFloat(row.layProfitLoss)
-          : 0;
+      const { matchedProfitNok } = resolveMatchedProfitWithLegFallback({
+        settledProfitNok: row.settledProfitNok,
+        backProfitLoss: row.backProfitLoss,
+        backProfitLossNok: row.backProfitLossNok,
+        backCurrency: row.backCurrency,
+        layProfitLoss: row.layProfitLoss,
+        layProfitLossNok: row.layProfitLossNok,
+        layCurrency: row.layCurrency,
+      });
+      const sequentialAdjustment = sequentialAdjustments.get(row.matchedId) ?? 0;
 
       // Back stake for ROI
       const stakeNok = row.backStakeNok
@@ -4753,9 +5030,7 @@ export async function getProfitByBookmaker({
           : 0;
 
       existing.count += 1;
-      existing.totalProfitLoss += row.settledProfitNok
-        ? Number.parseFloat(row.settledProfitNok)
-        : backPLNok + layPLNok;
+      existing.totalProfitLoss += matchedProfitNok + sequentialAdjustment;
       existing.totalStake += stakeNok;
 
       accountMap.set(row.accountId, existing);
@@ -4795,24 +5070,14 @@ export async function getProfitByExchange({
       // Single-leg containers (standalone wrappers) are reported as standalone.
       isNotNull(matchedBet.backBetId),
       isNotNull(matchedBet.layBetId),
+      ...buildSettledMatchedDateConditions({ startDate, endDate }),
     ];
 
-    if (startDate) {
-      conditions.push(sql`COALESCE(
-        ${backBet.settledAt},
-        ${layBet.settledAt},
-        ${matchedBet.confirmedAt},
-        ${matchedBet.createdAt}
-      ) >= ${startDate.toISOString()}`);
-    }
-    if (endDate) {
-      conditions.push(sql`COALESCE(
-        ${backBet.settledAt},
-        ${layBet.settledAt},
-        ${matchedBet.confirmedAt},
-        ${matchedBet.createdAt}
-      ) <= ${endDate.toISOString()}`);
-    }
+    const sequentialAdjustments = await getSequentialGroupProfitAdjustments({
+      userId,
+      startDate,
+      endDate,
+    });
 
     // Alias for lay account
     const layAccount = account;
@@ -4820,6 +5085,7 @@ export async function getProfitByExchange({
     // Fetch individual matched bets with both legs
     const rows = await db
       .select({
+        matchedId: matchedBet.id,
         accountId: layBet.accountId,
         accountName: layAccount.name,
         settledProfitNok: matchedBet.settledProfitNok,
@@ -4897,17 +5163,16 @@ export async function getProfitByExchange({
         totalStake: 0,
       };
 
-      // Calculate matched set P/L using matched-level realized profit first.
-      const backPLNok = row.backProfitLossNok
-        ? Number.parseFloat(row.backProfitLossNok)
-        : row.backCurrency === "NOK" && row.backProfitLoss
-          ? Number.parseFloat(row.backProfitLoss)
-          : 0;
-      const layPLNok = row.layProfitLossNok
-        ? Number.parseFloat(row.layProfitLossNok)
-        : row.layCurrency === "NOK" && row.layProfitLoss
-          ? Number.parseFloat(row.layProfitLoss)
-          : 0;
+      const { matchedProfitNok } = resolveMatchedProfitWithLegFallback({
+        settledProfitNok: row.settledProfitNok,
+        backProfitLoss: row.backProfitLoss,
+        backProfitLossNok: row.backProfitLossNok,
+        backCurrency: row.backCurrency,
+        layProfitLoss: row.layProfitLoss,
+        layProfitLossNok: row.layProfitLossNok,
+        layCurrency: row.layCurrency,
+      });
+      const sequentialAdjustment = sequentialAdjustments.get(row.matchedId) ?? 0;
 
       // Lay stake for this exchange
       const stakeNok = row.layStakeNok
@@ -4917,9 +5182,7 @@ export async function getProfitByExchange({
           : 0;
 
       existing.count += 1;
-      existing.totalProfitLoss += row.settledProfitNok
-        ? Number.parseFloat(row.settledProfitNok)
-        : backPLNok + layPLNok;
+      existing.totalProfitLoss += matchedProfitNok + sequentialAdjustment;
       existing.totalStake += stakeNok;
 
       accountMap.set(row.accountId, existing);
@@ -5203,6 +5466,12 @@ export async function getBookmakerProfitWithBonuses({
   endDate?: Date | null;
 }): Promise<BookmakerProfitWithBonuses[]> {
   try {
+    const sequentialAdjustments = await getSequentialGroupProfitAdjustments({
+      userId,
+      startDate,
+      endDate,
+    });
+
     // Get matched set profit per bookmaker (back + lay P/L combined)
     const bettingConditions: SQL<unknown>[] = [
       eq(matchedBet.userId, userId),
@@ -5210,28 +5479,13 @@ export async function getBookmakerProfitWithBonuses({
       // Only complete two-leg matched sets count as matched-set profit.
       isNotNull(matchedBet.backBetId),
       isNotNull(matchedBet.layBetId),
+      ...buildSettledMatchedDateConditions({ startDate, endDate }),
     ];
-
-    if (startDate) {
-      bettingConditions.push(sql`COALESCE(
-        ${backBet.settledAt},
-        ${layBet.settledAt},
-        ${matchedBet.confirmedAt},
-        ${matchedBet.createdAt}
-      ) >= ${startDate.toISOString()}`);
-    }
-    if (endDate) {
-      bettingConditions.push(sql`COALESCE(
-        ${backBet.settledAt},
-        ${layBet.settledAt},
-        ${matchedBet.confirmedAt},
-        ${matchedBet.createdAt}
-      ) <= ${endDate.toISOString()}`);
-    }
 
     // Fetch individual matched bets with BOTH legs for full P/L calculation
     const bettingRows = await db
       .select({
+        matchedId: matchedBet.id,
         accountId: backBet.accountId,
         accountName: account.name,
         settledProfitNok: matchedBet.settledProfitNok,
@@ -5353,38 +5607,33 @@ export async function getBookmakerProfitWithBonuses({
           totalNetExposure: 0,
         };
 
-        // Back bet P/L
-        const backCurrency = row.backCurrency ?? "NOK";
-        const backPLNok = row.backProfitLossNok
-          ? Number.parseFloat(row.backProfitLossNok)
-          : backCurrency === "NOK" && row.backProfitLoss
-            ? Number.parseFloat(row.backProfitLoss)
-            : 0;
-
-        // Lay bet P/L (the other leg of the matched bet)
-        const layCurrency = row.layCurrency ?? "NOK";
-        const layPLNok = row.layProfitLossNok
-          ? Number.parseFloat(row.layProfitLossNok)
-          : layCurrency === "NOK" && row.layProfitLoss
-            ? Number.parseFloat(row.layProfitLoss)
-            : 0;
+        const { matchedProfitNok, backProfitNok } =
+          resolveMatchedProfitWithLegFallback({
+            settledProfitNok: row.settledProfitNok,
+            backProfitLoss: row.backProfitLoss,
+            backProfitLossNok: row.backProfitLossNok,
+            backCurrency: row.backCurrency,
+            layProfitLoss: row.layProfitLoss,
+            layProfitLossNok: row.layProfitLossNok,
+            layCurrency: row.layCurrency,
+          });
+        const sequentialAdjustment =
+          sequentialAdjustments.get(row.matchedId) ?? 0;
 
         // Back stake for ROI
         const stakeNok = row.backStakeNok
           ? Number.parseFloat(row.backStakeNok)
-          : backCurrency === "NOK" && row.backStake
+          : row.backCurrency === "NOK" && row.backStake
             ? Number.parseFloat(row.backStake)
             : 0;
 
-        const matchedProfit = row.settledProfitNok
-          ? Number.parseFloat(row.settledProfitNok)
-          : backPLNok + layPLNok;
+        const matchedProfit = matchedProfitNok + sequentialAdjustment;
         const usedFreeBet =
           Boolean(row.freeBetId) || isFreeBetPromoType(row.promoType);
 
         existing.betCount += 1;
         existing.bettingProfit += matchedProfit;
-        existing.bookmakerBetProfit += backPLNok;
+        existing.bookmakerBetProfit += backProfitNok;
         if (usedFreeBet) {
           existing.freeBetCount += 1;
           existing.freeBetProfit += matchedProfit;
@@ -6528,7 +6777,8 @@ export async function getDashboardSummary({
 
     // Run all queries in parallel for performance
     const [
-      settledAggregates,
+      settledRows,
+      sequentialAdjustments,
       standaloneProfitSummary,
       bonusTotal,
       walletFeeSummary,
@@ -6536,15 +6786,19 @@ export async function getDashboardSummary({
       pendingReview,
       recentActivity,
     ] = await Promise.all([
-      // Aggregate settled bets using stored NOK values
+      // Fetch complete settled matched rows, then apply sequential adjustments.
       db
         .select({
-          totalSettledProfitNok: sql<string>`COALESCE(SUM(COALESCE(
-              ${matchedBet.settledProfitNok},
-              COALESCE(${backBet.profitLossNok}, 0) + COALESCE(${layBet.profitLossNok}, 0)
-            )), 0)`,
-          totalBackStakeNok: sql<string>`COALESCE(${sum(backBet.stakeNok)}, 0)`,
-          settledCount: count(matchedBet.id),
+          matchedId: matchedBet.id,
+          settledProfitNok: matchedBet.settledProfitNok,
+          backProfitLoss: backBet.profitLoss,
+          backProfitLossNok: backBet.profitLossNok,
+          backCurrency: backBet.currency,
+          layProfitLoss: layBet.profitLoss,
+          layProfitLossNok: layBet.profitLossNok,
+          layCurrency: layBet.currency,
+          backStake: backBet.stake,
+          backStakeNok: backBet.stakeNok,
         })
         .from(matchedBet)
         .leftJoin(backBet, eq(matchedBet.backBetId, backBet.id))
@@ -6559,6 +6813,8 @@ export async function getDashboardSummary({
             isNotNull(matchedBet.layBetId)
           )
         ),
+
+      getSequentialGroupProfitAdjustments({ userId }),
 
       // Standalone settled bets capture seized funds/account closures.
       getStandaloneSettledProfitSummary({ userId }),
@@ -6595,21 +6851,36 @@ export async function getDashboardSummary({
         ),
     ]);
 
-    const totals = settledAggregates[0];
-    const matchedProfit = totals?.totalSettledProfitNok
-      ? Number.parseFloat(totals.totalSettledProfitNok)
-      : 0;
-    const matchedStake = totals?.totalBackStakeNok
-      ? Number.parseFloat(totals.totalBackStakeNok)
-      : 0;
+    let matchedProfit = 0;
+    let matchedStake = 0;
+
+    for (const row of settledRows) {
+      const { matchedProfitNok } = resolveMatchedProfitWithLegFallback({
+        settledProfitNok: row.settledProfitNok,
+        backProfitLoss: row.backProfitLoss,
+        backProfitLossNok: row.backProfitLossNok,
+        backCurrency: row.backCurrency,
+        layProfitLoss: row.layProfitLoss,
+        layProfitLossNok: row.layProfitLossNok,
+        layCurrency: row.layCurrency,
+      });
+
+      matchedProfit +=
+        matchedProfitNok + (sequentialAdjustments.get(row.matchedId) ?? 0);
+      matchedStake += resolveNokAmount({
+        valueNok: row.backStakeNok,
+        value: row.backStake,
+        currency: row.backCurrency,
+      });
+    }
+
     const totalProfit =
       matchedProfit +
       standaloneProfitSummary.profit +
       bonusTotal -
       walletFeeSummary.total;
     const totalStake = matchedStake + standaloneProfitSummary.stake;
-    const settledCount =
-      (totals?.settledCount ?? 0) + standaloneProfitSummary.count;
+    const settledCount = settledRows.length + standaloneProfitSummary.count;
     const roi = totalStake > 0 ? (totalProfit / totalStake) * 100 : 0;
 
     return {
