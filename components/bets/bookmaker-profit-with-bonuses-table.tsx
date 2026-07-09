@@ -35,7 +35,7 @@ export function BookmakerProfitWithBonusesTable({
       <div className="border-b px-4 py-3">
         <h3 className="font-semibold text-lg">Bookmaker Performance</h3>
         <p className="text-muted-foreground text-sm">
-          Matched-set P/L, standalone losses, and bonus impact
+          Matched-set P/L, bookie-side bet P/L, standalone losses, and bonus impact
         </p>
       </div>
       {sorted.length === 0 ? (
@@ -53,6 +53,7 @@ export function BookmakerProfitWithBonusesTable({
                 <TableHead className="text-right">Net P/L</TableHead>
                 <TableHead className="text-right">Free Bets</TableHead>
                 <TableHead className="text-right">Standalone P/L</TableHead>
+                <TableHead className="text-right">Bookie Bets P/L</TableHead>
                 <TableHead className="text-right">Match ROI</TableHead>
                 <TableHead className="text-right">Retention</TableHead>
                 <TableHead className="text-right">
@@ -117,6 +118,16 @@ export function BookmakerProfitWithBonusesTable({
                     {(row.standaloneBetCount ?? 0) > 0
                       ? formatNOK(row.standaloneProfit ?? 0)
                       : "—"}
+                  </TableCell>
+                  <TableCell
+                    className={cn(
+                      "text-right font-medium",
+                      row.bookmakerBetProfit >= 0
+                        ? "text-emerald-600"
+                        : "text-rose-600"
+                    )}
+                  >
+                    {formatNOK(row.bookmakerBetProfit)}
                   </TableCell>
                   <TableCell
                     className={cn(

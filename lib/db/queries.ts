@@ -4981,6 +4981,8 @@ export type BookmakerProfitWithBonuses = {
   standaloneBetCount?: number;
   /** Profit/loss from standalone bets not attached to a matched set */
   standaloneProfit?: number;
+  /** Bookmaker-side bet P/L (back bets only, excludes lay legs and bonuses) */
+  bookmakerBetProfit: number;
   /** Total back stake wagered */
   totalStake: number;
   /** Total bonus/reward transaction amounts */
@@ -5326,6 +5328,7 @@ export async function getBookmakerProfitWithBonuses({
         freeBetProfit: number;
         standaloneBetCount: number;
         standaloneProfit: number;
+        bookmakerBetProfit: number;
         totalStake: number;
         bonusTotal: number;
         totalNetExposure: number;
@@ -5344,6 +5347,7 @@ export async function getBookmakerProfitWithBonuses({
           freeBetProfit: 0,
           standaloneBetCount: 0,
           standaloneProfit: 0,
+          bookmakerBetProfit: 0,
           totalStake: 0,
           bonusTotal: 0,
           totalNetExposure: 0,
@@ -5380,6 +5384,7 @@ export async function getBookmakerProfitWithBonuses({
 
         existing.betCount += 1;
         existing.bettingProfit += matchedProfit;
+        existing.bookmakerBetProfit += backPLNok;
         if (usedFreeBet) {
           existing.freeBetCount += 1;
           existing.freeBetProfit += matchedProfit;
@@ -5410,6 +5415,7 @@ export async function getBookmakerProfitWithBonuses({
         freeBetProfit: 0,
         standaloneBetCount: 0,
         standaloneProfit: 0,
+        bookmakerBetProfit: 0,
         totalStake: 0,
         bonusTotal: 0,
         totalNetExposure: 0,
@@ -5429,6 +5435,7 @@ export async function getBookmakerProfitWithBonuses({
 
       existing.standaloneBetCount += 1;
       existing.standaloneProfit += profitNok;
+      existing.bookmakerBetProfit += profitNok;
       existing.totalStake += stakeNok;
 
       accountMap.set(row.accountId, existing);
@@ -5460,6 +5467,7 @@ export async function getBookmakerProfitWithBonuses({
           freeBetProfit: 0,
           standaloneBetCount: 0,
           standaloneProfit: 0,
+          bookmakerBetProfit: 0,
           totalStake: 0,
           bonusTotal: amountNok,
           totalNetExposure: 0,
@@ -5499,6 +5507,7 @@ export async function getBookmakerProfitWithBonuses({
         freeBetProfit: Math.round(data.freeBetProfit * 100) / 100,
         standaloneBetCount: data.standaloneBetCount,
         standaloneProfit: Math.round(data.standaloneProfit * 100) / 100,
+        bookmakerBetProfit: Math.round(data.bookmakerBetProfit * 100) / 100,
         totalStake: Math.round(data.totalStake * 100) / 100,
         bonusTotal: Math.round(data.bonusTotal * 100) / 100,
         totalProfit,

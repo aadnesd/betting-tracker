@@ -89,6 +89,7 @@ describe("getBookmakerProfitWithBonuses", () => {
         accountName: "bet365",
         betCount: 25,
         bettingProfit: 150.5,
+        bookmakerBetProfit: 95.25,
         totalStake: 2500.0,
         bonusTotal: 50.0,
         totalProfit: 200.5,
@@ -111,6 +112,7 @@ describe("getBookmakerProfitWithBonuses", () => {
         accountName: "Ladbrokes",
         betCount: 10,
         bettingProfit: 75.0,
+        bookmakerBetProfit: 40.0,
         totalStake: 1000.0,
         bonusTotal: 0,
         totalProfit: 75.0,
@@ -127,6 +129,7 @@ describe("getBookmakerProfitWithBonuses", () => {
         accountName: "William Hill",
         betCount: 0,
         bettingProfit: 0,
+        bookmakerBetProfit: 0,
         totalStake: 0,
         bonusTotal: 25.0,
         totalProfit: 25.0,
@@ -144,6 +147,7 @@ describe("getBookmakerProfitWithBonuses", () => {
         accountName: "Coral",
         betCount: 5,
         bettingProfit: -30.0, // Lost money betting
+        bookmakerBetProfit: -25.0,
         totalStake: 500.0,
         bonusTotal: 50.0, // But gained from bonuses
         totalProfit: 20.0, // Net positive
@@ -165,6 +169,7 @@ describe("getBookmakerProfitWithBonuses", () => {
         accountName: "bet365",
         betCount: 10,
         bettingProfit: 100.0,
+        bookmakerBetProfit: 55.0,
         totalStake: 1000.0,
         bonusTotal: 50.0,
         totalProfit: 150.0,
@@ -181,6 +186,7 @@ describe("getBookmakerProfitWithBonuses", () => {
         accountName: "New Bookmaker",
         betCount: 0,
         bettingProfit: 0,
+        bookmakerBetProfit: 0,
         totalStake: 0,
         bonusTotal: 25.0,
         totalProfit: 25.0,
@@ -198,6 +204,7 @@ describe("getBookmakerProfitWithBonuses", () => {
         accountName: "bet365",
         betCount: 10,
         bettingProfit: 100.0,
+        bookmakerBetProfit: 60.0,
         totalStake: 1000.0,
         bonusTotal: 50.0,
         totalProfit: 150.0,
@@ -220,6 +227,7 @@ describe("getBookmakerProfitWithBonuses", () => {
           accountName: "bet365",
           betCount: 20,
           bettingProfit: 200.0,
+          bookmakerBetProfit: 120.0,
           totalStake: 2000.0,
           bonusTotal: 100.0,
           totalProfit: 300.0, // Highest
@@ -230,6 +238,7 @@ describe("getBookmakerProfitWithBonuses", () => {
           accountName: "Ladbrokes",
           betCount: 15,
           bettingProfit: 100.0,
+          bookmakerBetProfit: 70.0,
           totalStake: 1500.0,
           bonusTotal: 50.0,
           totalProfit: 150.0, // Second
@@ -240,6 +249,7 @@ describe("getBookmakerProfitWithBonuses", () => {
           accountName: "Coral",
           betCount: 10,
           bettingProfit: -50.0,
+          bookmakerBetProfit: -40.0,
           totalStake: 1000.0,
           bonusTotal: 25.0,
           totalProfit: -25.0, // Lowest
