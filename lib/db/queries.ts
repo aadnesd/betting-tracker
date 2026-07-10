@@ -3400,6 +3400,11 @@ export type PendingSettlementBet = {
 };
 
 function buildMatchedBetStillNeedsSettlementCondition() {
+  const hasAnySettledLeg = or(
+    and(isNotNull(backBet.id), eq(backBet.status, "settled")),
+    and(isNotNull(layBet.id), eq(layBet.status, "settled"))
+  )!;
+
   const stillHasUnsettledLeg = or(
     isNull(backBet.id),
     ne(backBet.status, "settled"),
@@ -3422,7 +3427,81 @@ function buildMatchedBetStillNeedsSettlementCondition() {
     )
   )!;
 
-  return and(stillHasUnsettledLeg, sql`NOT (${isResolvedSingleLegContainer})`)!;
+  const isSingleLegContainerWithSettledLeg = and(
+    hasAnySettledLeg,
+    or(isNull(backBet.id), isNull(layBet.id))!
+  )!;
+
+  return and(
+    stillHasUnsettledLeg,
+    sql`NOT (${isResolvedSingleLegContainer})`,
+    sql`NOT (${isSingleLegContainerWithSettledLeg})`
+  )!;
+}
+
+/**
+ * Keep matched container statuses aligned with already-settled legs.
+ *
+ * Why: Sequential lay flows can leave a container in `matched`/`needs_review`
+ * even after its only linked leg is settled. Those stale containers should not
+ * be re-queued for auto-settlement and should be treated as settled in reports.
+ */
+export async function syncMatchedContainerStatusesFromSettledLegs(): Promise<number> {
+  try {
+    const rows = await db
+      .update(matchedBet)
+      .set({ status: "settled" })
+      .where(
+        and(
+          inArray(matchedBet.status, ["matched", "needs_review"]),
+          or(
+            // Complete matched set: both legs settled.
+            and(
+              isNotNull(matchedBet.backBetId),
+              isNotNull(matchedBet.layBetId),
+              sql`EXISTS (
+                SELECT 1 FROM "BackBet" b
+                WHERE b.id = ${matchedBet.backBetId}
+                  AND b.status = 'settled'
+              )`,
+              sql`EXISTS (
+                SELECT 1 FROM "LayBet" l
+                WHERE l.id = ${matchedBet.layBetId}
+                  AND l.status = 'settled'
+              )`
+            ),
+            // Single-leg container (back-only): back leg settled.
+            and(
+              isNotNull(matchedBet.backBetId),
+              isNull(matchedBet.layBetId),
+              sql`EXISTS (
+                SELECT 1 FROM "BackBet" b
+                WHERE b.id = ${matchedBet.backBetId}
+                  AND b.status = 'settled'
+              )`
+            ),
+            // Single-leg container (lay-only): lay leg settled.
+            and(
+              isNotNull(matchedBet.layBetId),
+              isNull(matchedBet.backBetId),
+              sql`EXISTS (
+                SELECT 1 FROM "LayBet" l
+                WHERE l.id = ${matchedBet.layBetId}
+                  AND l.status = 'settled'
+              )`
+            )
+          )
+        )
+      )
+      .returning({ id: matchedBet.id });
+
+    return rows.length;
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to sync matched container statuses"
+    );
+  }
 }
 
 /**
@@ -4178,6 +4257,66 @@ export async function flagBetForReview({
   const now = new Date();
 
   try {
+    const [existing] = await db
+      .select({
+        id: matchedBet.id,
+        status: matchedBet.status,
+        backBetId: matchedBet.backBetId,
+        layBetId: matchedBet.layBetId,
+        backStatus: backBet.status,
+        layStatus: layBet.status,
+      })
+      .from(matchedBet)
+      .leftJoin(backBet, eq(matchedBet.backBetId, backBet.id))
+      .leftJoin(layBet, eq(matchedBet.layBetId, layBet.id))
+      .where(and(eq(matchedBet.id, matchedBetId), eq(matchedBet.userId, userId)))
+      .limit(1);
+
+    if (!existing) {
+      return;
+    }
+
+    const hasSettledBack =
+      Boolean(existing.backBetId) && existing.backStatus === "settled";
+    const hasSettledLay =
+      Boolean(existing.layBetId) && existing.layStatus === "settled";
+
+    const isSettledSingleLegContainer =
+      Number(hasSettledBack) + Number(hasSettledLay) === 1;
+    const isSettledTwoLegContainer = hasSettledBack && hasSettledLay;
+
+    // Guardrail: once legs are already settled, avoid flipping container back
+    // to needs_review via cron retries.
+    if (isSettledSingleLegContainer || isSettledTwoLegContainer) {
+      const inferredStatus = isSettledTwoLegContainer ? "settled" : "matched";
+
+      if (existing.status !== inferredStatus) {
+        await db
+          .update(matchedBet)
+          .set({ status: inferredStatus })
+          .where(
+            and(eq(matchedBet.id, matchedBetId), eq(matchedBet.userId, userId))
+          );
+
+        await db.insert(auditLog).values({
+          createdAt: now,
+          userId,
+          entityType: "matched_bet",
+          entityId: matchedBetId,
+          action: "status_change",
+          changes: {
+            fromStatus: existing.status,
+            toStatus: inferredStatus,
+            reason: "skip_needs_review_already_settled",
+          },
+          notes:
+            "Skipped needs_review because linked leg(s) are already settled.",
+        });
+      }
+
+      return;
+    }
+
     // Update status to needs_review and add note
     await db
       .update(matchedBet)

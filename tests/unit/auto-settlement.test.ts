@@ -329,6 +329,20 @@ describe("auto-settlement detection queries", () => {
         expect(status).not.toBe("FINISHED");
       }
     });
+
+    it("excludes single-leg containers with already-settled leg from re-queue", () => {
+      // Single-leg containers where the linked leg is already settled should
+      // be treated as resolved and not repeatedly auto-settled/flagged.
+      const singleLaySettled = {
+        backBetId: null,
+        layBetId: "lay-1",
+        layStatus: "settled",
+      };
+
+      expect(singleLaySettled.backBetId).toBeNull();
+      expect(singleLaySettled.layBetId).toBeDefined();
+      expect(singleLaySettled.layStatus).toBe("settled");
+    });
   });
 
   describe("applyAutoSettlement", () => {

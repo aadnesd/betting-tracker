@@ -12,6 +12,7 @@ import {
   processFreeBetWageringProgressOnSettle,
   processQualifyingBetsUnlockOnSettle,
   processWageringProgressOnSettle,
+  syncMatchedContainerStatusesFromSettledLegs,
   type UnlinkedBetReadyForSettlement,
 } from "@/lib/db/queries";
 import {
@@ -409,6 +410,13 @@ export async function POST(request: Request) {
   };
 
   try {
+    const syncedContainers = await syncMatchedContainerStatusesFromSettledLegs();
+    if (syncedContainers > 0) {
+      console.log(
+        `[Auto-Settle] Synced ${syncedContainers} matched container status(es) from settled legs`
+      );
+    }
+
     // Fetch all bets ready for auto-settlement
     const bets = await findBetsReadyForAutoSettlement({ limit: 100 });
     const unlinkedBets = await findUnlinkedBetsReadyForAutoSettlement({
