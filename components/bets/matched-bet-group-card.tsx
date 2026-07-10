@@ -68,11 +68,15 @@ export function MatchedBetGroupCard({
   betGroupId,
   members,
   aggregate,
+  isSequentialLay = false,
+  addNextLayHref = null,
 }: {
   currentId: string;
   betGroupId: string | null;
   members: GroupMember[];
   aggregate: Aggregate;
+  isSequentialLay?: boolean;
+  addNextLayHref?: string | null;
 }) {
   const router = useRouter();
   const [candidates, setCandidates] = useState<Candidate[]>([]);
@@ -160,17 +164,25 @@ export function MatchedBetGroupCard({
   };
 
   const isGrouped = Boolean(betGroupId) && members.length > 1;
+  const showSequentialTimeline = isSequentialLay && members.length > 0;
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Link2 className="h-4 w-4" />
-          Linked bets
-        </CardTitle>
+        <div className="flex items-center justify-between gap-3">
+          <CardTitle className="flex items-center gap-2">
+            <Link2 className="h-4 w-4" />
+            {isSequentialLay ? "Sequential lay timeline" : "Linked bets"}
+          </CardTitle>
+          {isSequentialLay && addNextLayHref && (
+            <Button asChild size="sm" variant="outline">
+              <Link href={addNextLayHref}>Add next lay</Link>
+            </Button>
+          )}
+        </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        {isGrouped ? (
+        {isGrouped || showSequentialTimeline ? (
           <>
             {/* Combined outcome across all group members */}
             {aggregate && (
@@ -217,6 +229,9 @@ export function MatchedBetGroupCard({
                 >
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
+                      <span className="rounded-full bg-muted px-2 py-0.5 text-muted-foreground text-xs">
+                        Step {members.findIndex((m) => m.id === member.id) + 1}
+                      </span>
                       {member.isCurrent ? (
                         <span className="truncate font-medium text-sm">
                           {member.selection}
@@ -245,58 +260,65 @@ export function MatchedBetGroupCard({
                       {formatNok(member.profitIfLoses)}
                     </p>
                   </div>
-                  <Button
-                    disabled={unlinkingId === member.id}
-                    onClick={() => handleUnlink(member.id)}
-                    size="sm"
-                    variant="ghost"
-                  >
-                    <Unlink className="mr-1 h-3 w-3" />
-                    {unlinkingId === member.id ? "Removing..." : "Unlink"}
-                  </Button>
+                  {!isSequentialLay && (
+                    <Button
+                      disabled={unlinkingId === member.id}
+                      onClick={() => handleUnlink(member.id)}
+                      size="sm"
+                      variant="ghost"
+                    >
+                      <Unlink className="mr-1 h-3 w-3" />
+                      {unlinkingId === member.id ? "Removing..." : "Unlink"}
+                    </Button>
+                  )}
                 </li>
               ))}
             </ul>
           </>
         ) : (
           <p className="text-muted-foreground text-sm">
-            Not linked to any other bets. Link another matched set to track
-            their combined exposure and guaranteed profit as one play.
+            {isSequentialLay
+              ? "This sequential lay currently has one recorded step. Add the next lay to preserve the timeline."
+              : "Not linked to any other bets. Link another matched set to track their combined exposure and guaranteed profit as one play."}
           </p>
         )}
 
-        {/* Link picker */}
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <Select onValueChange={setSelectedId} value={selectedId}>
-            <SelectTrigger className="sm:w-80">
-              <SelectValue
-                placeholder={
-                  loadingCandidates
-                    ? "Loading bets..."
-                    : candidates.length === 0
-                      ? "No other bets available"
-                      : "Select a bet to link"
-                }
-              />
-            </SelectTrigger>
-            <SelectContent>
-              {candidates.map((c) => (
-                <SelectItem key={c.id} value={c.id}>
-                  {c.selection} · {c.market}
-                  {c.promoType ? ` · ${c.promoType}` : ""}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button
-            disabled={!selectedId || isLinking}
-            onClick={handleLink}
-            variant="outline"
-          >
-            <Link2 className="mr-1 h-4 w-4" />
-            {isLinking ? "Linking..." : "Link bet"}
-          </Button>
-        </div>
+        {!isSequentialLay && (
+          <>
+            {/* Link picker */}
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <Select onValueChange={setSelectedId} value={selectedId}>
+                <SelectTrigger className="sm:w-80">
+                  <SelectValue
+                    placeholder={
+                      loadingCandidates
+                        ? "Loading bets..."
+                        : candidates.length === 0
+                          ? "No other bets available"
+                          : "Select a bet to link"
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {candidates.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.selection} · {c.market}
+                      {c.promoType ? ` · ${c.promoType}` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                disabled={!selectedId || isLinking}
+                onClick={handleLink}
+                variant="outline"
+              >
+                <Link2 className="mr-1 h-4 w-4" />
+                {isLinking ? "Linking..." : "Link bet"}
+              </Button>
+            </div>
+          </>
+        )}
       </CardContent>
     </Card>
   );
