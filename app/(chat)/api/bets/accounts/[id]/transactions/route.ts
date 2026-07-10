@@ -25,6 +25,10 @@ const createTransactionSchema = z
     // Amount in wallet currency (for cross-currency transfers)
     walletAmount: z.number().positive().nullable().optional(),
     walletCurrency: z.string().min(2).max(10).nullable().optional(),
+    // Implicit fee attributed to a wallet→account deposit (e.g. FX conversion loss).
+    // Reduces the account's total profit in reporting but does NOT affect balances.
+    depositFeeAmount: z.number().positive().nullable().optional(),
+    depositFeeCurrency: z.string().length(3).nullable().optional(),
   })
   .superRefine((data, ctx) => {
     if (data.type === "adjustment") {
@@ -112,6 +116,8 @@ export async function POST(
           date: body.occurredAt,
           notes: body.notes ?? null,
           userId: session.user.id,
+          depositFeeAmount: body.depositFeeAmount ?? null,
+          depositFeeCurrency: body.depositFeeCurrency ?? body.currency ?? null,
         });
         transaction = result.accountTx;
       } else {

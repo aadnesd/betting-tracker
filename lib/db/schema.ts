@@ -136,6 +136,17 @@ export const accountTransaction = pgTable(
     occurredAt: timestamp("occurredAt").notNull(),
     bonusSubcategory: text("bonusSubcategory"),
     notes: text("notes"),
+    // Implicit fee attributed to this transaction (e.g. currency conversion loss
+    // when funding a bookmaker from a wallet in another currency).
+    // Does NOT affect account/wallet balances (the capital loss is already
+    // reflected in the wallet-out vs account-in delta), but IS subtracted from
+    // reporting profit — both per-account and global net profit.
+    depositFeeAmount: numeric("depositFeeAmount", { precision: 14, scale: 2 }),
+    depositFeeCurrency: varchar("depositFeeCurrency", { length: 3 }),
+    depositFeeAmountNok: numeric("depositFeeAmountNok", {
+      precision: 14,
+      scale: 2,
+    }),
     // Link to corresponding wallet transaction (for deposit/withdrawal linked to wallet)
     linkedWalletTransactionId: uuid("linkedWalletTransactionId"),
     // Link to originating bet (for settlement/reversal transactions)

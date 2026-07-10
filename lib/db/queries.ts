@@ -1369,6 +1369,8 @@ export async function createAccountTransaction({
   linkedWalletTransactionId,
   linkedBackBetId,
   linkedLayBetId,
+  depositFeeAmount,
+  depositFeeCurrency,
 }: {
   userId: string;
   accountId: string;
@@ -1381,6 +1383,8 @@ export async function createAccountTransaction({
   linkedWalletTransactionId?: string | null;
   linkedBackBetId?: string | null;
   linkedLayBetId?: string | null;
+  depositFeeAmount?: number | null;
+  depositFeeCurrency?: string | null;
 }) {
   try {
     // Pre-compute NOK equivalent at write time to avoid FX API calls on read
@@ -1389,6 +1393,27 @@ export async function createAccountTransaction({
       amount,
       normalizedCurrency
     );
+
+    // Deposit fee is only meaningful on deposit rows. It represents an implicit
+    // capital cost (e.g. FX conversion loss) that reduces profit attribution
+    // for the account, without affecting balance math.
+    let feeAmountToStore: string | null = null;
+    let feeCurrencyToStore: string | null = null;
+    let feeAmountNokToStore: string | null = null;
+    if (
+      type === "deposit" &&
+      depositFeeAmount != null &&
+      depositFeeAmount > 0
+    ) {
+      const feeCurrency = (
+        depositFeeCurrency ?? normalizedCurrency
+      ).toUpperCase();
+      feeAmountToStore = depositFeeAmount.toString();
+      feeCurrencyToStore = feeCurrency;
+      feeAmountNokToStore = (
+        await convertAmountToNokStrict(depositFeeAmount, feeCurrency)
+      ).toString();
+    }
 
     const values: typeof accountTransaction.$inferInsert = {
       createdAt: new Date(),
@@ -1404,6 +1429,9 @@ export async function createAccountTransaction({
       linkedWalletTransactionId: linkedWalletTransactionId ?? null,
       linkedBackBetId: linkedBackBetId ?? null,
       linkedLayBetId: linkedLayBetId ?? null,
+      depositFeeAmount: feeAmountToStore,
+      depositFeeCurrency: feeCurrencyToStore,
+      depositFeeAmountNok: feeAmountNokToStore,
     };
 
     const [row] = await db
@@ -4277,7 +4305,9 @@ export async function flagBetForReview({
       .from(matchedBet)
       .leftJoin(backBet, eq(matchedBet.backBetId, backBet.id))
       .leftJoin(layBet, eq(matchedBet.layBetId, layBet.id))
-      .where(and(eq(matchedBet.id, matchedBetId), eq(matchedBet.userId, userId)))
+      .where(
+        and(eq(matchedBet.id, matchedBetId), eq(matchedBet.userId, userId))
+      )
       .limit(1);
 
     if (!existing) {
@@ -4633,7 +4663,9 @@ function resolveMatchedProfitWithLegFallback(row: MatchedProfitLegValues): {
 
   return {
     matchedProfitNok:
-      settledProfitNok !== null ? settledProfitNok : backProfitNok + layProfitNok,
+      settledProfitNok !== null
+        ? settledProfitNok
+        : backProfitNok + layProfitNok,
     backProfitNok,
     layProfitNok,
   };
@@ -5167,7 +5199,8 @@ export async function getProfitByBookmaker({
         layProfitLossNok: row.layProfitLossNok,
         layCurrency: row.layCurrency,
       });
-      const sequentialAdjustment = sequentialAdjustments.get(row.matchedId) ?? 0;
+      const sequentialAdjustment =
+        sequentialAdjustments.get(row.matchedId) ?? 0;
 
       // Back stake for ROI
       const stakeNok = row.backStakeNok
@@ -5319,7 +5352,8 @@ export async function getProfitByExchange({
         layProfitLossNok: row.layProfitLossNok,
         layCurrency: row.layCurrency,
       });
-      const sequentialAdjustment = sequentialAdjustments.get(row.matchedId) ?? 0;
+      const sequentialAdjustment =
+        sequentialAdjustments.get(row.matchedId) ?? 0;
 
       // Lay stake for this exchange
       const stakeNok = row.layStakeNok
@@ -5397,7 +5431,14 @@ export type BookmakerProfitWithBonuses = {
   totalStake: number;
   /** Total bonus/reward transaction amounts */
   bonusTotal: number;
-  /** Combined total (bettingProfit + standaloneProfit + bonusTotal) */
+  /**
+   * Total deposit-fee amounts (in NOK) attributed to this account.
+   * Represents implicit capital costs (e.g. FX conversion loss when funding
+   * this bookmaker from a foreign-currency wallet). Subtracted from totalProfit.
+   * Optional for backwards-compatibility with earlier callers.
+   */
+  depositFeeTotal?: number;
+  /** Combined total (bettingProfit + standaloneProfit + bonusTotal - depositFeeTotal) */
   totalProfit: number;
   /** ROI percentage based on total profit and stake */
   roi: number;
@@ -5685,6 +5726,30 @@ export async function getBookmakerProfitWithBonuses({
       .innerJoin(account, eq(accountTransaction.accountId, account.id))
       .where(and(...bonusConditions));
 
+    // Deposit fees attributed to bookmaker accounts (reduce totalProfit).
+    const feeConditions: SQL<unknown>[] = [
+      eq(accountTransaction.userId, userId),
+      eq(account.kind, "bookmaker"),
+      isNotNull(accountTransaction.depositFeeAmountNok),
+    ];
+    if (startDate) {
+      feeConditions.push(gte(accountTransaction.occurredAt, startDate));
+    }
+    if (endDate) {
+      feeConditions.push(lte(accountTransaction.occurredAt, endDate));
+    }
+    const feeRows = await db
+      .select({
+        accountId: accountTransaction.accountId,
+        accountName: account.name,
+        depositFeeAmount: accountTransaction.depositFeeAmount,
+        depositFeeCurrency: accountTransaction.depositFeeCurrency,
+        depositFeeAmountNok: accountTransaction.depositFeeAmountNok,
+      })
+      .from(accountTransaction)
+      .innerJoin(account, eq(accountTransaction.accountId, account.id))
+      .where(and(...feeConditions));
+
     const standaloneConditions: SQL<unknown>[] = [
       eq(backBet.userId, userId),
       eq(backBet.status, "settled"),
@@ -5732,6 +5797,7 @@ export async function getBookmakerProfitWithBonuses({
         bookmakerBetProfit: number;
         totalStake: number;
         bonusTotal: number;
+        depositFeeTotal: number;
         totalNetExposure: number;
       }
     >();
@@ -5751,6 +5817,7 @@ export async function getBookmakerProfitWithBonuses({
           bookmakerBetProfit: 0,
           totalStake: 0,
           bonusTotal: 0,
+          depositFeeTotal: 0,
           totalNetExposure: 0,
         };
 
@@ -5814,6 +5881,7 @@ export async function getBookmakerProfitWithBonuses({
         bookmakerBetProfit: 0,
         totalStake: 0,
         bonusTotal: 0,
+        depositFeeTotal: 0,
         totalNetExposure: 0,
       };
 
@@ -5866,6 +5934,37 @@ export async function getBookmakerProfitWithBonuses({
           bookmakerBetProfit: 0,
           totalStake: 0,
           bonusTotal: amountNok,
+          depositFeeTotal: 0,
+          totalNetExposure: 0,
+        });
+      }
+    }
+
+    // Process deposit-fee data (implicit conversion fees attributed to accounts).
+    for (const row of feeRows) {
+      const feeNok = row.depositFeeAmountNok
+        ? Number.parseFloat(row.depositFeeAmountNok)
+        : 0;
+      if (feeNok <= 0) {
+        continue;
+      }
+      const existing = accountMap.get(row.accountId);
+      if (existing) {
+        existing.depositFeeTotal += feeNok;
+      } else {
+        accountMap.set(row.accountId, {
+          accountId: row.accountId,
+          accountName: row.accountName ?? "Unknown Bookmaker",
+          betCount: 0,
+          bettingProfit: 0,
+          freeBetCount: 0,
+          freeBetProfit: 0,
+          standaloneBetCount: 0,
+          standaloneProfit: 0,
+          bookmakerBetProfit: 0,
+          totalStake: 0,
+          bonusTotal: 0,
+          depositFeeTotal: feeNok,
           totalNetExposure: 0,
         });
       }
@@ -5876,7 +5975,11 @@ export async function getBookmakerProfitWithBonuses({
     for (const data of accountMap.values()) {
       const totalProfit =
         Math.round(
-          (data.bettingProfit + data.standaloneProfit + data.bonusTotal) * 100
+          (data.bettingProfit +
+            data.standaloneProfit +
+            data.bonusTotal -
+            data.depositFeeTotal) *
+            100
         ) / 100;
       const roi =
         data.totalStake > 0 ? (totalProfit / data.totalStake) * 100 : 0;
@@ -5906,6 +6009,7 @@ export async function getBookmakerProfitWithBonuses({
         bookmakerBetProfit: Math.round(data.bookmakerBetProfit * 100) / 100,
         totalStake: Math.round(data.totalStake * 100) / 100,
         bonusTotal: Math.round(data.bonusTotal * 100) / 100,
+        depositFeeTotal: Math.round(data.depositFeeTotal * 100) / 100,
         totalProfit,
         roi: Math.round(roi * 100) / 100,
         bettingRoi: Math.round(bettingRoi * 100) / 100,
@@ -6166,8 +6270,36 @@ export async function getWalletFeeSummary({
       );
     }
 
+    // Also include implicit deposit fees attributed to account transactions
+    // (e.g. FX conversion loss when funding from a foreign-currency wallet).
+    const feeAccountConditions: SQL<unknown>[] = [
+      eq(accountTransaction.userId, userId),
+      isNotNull(accountTransaction.depositFeeAmountNok),
+    ];
+    if (startDate) {
+      feeAccountConditions.push(gte(accountTransaction.occurredAt, startDate));
+    }
+    if (endDate) {
+      feeAccountConditions.push(lte(accountTransaction.occurredAt, endDate));
+    }
+    const depositFeeRows = await db
+      .select({
+        depositFeeAmountNok: accountTransaction.depositFeeAmountNok,
+      })
+      .from(accountTransaction)
+      .where(and(...feeAccountConditions));
+
+    for (const row of depositFeeRows) {
+      const feeNok = row.depositFeeAmountNok
+        ? Number.parseFloat(row.depositFeeAmountNok)
+        : 0;
+      if (feeNok > 0) {
+        total += feeNok;
+      }
+    }
+
     return {
-      count: rows.length,
+      count: rows.length + depositFeeRows.length,
       total: Math.round(total * 100) / 100,
     };
   } catch (_error) {
@@ -10931,6 +11063,13 @@ export async function createTransferToAccount(params: {
   date: Date;
   notes?: string | null;
   userId: string;
+  /**
+   * Implicit deposit fee attributed to this transfer, in account currency by
+   * default. Represents a capital cost (e.g. FX conversion loss) that reduces
+   * the destination account's total profit but does NOT affect balances.
+   */
+  depositFeeAmount?: number | null;
+  depositFeeCurrency?: string | null;
 }) {
   const walletAmount = params.walletAmount ?? params.amount;
   const walletCurrency = params.walletCurrency ?? params.currency;
@@ -10959,6 +11098,8 @@ export async function createTransferToAccount(params: {
         ? `From wallet: ${params.notes}`
         : "Transfer from wallet",
       linkedWalletTransactionId: walletTx.id,
+      depositFeeAmount: params.depositFeeAmount ?? null,
+      depositFeeCurrency: params.depositFeeCurrency ?? null,
     });
 
     // Update wallet transaction with link back to account tx

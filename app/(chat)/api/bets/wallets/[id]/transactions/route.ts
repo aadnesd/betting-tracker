@@ -7,6 +7,7 @@ import {
   createTransferFromAccount,
   createTransferToAccount,
   createWalletTransaction,
+  getAccountById,
   getWalletById,
   listWalletTransactionsWithDetails,
 } from "@/lib/db/queries";
@@ -32,6 +33,11 @@ const createTransactionSchema = z
     relatedWalletAmount: z.number().positive().nullish(),
     externalRef: z.string().nullish(),
     notes: z.string().nullish(),
+    // Implicit fee attributed to a transfer_to_account (e.g. FX conversion loss).
+    // Reduces the destination account's total profit in reporting but does NOT
+    // affect balances.
+    depositFeeAmount: z.number().positive().nullish(),
+    depositFeeCurrency: z.string().length(3).nullish(),
   })
   .superRefine((data, ctx) => {
     if (data.type === "adjustment") {
@@ -127,12 +133,20 @@ export async function POST(
       relatedWalletAmount,
       externalRef,
       notes,
+      depositFeeAmount,
+      depositFeeCurrency,
     } = parsed.data;
 
     let result: unknown;
 
     // Handle linked transactions
     if (type === "transfer_to_account" && relatedAccountId) {
+      // Look up account to know its currency (fee defaults to account currency).
+      const relatedAccount = await getAccountById({
+        id: relatedAccountId,
+        userId: session.user.id,
+      });
+      const accountCurrency = relatedAccount?.currency ?? currency;
       result = await createTransferToAccount({
         walletId,
         accountId: relatedAccountId,
@@ -141,6 +155,8 @@ export async function POST(
         date,
         notes,
         userId: session.user.id,
+        depositFeeAmount: depositFeeAmount ?? null,
+        depositFeeCurrency: depositFeeCurrency ?? accountCurrency ?? null,
       });
     } else if (type === "transfer_from_account" && relatedAccountId) {
       result = await createTransferFromAccount({

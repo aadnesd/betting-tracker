@@ -85,6 +85,40 @@ When recording a transfer between wallet and account:
 
 This maintains accurate balances on both sides while showing the fund flow.
 
+### Deposit Fee (implicit conversion cost)
+
+When funding a bookmaker account from a wallet in another currency (e.g. paying
+919 EUR from Revolut and only receiving 10 000 NOK at Unibet), the FX spread
+represents a real capital cost that should reduce the destination account's
+reported profit — even though the wallet-out vs account-in delta already
+reflects that cost in total capital.
+
+The `AccountTransaction` row for the deposit therefore carries three optional
+fields captured at write-time:
+
+- `depositFeeAmount` — fee value in the fee currency
+- `depositFeeCurrency` — currency of the fee (defaults to the account currency)
+- `depositFeeAmountNok` — NOK equivalent computed at write-time via the FX API
+
+These fields **do not** affect any balance calculation. They are consumed by
+reporting:
+
+- `getBookmakerProfitWithBonuses` subtracts the account's total deposit fee
+  from that account's `totalProfit` (and exposes `depositFeeTotal`).
+- `getWalletFeeSummary` adds the fees to the global wallet-fee total so
+  `netProfit = bettingProfit + bonusTotal - walletFeeTotal` correctly reflects
+  conversion losses.
+
+Both API entry points accept the fee:
+
+- `POST /api/bets/accounts/[id]/transactions` — pass `depositFeeAmount` (and
+  optional `depositFeeCurrency`) alongside a `deposit` with `walletId` set.
+- `POST /api/bets/wallets/[id]/transactions` — pass `depositFeeAmount` (and
+  optional `depositFeeCurrency`) alongside `transfer_to_account`.
+
+The Quick Transaction sheet exposes the fee as an optional field on both the
+account-deposit-with-wallet path and the wallet transfer-to-account path.
+
 ## UI Requirements
 
 ### Navigation
