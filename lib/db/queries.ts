@@ -25,6 +25,7 @@ import {
 } from "../bet-calculations";
 import { DEFAULT_FREE_BET_EXPIRY_DAYS } from "../bets/free-bet-defaults";
 import { deriveMatchedBetDisplayStatus } from "../bets/matched-status";
+import { SEQUENTIAL_LAY_STEP_TAG } from "../bets/sequential-lay";
 import { ChatSDKError } from "../errors";
 import {
   convertAmountToNok,
@@ -2427,6 +2428,7 @@ export async function listMatchedBetsForList({
   toDate,
   search,
   accountId,
+  includeSequentialSteps = false,
   limit = 100,
 }: {
   userId: string;
@@ -2435,6 +2437,7 @@ export async function listMatchedBetsForList({
   toDate?: Date;
   search?: string;
   accountId?: string;
+  includeSequentialSteps?: boolean;
   limit?: number;
 }): Promise<MatchedBetListItem[]> {
   try {
@@ -2459,6 +2462,11 @@ export async function listMatchedBetsForList({
     if (accountId) {
       conditions.push(
         sql`(${backBet.accountId} = ${accountId} OR ${layBet.accountId} = ${accountId})`
+      );
+    }
+    if (!includeSequentialSteps) {
+      conditions.push(
+        sql`(${matchedBet.notes} IS NULL OR ${matchedBet.notes} NOT LIKE ${`%${SEQUENTIAL_LAY_STEP_TAG}%`})`
       );
     }
 

@@ -18,7 +18,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getCachedSession } from "@/lib/auth";
 import { computeMatchedBetOutcomes } from "@/lib/bet-calculations";
 import { deriveMatchedBetDisplayStatus } from "@/lib/bets/matched-status";
-import { isSequentialLayMatchedBet } from "@/lib/bets/sequential-lay";
+import { isSequentialLayRelatedMatchedBet } from "@/lib/bets/sequential-lay";
 import {
   getMatchedBetWithParts,
   getMatchedSetGroupMembers,
@@ -69,6 +69,7 @@ export default async function Page({ params }: PageProps) {
     freeBet,
     layAccountCommission,
   } = data;
+  const isSequentialLayFlow = isSequentialLayRelatedMatchedBet(matched.notes);
   const displayStatus = deriveMatchedBetDisplayStatus({
     matchedStatus: matched.status,
     backStatus: back?.status,
@@ -92,7 +93,7 @@ export default async function Page({ params }: PageProps) {
       })
     : [];
 
-  const groupMembers = groupMembersRaw.map((member) => ({
+  const mappedGroupMembers = groupMembersRaw.map((member) => ({
     id: member.id,
     market: member.market,
     selection: member.selection,
@@ -102,28 +103,6 @@ export default async function Page({ params }: PageProps) {
     profitIfLoses: member.outcomePreview?.profitIfLayWins ?? null,
     isCurrent: member.id === matched.id,
   }));
-
-  const groupAggregate =
-    groupMembers.length > 1 &&
-    groupMembers.every(
-      (m) => m.profitIfWins !== null && m.profitIfLoses !== null
-    )
-      ? (() => {
-          const ifWins = groupMembers.reduce(
-            (sum, m) => sum + (m.profitIfWins ?? 0),
-            0
-          );
-          const ifLoses = groupMembers.reduce(
-            (sum, m) => sum + (m.profitIfLoses ?? 0),
-            0
-          );
-          return {
-            ifWins,
-            ifLoses,
-            guaranteed: Math.min(ifWins, ifLoses),
-          };
-        })()
-      : null;
 
   // Detect mismatches
   const mismatches = detectMismatches(back, lay);
@@ -209,6 +188,44 @@ export default async function Page({ params }: PageProps) {
     }
   }
 
+  const groupMembers =
+    isSequentialLayFlow && mappedGroupMembers.length === 0
+      ? [
+          {
+            id: matched.id,
+            market: matched.market,
+            selection: matched.selection,
+            status: displayStatus,
+            promoType: matched.promoType,
+            profitIfWins: betOutcomes?.profitIfWins ?? null,
+            profitIfLoses: betOutcomes?.profitIfLoses ?? null,
+            isCurrent: true,
+          },
+        ]
+      : mappedGroupMembers;
+
+  const groupAggregate =
+    groupMembers.length > 1 &&
+    groupMembers.every(
+      (member) => member.profitIfWins !== null && member.profitIfLoses !== null
+    )
+      ? (() => {
+          const ifWins = groupMembers.reduce(
+            (sum, member) => sum + (member.profitIfWins ?? 0),
+            0
+          );
+          const ifLoses = groupMembers.reduce(
+            (sum, member) => sum + (member.profitIfLoses ?? 0),
+            0
+          );
+          return {
+            ifWins,
+            ifLoses,
+            guaranteed: Math.min(ifWins, ifLoses),
+          };
+        })()
+      : null;
+
   return (
     <div className="space-y-6 p-4 md:p-8">
       {/* Header */}
@@ -220,7 +237,7 @@ export default async function Page({ params }: PageProps) {
           <div className="flex items-center gap-3">
             <h1 className="font-semibold text-2xl">{matched.selection}</h1>
             <BetStatusBadge status={displayStatus} />
-            {isSequentialLayMatchedBet(matched.notes) && (
+            {isSequentialLayFlow && (
               <span className="rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-violet-700 text-xs">
                 Sequential lay
               </span>
@@ -315,7 +332,7 @@ export default async function Page({ params }: PageProps) {
             <p className="font-semibold text-purple-800">{matched.promoType}</p>
           </div>
         )}
-        {isSequentialLayMatchedBet(matched.notes) && (
+        {isSequentialLayFlow && (
           <div className="rounded-lg border border-violet-200 bg-violet-50 px-4 py-3">
             <p className="text-muted-foreground text-xs uppercase tracking-wide">
               Bet structure
@@ -368,9 +385,13 @@ export default async function Page({ params }: PageProps) {
 
       {/* Linked bets / group */}
       <MatchedBetGroupCard
+        addNextLayHref={
+          isSequentialLayFlow ? `/bets/sequential-lay/${matched.id}/next` : null
+        }
         aggregate={groupAggregate}
         betGroupId={matched.betGroupId}
         currentId={matched.id}
+        isSequentialLay={isSequentialLayFlow}
         members={groupMembers}
       />
 
