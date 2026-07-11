@@ -77,6 +77,7 @@ type AccountFormData = {
   notes: string;
   walletId: string;
   walletAmount: string;
+  depositFeeAmount: string;
 };
 
 // --- Wallet transaction types ---
@@ -101,6 +102,7 @@ type WalletFormData = {
   relatedAccountId: string;
   relatedWalletId: string;
   relatedWalletAmount: string;
+  depositFeeAmount: string;
 };
 
 type TabMode = "account" | "wallet";
@@ -247,6 +249,7 @@ export function QuickTransactionSheet({
     notes: "",
     walletId: "",
     walletAmount: "",
+    depositFeeAmount: "",
   });
   const [bonusSubcategories, setBonusSubcategories] = useState<string[]>(() =>
     sortBonusSubcategories(
@@ -273,6 +276,7 @@ export function QuickTransactionSheet({
     relatedAccountId: "",
     relatedWalletId: "",
     relatedWalletAmount: "",
+    depositFeeAmount: "",
   });
   const [walletErrors, setWalletErrors] = useState<
     Partial<Record<keyof WalletFormData, string>>
@@ -392,6 +396,7 @@ export function QuickTransactionSheet({
       notes: "",
       walletId: "",
       walletAmount: "",
+      depositFeeAmount: "",
     });
     setIsCreatingBonusSubcategory(false);
     setNewBonusSubcategory("");
@@ -406,6 +411,7 @@ export function QuickTransactionSheet({
       relatedAccountId: "",
       relatedWalletId: "",
       relatedWalletAmount: "",
+      depositFeeAmount: "",
     });
     setWalletErrors({});
   };
@@ -452,6 +458,13 @@ export function QuickTransactionSheet({
           "Wallet amount is required for cross-currency transfers";
       } else if (walletAmt <= 0) {
         newErrors.walletAmount = "Wallet amount must be positive";
+      }
+    }
+
+    if (accountForm.depositFeeAmount.trim() !== "") {
+      const feeAmt = Number.parseFloat(accountForm.depositFeeAmount);
+      if (Number.isNaN(feeAmt) || feeAmt <= 0) {
+        newErrors.depositFeeAmount = "Fee must be a positive number";
       }
     }
 
@@ -509,6 +522,16 @@ export function QuickTransactionSheet({
       }
     }
 
+    if (
+      walletForm.type === "transfer_to_account" &&
+      walletForm.depositFeeAmount.trim() !== ""
+    ) {
+      const feeAmt = Number.parseFloat(walletForm.depositFeeAmount);
+      if (Number.isNaN(feeAmt) || feeAmt <= 0) {
+        newErrors.depositFeeAmount = "Fee must be a positive number";
+      }
+    }
+
     setWalletErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -541,6 +564,18 @@ export function QuickTransactionSheet({
       if (showAccountWalletAmount && selectedAccountWallet) {
         payload.walletAmount = Number.parseFloat(accountForm.walletAmount);
         payload.walletCurrency = selectedAccountWallet.currency;
+      }
+
+      if (
+        accountForm.type === "deposit" &&
+        accountForm.walletId &&
+        accountForm.depositFeeAmount.trim() !== ""
+      ) {
+        payload.depositFeeAmount = Number.parseFloat(
+          accountForm.depositFeeAmount
+        );
+        // Fee expressed in account currency by default.
+        payload.depositFeeCurrency = accountForm.currency;
       }
 
       const response = await fetch(
@@ -611,6 +646,21 @@ export function QuickTransactionSheet({
         payload.relatedWalletAmount = Number.parseFloat(
           walletForm.relatedWalletAmount
         );
+      }
+
+      if (
+        walletForm.type === "transfer_to_account" &&
+        walletForm.depositFeeAmount.trim() !== ""
+      ) {
+        payload.depositFeeAmount = Number.parseFloat(
+          walletForm.depositFeeAmount
+        );
+        // Fee expressed in destination account currency by default.
+        const relatedAccount = accounts.find(
+          (a) => a.id === walletForm.relatedAccountId
+        );
+        payload.depositFeeCurrency =
+          relatedAccount?.currency ?? walletForm.currency;
       }
 
       const response = await fetch(
@@ -992,6 +1042,40 @@ export function QuickTransactionSheet({
               </div>
             )}
 
+            {/* Deposit Fee (only when depositing from a wallet) */}
+            {accountForm.type === "deposit" && accountForm.walletId && (
+              <div className="space-y-2">
+                <Label htmlFor="depositFeeAmount">
+                  Deposit fee ({accountForm.currency}){" "}
+                  <span className="text-muted-foreground">— optional</span>
+                </Label>
+                <Input
+                  className={
+                    accountErrors.depositFeeAmount ? "border-destructive" : ""
+                  }
+                  id="depositFeeAmount"
+                  min="0"
+                  onChange={(e) =>
+                    updateAccountField("depositFeeAmount", e.target.value)
+                  }
+                  placeholder={`e.g. 200 ${accountForm.currency}`}
+                  step="0.01"
+                  type="number"
+                  value={accountForm.depositFeeAmount}
+                />
+                {accountErrors.depositFeeAmount && (
+                  <p className="text-destructive text-xs">
+                    {accountErrors.depositFeeAmount}
+                  </p>
+                )}
+                <p className="text-muted-foreground text-xs">
+                  Implicit cost of this deposit (e.g. FX conversion loss).
+                  Reduces this account&apos;s total profit in reporting without
+                  affecting balances.
+                </p>
+              </div>
+            )}
+
             {/* Amount and Currency */}
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
@@ -1249,6 +1333,42 @@ export function QuickTransactionSheet({
                     {walletErrors.relatedAccountId}
                   </p>
                 )}
+              </div>
+            )}
+
+            {/* Deposit Fee (only for transfer_to_account) */}
+            {walletForm.type === "transfer_to_account" && (
+              <div className="space-y-2">
+                <Label htmlFor="walletDepositFeeAmount">
+                  Deposit fee (
+                  {accounts.find((a) => a.id === walletForm.relatedAccountId)
+                    ?.currency ?? walletForm.currency}
+                  ) <span className="text-muted-foreground">— optional</span>
+                </Label>
+                <Input
+                  className={
+                    walletErrors.depositFeeAmount ? "border-destructive" : ""
+                  }
+                  id="walletDepositFeeAmount"
+                  min="0"
+                  onChange={(e) =>
+                    updateWalletField("depositFeeAmount", e.target.value)
+                  }
+                  placeholder="e.g. 200"
+                  step="0.01"
+                  type="number"
+                  value={walletForm.depositFeeAmount}
+                />
+                {walletErrors.depositFeeAmount && (
+                  <p className="text-destructive text-xs">
+                    {walletErrors.depositFeeAmount}
+                  </p>
+                )}
+                <p className="text-muted-foreground text-xs">
+                  Implicit cost of this deposit (e.g. FX conversion loss).
+                  Reduces the destination account&apos;s total profit in
+                  reporting without affecting balances.
+                </p>
               </div>
             )}
 
