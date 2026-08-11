@@ -144,8 +144,9 @@ function buildPrompt({
     ? `The bet was placed at ${placedAt.toISOString()}. Prefer a match played after this time and near this date.`
     : "The bet placement time is unknown.";
   const searchQueries = buildSearchQueries({ market, placedAt });
+  const dateFallbackQuery = placedAt ? searchQueries.at(-1) : undefined;
   const dateFallbackHint = placedAt
-    ? `Only if those searches do not identify a reliable result, use the date-scoped fallback query "${searchQueries[2]}".`
+    ? `Only if those searches do not identify a reliable result, use the date-scoped fallback query "${dateFallbackQuery}".`
     : "No placement date is available, so do not invent a date-scoped query.";
 
   return `Find the final score for this sports bet using web search.
