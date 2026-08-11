@@ -103,6 +103,26 @@ function splitMarketTeams(market: string) {
   return parts.length >= 2 ? parts.slice(0, 2) : [];
 }
 
+function getMatchup(market: string) {
+  const teams = splitMarketTeams(market);
+  return teams.length === 2 ? `${teams[0]} vs ${teams[1]}` : market;
+}
+
+function buildDateScopedSearchQuery({
+  market,
+  placedAt,
+}: {
+  market: string;
+  placedAt: Date;
+}) {
+  const monthYear = placedAt.toLocaleDateString("en-US", {
+    month: "long",
+    timeZone: "UTC",
+    year: "numeric",
+  });
+  return `${getMatchup(market)} ${monthYear}`;
+}
+
 export function buildSearchQueries({
   market,
   placedAt,
@@ -110,17 +130,11 @@ export function buildSearchQueries({
   market: string;
   placedAt?: Date | null;
 }): string[] {
-  const teams = splitMarketTeams(market);
-  const matchup = teams.length === 2 ? `${teams[0]} vs ${teams[1]}` : market;
+  const matchup = getMatchup(market);
   const queries = [`${matchup} sofascore`, `${matchup} flashscore`];
 
   if (placedAt) {
-    const monthYear = placedAt.toLocaleDateString("en-US", {
-      month: "long",
-      timeZone: "UTC",
-      year: "numeric",
-    });
-    queries.push(`${matchup} ${monthYear}`);
+    queries.push(buildDateScopedSearchQuery({ market, placedAt }));
   }
 
   return queries;
@@ -144,7 +158,9 @@ function buildPrompt({
     ? `The bet was placed at ${placedAt.toISOString()}. Prefer a match played after this time and near this date.`
     : "The bet placement time is unknown.";
   const searchQueries = buildSearchQueries({ market, placedAt });
-  const dateFallbackQuery = placedAt ? searchQueries.at(-1) : undefined;
+  const dateFallbackQuery = placedAt
+    ? buildDateScopedSearchQuery({ market, placedAt })
+    : undefined;
   const dateFallbackHint = placedAt
     ? `Only if those searches do not identify a reliable result, use the date-scoped fallback query "${dateFallbackQuery}".`
     : "No placement date is available, so do not invent a date-scoped query.";
