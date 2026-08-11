@@ -115,11 +115,11 @@ function buildDateScopedSearchQuery({
   market: string;
   placedAt: Date;
 }) {
-  const monthYear = placedAt.toLocaleDateString("en-US", {
+  const month = new Intl.DateTimeFormat("en-US", {
     month: "long",
     timeZone: "UTC",
-    year: "numeric",
-  });
+  }).format(placedAt);
+  const monthYear = `${month} ${placedAt.getUTCFullYear()}`;
   return `${getMatchup(market)} ${monthYear}`;
 }
 
@@ -163,10 +163,9 @@ function buildPrompt({
     market,
     placedAt,
   });
-  const dateFallbackHint =
-    placedAt && dateFallbackQuery
-      ? `Only if those searches do not identify a reliable result, use the date-scoped fallback query "${dateFallbackQuery}".`
-      : "No placement date is available, so do not invent a date-scoped query.";
+  const dateFallbackHint = dateFallbackQuery
+    ? `Only if those searches do not identify a reliable result, use the date-scoped fallback query "${dateFallbackQuery}".`
+    : "No placement date is available, so do not invent a date-scoped query.";
 
   return `Find the final score for this sports bet using web search.
 
