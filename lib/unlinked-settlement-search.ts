@@ -112,10 +112,7 @@ export function buildSearchQueries({
 }): string[] {
   const teams = splitMarketTeams(market);
   const matchup = teams.length === 2 ? `${teams[0]} vs ${teams[1]}` : market;
-  const queries = [
-    `${matchup} sofascore`,
-    `${matchup} flashscore`,
-  ];
+  const queries = [`${matchup} sofascore`, `${matchup} flashscore`];
 
   if (placedAt) {
     const monthYear = placedAt.toLocaleDateString("en-US", {
@@ -147,6 +144,9 @@ function buildPrompt({
     ? `The bet was placed at ${placedAt.toISOString()}. Prefer a match played after this time and near this date.`
     : "The bet placement time is unknown.";
   const searchQueries = buildSearchQueries({ market, placedAt });
+  const dateFallbackHint = placedAt
+    ? `Only if those searches do not identify a reliable result, use the date-scoped fallback query "${searchQueries[2]}".`
+    : "No placement date is available, so do not invent a date-scoped query.";
 
   return `Find the final score for this sports bet using web search.
 
@@ -161,7 +161,7 @@ Search strategy (follow this order):
     .map((query) => `"${query}"`)
     .join(", ")}.
    Prefer current match pages or final-result pages from SofaScore and Flashscore.
-2. Only if those searches do not identify a reliable result, use the date-scoped fallback query${placedAt ? ` "${searchQueries[2]}"` : ""}.
+2. ${dateFallbackHint}
    The date fallback is secondary: a bet placed near the end of a month may refer to a
    match in the following month, so never exclude a result solely because it is outside
    the placement month. Cross-check the result date against the placement time and match
