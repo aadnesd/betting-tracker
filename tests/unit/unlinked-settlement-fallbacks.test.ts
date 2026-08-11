@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  buildSearchQueries,
   getFallbackModels,
   isTransientLookupError,
 } from "@/lib/unlinked-settlement-search";
@@ -51,6 +52,28 @@ describe("getFallbackModels", () => {
     process.env[ENV_KEY] = "openai/gpt-5.4-mini";
 
     expect(getFallbackModels("openai/gpt-5.4-mini")).toEqual([]);
+  });
+});
+
+describe("buildSearchQueries", () => {
+  it("prioritizes source-specific searches before the placement-month fallback", () => {
+    expect(
+      buildSearchQueries({
+        market: "Gil Vicente v Rio Ave",
+        placedAt: new Date("2026-08-30T12:00:00Z"),
+      })
+    ).toEqual([
+      "Gil Vicente vs Rio Ave sofascore",
+      "Gil Vicente vs Rio Ave flashscore",
+      "Gil Vicente vs Rio Ave August 2026",
+    ]);
+  });
+
+  it("does not add a date fallback when placement time is unknown", () => {
+    expect(buildSearchQueries({ market: "Gil Vicente v Rio Ave" })).toEqual([
+      "Gil Vicente vs Rio Ave sofascore",
+      "Gil Vicente vs Rio Ave flashscore",
+    ]);
   });
 });
 
