@@ -62,18 +62,23 @@ describe("buildSearchQueries", () => {
         market: "Gil Vicente v Rio Ave",
         placedAt: new Date("2026-08-30T12:00:00Z"),
       })
-    ).toEqual([
-      "Gil Vicente vs Rio Ave sofascore",
-      "Gil Vicente vs Rio Ave flashscore",
-      "Gil Vicente vs Rio Ave August 2026",
-    ]);
+    ).toEqual({
+      sourceQueries: [
+        "Gil Vicente vs Rio Ave sofascore",
+        "Gil Vicente vs Rio Ave flashscore",
+      ],
+      dateFallbackQuery: "Gil Vicente vs Rio Ave August 2026",
+    });
   });
 
   it("does not add a date fallback when placement time is unknown", () => {
-    expect(buildSearchQueries({ market: "Gil Vicente v Rio Ave" })).toEqual([
-      "Gil Vicente vs Rio Ave sofascore",
-      "Gil Vicente vs Rio Ave flashscore",
-    ]);
+    expect(buildSearchQueries({ market: "Gil Vicente v Rio Ave" })).toEqual({
+      sourceQueries: [
+        "Gil Vicente vs Rio Ave sofascore",
+        "Gil Vicente vs Rio Ave flashscore",
+      ],
+      dateFallbackQuery: undefined,
+    });
   });
 });
 

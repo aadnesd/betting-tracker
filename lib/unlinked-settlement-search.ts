@@ -129,15 +129,17 @@ export function buildSearchQueries({
 }: {
   market: string;
   placedAt?: Date | null;
-}): string[] {
+}): {
+  sourceQueries: string[];
+  dateFallbackQuery?: string;
+} {
   const matchup = getMatchup(market);
-  const queries = [`${matchup} sofascore`, `${matchup} flashscore`];
-
-  if (placedAt) {
-    queries.push(buildDateScopedSearchQuery({ market, placedAt }));
-  }
-
-  return queries;
+  return {
+    sourceQueries: [`${matchup} sofascore`, `${matchup} flashscore`],
+    dateFallbackQuery: placedAt
+      ? buildDateScopedSearchQuery({ market, placedAt })
+      : undefined,
+  };
 }
 
 function buildPrompt({
@@ -157,10 +159,10 @@ function buildPrompt({
   const placedHint = placedAt
     ? `The bet was placed at ${placedAt.toISOString()}. Prefer a match played after this time and near this date.`
     : "The bet placement time is unknown.";
-  const searchQueries = buildSearchQueries({ market, placedAt });
-  const dateFallbackQuery = placedAt
-    ? buildDateScopedSearchQuery({ market, placedAt })
-    : undefined;
+  const { sourceQueries, dateFallbackQuery } = buildSearchQueries({
+    market,
+    placedAt,
+  });
   const dateFallbackHint = placedAt
     ? `Only if those searches do not identify a reliable result, use the date-scoped fallback query "${dateFallbackQuery}".`
     : "No placement date is available, so do not invent a date-scoped query.";
@@ -173,8 +175,7 @@ ${teamHint}
 ${placedHint}
 
 Search strategy (follow this order):
-1. Search each of these source-specific queries first: ${searchQueries
-    .slice(0, 2)
+1. Search each of these source-specific queries first: ${sourceQueries
     .map((query) => `"${query}"`)
     .join(", ")}.
    Prefer current match pages or final-result pages from SofaScore and Flashscore.
