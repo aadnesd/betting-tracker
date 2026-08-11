@@ -103,45 +103,6 @@ function splitMarketTeams(market: string) {
   return parts.length >= 2 ? parts.slice(0, 2) : [];
 }
 
-function getMatchup(market: string) {
-  const teams = splitMarketTeams(market);
-  return teams.length === 2 ? `${teams[0]} vs ${teams[1]}` : market;
-}
-
-function buildDateScopedSearchQuery({
-  market,
-  placedAt,
-}: {
-  market: string;
-  placedAt: Date;
-}) {
-  const month = new Intl.DateTimeFormat("en-US", {
-    month: "long",
-    timeZone: "UTC",
-  }).format(placedAt);
-  const monthYear = `${month} ${placedAt.getUTCFullYear()}`;
-  return `${getMatchup(market)} ${monthYear}`;
-}
-
-export function buildSearchQueries({
-  market,
-  placedAt,
-}: {
-  market: string;
-  placedAt?: Date | null;
-}): {
-  sourceQueries: string[];
-  dateFallbackQuery?: string;
-} {
-  const matchup = getMatchup(market);
-  return {
-    sourceQueries: [`${matchup} sofascore`, `${matchup} flashscore`],
-    dateFallbackQuery: placedAt
-      ? buildDateScopedSearchQuery({ market, placedAt })
-      : undefined,
-  };
-}
-
 function buildPrompt({
   market,
   selection,
@@ -159,13 +120,6 @@ function buildPrompt({
   const placedHint = placedAt
     ? `The bet was placed at ${placedAt.toISOString()}. Prefer a match played after this time and near this date.`
     : "The bet placement time is unknown.";
-  const { sourceQueries, dateFallbackQuery } = buildSearchQueries({
-    market,
-    placedAt,
-  });
-  const dateFallbackHint = dateFallbackQuery
-    ? `Only if those searches do not identify a reliable result, use the date-scoped fallback query "${dateFallbackQuery}".`
-    : "No placement date is available, so do not invent a date-scoped query.";
 
   return `Find the final score for this sports bet using web search.
 
@@ -174,16 +128,10 @@ Selection: "${selection}"
 ${teamHint}
 ${placedHint}
 
-Search strategy (follow this order):
-1. Search each of these source-specific queries first: ${sourceQueries
-    .map((query) => `"${query}"`)
-    .join(", ")}.
-   Prefer current match pages or final-result pages from SofaScore and Flashscore.
-2. ${dateFallbackHint}
-   The date fallback is secondary: a bet placed near the end of a month may refer to a
-   match in the following month, so never exclude a result solely because it is outside
-   the placement month. Cross-check the result date against the placement time and match
-   status before deciding.
+Search reliable current or final-result pages, preferably from SofaScore or Flashscore.
+Use the placement time as context, but do not restrict the search to that month: a
+match near a month boundary may be played in the adjacent month. Verify the teams,
+result date, and final status before choosing a result.
 
 Return JSON only with this shape:
 {
