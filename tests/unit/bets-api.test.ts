@@ -2580,6 +2580,123 @@ describe("bets API routes (unit)", () => {
   });
 
   describe("POST /api/bets/individual/update", () => {
+    it("adds lay portions and recomputes the combined lay bet", async () => {
+      const betId = "22222222-2222-2222-2222-222222222222";
+      const primaryAccountId = "33333333-3333-3333-3333-333333333333";
+      const secondAccountId = "44444444-4444-4444-4444-444444444444";
+
+      (dbQueries.getLayBetById as vi.Mock).mockResolvedValue({
+        id: betId,
+        status: "matched",
+        market: "Molde FK vs Tromso IL",
+        selection: "Molde FK to Win",
+        odds: "2.00",
+        stake: "100.00",
+        accountId: primaryAccountId,
+        currency: "USD",
+        placedAt: new Date(),
+        splitLegs: null,
+      });
+      (dbQueries.getAccountById as vi.Mock).mockImplementation(
+        ({ id }: { id: string }) =>
+          Promise.resolve({
+            id,
+            name: id === primaryAccountId ? "SharkbetX" : "Betfair",
+            kind: "exchange",
+            currency: "USD",
+            commission: null,
+          })
+      );
+      (dbQueries.updateLayBetDetails as vi.Mock).mockResolvedValue({
+        id: betId,
+        status: "matched",
+        market: "Molde FK vs Tromso IL",
+        selection: "Molde FK to Win",
+        odds: "2.0666666667",
+        stake: "150.00",
+        accountId: primaryAccountId,
+        currency: "USD",
+        placedAt: new Date(),
+        splitLegs: [
+          {
+            accountId: primaryAccountId,
+            odds: 2,
+            stake: 100,
+            currency: "USD",
+          },
+          {
+            accountId: secondAccountId,
+            odds: 2.2,
+            stake: 50,
+            currency: "USD",
+          },
+        ],
+      });
+      (dbQueries.getMatchedBetByLegId as vi.Mock).mockResolvedValue({
+        id: "55555555-5555-5555-5555-555555555555",
+        backBetId: "66666666-6666-6666-6666-666666666666",
+        layBetId: betId,
+        netExposure: "-10.00",
+        promoType: null,
+      });
+      (dbQueries.getBackBetById as vi.Mock).mockResolvedValue({
+        id: "66666666-6666-6666-6666-666666666666",
+        odds: "2.50",
+        stake: "120.00",
+        currency: "USD",
+      });
+      (dbQueries.getFreeBetByMatchedBetId as vi.Mock).mockResolvedValue(null);
+      (dbQueries.updateMatchedBetRecord as vi.Mock).mockResolvedValue({
+        id: "55555555-5555-5555-5555-555555555555",
+      });
+      (dbQueries.createAuditEntry as vi.Mock).mockResolvedValue({
+        id: "audit-1",
+      });
+
+      const res = await updateIndividualRoute(
+        new Request("http://localhost/api/bets/individual/update", {
+          method: "POST",
+          body: JSON.stringify({
+            betId,
+            betKind: "lay",
+            market: "Molde FK vs Tromso IL",
+            selection: "Molde FK to Win",
+            odds: 2,
+            stake: 100,
+            accountId: primaryAccountId,
+            currency: "USD",
+            splitLegs: [
+              { accountId: primaryAccountId, odds: 2, stake: 100 },
+              { accountId: secondAccountId, odds: 2.2, stake: 50 },
+            ],
+          }),
+        })
+      );
+
+      expect(res.status).toBe(200);
+      expect(dbQueries.updateLayBetDetails).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: betId,
+          odds: expect.closeTo(2.066_666_666_7, 8),
+          stake: 150,
+          splitLegs: [
+            {
+              accountId: primaryAccountId,
+              odds: 2,
+              stake: 100,
+              currency: "USD",
+            },
+            {
+              accountId: secondAccountId,
+              odds: 2.2,
+              stake: 50,
+              currency: "USD",
+            },
+          ],
+        })
+      );
+    });
+
     it("updates a back bet and recomputes matched set net exposure", async () => {
       const betId = "22222222-2222-2222-2222-222222222222";
       const accountId = "33333333-3333-3333-3333-333333333333";
