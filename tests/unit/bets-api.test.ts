@@ -2697,6 +2697,32 @@ describe("bets API routes (unit)", () => {
       );
     });
 
+    it("rejects lay portions with odds at or below 1.0", async () => {
+      const betId = "22222222-2222-2222-2222-222222222222";
+      const primaryAccountId = "33333333-3333-3333-3333-333333333333";
+
+      const res = await updateIndividualRoute(
+        new Request("http://localhost/api/bets/individual/update", {
+          method: "POST",
+          body: JSON.stringify({
+            betId,
+            betKind: "lay",
+            market: "Molde FK vs Tromso IL",
+            selection: "Molde FK to Win",
+            odds: 2,
+            stake: 100,
+            accountId: primaryAccountId,
+            currency: "USD",
+            splitLegs: [{ accountId: primaryAccountId, odds: 1, stake: 100 }],
+          }),
+        })
+      );
+
+      expect(res.status).toBe(400);
+      expect(dbQueries.getLayBetById).not.toHaveBeenCalled();
+      expect(dbQueries.updateLayBetDetails).not.toHaveBeenCalled();
+    });
+
     it("updates a back bet and recomputes matched set net exposure", async () => {
       const betId = "22222222-2222-2222-2222-222222222222";
       const accountId = "33333333-3333-3333-3333-333333333333";

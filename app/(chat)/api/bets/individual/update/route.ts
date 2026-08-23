@@ -55,7 +55,7 @@ const updateSchema = z.object({
     .array(
       z.object({
         accountId: z.string().uuid(),
-        odds: z.number().positive("Lay odds must be positive"),
+        odds: z.number().gt(1, "Lay odds must be greater than 1.0"),
         stake: z.number().positive("Lay stake must be positive"),
       })
     )
