@@ -128,6 +128,11 @@ Selection: "${selection}"
 ${teamHint}
 ${placedHint}
 
+Search reliable current or final-result pages, preferably from SofaScore or Flashscore.
+Use the placement time as context, but do not restrict the search to that month: a
+match near a month boundary may be played in the adjacent month. Verify the teams,
+result date, and final status before choosing a result.
+
 Return JSON only with this shape:
 {
   "status": "finished" | "not_finished" | "not_found" | "ambiguous",
