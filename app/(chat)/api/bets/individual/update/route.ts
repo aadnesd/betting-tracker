@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/app/(auth)/auth";
 import {
+  combineSplitBetLegs,
   computeMatchedNetExposure,
   computeNetExposureInputs,
 } from "@/lib/bet-calculations";
@@ -22,6 +23,7 @@ import {
   updateLayBetDetails,
   updateMatchedBetRecord,
 } from "@/lib/db/queries";
+import type { BetSplitLeg } from "@/lib/db/schema";
 import { convertAmountToNok } from "@/lib/fx-rates";
 import {
   canUserEditSettledBets,
@@ -49,6 +51,17 @@ const updateSchema = z.object({
     .optional()
     .nullable(),
   notes: z.string().optional(),
+  splitLegs: z
+    .array(
+      z.object({
+        accountId: z.string().uuid(),
+        odds: z.number().gt(1, "Lay odds must be greater than 1.0"),
+        stake: z.number().positive("Lay stake must be positive"),
+      })
+    )
+    .min(1, "At least one lay portion is required")
+    .max(50, "Too many lay portions")
+    .optional(),
 });
 
 function safeDate(value?: string | null) {
@@ -126,6 +139,20 @@ export async function POST(request: Request) {
       );
     }
 
+    if (payload.splitLegs && payload.betKind !== "lay") {
+      return NextResponse.json(
+        { error: "Only lay bets can be split into portions" },
+        { status: 400 }
+      );
+    }
+
+    if (isSettled && payload.splitLegs) {
+      return NextResponse.json(
+        { error: "Cannot change lay portions on a settled bet" },
+        { status: 400 }
+      );
+    }
+
     const account = await getAccountById({
       id: payload.accountId,
       userId,
@@ -141,6 +168,57 @@ export async function POST(request: Request) {
         { error: "Account type does not match bet kind" },
         { status: 400 }
       );
+    }
+
+    let splitLegs: BetSplitLeg[] | null | undefined;
+    let combinedLay: ReturnType<typeof combineSplitBetLegs> | null = null;
+    if (payload.splitLegs) {
+      if (payload.splitLegs[0]?.accountId !== payload.accountId) {
+        return NextResponse.json(
+          { error: "The first lay portion must use the selected exchange" },
+          { status: 400 }
+        );
+      }
+
+      const splitAccounts = await Promise.all(
+        payload.splitLegs.map((leg) =>
+          leg.accountId === account.id
+            ? account
+            : getAccountById({ id: leg.accountId, userId })
+        )
+      );
+      if (
+        splitAccounts.some(
+          (splitAccount) => !splitAccount || splitAccount.kind !== "exchange"
+        )
+      ) {
+        return NextResponse.json(
+          { error: "Each lay portion must use one of your exchange accounts" },
+          { status: 400 }
+        );
+      }
+      if (
+        splitAccounts.some(
+          (splitAccount) =>
+            splitAccount?.currency &&
+            splitAccount.currency.toUpperCase() !==
+              payload.currency.toUpperCase()
+        )
+      ) {
+        return NextResponse.json(
+          { error: "All lay portions must use the bet currency" },
+          { status: 400 }
+        );
+      }
+
+      const nextSplitLegs: BetSplitLeg[] = payload.splitLegs.map((leg) => ({
+        accountId: leg.accountId,
+        odds: leg.odds,
+        stake: leg.stake,
+        currency: payload.currency,
+      }));
+      splitLegs = nextSplitLegs.length > 1 ? nextSplitLegs : null;
+      combinedLay = combineSplitBetLegs(nextSplitLegs, "lay");
     }
 
     if (payload.matchId !== undefined && payload.matchId !== null) {
@@ -159,6 +237,7 @@ export async function POST(request: Request) {
       accountId: bet.accountId,
       currency: bet.currency,
       placedAt: bet.placedAt,
+      splitLegs: bet.splitLegs ?? null,
     };
 
     const matchIdForUpdate =
@@ -207,13 +286,14 @@ export async function POST(request: Request) {
             userId,
             market: payload.market,
             selection: payload.selection,
-            odds: payload.odds,
-            stake: payload.stake,
+            odds: combinedLay?.odds ?? payload.odds,
+            stake: combinedLay?.stake ?? payload.stake,
             exchange: account.name,
             matchId: matchIdForUpdate,
             accountId: account.id,
             currency: payload.currency,
             placedAt: safeDate(payload.placedAt),
+            splitLegs,
           });
 
     if (!updated) {
@@ -232,6 +312,7 @@ export async function POST(request: Request) {
       accountId: updated.accountId,
       currency: updated.currency,
       placedAt: updated.placedAt,
+      splitLegs: updated.splitLegs ?? null,
     };
 
     const changes = computeChanges(beforeState, afterState);

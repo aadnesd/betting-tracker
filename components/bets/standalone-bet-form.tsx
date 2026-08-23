@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Gift, Loader2 } from "lucide-react";
+import { ArrowLeft, Gift, Loader2, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
@@ -26,6 +26,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { combineSplitBetLegs } from "@/lib/bet-calculations";
 import type { SettlementOutcome } from "@/lib/settled-bet-edit";
 
 const PROMO_TYPES = [
@@ -81,7 +82,19 @@ type StandaloneBetFormProps = {
     matchId?: string | null;
     settlementOutcome?: SettlementOutcome | null;
     notes?: string | null;
+    splitLegs?: Array<{
+      accountId: string | null;
+      odds: number;
+      stake: number;
+      currency: string | null;
+    }> | null;
   };
+};
+
+type LayPortionFormData = {
+  accountId: string;
+  odds: string;
+  stake: string;
 };
 
 type FormData = {
@@ -111,6 +124,11 @@ export function StandaloneBetForm({
   const searchParams = useSearchParams();
   const isEdit = Boolean(mode === "edit" && initialData);
   const isSettledEdit = isEdit && initialData?.status === "settled";
+  const canSplitLay =
+    isEdit &&
+    !isSettledEdit &&
+    initialData?.kind === "lay" &&
+    initialData.status === "matched";
   const returnTo = getSafeReturnPath(searchParams.get("returnTo"));
 
   const initialKind = initialData?.kind ?? "back";
@@ -138,6 +156,25 @@ export function StandaloneBetForm({
     notes: initialData?.notes ?? "",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [layPortions, setLayPortions] = useState<LayPortionFormData[]>(() => {
+    const persistedPortions = initialData?.splitLegs?.filter(
+      (portion) => portion.accountId
+    );
+    if (persistedPortions && persistedPortions.length > 0) {
+      return persistedPortions.map((portion) => ({
+        accountId: portion.accountId ?? "",
+        odds: portion.odds.toString(),
+        stake: portion.stake.toString(),
+      }));
+    }
+    return [
+      {
+        accountId: initialData?.accountId ?? fallbackAccountId,
+        odds: initialData?.odds.toString() ?? "",
+        stake: initialData?.stake.toString() ?? "",
+      },
+    ];
+  });
   const [errors, setErrors] = useState<Partial<Record<keyof FormData, string>>>(
     {}
   );
@@ -202,6 +239,44 @@ export function StandaloneBetForm({
     }));
   };
 
+  const updateLayPortion = (
+    index: number,
+    field: keyof LayPortionFormData,
+    value: string
+  ) => {
+    setLayPortions((portions) =>
+      portions.map((portion, portionIndex) =>
+        portionIndex === index ? { ...portion, [field]: value } : portion
+      )
+    );
+  };
+
+  const addLayPortion = () => {
+    setLayPortions((portions) => [
+      ...portions,
+      {
+        accountId: portions[0]?.accountId ?? formData.accountId,
+        odds: "",
+        stake: "",
+      },
+    ]);
+  };
+
+  const removeLayPortion = (index: number) => {
+    setLayPortions((portions) =>
+      portions.filter((_, portionIndex) => portionIndex !== index)
+    );
+  };
+
+  const parsedLayPortions = layPortions.map((portion) => ({
+    accountId: portion.accountId,
+    odds: Number.parseFloat(portion.odds),
+    stake: Number.parseFloat(portion.stake),
+  }));
+  const combinedLayPortions = canSplitLay
+    ? combineSplitBetLegs(parsedLayPortions, "lay")
+    : null;
+
   const handlePromoTypeChange = (promoType: string) => {
     setFormData((prev) => ({
       ...prev,
@@ -238,13 +313,30 @@ export function StandaloneBetForm({
     if (!formData.selection.trim()) {
       newErrors.selection = "Selection is required";
     }
-    if (!formData.odds || Number.parseFloat(formData.odds) <= 0) {
+    if (
+      canSplitLay &&
+      parsedLayPortions.some(
+        (portion) =>
+          !portion.accountId ||
+          !Number.isFinite(portion.odds) ||
+          portion.odds <= 1
+      )
+    ) {
+      newErrors.odds = "Each lay portion needs odds greater than 1.0";
+    } else if (!formData.odds || Number.parseFloat(formData.odds) <= 0) {
       newErrors.odds = "Odds must be positive";
     }
-    if (!formData.stake || Number.parseFloat(formData.stake) <= 0) {
+    if (
+      canSplitLay &&
+      parsedLayPortions.some(
+        (portion) => !Number.isFinite(portion.stake) || portion.stake <= 0
+      )
+    ) {
+      newErrors.stake = "Each lay portion needs a stake greater than 0";
+    } else if (!formData.stake || Number.parseFloat(formData.stake) <= 0) {
       newErrors.stake = "Stake must be positive";
     }
-    if (!formData.accountId) {
+    if (!canSplitLay && !formData.accountId) {
       newErrors.accountId = "Account is required";
     }
     if (isSettledEdit && !formData.settlementOutcome) {
@@ -268,6 +360,8 @@ export function StandaloneBetForm({
     setIsSubmitting(true);
 
     try {
+      const effectiveLay = canSplitLay ? combinedLayPortions : null;
+      const primaryLayPortion = parsedLayPortions[0];
       const endpoint =
         mode === "edit"
           ? "/api/bets/individual/update"
@@ -281,9 +375,12 @@ export function StandaloneBetForm({
           kind: formData.kind,
           market: formData.market.trim(),
           selection: formData.selection.trim(),
-          odds: Number.parseFloat(formData.odds),
-          stake: Number.parseFloat(formData.stake),
-          accountId: formData.accountId,
+          odds: effectiveLay?.odds ?? Number.parseFloat(formData.odds),
+          stake: effectiveLay?.stake ?? Number.parseFloat(formData.stake),
+          accountId:
+            canSplitLay && primaryLayPortion
+              ? primaryLayPortion.accountId
+              : formData.accountId,
           currency: formData.currency,
           matchId: formData.matchId ? formData.matchId : null,
           promoType:
@@ -299,6 +396,7 @@ export function StandaloneBetForm({
             : undefined,
           settlementOutcome: formData.settlementOutcome || undefined,
           notes: formData.notes.trim() || undefined,
+          splitLegs: canSplitLay ? parsedLayPortions : undefined,
         }),
       });
 
@@ -316,7 +414,9 @@ export function StandaloneBetForm({
           ? "Bet updated successfully"
           : `${formData.kind === "back" ? "Back" : "Lay"} bet created successfully`,
         {
-          description: `${formData.selection} @ ${formData.odds}`,
+          description: `${formData.selection} @ ${
+            effectiveLay?.odds ?? formData.odds
+          }`,
         }
       );
 
@@ -345,8 +445,10 @@ export function StandaloneBetForm({
   };
 
   // Calculate potential profit/loss for display
-  const odds = Number.parseFloat(formData.odds) || 0;
-  const stake = Number.parseFloat(formData.stake) || 0;
+  const odds =
+    combinedLayPortions?.odds ?? (Number.parseFloat(formData.odds) || 0);
+  const stake =
+    combinedLayPortions?.stake ?? (Number.parseFloat(formData.stake) || 0);
   const potentialProfit =
     formData.kind === "back"
       ? stake * (odds - 1) // Back bet: profit if wins
@@ -431,93 +533,98 @@ export function StandaloneBetForm({
               </div>
 
               {/* Account Selection */}
-              <div className="space-y-2">
-                <Label htmlFor="account">
-                  {formData.kind === "back" ? "Account" : "Exchange"}
-                </Label>
-                {noAccountsForType ? (
-                  <div className="rounded-md border border-yellow-500/50 bg-yellow-500/10 p-3 text-sm">
-                    <p>
-                      No{" "}
-                      {formData.kind === "back"
-                        ? "bookmaker or exchange"
-                        : "exchange"}{" "}
-                      accounts configured.{" "}
-                      <Link
-                        className="underline hover:text-foreground"
-                        href="/bets/settings/accounts/new"
-                      >
-                        Add one
-                      </Link>
-                    </p>
-                  </div>
-                ) : (
-                  <Select
-                    disabled={isSettledEdit}
-                    onValueChange={handleAccountChange}
-                    value={formData.accountId}
-                  >
-                    <SelectTrigger id="account">
-                      <SelectValue placeholder="Select account" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {formData.kind === "back" ? (
-                        <>
-                          {bookmakers.length > 0 && (
-                            <SelectGroup>
-                              <SelectLabel>Bookmakers</SelectLabel>
-                              {bookmakers.map((acc) => (
-                                <SelectItem key={acc.id} value={acc.id}>
-                                  {acc.name}{" "}
-                                  {acc.currency && (
-                                    <span className="text-muted-foreground">
-                                      ({acc.currency})
-                                    </span>
-                                  )}
-                                </SelectItem>
-                              ))}
-                            </SelectGroup>
-                          )}
-                          {exchanges.length > 0 && (
-                            <SelectGroup>
-                              <SelectLabel>Exchanges</SelectLabel>
-                              {exchanges.map((acc) => (
-                                <SelectItem key={acc.id} value={acc.id}>
-                                  {acc.name}{" "}
-                                  {acc.currency && (
-                                    <span className="text-muted-foreground">
-                                      ({acc.currency})
-                                    </span>
-                                  )}
-                                </SelectItem>
-                              ))}
-                            </SelectGroup>
-                          )}
-                        </>
-                      ) : (
-                        accounts.map((acc) => (
-                          <SelectItem key={acc.id} value={acc.id}>
-                            {acc.name}{" "}
-                            {acc.currency && (
-                              <span className="text-muted-foreground">
-                                ({acc.currency})
-                              </span>
+              {!canSplitLay && (
+                <div className="space-y-2">
+                  <Label htmlFor="account">
+                    {formData.kind === "back" ? "Account" : "Exchange"}
+                  </Label>
+                  {noAccountsForType ? (
+                    <div className="rounded-md border border-yellow-500/50 bg-yellow-500/10 p-3 text-sm">
+                      <p>
+                        No{" "}
+                        {formData.kind === "back"
+                          ? "bookmaker or exchange"
+                          : "exchange"}{" "}
+                        accounts configured.{" "}
+                        <Link
+                          className="underline hover:text-foreground"
+                          href="/bets/settings/accounts/new"
+                        >
+                          Add one
+                        </Link>
+                      </p>
+                    </div>
+                  ) : (
+                    <Select
+                      disabled={isSettledEdit}
+                      onValueChange={handleAccountChange}
+                      value={formData.accountId}
+                    >
+                      <SelectTrigger id="account">
+                        <SelectValue placeholder="Select account" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {formData.kind === "back" ? (
+                          <>
+                            {bookmakers.length > 0 && (
+                              <SelectGroup>
+                                <SelectLabel>Bookmakers</SelectLabel>
+                                {bookmakers.map((acc) => (
+                                  <SelectItem key={acc.id} value={acc.id}>
+                                    {acc.name}{" "}
+                                    {acc.currency && (
+                                      <span className="text-muted-foreground">
+                                        ({acc.currency})
+                                      </span>
+                                    )}
+                                  </SelectItem>
+                                ))}
+                              </SelectGroup>
                             )}
-                          </SelectItem>
-                        ))
-                      )}
-                    </SelectContent>
-                  </Select>
-                )}
-                {errors.accountId && (
-                  <p className="text-destructive text-xs">{errors.accountId}</p>
-                )}
-                {isSettledEdit && (
-                  <p className="text-muted-foreground text-xs">
-                    Account and currency are locked for settled-bet corrections.
-                  </p>
-                )}
-              </div>
+                            {exchanges.length > 0 && (
+                              <SelectGroup>
+                                <SelectLabel>Exchanges</SelectLabel>
+                                {exchanges.map((acc) => (
+                                  <SelectItem key={acc.id} value={acc.id}>
+                                    {acc.name}{" "}
+                                    {acc.currency && (
+                                      <span className="text-muted-foreground">
+                                        ({acc.currency})
+                                      </span>
+                                    )}
+                                  </SelectItem>
+                                ))}
+                              </SelectGroup>
+                            )}
+                          </>
+                        ) : (
+                          accounts.map((acc) => (
+                            <SelectItem key={acc.id} value={acc.id}>
+                              {acc.name}{" "}
+                              {acc.currency && (
+                                <span className="text-muted-foreground">
+                                  ({acc.currency})
+                                </span>
+                              )}
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                  )}
+                  {errors.accountId && (
+                    <p className="text-destructive text-xs">
+                      {errors.accountId}
+                    </p>
+                  )}
+                  {isSettledEdit && (
+                    <p className="text-muted-foreground text-xs">
+                      Account and currency are locked for settled-bet
+                      corrections.
+                    </p>
+                  )}
+                </div>
+              )}
 
               {/* Market & Selection */}
               <div className="space-y-2">
@@ -677,39 +784,160 @@ export function StandaloneBetForm({
                 </>
               )}
 
-              {/* Odds & Stake */}
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="odds">Odds</Label>
-                  <Input
-                    id="odds"
-                    min="1.01"
-                    onChange={(e) => updateField("odds", e.target.value)}
-                    placeholder="e.g., 2.50"
-                    step="any"
-                    type="number"
-                    value={formData.odds}
-                  />
+              {canSplitLay ? (
+                <div className="space-y-3 rounded-md border bg-muted/20 p-3">
+                  <div>
+                    <Label>Lay portions</Label>
+                    <p className="text-muted-foreground text-xs">
+                      Keep the fill you already received, then add each new fill
+                      at its actual odds and stake.
+                    </p>
+                  </div>
+                  {layPortions.map((portion, index) => (
+                    <div
+                      className="space-y-3 rounded-md border bg-background p-3"
+                      key={`${index}-${portion.accountId}`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="font-medium text-sm">
+                          Lay portion {index + 1}
+                        </p>
+                        {layPortions.length > 1 && index > 0 && (
+                          <Button
+                            aria-label={`Remove lay portion ${index + 1}`}
+                            onClick={() => removeLayPortion(index)}
+                            size="icon"
+                            type="button"
+                            variant="ghost"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                      <div className="grid gap-3 sm:grid-cols-3">
+                        <div className="space-y-2">
+                          <Label>Exchange</Label>
+                          <Select
+                            onValueChange={(value) =>
+                              updateLayPortion(index, "accountId", value)
+                            }
+                            value={portion.accountId}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select exchange" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {exchanges
+                                .filter(
+                                  (account) =>
+                                    !account.currency ||
+                                    account.currency.toUpperCase() ===
+                                      formData.currency.toUpperCase()
+                                )
+                                .map((account) => (
+                                  <SelectItem
+                                    key={account.id}
+                                    value={account.id}
+                                  >
+                                    {account.name}
+                                  </SelectItem>
+                                ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Lay odds</Label>
+                          <Input
+                            min="1.01"
+                            onChange={(event) =>
+                              updateLayPortion(
+                                index,
+                                "odds",
+                                event.target.value
+                              )
+                            }
+                            step="any"
+                            type="number"
+                            value={portion.odds}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Stake ({formData.currency})</Label>
+                          <Input
+                            min="0.01"
+                            onChange={(event) =>
+                              updateLayPortion(
+                                index,
+                                "stake",
+                                event.target.value
+                              )
+                            }
+                            step="0.01"
+                            type="number"
+                            value={portion.stake}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                   {errors.odds && (
                     <p className="text-destructive text-xs">{errors.odds}</p>
                   )}
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="stake">Stake ({formData.currency})</Label>
-                  <Input
-                    id="stake"
-                    min="0.01"
-                    onChange={(e) => updateField("stake", e.target.value)}
-                    placeholder="e.g., 100"
-                    step="0.01"
-                    type="number"
-                    value={formData.stake}
-                  />
                   {errors.stake && (
                     <p className="text-destructive text-xs">{errors.stake}</p>
                   )}
+                  <Button
+                    onClick={addLayPortion}
+                    size="sm"
+                    type="button"
+                    variant="outline"
+                  >
+                    <Plus className="mr-1 h-4 w-4" />
+                    Add lay portion
+                  </Button>
+                  {combinedLayPortions && combinedLayPortions.stake > 0 && (
+                    <p className="text-muted-foreground text-sm">
+                      Combined: {combinedLayPortions.stake.toFixed(2)}{" "}
+                      {formData.currency} at{" "}
+                      {combinedLayPortions.odds.toFixed(4)}
+                      lay odds
+                    </p>
+                  )}
                 </div>
-              </div>
+              ) : (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="odds">Odds</Label>
+                    <Input
+                      id="odds"
+                      min="1.01"
+                      onChange={(e) => updateField("odds", e.target.value)}
+                      placeholder="e.g., 2.50"
+                      step="any"
+                      type="number"
+                      value={formData.odds}
+                    />
+                    {errors.odds && (
+                      <p className="text-destructive text-xs">{errors.odds}</p>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="stake">Stake ({formData.currency})</Label>
+                    <Input
+                      id="stake"
+                      min="0.01"
+                      onChange={(e) => updateField("stake", e.target.value)}
+                      placeholder="e.g., 100"
+                      step="0.01"
+                      type="number"
+                      value={formData.stake}
+                    />
+                    {errors.stake && (
+                      <p className="text-destructive text-xs">{errors.stake}</p>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {isSettledEdit && (
                 <p className="text-muted-foreground text-xs">
