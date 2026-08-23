@@ -31,6 +31,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   calculateSequentialLayOutcomes,
   calculateSequentialLayPlan,
+  predictionMarketPositionToLay,
   type SequentialLayMode,
 } from "@/lib/bet-calculations";
 import { SEQUENTIAL_LAY_TAG } from "@/lib/bets/sequential-lay";
@@ -50,6 +51,7 @@ export type AccountOption = {
   id: string;
   name: string;
   kind: "bookmaker" | "exchange";
+  exchangeType: "traditional" | "prediction_market";
   currency: string | null;
   commission: number | null;
 };
@@ -90,6 +92,9 @@ type FormData = {
   backCurrency: string;
   layOdds: string;
   layStake: string;
+  laySharePrice: string;
+  layShares: string;
+  layShareSide: "no" | "under" | "over";
   layExchange: string;
   layCurrency: string;
   notes: string;
@@ -122,6 +127,9 @@ type LayStakeCalculation = {
   commissionRate: number;
   backRateToNok: number;
   layRateToNok: number;
+  equivalentLayOdds?: number;
+  shares?: number | null;
+  balancedShares?: number | null;
 };
 
 type LayStakeMode = "balanced" | "underlay" | "overlay";
@@ -189,6 +197,9 @@ export function QuickAddForm({
     backCurrency: defaultBackCurrency,
     layOdds: "",
     layStake: "",
+    laySharePrice: "",
+    layShares: "",
+    layShareSide: "no",
     layExchange: defaultExchange,
     layCurrency: defaultLayCurrency,
     notes: "",
@@ -328,6 +339,20 @@ export function QuickAddForm({
     }
     return freeBets.find((fb) => fb.id === formData.freeBetId) ?? null;
   }, [formData.freeBetId, freeBets]);
+
+  const selectedExchange = useMemo(
+    () => exchanges.find((exchange) => exchange.name === formData.layExchange),
+    [exchanges, formData.layExchange]
+  );
+  const isPredictionMarket =
+    selectedExchange?.exchangeType === "prediction_market";
+
+  const predictionMarketSideLabel =
+    formData.layShareSide === "no"
+      ? "No"
+      : formData.layShareSide === "under"
+        ? "Under"
+        : "Over";
 
   const sequentialLayPlan = useMemo(() => {
     if (hedgeMode !== "sequential_lay") {
@@ -471,13 +496,14 @@ export function QuickAddForm({
     const backOdds = parsePositiveDecimal(backLegs[0]?.odds ?? "");
     const backStake = parsePositiveDecimal(backLegs[0]?.stake ?? "");
     const layOdds = parsePositiveDecimal(layLegs[0]?.odds ?? "");
+    const sharePrice = parsePositiveDecimal(formData.laySharePrice);
 
     if (
       backOdds === null ||
       backStake === null ||
-      layOdds === null ||
       backOdds <= 1 ||
-      layOdds <= 1 ||
+      (!isPredictionMarket && (layOdds === null || layOdds <= 1)) ||
+      (isPredictionMarket && sharePrice === null) ||
       !formData.backCurrency ||
       !formData.layCurrency ||
       !formData.layExchange
@@ -500,7 +526,8 @@ export function QuickAddForm({
             backOdds,
             backStake,
             backCurrency: formData.backCurrency,
-            layOdds,
+            layOdds: isPredictionMarket ? undefined : layOdds,
+            sharePrice: isPredictionMarket ? sharePrice : undefined,
             layCurrency: formData.layCurrency,
             layExchange: formData.layExchange,
             promoType: formData.promoType || undefined,
@@ -520,14 +547,29 @@ export function QuickAddForm({
         }
 
         const nextStake = formatStakeInput(calculation.layStake);
+        const nextOdds = calculation.equivalentLayOdds
+          ? formatStakeInput(calculation.equivalentLayOdds)
+          : (layLegs[0]?.odds ?? "");
+        const nextShares = calculation.shares
+          ? formatStakeInput(calculation.shares)
+          : "";
         setLayLegs((prev) => {
           if (prev.length !== 1 || prev[0].stake === nextStake) {
-            return prev;
+            return prev.map((leg) => ({ ...leg, odds: nextOdds }));
           }
-          return [{ ...prev[0], stake: nextStake }];
+          return [{ ...prev[0], odds: nextOdds, stake: nextStake }];
         });
         setFormData((prev) =>
-          prev.layStake === nextStake ? prev : { ...prev, layStake: nextStake }
+          isPredictionMarket
+            ? {
+                ...prev,
+                layOdds: nextOdds,
+                layStake: nextStake,
+                layShares: nextShares,
+              }
+            : prev.layStake === nextStake
+              ? prev
+              : { ...prev, layStake: nextStake }
         );
         setLayStakeCalculation(calculation);
       } catch (error) {
@@ -556,10 +598,12 @@ export function QuickAddForm({
     formData.backCurrency,
     formData.layCurrency,
     formData.layExchange,
+    formData.laySharePrice,
     formData.promoType,
     layStakeBias,
     layStakeMode,
     selectedFreeBet?.stakeReturned,
+    isPredictionMarket,
   ]);
 
   // When bookmaker changes, update currency to match and sync first leg's account
@@ -677,6 +721,9 @@ export function QuickAddForm({
         : "0";
     updateField("layExchange", value);
     const selected = exchanges.find((e) => e.name === value);
+    if (selected?.exchangeType === "prediction_market") {
+      setHedgeMode("standard");
+    }
     if (selected?.currency) {
       updateField("layCurrency", selected.currency);
     }
@@ -697,6 +744,41 @@ export function QuickAddForm({
           : leg
       )
     );
+  };
+
+  const updatePredictionMarketPosition = (
+    field: "laySharePrice" | "layShares",
+    value: string
+  ) => {
+    updateField(field, value);
+
+    const sharePrice = Number.parseFloat(
+      field === "laySharePrice" ? value : formData.laySharePrice
+    );
+    const shares = Number.parseFloat(
+      field === "layShares" ? value : formData.layShares
+    );
+    const position = predictionMarketPositionToLay({ sharePrice, shares });
+
+    if (position) {
+      setLayLegs((prev) => {
+        if (prev.length !== 1) {
+          return prev;
+        }
+        return [
+          {
+            ...prev[0],
+            odds: formatStakeInput(position.equivalentLayOdds),
+            stake: formatStakeInput(position.layStake),
+          },
+        ];
+      });
+      setFormData((prev) => ({
+        ...prev,
+        layOdds: formatStakeInput(position.equivalentLayOdds),
+        layStake: formatStakeInput(position.layStake),
+      }));
+    }
   };
 
   const validateForm = (): boolean => {
@@ -729,6 +811,10 @@ export function QuickAddForm({
         leg.stake &&
         Number.parseFloat(leg.stake) > 0
     );
+    const validPredictionPosition =
+      Number.parseFloat(formData.laySharePrice) > 0 &&
+      Number.parseFloat(formData.laySharePrice) < 1 &&
+      Number.parseFloat(formData.layShares) > 0;
 
     if (!validBackLegs) {
       newErrors.backOdds = "Valid odds (> 1.0) required";
@@ -739,11 +825,22 @@ export function QuickAddForm({
     if (!formData.backBookmaker.trim()) {
       newErrors.backBookmaker = "Bookmaker is required";
     }
-    if (!validLayLegs) {
-      newErrors.layOdds = "Valid odds (> 1.0) required";
-    }
-    if (!validLayLegs) {
-      newErrors.layStake = "Valid stake required";
+    if (isPredictionMarket) {
+      if (!validPredictionPosition) {
+        newErrors.laySharePrice = "Share price must be between 0 and 1";
+        newErrors.layShares = "Valid share amount required";
+      }
+      if (layLegs.length !== 1) {
+        newErrors.laySharePrice =
+          "Prediction-market hedges currently support one share position";
+      }
+    } else {
+      if (!validLayLegs) {
+        newErrors.layOdds = "Valid odds (> 1.0) required";
+      }
+      if (!validLayLegs) {
+        newErrors.layStake = "Valid stake required";
+      }
     }
     if (!formData.layExchange.trim()) {
       newErrors.layExchange = "Exchange is required";
@@ -792,6 +889,12 @@ export function QuickAddForm({
         stake: Number.parseFloat(leg.stake),
         accountName: leg.accountName || formData.layExchange,
       }));
+      const sharePrice = isPredictionMarket
+        ? Number.parseFloat(formData.laySharePrice)
+        : null;
+      const shares = isPredictionMarket
+        ? Number.parseFloat(formData.layShares)
+        : null;
 
       // Use the first leg's account as the primary bookmaker for the combined bet
       const primaryBookmaker =
@@ -904,6 +1007,9 @@ export function QuickAddForm({
             exchange: formData.layExchange.trim(),
             currency: formData.layCurrency,
             legs: parsedLayLegs,
+            sharePrice,
+            shares,
+            shareSide: isPredictionMarket ? formData.layShareSide : undefined,
           },
           notes: combinedNotes,
           entryMode: hedgeMode,
@@ -1002,16 +1108,18 @@ export function QuickAddForm({
                 >
                   Standard matched bet
                 </Button>
-                <Button
-                  onClick={() => setHedgeMode("sequential_lay")}
-                  size="sm"
-                  type="button"
-                  variant={
-                    hedgeMode === "sequential_lay" ? "default" : "outline"
-                  }
-                >
-                  Sequential lay
-                </Button>
+                {!isPredictionMarket && (
+                  <Button
+                    onClick={() => setHedgeMode("sequential_lay")}
+                    size="sm"
+                    type="button"
+                    variant={
+                      hedgeMode === "sequential_lay" ? "default" : "outline"
+                    }
+                  >
+                    Sequential lay
+                  </Button>
+                )}
               </div>
               {hedgeMode === "sequential_lay" && (
                 <div className="rounded-md border border-violet-200 bg-violet-50 p-3 text-sm text-violet-900">
@@ -1920,7 +2028,131 @@ export function QuickAddForm({
                   </Select>
                 </div>
               </div>
-              <div className="space-y-3">
+              {isPredictionMarket && (
+                <div className="space-y-4 rounded-md border bg-muted/20 p-3">
+                  <p className="text-muted-foreground text-xs">
+                    Buy the opposite outcome share: No for 1X2, or Under/Over
+                    for the opposite totals side.
+                  </p>
+                  <div className="grid gap-4 sm:grid-cols-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="layShareSide">Hedge side</Label>
+                      <Select
+                        onValueChange={(value: "no" | "under" | "over") =>
+                          updateField("layShareSide", value)
+                        }
+                        value={formData.layShareSide}
+                      >
+                        <SelectTrigger id="layShareSide">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="no">No (1X2)</SelectItem>
+                          <SelectItem value="under">Under</SelectItem>
+                          <SelectItem value="over">Over</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="laySharePrice">
+                        {predictionMarketSideLabel} share price
+                      </Label>
+                      <Input
+                        className={
+                          errors.laySharePrice ? "border-destructive" : ""
+                        }
+                        id="laySharePrice"
+                        max="0.99"
+                        min="0.01"
+                        onChange={(e) =>
+                          updatePredictionMarketPosition(
+                            "laySharePrice",
+                            e.target.value
+                          )
+                        }
+                        placeholder="e.g., 0.42"
+                        step="any"
+                        type="number"
+                        value={formData.laySharePrice}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="layShares">Amount of shares</Label>
+                      <Input
+                        className={errors.layShares ? "border-destructive" : ""}
+                        id="layShares"
+                        min="0.0001"
+                        onChange={(e) =>
+                          updatePredictionMarketPosition(
+                            "layShares",
+                            e.target.value
+                          )
+                        }
+                        placeholder="Auto-calculated"
+                        step="any"
+                        type="number"
+                        value={formData.layShares}
+                      />
+                    </div>
+                  </div>
+                  {(errors.laySharePrice || errors.layShares) && (
+                    <p className="text-destructive text-xs">
+                      {errors.laySharePrice ?? errors.layShares}
+                    </p>
+                  )}
+                  <div className="flex flex-wrap gap-2">
+                    {(
+                      [
+                        ["balanced", "Equal"],
+                        ["underlay", "Underlay"],
+                        ["overlay", "Overlay"],
+                      ] as const
+                    ).map(([mode, label]) => (
+                      <Button
+                        key={mode}
+                        onClick={() => setLayStakeMode(mode)}
+                        size="sm"
+                        type="button"
+                        variant={layStakeMode === mode ? "default" : "outline"}
+                      >
+                        {label}
+                      </Button>
+                    ))}
+                  </div>
+                  <div className="grid gap-2 text-xs sm:grid-cols-3">
+                    <div>
+                      <span className="text-muted-foreground">
+                        Equivalent lay odds
+                      </span>
+                      <div className="font-medium">
+                        {layLegs[0]?.odds || "—"}
+                      </div>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">
+                        Suggested shares
+                      </span>
+                      <div className="font-medium">
+                        {layStakeCalculation?.shares?.toFixed(4) ?? "—"}
+                      </div>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Commission</span>
+                      <div className="font-medium">
+                        {layStakeCalculation
+                          ? `${(layStakeCalculation.commissionRate * 100).toFixed(1)}%`
+                          : "—"}
+                      </div>
+                    </div>
+                  </div>
+                  <p className="text-muted-foreground text-xs">
+                    {isCalculatingLayStake
+                      ? "Calculating optimal share amount..."
+                      : "Share amount includes currency conversion and exchange commission."}
+                  </p>
+                </div>
+              )}
+              <div className={isPredictionMarket ? "hidden" : "space-y-3"}>
                 {layLegs.map((leg, index) => (
                   <div className="space-y-2" key={index}>
                     {layLegs.length > 1 && (

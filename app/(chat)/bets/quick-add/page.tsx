@@ -88,6 +88,7 @@ export default async function QuickAddPage(props: QuickAddPageProps) {
       id: a.id,
       name: a.name,
       kind: a.kind as "bookmaker" | "exchange",
+      exchangeType: a.exchangeType,
       currency: a.currency,
       commission: a.commission ? Number(a.commission) : null,
     }));
@@ -98,6 +99,7 @@ export default async function QuickAddPage(props: QuickAddPageProps) {
       id: a.id,
       name: a.name,
       kind: a.kind as "bookmaker" | "exchange",
+      exchangeType: a.exchangeType,
       currency: a.currency,
       commission: a.commission ? Number(a.commission) : null,
     }));

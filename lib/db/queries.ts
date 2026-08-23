@@ -40,6 +40,7 @@ import {
 import { generateUUID } from "../utils";
 import { db } from "./connection";
 import {
+  type AccountExchangeType,
   account,
   accountTransaction,
   auditLog,
@@ -56,6 +57,7 @@ import {
   freeBetWageringBet,
   layBet,
   matchedBet,
+  type PredictionMarketShareSide,
   promo,
   qualifyingBet,
   screenshotUpload,
@@ -391,6 +393,7 @@ export async function createAccount({
   kind,
   currency,
   commission,
+  exchangeType,
   limits,
   status,
 }: {
@@ -399,6 +402,7 @@ export async function createAccount({
   kind: "bookmaker" | "exchange";
   currency?: string | null;
   commission?: number | null;
+  exchangeType?: AccountExchangeType;
   limits?: Record<string, unknown> | null;
   status?: "active" | "archived";
 }) {
@@ -410,6 +414,8 @@ export async function createAccount({
       name: name.trim(),
       nameNormalized: normalizedName,
       kind,
+      exchangeType:
+        kind === "exchange" ? (exchangeType ?? "traditional") : "traditional",
       currency: currency ?? null,
       commission:
         commission === undefined || commission === null
@@ -480,6 +486,7 @@ export async function updateAccount({
   kind,
   currency,
   commission,
+  exchangeType,
   status,
   limits,
 }: {
@@ -489,6 +496,7 @@ export async function updateAccount({
   kind?: "bookmaker" | "exchange";
   currency?: string | null;
   commission?: number | null;
+  exchangeType?: AccountExchangeType;
   status?: "active" | "archived";
   limits?: Record<string, unknown> | null;
 }) {
@@ -500,6 +508,11 @@ export async function updateAccount({
     }
     if (kind !== undefined) {
       updates.kind = kind;
+      if (kind === "bookmaker") {
+        updates.exchangeType = "traditional";
+      }
+    } else if (exchangeType !== undefined) {
+      updates.exchangeType = exchangeType;
     }
     if (currency !== undefined) {
       updates.currency = currency;
@@ -579,6 +592,7 @@ export type AccountWithBalance = {
   name: string;
   nameNormalized: string;
   kind: "bookmaker" | "exchange";
+  exchangeType?: AccountExchangeType;
   currency: string | null;
   commission: string | null;
   status: "active" | "archived";
@@ -639,6 +653,7 @@ export async function listAccountsWithBalances({
         name: account.name,
         nameNormalized: account.nameNormalized,
         kind: account.kind,
+        exchangeType: account.exchangeType,
         currency: account.currency,
         commission: account.commission,
         status: account.status,
@@ -1684,6 +1699,9 @@ type BetInputBase = {
   selection: string;
   odds: number;
   stake: number;
+  sharePrice?: number | null;
+  shares?: number | null;
+  shareSide?: PredictionMarketShareSide | null;
   exchange: string;
   matchId?: string | null;
   accountId?: string | null;
@@ -1881,6 +1899,15 @@ export async function saveLayBet({
       normalizedSelection: bet.normalizedSelection ?? null,
       odds: bet.odds.toString(),
       stake: bet.stake.toString(),
+      sharePrice:
+        bet.sharePrice === undefined || bet.sharePrice === null
+          ? null
+          : bet.sharePrice.toString(),
+      shares:
+        bet.shares === undefined || bet.shares === null
+          ? null
+          : bet.shares.toString(),
+      shareSide: bet.shareSide ?? null,
       stakeNok: stakeNok.toFixed(2),
       exchange: bet.exchange,
       currency: bet.currency ?? null,

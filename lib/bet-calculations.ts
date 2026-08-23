@@ -180,6 +180,81 @@ export function calculateOptimalLayStake({
 }
 
 /**
+ * Convert a binary prediction-market hedge position into the canonical lay
+ * values used by settlement and reporting.
+ *
+ * `sharePrice` is the price of the opposite outcome share (No, Under, or
+ * Over). Buying one share costs `sharePrice` and returns 1 when that outcome
+ * wins, so the equivalent lay stake is the winning profit and the liability
+ * is the purchase cost.
+ */
+export function predictionMarketPositionToLay({
+  sharePrice,
+  shares,
+}: {
+  sharePrice: number;
+  shares: number;
+}) {
+  if (
+    !Number.isFinite(sharePrice) ||
+    sharePrice <= 0 ||
+    sharePrice >= 1 ||
+    !Number.isFinite(shares) ||
+    shares <= 0
+  ) {
+    return null;
+  }
+
+  return {
+    equivalentLayOdds: 1 / (1 - sharePrice),
+    layStake: shares * (1 - sharePrice),
+    layLiability: shares * sharePrice,
+  };
+}
+
+/**
+ * Calculate the optimal number of opposite-outcome shares for a prediction
+ * market hedge. Commission is applied to the winning share profit through the
+ * existing lay-stake calculation before converting that stake to shares.
+ */
+export function calculateOptimalPredictionMarketShares({
+  sharePrice,
+  ...layStakeInput
+}: {
+  sharePrice: number;
+  backStake: number;
+  backOdds: number;
+  backRateToBase?: number;
+  layRateToBase?: number;
+  isFreeBet?: boolean;
+  freeBetStakeReturned?: boolean;
+  commissionRate?: number;
+  strategy?: "balanced" | "underlay" | "overlay";
+  biasPercent?: number;
+}) {
+  if (!Number.isFinite(sharePrice) || sharePrice <= 0 || sharePrice >= 1) {
+    return null;
+  }
+
+  const equivalentLayOdds = 1 / (1 - sharePrice);
+  const calculated = calculateOptimalLayStake({
+    ...layStakeInput,
+    layOdds: equivalentLayOdds,
+  });
+
+  if (!calculated) {
+    return null;
+  }
+
+  return {
+    ...calculated,
+    equivalentLayOdds,
+    shares: calculated.layStake / (1 - sharePrice),
+    balancedShares: calculated.balancedLayStake / (1 - sharePrice),
+  };
+}
+
+/**
  * Calculate the win/lose contribution of a single bet leg toward a shared
  * outcome (used when a back-only or lay-only leg is part of a bet group).
  *

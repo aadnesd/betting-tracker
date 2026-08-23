@@ -21,6 +21,7 @@ type AccountEditFormProps = {
     id: string;
     name: string;
     kind: "bookmaker" | "exchange";
+    exchangeType: "traditional" | "prediction_market";
     currency: string | null;
     commission: number | null;
     status: "active" | "archived";
@@ -30,6 +31,7 @@ type AccountEditFormProps = {
 type FormData = {
   name: string;
   kind: "bookmaker" | "exchange";
+  exchangeType: "traditional" | "prediction_market";
   currency: string;
   commission: string;
   status: "active" | "archived";
@@ -42,6 +44,7 @@ export function AccountEditForm({ account }: AccountEditFormProps) {
   const [formData, setFormData] = useState<FormData>({
     name: account.name,
     kind: account.kind,
+    exchangeType: account.exchangeType,
     currency: account.currency ?? "NOK",
     commission: account.commission?.toString() ?? "",
     status: account.status,
@@ -103,6 +106,10 @@ export function AccountEditForm({ account }: AccountEditFormProps) {
           id: account.id,
           name: formData.name.trim(),
           kind: formData.kind,
+          exchangeType:
+            formData.kind === "exchange"
+              ? formData.exchangeType
+              : "traditional",
           currency: formData.currency || null,
           commission: formData.kind === "exchange" ? commissionDecimal : null,
           status: formData.status,
@@ -130,6 +137,7 @@ export function AccountEditForm({ account }: AccountEditFormProps) {
   const hasChanges =
     formData.name !== account.name ||
     formData.kind !== account.kind ||
+    formData.exchangeType !== account.exchangeType ||
     formData.currency !== (account.currency ?? "NOK") ||
     formData.commission !== (account.commission?.toString() ?? "") ||
     formData.status !== account.status;
@@ -179,6 +187,34 @@ export function AccountEditForm({ account }: AccountEditFormProps) {
           </SelectContent>
         </Select>
       </div>
+
+      {formData.kind === "exchange" && (
+        <div className="space-y-2">
+          <Label htmlFor="exchangeType">Exchange Type</Label>
+          <Select
+            onValueChange={(value: "traditional" | "prediction_market") =>
+              updateField("exchangeType", value)
+            }
+            value={formData.exchangeType}
+          >
+            <SelectTrigger id="exchangeType">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="traditional">
+                Traditional odds exchange
+              </SelectItem>
+              <SelectItem value="prediction_market">
+                Prediction market shares
+              </SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-muted-foreground text-xs">
+            Prediction markets use opposite-outcome share prices and share
+            amounts instead of lay odds and stake.
+          </p>
+        </div>
+      )}
 
       {/* Account Name */}
       <div className="space-y-2">

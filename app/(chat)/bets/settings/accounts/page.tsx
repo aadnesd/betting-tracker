@@ -227,6 +227,13 @@ export default async function AccountSettingsPage() {
                         %
                       </span>
                     )}
+                    {acct.kind === "exchange" && (
+                      <span>
+                        {acct.exchangeType === "prediction_market"
+                          ? "Prediction market shares"
+                          : "Traditional odds"}
+                      </span>
+                    )}
                     <span>
                       {acct.transactionCount} transaction
                       {acct.transactionCount !== 1 ? "s" : ""}

@@ -1801,6 +1801,65 @@ describe("bets API routes (unit)", () => {
       expect(json.details).toBeDefined();
     });
 
+    it("saves prediction-market shares as canonical lay values", async () => {
+      (dbQueries.createManualScreenshot as vi.Mock).mockResolvedValueOnce({
+        id: "manual-back-1",
+      });
+      (dbQueries.createManualScreenshot as vi.Mock).mockResolvedValueOnce({
+        id: "manual-lay-1",
+      });
+      (dbQueries.getOrCreateAccount as vi.Mock).mockResolvedValueOnce({
+        id: "acc-back",
+        kind: "bookmaker",
+      });
+      (dbQueries.getOrCreateAccount as vi.Mock).mockResolvedValueOnce({
+        id: "acc-prediction",
+        kind: "exchange",
+        exchangeType: "prediction_market",
+        commission: "0.05",
+      });
+      (dbQueries.saveBackBet as vi.Mock).mockResolvedValue({ id: "bb1" });
+      (dbQueries.saveLayBet as vi.Mock).mockResolvedValue({ id: "lb1" });
+      (dbQueries.createMatchedBetRecord as vi.Mock).mockResolvedValue({
+        id: "mb1",
+        status: "matched",
+      });
+
+      const res = await quickAddRoute(
+        new Request("http://localhost/api/bets/quick-add", {
+          method: "POST",
+          body: JSON.stringify({
+            market: "Premier League",
+            selection: "Arsenal to Win",
+            back: {
+              odds: 2,
+              stake: 100,
+              bookmaker: "bet365",
+              currency: "NOK",
+            },
+            lay: {
+              exchange: "Polymarket",
+              currency: "NOK",
+              sharePrice: 0.5,
+              shares: 200,
+              shareSide: "no",
+            },
+          }),
+        })
+      );
+
+      expect(res.status).toBe(200);
+      expect(dbQueries.saveLayBet).toHaveBeenCalledWith(
+        expect.objectContaining({
+          odds: 2,
+          stake: 100,
+          sharePrice: 0.5,
+          shares: 200,
+          shareSide: "no",
+        })
+      );
+    });
+
     it("stores unlinked match date for unlinked quick-add bets", async () => {
       (dbQueries.createManualScreenshot as vi.Mock).mockResolvedValueOnce({
         id: "manual-back-1",
