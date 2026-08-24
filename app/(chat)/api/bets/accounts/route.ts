@@ -15,6 +15,7 @@ import {
 const createAccountSchema = z.object({
   name: z.string().min(1, "Account name is required").max(100),
   kind: z.enum(["bookmaker", "exchange"]),
+  exchangeType: z.enum(["traditional", "prediction_market"]).optional(),
   currency: z.string().length(3).nullable().optional(),
   commission: z.number().min(0).max(1).nullable().optional(),
   limits: z.record(z.unknown()).nullable().optional(),
@@ -24,6 +25,7 @@ const updateAccountSchema = z.object({
   id: z.string().uuid("Invalid account ID"),
   name: z.string().min(1).max(100).optional(),
   kind: z.enum(["bookmaker", "exchange"]).optional(),
+  exchangeType: z.enum(["traditional", "prediction_market"]).optional(),
   currency: z.string().length(3).nullable().optional(),
   commission: z.number().min(0).max(1).nullable().optional(),
   status: z.enum(["active", "archived"]).optional(),
@@ -56,6 +58,10 @@ export async function POST(request: Request) {
       userId: session.user.id,
       name: body.name,
       kind: body.kind,
+      exchangeType:
+        body.kind === "exchange"
+          ? (body.exchangeType ?? "traditional")
+          : "traditional",
       currency: body.currency ?? null,
       commission: body.commission ?? null,
       limits: body.limits ?? null,
@@ -70,6 +76,10 @@ export async function POST(request: Request) {
       changes: {
         name: body.name,
         kind: body.kind,
+        exchangeType:
+          body.kind === "exchange"
+            ? (body.exchangeType ?? "traditional")
+            : "traditional",
         currency: body.currency ?? null,
         commission: body.commission ?? null,
       },
@@ -128,6 +138,11 @@ export async function PATCH(request: Request) {
       userId: session.user.id,
       name: body.name,
       kind: body.kind,
+      exchangeType:
+        body.kind === "bookmaker"
+          ? "traditional"
+          : (body.exchangeType ??
+            (body.kind === "exchange" ? original.exchangeType : undefined)),
       currency: body.currency,
       commission: body.commission,
       status: body.status,
@@ -158,6 +173,15 @@ export async function PATCH(request: Request) {
     }
     if (body.kind !== undefined && body.kind !== original.kind) {
       changes.kind = { from: original.kind, to: body.kind };
+    }
+    if (
+      body.exchangeType !== undefined &&
+      body.exchangeType !== original.exchangeType
+    ) {
+      changes.exchangeType = {
+        from: original.exchangeType,
+        to: body.exchangeType,
+      };
     }
     if (body.currency !== undefined && body.currency !== original.currency) {
       changes.currency = { from: original.currency, to: body.currency };

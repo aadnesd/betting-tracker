@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   calculateOptimalLayStake,
+  calculateOptimalPredictionMarketShares,
   combineSplitBetLegs,
   computeMatchedNetExposure,
   computeSingleLegOutcome,
+  predictionMarketPositionToLay,
 } from "@/lib/bet-calculations";
 
 describe("computeMatchedNetExposure", () => {
@@ -135,6 +137,33 @@ describe("calculateOptimalLayStake", () => {
     expect(result?.profitIfLayWins).toBeGreaterThan(
       result?.profitIfBackWins ?? 0
     );
+  });
+});
+
+describe("prediction-market share hedges", () => {
+  it("converts opposite-outcome shares into equivalent lay values", () => {
+    const result = predictionMarketPositionToLay({
+      sharePrice: 0.4,
+      shares: 100,
+    });
+
+    expect(result?.equivalentLayOdds).toBeCloseTo(1.666_666_666_7);
+    expect(result?.layStake).toBeCloseTo(60);
+    expect(result?.layLiability).toBeCloseTo(40);
+  });
+
+  it("sizes shares with exchange commission included", () => {
+    const result = calculateOptimalPredictionMarketShares({
+      backStake: 100,
+      backOdds: 2,
+      sharePrice: 0.5,
+      commissionRate: 0.05,
+    });
+
+    expect(result?.equivalentLayOdds).toBeCloseTo(2);
+    expect(result?.layStake).toBeCloseTo(200 / 1.95);
+    expect(result?.shares).toBeCloseTo(200 / 1.95 / 0.5);
+    expect(result?.profitIfBackWins).toBeCloseTo(result?.profitIfLayWins ?? 0);
   });
 });
 

@@ -138,6 +138,31 @@ export function IndividualBetDetail({
               <span className="text-muted-foreground">Odds</span>
               <span className="font-medium">{formatOdds(odds)}</span>
             </div>
+            {betKind === "lay" &&
+              "sharePrice" in bet &&
+              bet.sharePrice !== null &&
+              bet.shares !== null && (
+                <>
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Hedge side</span>
+                    <span className="font-medium capitalize">
+                      {bet.shareSide ?? "opposite outcome"}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Share price</span>
+                    <span className="font-medium">
+                      {Number(bet.sharePrice).toFixed(4)}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Shares</span>
+                    <span className="font-medium">
+                      {Number(bet.shares).toFixed(4)}
+                    </span>
+                  </div>
+                </>
+              )}
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">Stake</span>
               <span className="font-medium">

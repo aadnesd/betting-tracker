@@ -116,6 +116,9 @@ function createMockMatchedBet(
           status: "settled",
           error: null,
           ...layOverrides,
+          sharePrice: layOverrides.sharePrice ?? null,
+          shares: layOverrides.shares ?? null,
+          shareSide: layOverrides.shareSide ?? null,
           matchId: layOverrides.matchId ?? null,
         };
 

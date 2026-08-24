@@ -224,6 +224,7 @@ export default async function AccountDetailPage({
               id: account.id,
               name: account.name,
               kind: account.kind as "bookmaker" | "exchange",
+              exchangeType: account.exchangeType,
               currency: account.currency,
               commission,
               status: account.status as "active" | "archived",

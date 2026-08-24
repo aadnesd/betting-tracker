@@ -5,6 +5,7 @@ import {
   combineSplitBetLegs,
   computeMatchedNetExposure,
   computeNetExposureInputs,
+  predictionMarketPositionToLay,
 } from "@/lib/bet-calculations";
 import { SEQUENTIAL_LAY_TAG } from "@/lib/bets/sequential-lay";
 import { revalidateDashboard } from "@/lib/cache";
@@ -48,11 +49,14 @@ const quickAddSchema = z.object({
     legs: z.array(splitLegSchema).optional(),
   }),
   lay: z.object({
-    odds: z.number().positive("Lay odds must be positive"),
-    stake: z.number().positive("Lay stake must be positive"),
+    odds: z.number().positive("Lay odds must be positive").optional(),
+    stake: z.number().positive("Lay stake must be positive").optional(),
     exchange: z.string().default("bfb247"),
     currency: z.string().length(3).default("NOK"),
     legs: z.array(splitLegSchema).optional(),
+    sharePrice: z.number().gt(0).lt(1).optional(),
+    shares: z.number().positive().optional(),
+    shareSide: z.enum(["no", "under", "over"]).optional(),
   }),
   notes: z.string().optional(),
 });
@@ -106,9 +110,11 @@ export async function POST(request: Request) {
     const layLegs =
       body.lay.legs && body.lay.legs.length > 0
         ? body.lay.legs
-        : [{ odds: body.lay.odds, stake: body.lay.stake }];
+        : body.lay.odds !== undefined && body.lay.stake !== undefined
+          ? [{ odds: body.lay.odds, stake: body.lay.stake }]
+          : [];
     const combinedBack = combineSplitBetLegs(backLegs, "back");
-    const combinedLay = combineSplitBetLegs(layLegs, "lay");
+    let combinedLay = combineSplitBetLegs(layLegs, "lay");
 
     // Create placeholder screenshots for manual entry
     const [backScreenshot, layScreenshot] = await Promise.all([
@@ -152,6 +158,63 @@ export async function POST(request: Request) {
       kind: "exchange",
       currency: body.lay.currency,
     });
+
+    const hasSharePosition =
+      body.lay.sharePrice !== undefined ||
+      body.lay.shares !== undefined ||
+      body.lay.shareSide !== undefined;
+    if (layAccount.exchangeType === "prediction_market") {
+      if (
+        body.lay.sharePrice === undefined ||
+        body.lay.shares === undefined ||
+        body.lay.shareSide === undefined ||
+        layLegs.length > 1
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              "Prediction-market lays require one share price, share amount, and hedge side",
+          },
+          { status: 400 }
+        );
+      }
+
+      const sharePosition = predictionMarketPositionToLay({
+        sharePrice: body.lay.sharePrice,
+        shares: body.lay.shares,
+      });
+      if (!sharePosition) {
+        return NextResponse.json(
+          { error: "Invalid prediction-market share position" },
+          { status: 400 }
+        );
+      }
+      combinedLay = combineSplitBetLegs(
+        [
+          {
+            odds: sharePosition.equivalentLayOdds,
+            stake: sharePosition.layStake,
+          },
+        ],
+        "lay"
+      );
+    } else {
+      if (hasSharePosition) {
+        return NextResponse.json(
+          {
+            error:
+              "Share positions are only valid for prediction-market exchanges",
+          },
+          { status: 400 }
+        );
+      }
+      if (layLegs.length === 0) {
+        return NextResponse.json(
+          { error: "Traditional exchanges require lay odds and stake" },
+          { status: 400 }
+        );
+      }
+    }
 
     // Resolve the account each split leg was placed on so settlement can deduct
     // the correct amount from every account. Legs default to their section's
@@ -262,6 +325,9 @@ export async function POST(request: Request) {
         confidence: null,
         status: "matched",
         splitLegs: laySplitLegs,
+        sharePrice: body.lay.sharePrice ?? null,
+        shares: body.lay.shares ?? null,
+        shareSide: body.lay.shareSide ?? null,
       }),
     ]);
 
@@ -384,6 +450,9 @@ export async function POST(request: Request) {
           splitCount: combinedBack.legs.length,
           source: "quick_add",
           entryMode: body.entryMode,
+          sharePrice: body.lay.sharePrice ?? null,
+          shares: body.lay.shares ?? null,
+          shareSide: body.lay.shareSide ?? null,
         },
         notes:
           body.entryMode === "sequential_lay"

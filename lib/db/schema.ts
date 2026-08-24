@@ -59,6 +59,11 @@ export const screenshotUpload = pgTable("ScreenshotUpload", {
 export type ScreenshotUpload = InferSelectModel<typeof screenshotUpload>;
 
 const accountKindEnum = ["bookmaker", "exchange"] as const;
+export const accountExchangeTypeEnum = [
+  "traditional",
+  "prediction_market",
+] as const;
+export type AccountExchangeType = (typeof accountExchangeTypeEnum)[number];
 const accountStatusEnum = ["active", "archived"] as const;
 
 export const account = pgTable(
@@ -72,6 +77,11 @@ export const account = pgTable(
     name: text("name").notNull(),
     nameNormalized: text("nameNormalized").notNull(),
     kind: varchar("kind", { enum: accountKindEnum }).notNull(),
+    exchangeType: varchar("exchangeType", {
+      enum: accountExchangeTypeEnum,
+    })
+      .notNull()
+      .default("traditional"),
     currency: varchar("currency", { length: 3 }),
     commission: numeric("commission", { precision: 6, scale: 4 }),
     status: varchar("status", { enum: accountStatusEnum })
@@ -212,6 +222,10 @@ export type BetSplitLeg = {
   liability?: number | null;
 };
 
+export const predictionMarketShareSideEnum = ["no", "under", "over"] as const;
+export type PredictionMarketShareSide =
+  (typeof predictionMarketShareSideEnum)[number];
+
 export const backBet = pgTable("BackBet", {
   id: uuid("id").primaryKey().notNull().defaultRandom(),
   createdAt: timestamp("createdAt").notNull(),
@@ -267,6 +281,9 @@ export const layBet = pgTable("LayBet", {
   }),
   odds: numeric("odds", { precision: 12, scale: 4 }).notNull(),
   stake: numeric("stake", { precision: 12, scale: 2 }).notNull(),
+  sharePrice: numeric("sharePrice", { precision: 12, scale: 6 }),
+  shares: numeric("shares", { precision: 14, scale: 4 }),
+  shareSide: varchar("shareSide", { enum: predictionMarketShareSideEnum }),
   stakeNok: numeric("stakeNok", { precision: 14, scale: 2 }),
   exchange: text("exchange").notNull(),
   currency: varchar("currency", { length: 3 }),

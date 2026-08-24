@@ -26,6 +26,7 @@ import {
 type FormData = {
   name: string;
   kind: "bookmaker" | "exchange";
+  exchangeType: "traditional" | "prediction_market";
   currency: string;
   commission: string;
 };
@@ -33,6 +34,7 @@ type FormData = {
 const initialFormData: FormData = {
   name: "",
   kind: "bookmaker",
+  exchangeType: "traditional",
   currency: "NOK",
   commission: "",
 };
@@ -98,6 +100,10 @@ export default function NewAccountPage() {
         body: JSON.stringify({
           name: formData.name.trim(),
           kind: formData.kind,
+          exchangeType:
+            formData.kind === "exchange"
+              ? formData.exchangeType
+              : "traditional",
           currency: formData.currency || null,
           commission: formData.kind === "exchange" ? commissionDecimal : null,
         }),
@@ -184,6 +190,34 @@ export default function NewAccountPage() {
                   : "Exchanges are where you lay bets to lock in profit"}
               </p>
             </div>
+
+            {formData.kind === "exchange" && (
+              <div className="space-y-2">
+                <Label htmlFor="exchangeType">Exchange Type</Label>
+                <Select
+                  onValueChange={(value: "traditional" | "prediction_market") =>
+                    updateField("exchangeType", value)
+                  }
+                  value={formData.exchangeType}
+                >
+                  <SelectTrigger id="exchangeType">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="traditional">
+                      Traditional odds exchange
+                    </SelectItem>
+                    <SelectItem value="prediction_market">
+                      Prediction market shares
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-muted-foreground text-xs">
+                  Prediction markets use opposite-outcome share prices and share
+                  amounts instead of lay odds and stake.
+                </p>
+              </div>
+            )}
 
             {/* Account Name */}
             <div className="space-y-2">

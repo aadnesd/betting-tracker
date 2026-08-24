@@ -20,14 +20,20 @@ vi.mock("@/lib/db/queries", () => ({
   createAccount: vi.fn(),
   updateAccount: vi.fn(),
   getAccountById: vi.fn(),
+  getUserSettings: vi.fn(),
   listAccountsByUser: vi.fn(),
   createAuditEntry: vi.fn(),
+}));
+
+vi.mock("@/lib/cache", () => ({
+  revalidateDashboard: vi.fn(),
 }));
 
 describe("accounts API routes (unit)", () => {
   beforeEach(() => {
     vi.resetAllMocks();
     (authModule.auth as vi.Mock).mockResolvedValue({ user });
+    (dbQueries.getUserSettings as vi.Mock).mockResolvedValue(null);
   });
 
   describe("POST /api/bets/accounts (create)", () => {
@@ -69,6 +75,7 @@ describe("accounts API routes (unit)", () => {
         kind: "bookmaker",
         currency: "GBP",
         commission: null,
+        exchangeType: "traditional",
         limits: null,
       });
 
@@ -82,7 +89,7 @@ describe("accounts API routes (unit)", () => {
       );
     });
 
-    it("creates an exchange account with commission", async () => {
+    it("creates a prediction-market exchange account with commission", async () => {
       const mockAccount = {
         id: "acc-2",
         name: "Betfair Exchange",
@@ -101,6 +108,7 @@ describe("accounts API routes (unit)", () => {
           body: JSON.stringify({
             name: "Betfair Exchange",
             kind: "exchange",
+            exchangeType: "prediction_market",
             currency: "GBP",
             commission: 0.02, // 2% as decimal
           }),
@@ -118,6 +126,7 @@ describe("accounts API routes (unit)", () => {
         kind: "exchange",
         currency: "GBP",
         commission: 0.02,
+        exchangeType: "prediction_market",
         limits: null,
       });
     });
@@ -217,6 +226,7 @@ describe("accounts API routes (unit)", () => {
         kind: undefined,
         currency: undefined,
         commission: undefined,
+        exchangeType: undefined,
         status: undefined,
         limits: undefined,
       });
