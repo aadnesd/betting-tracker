@@ -286,6 +286,60 @@ describe("accounts API routes (unit)", () => {
       );
     });
 
+    it("updates an exchange account type", async () => {
+      const originalAccount = {
+        id: testAccountId,
+        name: "Polymarket",
+        kind: "exchange",
+        exchangeType: "traditional",
+        currency: "USD",
+        commission: "0.05",
+        status: "active",
+      };
+      const updatedAccount = {
+        ...originalAccount,
+        exchangeType: "prediction_market",
+      };
+
+      (dbQueries.getAccountById as vi.Mock).mockResolvedValueOnce(
+        originalAccount
+      );
+      (dbQueries.updateAccount as vi.Mock).mockResolvedValueOnce(
+        updatedAccount
+      );
+
+      const res = await updateAccountRoute(
+        new Request("http://localhost/api/bets/accounts", {
+          method: "PATCH",
+          body: JSON.stringify({
+            id: testAccountId,
+            kind: "exchange",
+            exchangeType: "prediction_market",
+          }),
+        })
+      );
+
+      expect(res.status).toBe(200);
+      const json = await res.json();
+      expect(json.account.exchangeType).toBe("prediction_market");
+      expect(dbQueries.updateAccount).toHaveBeenCalledWith(
+        expect.objectContaining({
+          kind: "exchange",
+          exchangeType: "prediction_market",
+        })
+      );
+      expect(dbQueries.createAuditEntry).toHaveBeenCalledWith(
+        expect.objectContaining({
+          changes: {
+            exchangeType: {
+              from: "traditional",
+              to: "prediction_market",
+            },
+          },
+        })
+      );
+    });
+
     it("returns 404 for non-existent account", async () => {
       (dbQueries.getAccountById as vi.Mock).mockResolvedValueOnce(null);
 

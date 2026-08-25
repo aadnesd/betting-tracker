@@ -1710,6 +1710,8 @@ describe("bets API routes (unit)", () => {
           stake: 99.2,
           exchange: "bfb247",
           currency: "NOK",
+          sharePrice: null,
+          shares: null,
         },
         notes: "Test bet",
       };

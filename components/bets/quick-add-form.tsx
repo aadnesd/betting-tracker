@@ -891,10 +891,10 @@ export function QuickAddForm({
       }));
       const sharePrice = isPredictionMarket
         ? Number.parseFloat(formData.laySharePrice)
-        : null;
+        : undefined;
       const shares = isPredictionMarket
         ? Number.parseFloat(formData.layShares)
-        : null;
+        : undefined;
 
       // Use the first leg's account as the primary bookmaker for the combined bet
       const primaryBookmaker =

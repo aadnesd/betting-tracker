@@ -510,6 +510,8 @@ export async function updateAccount({
       updates.kind = kind;
       if (kind === "bookmaker") {
         updates.exchangeType = "traditional";
+      } else if (exchangeType !== undefined) {
+        updates.exchangeType = exchangeType;
       }
     } else if (exchangeType !== undefined) {
       updates.exchangeType = exchangeType;
