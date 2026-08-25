@@ -54,8 +54,8 @@ const quickAddSchema = z.object({
     exchange: z.string().default("bfb247"),
     currency: z.string().length(3).default("NOK"),
     legs: z.array(splitLegSchema).optional(),
-    sharePrice: z.number().gt(0).lt(1).optional(),
-    shares: z.number().positive().optional(),
+    sharePrice: z.number().gt(0).lt(1).nullish(),
+    shares: z.number().positive().nullish(),
     shareSide: z.enum(["no", "under", "over"]).optional(),
   }),
   notes: z.string().optional(),
@@ -160,14 +160,14 @@ export async function POST(request: Request) {
     });
 
     const hasSharePosition =
-      body.lay.sharePrice !== undefined ||
-      body.lay.shares !== undefined ||
-      body.lay.shareSide !== undefined;
+      body.lay.sharePrice != null ||
+      body.lay.shares != null ||
+      body.lay.shareSide != null;
     if (layAccount.exchangeType === "prediction_market") {
       if (
-        body.lay.sharePrice === undefined ||
-        body.lay.shares === undefined ||
-        body.lay.shareSide === undefined ||
+        body.lay.sharePrice == null ||
+        body.lay.shares == null ||
+        body.lay.shareSide == null ||
         layLegs.length > 1
       ) {
         return NextResponse.json(
