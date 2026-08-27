@@ -76,7 +76,7 @@ function formatSplitLegNotes({
 
   return `${label} splits: ${legs
     .map(
-      (leg) => `${currency} ${leg.stake.toFixed(2)} @ ${leg.odds.toFixed(4)}`
+      (leg) => `${currency} ${leg.stake.toFixed(2)} @ ${leg.odds.toFixed(5)}`
     )
     .join(", ")}`;
 }
