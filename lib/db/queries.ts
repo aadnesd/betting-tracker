@@ -2040,6 +2040,7 @@ export async function updateBackBetDetails({
   accountId,
   currency,
   placedAt,
+  splitLegs,
 }: {
   id: string;
   userId: string;
@@ -2052,6 +2053,7 @@ export async function updateBackBetDetails({
   accountId: string | null;
   currency: string | null;
   placedAt: Date | null;
+  splitLegs?: BetSplitLeg[] | null;
 }) {
   try {
     const stakeNok = await convertAmountToNokStrict(stake, currency ?? "NOK");
@@ -2066,6 +2068,7 @@ export async function updateBackBetDetails({
       accountId,
       currency,
       placedAt,
+      ...(splitLegs !== undefined ? { splitLegs } : {}),
     };
 
     const [row] = await db

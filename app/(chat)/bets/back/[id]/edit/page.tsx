@@ -87,6 +87,7 @@ export default async function Page({ params }: PageProps) {
         matchId: bet.matchId ?? null,
         placedAt: bet.placedAt ?? bet.createdAt,
         notes: null,
+        splitLegs: bet.splitLegs ?? null,
         status: bet.status,
         settlementOutcome: deriveSettlementOutcomeFromProfitLoss({
           kind: "back",
