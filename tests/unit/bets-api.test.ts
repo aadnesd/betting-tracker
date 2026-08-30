@@ -1706,7 +1706,7 @@ describe("bets API routes (unit)", () => {
           currency: "NOK",
         },
         lay: {
-          odds: 2.52,
+          odds: 2.523_45,
           stake: 99.2,
           exchange: "bfb247",
           currency: "NOK",
@@ -1751,7 +1751,7 @@ describe("bets API routes (unit)", () => {
       expect(dbQueries.saveLayBet).toHaveBeenCalledWith(
         expect.objectContaining({
           screenshotId: "manual-lay-1",
-          odds: expect.closeTo(2.52, 8),
+          odds: expect.closeTo(2.523_45, 8),
           stake: 99.2,
           status: "matched",
         })

@@ -152,6 +152,10 @@ function formatStakeInput(value: number) {
   return value.toFixed(2).replace(/\.?0+$/, "");
 }
 
+function formatOddsInput(value: number) {
+  return value.toFixed(5).replace(/\.?0+$/, "");
+}
+
 function formatProfit(value: number, currency: string) {
   const prefix = value > 0 ? "+" : "";
   return `${prefix}${currency} ${value.toFixed(2)}`;
@@ -548,7 +552,7 @@ export function QuickAddForm({
 
         const nextStake = formatStakeInput(calculation.layStake);
         const nextOdds = calculation.equivalentLayOdds
-          ? formatStakeInput(calculation.equivalentLayOdds)
+          ? formatOddsInput(calculation.equivalentLayOdds)
           : (layLegs[0]?.odds ?? "");
         const nextShares = calculation.shares
           ? formatStakeInput(calculation.shares)
@@ -768,14 +772,14 @@ export function QuickAddForm({
         return [
           {
             ...prev[0],
-            odds: formatStakeInput(position.equivalentLayOdds),
+            odds: formatOddsInput(position.equivalentLayOdds),
             stake: formatStakeInput(position.layStake),
           },
         ];
       });
       setFormData((prev) => ({
         ...prev,
-        layOdds: formatStakeInput(position.equivalentLayOdds),
+        layOdds: formatOddsInput(position.equivalentLayOdds),
         layStake: formatStakeInput(position.layStake),
       }));
     }
@@ -909,7 +913,7 @@ export function QuickAddForm({
           ? `Back split accounts: ${parsedBackLegs
               .map(
                 (leg) =>
-                  `${leg.accountName} ${formData.backCurrency} ${leg.stake.toFixed(2)} @ ${leg.odds.toFixed(4)}`
+                  `${leg.accountName} ${formData.backCurrency} ${leg.stake.toFixed(2)} @ ${leg.odds.toFixed(5)}`
               )
               .join(", ")}`
           : null;
@@ -922,7 +926,7 @@ export function QuickAddForm({
           ? `Lay split accounts: ${parsedLayLegs
               .map(
                 (leg) =>
-                  `${leg.accountName} ${formData.layCurrency} ${leg.stake.toFixed(2)} @ ${leg.odds.toFixed(4)}`
+                  `${leg.accountName} ${formData.layCurrency} ${leg.stake.toFixed(2)} @ ${leg.odds.toFixed(5)}`
               )
               .join(", ")}`
           : null;
@@ -1885,7 +1889,7 @@ export function QuickAddForm({
                                   Combined lay odds
                                 </p>
                                 <p className="font-semibold text-sm">
-                                  {sequentialLayPlan.combinedLayOdds.toFixed(2)}
+                                  {sequentialLayPlan.combinedLayOdds.toFixed(5)}
                                 </p>
                               </div>
                               <div>

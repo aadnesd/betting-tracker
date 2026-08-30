@@ -27,6 +27,10 @@ function roundStake(value: number) {
   return Math.round(value * 100) / 100;
 }
 
+function roundOdds(value: number) {
+  return Math.round(value * 100_000) / 100_000;
+}
+
 export async function POST(request: Request) {
   const session = await auth();
 
@@ -111,7 +115,7 @@ export async function POST(request: Request) {
     }
 
     const layStake = roundStake(calculated.layStake);
-    const equivalentLayOdds = roundStake(
+    const equivalentLayOdds = roundOdds(
       isPredictionMarket
         ? 1 / (1 - (body.sharePrice as number))
         : (body.layOdds as number)

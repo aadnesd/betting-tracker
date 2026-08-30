@@ -243,7 +243,7 @@ export const backBet = pgTable("BackBet", {
   normalizedSelection: varchar("normalizedSelection", {
     enum: ["HOME_TEAM", "AWAY_TEAM", "DRAW"],
   }),
-  odds: numeric("odds", { precision: 12, scale: 4 }).notNull(),
+  odds: numeric("odds", { precision: 12, scale: 5 }).notNull(),
   stake: numeric("stake", { precision: 12, scale: 2 }).notNull(),
   stakeNok: numeric("stakeNok", { precision: 14, scale: 2 }),
   exchange: text("exchange").notNull(),
@@ -279,7 +279,7 @@ export const layBet = pgTable("LayBet", {
   normalizedSelection: varchar("normalizedSelection", {
     enum: ["HOME_TEAM", "AWAY_TEAM", "DRAW"],
   }),
-  odds: numeric("odds", { precision: 12, scale: 4 }).notNull(),
+  odds: numeric("odds", { precision: 12, scale: 5 }).notNull(),
   stake: numeric("stake", { precision: 12, scale: 2 }).notNull(),
   sharePrice: numeric("sharePrice", { precision: 12, scale: 6 }),
   shares: numeric("shares", { precision: 14, scale: 4 }),
