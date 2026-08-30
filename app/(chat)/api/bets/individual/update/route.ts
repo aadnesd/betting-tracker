@@ -55,11 +55,11 @@ const updateSchema = z.object({
     .array(
       z.object({
         accountId: z.string().uuid(),
-        odds: z.number().gt(1, "Lay odds must be greater than 1.0"),
-        stake: z.number().positive("Lay stake must be positive"),
+        odds: z.number().gt(1, "Bet odds must be greater than 1.0"),
+        stake: z.number().positive("Bet stake must be positive"),
       })
     )
-    .min(1, "At least one lay portion is required")
+    .min(1, "At least one bet portion is required")
     .max(50, "Too many lay portions")
     .optional(),
 });
@@ -139,16 +139,9 @@ export async function POST(request: Request) {
       );
     }
 
-    if (payload.splitLegs && payload.betKind !== "lay") {
-      return NextResponse.json(
-        { error: "Only lay bets can be split into portions" },
-        { status: 400 }
-      );
-    }
-
     if (isSettled && payload.splitLegs) {
       return NextResponse.json(
-        { error: "Cannot change lay portions on a settled bet" },
+        { error: "Cannot change bet portions on a settled bet" },
         { status: 400 }
       );
     }
@@ -162,8 +155,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Account not found" }, { status: 404 });
     }
 
-    const expectedKind = payload.betKind === "back" ? "bookmaker" : "exchange";
-    if (account.kind !== expectedKind) {
+    const accountMatchesBet =
+      payload.betKind === "back"
+        ? account.kind === "bookmaker" || account.kind === "exchange"
+        : account.kind === "exchange";
+    if (!accountMatchesBet) {
       return NextResponse.json(
         { error: "Account type does not match bet kind" },
         { status: 400 }
@@ -171,11 +167,11 @@ export async function POST(request: Request) {
     }
 
     let splitLegs: BetSplitLeg[] | null | undefined;
-    let combinedLay: ReturnType<typeof combineSplitBetLegs> | null = null;
+    let combinedBet: ReturnType<typeof combineSplitBetLegs> | null = null;
     if (payload.splitLegs) {
       if (payload.splitLegs[0]?.accountId !== payload.accountId) {
         return NextResponse.json(
-          { error: "The first lay portion must use the selected exchange" },
+          { error: "The first bet portion must use the selected account" },
           { status: 400 }
         );
       }
@@ -189,11 +185,21 @@ export async function POST(request: Request) {
       );
       if (
         splitAccounts.some(
-          (splitAccount) => !splitAccount || splitAccount.kind !== "exchange"
+          (splitAccount) =>
+            !splitAccount ||
+            (payload.betKind === "back"
+              ? splitAccount.kind !== "bookmaker" &&
+                splitAccount.kind !== "exchange"
+              : splitAccount.kind !== "exchange")
         )
       ) {
         return NextResponse.json(
-          { error: "Each lay portion must use one of your exchange accounts" },
+          {
+            error:
+              payload.betKind === "back"
+                ? "Each back portion must use one of your bookmaker or exchange accounts"
+                : "Each lay portion must use one of your exchange accounts",
+          },
           { status: 400 }
         );
       }
@@ -218,7 +224,7 @@ export async function POST(request: Request) {
         currency: payload.currency,
       }));
       splitLegs = nextSplitLegs.length > 1 ? nextSplitLegs : null;
-      combinedLay = combineSplitBetLegs(nextSplitLegs, "lay");
+      combinedBet = combineSplitBetLegs(nextSplitLegs, payload.betKind);
     }
 
     if (payload.matchId !== undefined && payload.matchId !== null) {
@@ -273,21 +279,22 @@ export async function POST(request: Request) {
             userId,
             market: payload.market,
             selection: payload.selection,
-            odds: payload.odds,
-            stake: payload.stake,
+            odds: combinedBet?.odds ?? payload.odds,
+            stake: combinedBet?.stake ?? payload.stake,
             exchange: account.name,
             matchId: matchIdForUpdate,
             accountId: account.id,
             currency: payload.currency,
             placedAt: safeDate(payload.placedAt),
+            splitLegs,
           })
         : await updateLayBetDetails({
             id: payload.betId,
             userId,
             market: payload.market,
             selection: payload.selection,
-            odds: combinedLay?.odds ?? payload.odds,
-            stake: combinedLay?.stake ?? payload.stake,
+            odds: combinedBet?.odds ?? payload.odds,
+            stake: combinedBet?.stake ?? payload.stake,
             exchange: account.name,
             matchId: matchIdForUpdate,
             accountId: account.id,

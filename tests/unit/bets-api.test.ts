@@ -3098,6 +3098,95 @@ describe("bets API routes (unit)", () => {
       );
     });
 
+    it("updates a split back bet and accepts exchange accounts", async () => {
+      const betId = "88888888-8888-8888-8888-888888888888";
+      const primaryAccountId = "99999999-9999-9999-9999-999999999999";
+      const secondAccountId = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+
+      (dbQueries.getBackBetById as vi.Mock).mockResolvedValue({
+        id: betId,
+        status: "matched",
+        market: "Lillestrom vs Egnatia",
+        selection: "Lillestrom",
+        odds: "2.3333333333",
+        stake: "150.00",
+        accountId: primaryAccountId,
+        currency: "USD",
+        placedAt: new Date("2026-08-27T15:09:00Z"),
+        splitLegs: [
+          { accountId: primaryAccountId, odds: 2, stake: 100, currency: "USD" },
+          { accountId: secondAccountId, odds: 3, stake: 50, currency: "USD" },
+        ],
+      });
+      (dbQueries.getAccountById as vi.Mock).mockImplementation(
+        ({ id }: { id: string }) =>
+          Promise.resolve({
+            id,
+            name: id === primaryAccountId ? "Exchange back" : "Bookmaker back",
+            kind: id === primaryAccountId ? "exchange" : "bookmaker",
+            currency: "USD",
+          })
+      );
+      (dbQueries.updateBackBetDetails as vi.Mock).mockResolvedValue({
+        id: betId,
+        status: "matched",
+        market: "Lillestrom vs Egnatia",
+        selection: "Lillestrom",
+        odds: "2.3333333333",
+        stake: "150.00",
+        accountId: primaryAccountId,
+        currency: "USD",
+        placedAt: new Date("2026-08-27T15:09:00Z"),
+        splitLegs: [
+          { accountId: primaryAccountId, odds: 2, stake: 100, currency: "USD" },
+          { accountId: secondAccountId, odds: 3, stake: 50, currency: "USD" },
+        ],
+      });
+
+      const res = await updateIndividualRoute(
+        new Request("http://localhost/api/bets/individual/update", {
+          method: "POST",
+          body: JSON.stringify({
+            betId,
+            betKind: "back",
+            market: "Lillestrom vs Egnatia",
+            selection: "Lillestrom",
+            odds: 2.333_333_333_3,
+            stake: 150,
+            accountId: primaryAccountId,
+            currency: "USD",
+            splitLegs: [
+              { accountId: primaryAccountId, odds: 2, stake: 100 },
+              { accountId: secondAccountId, odds: 3, stake: 50 },
+            ],
+          }),
+        })
+      );
+
+      expect(res.status).toBe(200);
+      expect(dbQueries.updateBackBetDetails).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: betId,
+          odds: expect.closeTo(2.333_333_333_3, 8),
+          stake: 150,
+          splitLegs: [
+            {
+              accountId: primaryAccountId,
+              odds: 2,
+              stake: 100,
+              currency: "USD",
+            },
+            {
+              accountId: secondAccountId,
+              odds: 3,
+              stake: 50,
+              currency: "USD",
+            },
+          ],
+        })
+      );
+    });
+
     it("corrects stake on a settled bet, recomputing P&L and posting a delta adjustment", async () => {
       process.env.SETTLED_BET_EDIT_USER_IDS = user.id;
 
@@ -3302,8 +3391,8 @@ describe("bets API routes (unit)", () => {
       );
     });
 
-    it("rejects account kind mismatch", async () => {
-      (dbQueries.getBackBetById as vi.Mock).mockResolvedValue({
+    it("rejects account kind mismatch for lay bets", async () => {
+      (dbQueries.getLayBetById as vi.Mock).mockResolvedValue({
         id: "88888888-8888-8888-8888-888888888888",
         status: "placed",
         odds: "2.10",
@@ -3312,7 +3401,7 @@ describe("bets API routes (unit)", () => {
       (dbQueries.getAccountById as vi.Mock).mockResolvedValue({
         id: "99999999-9999-9999-9999-999999999999",
         name: "Betfair",
-        kind: "exchange",
+        kind: "bookmaker",
       });
 
       const res = await updateIndividualRoute(
@@ -3320,7 +3409,7 @@ describe("bets API routes (unit)", () => {
           method: "POST",
           body: JSON.stringify({
             betId: "88888888-8888-8888-8888-888888888888",
-            betKind: "back",
+            betKind: "lay",
             market: "New market",
             selection: "New selection",
             odds: 2.5,

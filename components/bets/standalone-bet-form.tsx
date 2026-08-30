@@ -91,7 +91,7 @@ type StandaloneBetFormProps = {
   };
 };
 
-type LayPortionFormData = {
+type BetPortionFormData = {
   accountId: string;
   odds: string;
   stake: string;
@@ -124,11 +124,8 @@ export function StandaloneBetForm({
   const searchParams = useSearchParams();
   const isEdit = Boolean(mode === "edit" && initialData);
   const isSettledEdit = isEdit && initialData?.status === "settled";
-  const canSplitLay =
-    isEdit &&
-    !isSettledEdit &&
-    initialData?.kind === "lay" &&
-    initialData.status === "matched";
+  const canSplit =
+    isEdit && !isSettledEdit && initialData?.status === "matched";
   const returnTo = getSafeReturnPath(searchParams.get("returnTo"));
 
   const initialKind = initialData?.kind ?? "back";
@@ -156,7 +153,7 @@ export function StandaloneBetForm({
     notes: initialData?.notes ?? "",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [layPortions, setLayPortions] = useState<LayPortionFormData[]>(() => {
+  const [betPortions, setBetPortions] = useState<BetPortionFormData[]>(() => {
     const persistedPortions = initialData?.splitLegs?.filter(
       (portion) => portion.accountId
     );
@@ -239,20 +236,20 @@ export function StandaloneBetForm({
     }));
   };
 
-  const updateLayPortion = (
+  const updateBetPortion = (
     index: number,
-    field: keyof LayPortionFormData,
+    field: keyof BetPortionFormData,
     value: string
   ) => {
-    setLayPortions((portions) =>
+    setBetPortions((portions) =>
       portions.map((portion, portionIndex) =>
         portionIndex === index ? { ...portion, [field]: value } : portion
       )
     );
   };
 
-  const addLayPortion = () => {
-    setLayPortions((portions) => [
+  const addBetPortion = () => {
+    setBetPortions((portions) => [
       ...portions,
       {
         accountId: portions[0]?.accountId ?? formData.accountId,
@@ -262,19 +259,19 @@ export function StandaloneBetForm({
     ]);
   };
 
-  const removeLayPortion = (index: number) => {
-    setLayPortions((portions) =>
+  const removeBetPortion = (index: number) => {
+    setBetPortions((portions) =>
       portions.filter((_, portionIndex) => portionIndex !== index)
     );
   };
 
-  const parsedLayPortions = layPortions.map((portion) => ({
+  const parsedBetPortions = betPortions.map((portion) => ({
     accountId: portion.accountId,
     odds: Number.parseFloat(portion.odds),
     stake: Number.parseFloat(portion.stake),
   }));
-  const combinedLayPortions = canSplitLay
-    ? combineSplitBetLegs(parsedLayPortions, "lay")
+  const combinedBetPortions = canSplit
+    ? combineSplitBetLegs(parsedBetPortions, formData.kind)
     : null;
 
   const handlePromoTypeChange = (promoType: string) => {
@@ -314,21 +311,21 @@ export function StandaloneBetForm({
       newErrors.selection = "Selection is required";
     }
     if (
-      canSplitLay &&
-      parsedLayPortions.some(
+      canSplit &&
+      parsedBetPortions.some(
         (portion) =>
           !portion.accountId ||
           !Number.isFinite(portion.odds) ||
           portion.odds <= 1
       )
     ) {
-      newErrors.odds = "Each lay portion needs odds greater than 1.0";
+      newErrors.odds = "Each bet portion needs odds greater than 1.0";
     } else if (!formData.odds || Number.parseFloat(formData.odds) <= 0) {
       newErrors.odds = "Odds must be positive";
     }
     if (
-      canSplitLay &&
-      parsedLayPortions.some(
+      canSplit &&
+      parsedBetPortions.some(
         (portion) => !Number.isFinite(portion.stake) || portion.stake <= 0
       )
     ) {
@@ -336,7 +333,7 @@ export function StandaloneBetForm({
     } else if (!formData.stake || Number.parseFloat(formData.stake) <= 0) {
       newErrors.stake = "Stake must be positive";
     }
-    if (!canSplitLay && !formData.accountId) {
+    if (!canSplit && !formData.accountId) {
       newErrors.accountId = "Account is required";
     }
     if (isSettledEdit && !formData.settlementOutcome) {
@@ -360,8 +357,8 @@ export function StandaloneBetForm({
     setIsSubmitting(true);
 
     try {
-      const effectiveLay = canSplitLay ? combinedLayPortions : null;
-      const primaryLayPortion = parsedLayPortions[0];
+      const effectiveBet = canSplit ? combinedBetPortions : null;
+      const primaryBetPortion = parsedBetPortions[0];
       const endpoint =
         mode === "edit"
           ? "/api/bets/individual/update"
@@ -375,11 +372,11 @@ export function StandaloneBetForm({
           kind: formData.kind,
           market: formData.market.trim(),
           selection: formData.selection.trim(),
-          odds: effectiveLay?.odds ?? Number.parseFloat(formData.odds),
-          stake: effectiveLay?.stake ?? Number.parseFloat(formData.stake),
+          odds: effectiveBet?.odds ?? Number.parseFloat(formData.odds),
+          stake: effectiveBet?.stake ?? Number.parseFloat(formData.stake),
           accountId:
-            canSplitLay && primaryLayPortion
-              ? primaryLayPortion.accountId
+            canSplit && primaryBetPortion
+              ? primaryBetPortion.accountId
               : formData.accountId,
           currency: formData.currency,
           matchId: formData.matchId ? formData.matchId : null,
@@ -396,7 +393,7 @@ export function StandaloneBetForm({
             : undefined,
           settlementOutcome: formData.settlementOutcome || undefined,
           notes: formData.notes.trim() || undefined,
-          splitLegs: canSplitLay ? parsedLayPortions : undefined,
+          splitLegs: canSplit ? parsedBetPortions : undefined,
         }),
       });
 
@@ -415,7 +412,7 @@ export function StandaloneBetForm({
           : `${formData.kind === "back" ? "Back" : "Lay"} bet created successfully`,
         {
           description: `${formData.selection} @ ${
-            effectiveLay?.odds ?? formData.odds
+            effectiveBet?.odds ?? formData.odds
           }`,
         }
       );
@@ -446,9 +443,9 @@ export function StandaloneBetForm({
 
   // Calculate potential profit/loss for display
   const odds =
-    combinedLayPortions?.odds ?? (Number.parseFloat(formData.odds) || 0);
+    combinedBetPortions?.odds ?? (Number.parseFloat(formData.odds) || 0);
   const stake =
-    combinedLayPortions?.stake ?? (Number.parseFloat(formData.stake) || 0);
+    combinedBetPortions?.stake ?? (Number.parseFloat(formData.stake) || 0);
   const potentialProfit =
     formData.kind === "back"
       ? stake * (odds - 1) // Back bet: profit if wins
@@ -533,7 +530,7 @@ export function StandaloneBetForm({
               </div>
 
               {/* Account Selection */}
-              {!canSplitLay && (
+              {!canSplit && (
                 <div className="space-y-2">
                   <Label htmlFor="account">
                     {formData.kind === "back" ? "Account" : "Exchange"}
@@ -784,28 +781,31 @@ export function StandaloneBetForm({
                 </>
               )}
 
-              {canSplitLay ? (
+              {canSplit ? (
                 <div className="space-y-3 rounded-md border bg-muted/20 p-3">
                   <div>
-                    <Label>Lay portions</Label>
+                    <Label>
+                      {formData.kind === "back" ? "Back" : "Lay"} portions
+                    </Label>
                     <p className="text-muted-foreground text-xs">
-                      Keep the fill you already received, then add each new fill
-                      at its actual odds and stake.
+                      Keep each fill you already received, then correct its
+                      account, odds, and stake individually.
                     </p>
                   </div>
-                  {layPortions.map((portion, index) => (
+                  {betPortions.map((portion, index) => (
                     <div
                       className="space-y-3 rounded-md border bg-background p-3"
                       key={`${index}-${portion.accountId}`}
                     >
                       <div className="flex items-center justify-between gap-2">
                         <p className="font-medium text-sm">
-                          Lay portion {index + 1}
+                          {formData.kind === "back" ? "Back" : "Lay"} portion{" "}
+                          {index + 1}
                         </p>
-                        {layPortions.length > 1 && index > 0 && (
+                        {betPortions.length > 1 && index > 0 && (
                           <Button
-                            aria-label={`Remove lay portion ${index + 1}`}
-                            onClick={() => removeLayPortion(index)}
+                            aria-label={`Remove ${formData.kind} portion ${index + 1}`}
+                            onClick={() => removeBetPortion(index)}
                             size="icon"
                             type="button"
                             variant="ghost"
@@ -816,18 +816,29 @@ export function StandaloneBetForm({
                       </div>
                       <div className="grid gap-3 sm:grid-cols-3">
                         <div className="space-y-2">
-                          <Label>Exchange</Label>
+                          <Label>
+                            {formData.kind === "back" ? "Account" : "Exchange"}
+                          </Label>
                           <Select
                             onValueChange={(value) =>
-                              updateLayPortion(index, "accountId", value)
+                              updateBetPortion(index, "accountId", value)
                             }
                             value={portion.accountId}
                           >
                             <SelectTrigger>
-                              <SelectValue placeholder="Select exchange" />
+                              <SelectValue
+                                placeholder={
+                                  formData.kind === "back"
+                                    ? "Select account"
+                                    : "Select exchange"
+                                }
+                              />
                             </SelectTrigger>
                             <SelectContent>
-                              {exchanges
+                              {(formData.kind === "back"
+                                ? [...bookmakers, ...exchanges]
+                                : exchanges
+                              )
                                 .filter(
                                   (account) =>
                                     !account.currency ||
@@ -846,11 +857,15 @@ export function StandaloneBetForm({
                           </Select>
                         </div>
                         <div className="space-y-2">
-                          <Label>Lay odds</Label>
+                          <Label>
+                            {formData.kind === "back"
+                              ? "Back odds"
+                              : "Lay odds"}
+                          </Label>
                           <Input
                             min="1.01"
                             onChange={(event) =>
-                              updateLayPortion(
+                              updateBetPortion(
                                 index,
                                 "odds",
                                 event.target.value
@@ -866,7 +881,7 @@ export function StandaloneBetForm({
                           <Input
                             min="0.01"
                             onChange={(event) =>
-                              updateLayPortion(
+                              updateBetPortion(
                                 index,
                                 "stake",
                                 event.target.value
@@ -887,20 +902,19 @@ export function StandaloneBetForm({
                     <p className="text-destructive text-xs">{errors.stake}</p>
                   )}
                   <Button
-                    onClick={addLayPortion}
+                    onClick={addBetPortion}
                     size="sm"
                     type="button"
                     variant="outline"
                   >
                     <Plus className="mr-1 h-4 w-4" />
-                    Add lay portion
+                    Add {formData.kind} portion
                   </Button>
-                  {combinedLayPortions && combinedLayPortions.stake > 0 && (
+                  {combinedBetPortions && combinedBetPortions.stake > 0 && (
                     <p className="text-muted-foreground text-sm">
-                      Combined: {combinedLayPortions.stake.toFixed(2)}{" "}
+                      Combined: {combinedBetPortions.stake.toFixed(2)}{" "}
                       {formData.currency} at{" "}
-                      {combinedLayPortions.odds.toFixed(4)}
-                      lay odds
+                      {combinedBetPortions.odds.toFixed(4)} {formData.kind} odds
                     </p>
                   )}
                 </div>
