@@ -15,6 +15,7 @@ vi.mock("postgres", () => ({ default: vi.fn(() => ({})) }));
 import {
   DEFAULT_ODDS_API_LEAGUES,
   mapOddsApiStatus,
+  oddsApiProvider,
   parseOddsApiEvent,
 } from "@/lib/matches/providers/odds-api";
 
@@ -126,6 +127,48 @@ describe("DEFAULT_ODDS_API_LEAGUES", () => {
     ]) {
       expect(DEFAULT_ODDS_API_LEAGUES).toContain(slug);
     }
+  });
+});
+
+describe("oddsApiProvider.resolveCompetitions", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+  });
+
+  it("keeps dormant configured targets without including irrelevant leagues", async () => {
+    vi.stubEnv("ODDS_API_API_KEY", "key");
+    vi.stubEnv(
+      "ODDS_API_LEAGUES",
+      "uefa-champions-league,england-premier-league"
+    );
+
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify([
+          {
+            name: "UEFA Champions League",
+            slug: "uefa-champions-league",
+            eventsCount: 0,
+          },
+          {
+            name: "England - Premier League",
+            slug: "england-premier-league",
+            eventsCount: 20,
+          },
+          { name: "Irrelevant League", slug: "irrelevant-league" },
+        ]),
+        { status: 200 }
+      )
+    );
+
+    await expect(oddsApiProvider.resolveCompetitions([])).resolves.toEqual([
+      "uefa-champions-league",
+      "england-premier-league",
+    ]);
+
+    const requestUrl = new URL(fetchMock.mock.calls[0][0] as string);
+    expect(requestUrl.searchParams.get("all")).toBe("true");
   });
 });
 
