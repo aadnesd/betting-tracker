@@ -13,10 +13,9 @@ const EVENTS_PER_LEAGUE_LIMIT = 400;
 /**
  * Curated set of league slugs we want to track on odds-api.io.
  *
- * Dynamic discovery (see resolveCompetitions) intersects this with the leagues
- * that currently have fixtures, so listing a competition that is out of season
- * (or whose slug is slightly off) is harmless — it is simply skipped until it
- * becomes active. Override at runtime with ODDS_API_LEAGUES (comma-separated).
+ * Override at runtime with ODDS_API_LEAGUES (comma-separated). When the app's
+ * competition settings are available, resolveCompetitions narrows this list
+ * to the selected competitions.
  */
 export const DEFAULT_ODDS_API_LEAGUES = [
   // Internationals
@@ -63,12 +62,6 @@ type OddsApiEvent = {
     away?: number | null;
     periods?: Record<string, OddsApiPeriodScore>;
   };
-};
-
-type OddsApiLeague = {
-  name: string;
-  slug: string;
-  eventsCount?: number;
 };
 
 /**
@@ -176,14 +169,6 @@ async function oddsApiGet<T>(
   return (await response.json()) as T;
 }
 
-/** List the full football league catalog, including dormant competitions. */
-async function listLeagues(): Promise<OddsApiLeague[]> {
-  return await oddsApiGet<OddsApiLeague[]>("/leagues", {
-    sport: FOOTBALL_SPORT_SLUG,
-    all: "true",
-  });
-}
-
 /** Fetch events for a single league + status within a window. */
 async function fetchEventsForLeague({
   league,
@@ -206,17 +191,45 @@ async function fetchEventsForLeague({
   });
 }
 
-/** Read configured target leagues from env, falling back to the curated list. */
-function getTargetLeagues(): string[] {
+/** Map the app's competition codes to odds-api.io league slugs. */
+const ODDS_API_LEAGUE_BY_CODE: Record<string, string> = {
+  ALL: "sweden-allsvenskan",
+  BL1: "germany-bundesliga",
+  CLI: "south-america-copa-libertadores",
+  CL: "uefa-champions-league",
+  DED: "netherlands-eredivisie",
+  EC: "uefa-europa-conference-league",
+  EFL: "england-efl-cup",
+  ELC: "england-championship",
+  EL: "uefa-europa-league",
+  FAC: "england-fa-cup",
+  FL1: "france-ligue-1",
+  PD: "spain-laliga",
+  PL: "england-premier-league",
+  PPL: "portugal-primeira-liga",
+  SA: "italy-serie-a",
+  TIP: "norway-eliteserien",
+  WC: "international-fifa-world-cup",
+};
+
+/** Read configured target leagues from env or selected app competitions. */
+function getTargetLeagues(userEnabled: string[]): string[] {
   const raw = process.env.ODDS_API_LEAGUES;
-  if (!raw) {
-    return [...DEFAULT_ODDS_API_LEAGUES];
+  if (raw) {
+    const slugs = raw
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (slugs.length > 0) {
+      return slugs;
+    }
   }
-  const slugs = raw
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-  return slugs.length > 0 ? slugs : [...DEFAULT_ODDS_API_LEAGUES];
+
+  const selected = userEnabled
+    .map((code) => ODDS_API_LEAGUE_BY_CODE[code])
+    .filter((slug): slug is string => Boolean(slug));
+
+  return selected.length > 0 ? selected : [...DEFAULT_ODDS_API_LEAGUES];
 }
 
 /**
@@ -257,11 +270,9 @@ async function fetchAcrossLeagues({
  * Competition identifiers are odds-api league slugs (e.g.
  * "england-premier-league").
  *
- * Why dynamic discovery: odds-api's league list is fixture-driven, so a
- * competition only appears while it has scheduled fixtures. We intersect our
- * curated target leagues with the currently-active list to avoid wasting
- * requests on dormant competitions and to pick them up automatically once they
- * come back into season.
+ * The target list is deliberately allowlisted. We request those slugs
+ * directly instead of treating the provider's league catalog as authoritative:
+ * the catalog can omit a competition even when its events endpoint supports it.
  */
 export const oddsApiProvider: MatchProvider = {
   id: "odds-api",
@@ -271,31 +282,8 @@ export const oddsApiProvider: MatchProvider = {
     return Boolean(process.env.ODDS_API_API_KEY);
   },
 
-  async resolveCompetitions(_userEnabled: string[]) {
-    const targets = getTargetLeagues();
-
-    try {
-      const live = await listLeagues();
-      const liveSlugs = new Set(live.map((l) => l.slug));
-      const active = targets.filter((slug) => liveSlugs.has(slug));
-      const skipped = targets.filter((slug) => !liveSlugs.has(slug));
-
-      if (skipped.length > 0) {
-        console.log(
-          `[odds-api] Skipping ${skipped.length} dormant/unknown leagues: ${skipped.join(", ")}`
-        );
-      }
-
-      // If discovery matched nothing (unexpected), fall back to raw targets
-      // rather than syncing zero leagues.
-      return active.length > 0 ? active : targets;
-    } catch (error) {
-      console.warn(
-        "[odds-api] League discovery failed, using target list as-is:",
-        error instanceof Error ? error.message : error
-      );
-      return targets;
-    }
+  async resolveCompetitions(userEnabled: string[]) {
+    return getTargetLeagues(userEnabled);
   },
 
   async fetchUpcoming({ competitions, from, to }: FetchMatchesOptions) {
