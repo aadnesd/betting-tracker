@@ -176,10 +176,11 @@ async function oddsApiGet<T>(
   return (await response.json()) as T;
 }
 
-/** List leagues that currently have fixtures for football. */
+/** List the full football league catalog, including dormant competitions. */
 async function listLeagues(): Promise<OddsApiLeague[]> {
   return await oddsApiGet<OddsApiLeague[]>("/leagues", {
     sport: FOOTBALL_SPORT_SLUG,
+    all: "true",
   });
 }
 
