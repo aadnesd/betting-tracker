@@ -136,39 +136,26 @@ describe("oddsApiProvider.resolveCompetitions", () => {
     vi.unstubAllEnvs();
   });
 
-  it("keeps dormant configured targets without including irrelevant leagues", async () => {
+  it("uses explicit target slugs without including irrelevant leagues", async () => {
     vi.stubEnv("ODDS_API_API_KEY", "key");
     vi.stubEnv(
       "ODDS_API_LEAGUES",
       "uefa-champions-league,england-premier-league"
     );
 
-    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      new Response(
-        JSON.stringify([
-          {
-            name: "UEFA Champions League",
-            slug: "uefa-champions-league",
-            eventsCount: 0,
-          },
-          {
-            name: "England - Premier League",
-            slug: "england-premier-league",
-            eventsCount: 20,
-          },
-          { name: "Irrelevant League", slug: "irrelevant-league" },
-        ]),
-        { status: 200 }
-      )
-    );
-
     await expect(oddsApiProvider.resolveCompetitions([])).resolves.toEqual([
       "uefa-champions-league",
       "england-premier-league",
     ]);
+  });
 
-    const requestUrl = new URL(fetchMock.mock.calls[0][0] as string);
-    expect(requestUrl.searchParams.get("all")).toBe("true");
+  it("maps selected app competitions to provider slugs", async () => {
+    vi.stubEnv("ODDS_API_API_KEY", "key");
+    vi.stubEnv("ODDS_API_LEAGUES", "");
+
+    await expect(
+      oddsApiProvider.resolveCompetitions(["CL", "PL"])
+    ).resolves.toEqual(["uefa-champions-league", "england-premier-league"]);
   });
 });
 
