@@ -22,7 +22,7 @@ export const DEFAULT_ODDS_API_LEAGUES = [
   "international-fifa-world-cup",
   "international-uefa-nations-league",
   // UEFA club competitions
-  "uefa-champions-league",
+  "international-clubs-uefa-champions-league",
   "uefa-europa-league",
   "uefa-europa-conference-league",
   // England
@@ -196,7 +196,7 @@ const ODDS_API_LEAGUE_BY_CODE: Record<string, string> = {
   ALL: "sweden-allsvenskan",
   BL1: "germany-bundesliga",
   CLI: "south-america-copa-libertadores",
-  CL: "uefa-champions-league",
+  CL: "international-clubs-uefa-champions-league",
   DED: "netherlands-eredivisie",
   EC: "uefa-europa-conference-league",
   EFL: "england-efl-cup",
