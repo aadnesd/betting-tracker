@@ -140,11 +140,11 @@ describe("oddsApiProvider.resolveCompetitions", () => {
     vi.stubEnv("ODDS_API_API_KEY", "key");
     vi.stubEnv(
       "ODDS_API_LEAGUES",
-      "uefa-champions-league,england-premier-league"
+      "international-clubs-uefa-champions-league,england-premier-league"
     );
 
     await expect(oddsApiProvider.resolveCompetitions([])).resolves.toEqual([
-      "uefa-champions-league",
+      "international-clubs-uefa-champions-league",
       "england-premier-league",
     ]);
   });
@@ -155,7 +155,10 @@ describe("oddsApiProvider.resolveCompetitions", () => {
 
     await expect(
       oddsApiProvider.resolveCompetitions(["CL", "PL"])
-    ).resolves.toEqual(["uefa-champions-league", "england-premier-league"]);
+    ).resolves.toEqual([
+      "international-clubs-uefa-champions-league",
+      "england-premier-league",
+    ]);
   });
 });
 
