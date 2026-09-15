@@ -26,6 +26,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import type { PredictionMarketExecution } from "@/lib/db/schema";
+import { calculateLayProfitLoss, calculateProfitLoss } from "@/lib/settlement";
 import { cn } from "@/lib/utils";
 
 const outcomes = [
@@ -53,6 +55,9 @@ type IndividualBetActionsProps = {
   selection: string;
   accountId?: string | null;
   accountBalance?: number | null;
+  accountCommission?: number | null;
+  predictionMarketSharePrice?: number | null;
+  predictionMarketExecution?: PredictionMarketExecution | null;
   matchedBetId?: string | null;
   settlementInfo?: SettlementInfo | null;
   canEditSettled?: boolean;
@@ -62,18 +67,30 @@ function calculatePotentialPL(
   kind: "back" | "lay",
   outcome: Outcome,
   stake: number,
-  odds: number
+  odds: number,
+  commissionRate = 0,
+  predictionMarketSharePrice?: number | null,
+  predictionMarketExecution?: PredictionMarketExecution | null
 ) {
-  switch (outcome) {
-    case "won":
-      return kind === "back" ? stake * (odds - 1) : stake;
-    case "lost":
-      return kind === "back" ? -stake : -stake * (odds - 1);
-    case "push":
-      return 0;
-    default:
-      return 0;
+  const betOutcome =
+    outcome === "won" ? "win" : outcome === "lost" ? "loss" : "push";
+  if (kind === "back") {
+    return calculateProfitLoss(betOutcome, stake, odds);
   }
+  const layOutcome =
+    betOutcome === "win" ? "loss" : betOutcome === "loss" ? "win" : "push";
+  return calculateLayProfitLoss(
+    layOutcome,
+    stake,
+    odds,
+    commissionRate,
+    predictionMarketSharePrice == null
+      ? null
+      : {
+          sharePrice: predictionMarketSharePrice,
+          execution: predictionMarketExecution,
+        }
+  );
 }
 
 function formatCurrency(amount: number, currency: string) {
@@ -95,6 +112,9 @@ export function IndividualBetActions({
   selection,
   accountId,
   accountBalance,
+  accountCommission = 0,
+  predictionMarketSharePrice = null,
+  predictionMarketExecution = null,
   matchedBetId,
   settlementInfo,
   canEditSettled = false,
@@ -110,14 +130,31 @@ export function IndividualBetActions({
     if (!outcome) {
       return null;
     }
-    const profitLoss = calculatePotentialPL(betKind, outcome, stake, odds);
+    const profitLoss = calculatePotentialPL(
+      betKind,
+      outcome,
+      stake,
+      odds,
+      accountCommission ?? 0,
+      predictionMarketSharePrice,
+      predictionMarketExecution
+    );
     const projectedBalance =
       accountBalance !== null && accountBalance !== undefined
         ? accountBalance + profitLoss
         : null;
 
     return { profitLoss, projectedBalance };
-  }, [accountBalance, betKind, odds, outcome, stake]);
+  }, [
+    accountBalance,
+    accountCommission,
+    betKind,
+    odds,
+    outcome,
+    predictionMarketExecution,
+    predictionMarketSharePrice,
+    stake,
+  ]);
 
   const settleBet = async () => {
     if (!outcome) {

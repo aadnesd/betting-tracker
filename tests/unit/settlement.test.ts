@@ -479,6 +479,23 @@ describe("settlement outcome logic", () => {
       expect(result.netProfitLoss).toBe(-5); // -100 + 95
     });
 
+    it("calculates the Polymarket taker fee from share price", () => {
+      const result = calculateMatchedBetProfitLoss(
+        "loss",
+        13_500,
+        1.23,
+        13_629.87,
+        1 / 0.81,
+        false,
+        false,
+        0.05,
+        { sharePrice: 0.19, execution: "taker" }
+      );
+
+      expect(result.layProfitLoss).toBeCloseTo(13_500.386_235);
+      expect(result.netProfitLoss).toBeCloseTo(0.386_235);
+    });
+
     it("does not apply commission when back wins (lay loses)", () => {
       // Back £100 @ 2.00, Lay £100 @ 2.00, 5% exchange commission
       // Back wins: +£100, Lay loses: -£100 (no commission on losses)

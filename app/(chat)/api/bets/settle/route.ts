@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/app/(auth)/auth";
+import type { PredictionMarketPosition } from "@/lib/bet-calculations";
 import { revalidateDashboard } from "@/lib/cache";
 import {
   activateFreeBetWageringOnWin,
@@ -19,6 +20,7 @@ import {
   updateLayBet,
   updateMatchedBetRecord,
 } from "@/lib/db/queries";
+import type { LayBet } from "@/lib/db/schema";
 import { convertAmountToNokStrict } from "@/lib/fx-rates";
 import {
   calculateLayProfitLoss,
@@ -46,7 +48,8 @@ function calculateBetProfitLoss(
   odds: number,
   isFreeBet = false,
   freeBetStakeReturned = false,
-  commissionRate = 0
+  commissionRate = 0,
+  predictionMarketPosition?: PredictionMarketPosition | null
 ): number {
   // Convert outcome to settlement outcome type
   const betOutcome =
@@ -71,7 +74,8 @@ function calculateBetProfitLoss(
     layOutcomeFromBackPerspective,
     stake,
     odds,
-    commissionRate
+    commissionRate,
+    predictionMarketPosition
   );
 }
 
@@ -107,6 +111,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Bet not found" }, { status: 404 });
     }
 
+    const layBet: LayBet | null =
+      body.betKind === "lay" && "sharePrice" in bet ? (bet as LayBet) : null;
+
     const matchedBet = await getMatchedBetByLegId({
       betId: body.betId,
       kind: body.betKind,
@@ -141,6 +148,7 @@ export async function POST(request: Request) {
 
     // For lay bets, get the exchange account's commission rate
     let commissionRate = 0;
+    let predictionMarketPosition: PredictionMarketPosition | null = null;
     if (body.betKind === "lay" && bet.accountId) {
       const exchangeAccount = await getAccountById({
         id: bet.accountId,
@@ -148,6 +156,12 @@ export async function POST(request: Request) {
       });
       if (exchangeAccount?.commission) {
         commissionRate = Number.parseFloat(exchangeAccount.commission);
+      }
+      if (layBet?.sharePrice != null) {
+        predictionMarketPosition = {
+          sharePrice: Number(layBet.sharePrice),
+          execution: layBet.predictionMarketExecution,
+        };
       }
     }
 
@@ -161,7 +175,8 @@ export async function POST(request: Request) {
       odds,
       isFreeBet,
       freeBetStakeReturned,
-      commissionRate
+      commissionRate,
+      predictionMarketPosition
     );
 
     const now = new Date();
@@ -207,6 +222,7 @@ export async function POST(request: Request) {
       isFreeBet,
       freeBetStakeReturned,
       commissionRate,
+      predictionMarketPosition,
     });
     for (const adjustment of adjustments) {
       await createAccountTransaction({

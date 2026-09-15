@@ -4,6 +4,7 @@ import { auth } from "@/app/(auth)/auth";
 import {
   computeMatchedNetExposure,
   computeNetExposureInputs,
+  type PredictionMarketPosition,
 } from "@/lib/bet-calculations";
 import { revalidateDashboard } from "@/lib/cache";
 import {
@@ -62,6 +63,13 @@ export async function POST(request: Request) {
     const backOdds = Number.parseFloat(back.odds);
     const layStake = Number.parseFloat(lay.stake);
     const layOdds = Number.parseFloat(lay.odds);
+    const predictionMarketPosition: PredictionMarketPosition | null =
+      lay.sharePrice === null
+        ? null
+        : {
+            sharePrice: Number(lay.sharePrice),
+            execution: lay.predictionMarketExecution,
+          };
 
     if (
       Number.isNaN(backStake) ||
@@ -108,6 +116,7 @@ export async function POST(request: Request) {
         !!fullBet.freeBet || isFreeBetPromoType(matched.promoType ?? null),
       freeBetStakeReturned: fullBet.freeBet?.stakeReturned ?? false,
       commissionRate: fullBet.layAccountCommission ?? 0,
+      predictionMarketPosition,
     });
 
     console.log(

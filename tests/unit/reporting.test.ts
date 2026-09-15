@@ -119,6 +119,8 @@ function createMockMatchedBet(
           sharePrice: layOverrides.sharePrice ?? null,
           shares: layOverrides.shares ?? null,
           shareSide: layOverrides.shareSide ?? null,
+          predictionMarketExecution:
+            layOverrides.predictionMarketExecution ?? null,
           matchId: layOverrides.matchId ?? null,
         };
 

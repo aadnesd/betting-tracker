@@ -19,9 +19,11 @@ import {
   sum,
 } from "drizzle-orm";
 import {
+  calculateLayLiability,
   computeMatchedNetExposure,
   computeNetExposureInputs,
   computeSingleLegOutcome,
+  type PredictionMarketPosition,
 } from "../bet-calculations";
 import { DEFAULT_FREE_BET_EXPIRY_DAYS } from "../bets/free-bet-defaults";
 import { deriveMatchedBetDisplayStatus } from "../bets/matched-status";
@@ -57,6 +59,7 @@ import {
   freeBetWageringBet,
   layBet,
   matchedBet,
+  type PredictionMarketExecution,
   type PredictionMarketShareSide,
   promo,
   qualifyingBet,
@@ -108,6 +111,8 @@ function calculateMatchedOutcomePreview({
   layStakeNok,
   layOdds,
   layAccountCommission,
+  predictionMarketSharePrice,
+  predictionMarketExecution,
   freeBetId,
   freeBetStakeReturned,
 }: {
@@ -120,6 +125,8 @@ function calculateMatchedOutcomePreview({
   layStakeNok?: string | number | null;
   layOdds?: string | number | null;
   layAccountCommission?: string | number | null;
+  predictionMarketSharePrice?: string | number | null;
+  predictionMarketExecution?: PredictionMarketExecution | null;
   freeBetId?: string | null;
   freeBetStakeReturned?: boolean | null;
 }): MatchedOutcomePreview | null {
@@ -134,12 +141,27 @@ function calculateMatchedOutcomePreview({
     layStakeValue !== null &&
     layOddsValue !== null
   ) {
-    const { backProfit, layLiability } = computeNetExposureInputs({
-      backStake: backStakeValue,
-      backOdds: backOddsValue,
-      layStake: layStakeValue,
-      layOdds: layOddsValue,
-    });
+    const { backProfit, layLiability: calculatedLayLiability } =
+      computeNetExposureInputs({
+        backStake: backStakeValue,
+        backOdds: backOddsValue,
+        layStake: layStakeValue,
+        layOdds: layOddsValue,
+      });
+    const predictionMarketPosition =
+      parseNumeric(predictionMarketSharePrice) === null
+        ? null
+        : {
+            sharePrice: parseNumeric(predictionMarketSharePrice) as number,
+            execution: predictionMarketExecution,
+          };
+    const layLiability = predictionMarketPosition
+      ? calculateLayLiability({
+          layStake: layStakeValue,
+          layOdds: layOddsValue,
+          predictionMarketPosition,
+        })
+      : calculatedLayLiability;
     const outcomes = computeMatchedNetExposure({
       backStake: backStakeValue,
       backProfit,
@@ -148,6 +170,7 @@ function calculateMatchedOutcomePreview({
       isFreeBet: !!freeBetId || isFreeBetPromoType(promoType ?? null),
       freeBetStakeReturned: freeBetStakeReturned ?? false,
       commissionRate: parseNumeric(layAccountCommission) ?? 0,
+      predictionMarketPosition,
     });
 
     return {
@@ -1704,6 +1727,7 @@ type BetInputBase = {
   sharePrice?: number | null;
   shares?: number | null;
   shareSide?: PredictionMarketShareSide | null;
+  predictionMarketExecution?: PredictionMarketExecution | null;
   exchange: string;
   matchId?: string | null;
   accountId?: string | null;
@@ -1910,6 +1934,7 @@ export async function saveLayBet({
           ? null
           : bet.shares.toString(),
       shareSide: bet.shareSide ?? null,
+      predictionMarketExecution: bet.predictionMarketExecution ?? null,
       stakeNok: stakeNok.toFixed(2),
       exchange: bet.exchange,
       currency: bet.currency ?? null,
@@ -2293,6 +2318,8 @@ export async function listMatchedBetsByUser({
         layStake: layBet.stake,
         layStakeNok: layBet.stakeNok,
         layOdds: layBet.odds,
+        predictionMarketSharePrice: layBet.sharePrice,
+        predictionMarketExecution: layBet.predictionMarketExecution,
         layAccountCommission: layAccount.commission,
         freeBetId: freeBet.id,
         freeBetStakeReturned: freeBet.stakeReturned,
@@ -2326,6 +2353,8 @@ export async function listMatchedBetsByUser({
         layStake: row.layStake,
         layStakeNok: row.layStakeNok,
         layOdds: row.layOdds,
+        predictionMarketSharePrice: row.predictionMarketSharePrice,
+        predictionMarketExecution: row.predictionMarketExecution,
         layAccountCommission: row.layAccountCommission,
         freeBetId: row.freeBetId,
         freeBetStakeReturned: row.freeBetStakeReturned,
@@ -2569,6 +2598,8 @@ export async function listMatchedBetsForList({
           odds: layBet.odds,
           stake: layBet.stake,
           stakeNok: layBet.stakeNok,
+          sharePrice: layBet.sharePrice,
+          predictionMarketExecution: layBet.predictionMarketExecution,
           exchange: layBet.exchange,
           currency: layBet.currency,
           status: layBet.status,
@@ -2629,6 +2660,9 @@ export async function listMatchedBetsForList({
               odds: Number.parseFloat((row.lay.odds ?? 0).toString()),
               stake: Number.parseFloat((row.lay.stake ?? 0).toString()),
               stakeNok: parseNumber(row.lay.stakeNok),
+              sharePrice: parseNumber(row.lay.sharePrice),
+              predictionMarketExecution:
+                row.lay.predictionMarketExecution ?? null,
               exchange: row.lay.exchange ?? "",
               currency: row.lay.currency ?? null,
               status: row.lay.status ?? ("draft" as const),
@@ -2684,6 +2718,8 @@ export async function listMatchedBetsForList({
           layStake: row.lay?.stake,
           layStakeNok: row.lay?.stakeNok,
           layOdds: row.lay?.odds,
+          predictionMarketSharePrice: row.lay?.sharePrice,
+          predictionMarketExecution: row.lay?.predictionMarketExecution,
           layAccountCommission: row.layAccountCommission,
           freeBetId: row.freeBetId,
           freeBetStakeReturned: row.freeBetStakeReturned,
@@ -2722,6 +2758,8 @@ export type IndividualBetListItem = {
   accountKind: "bookmaker" | "exchange" | null;
   /** Exchange commission rate for lay bets (decimal, e.g., 0.05 for 5%) */
   accountCommission: number | null;
+  predictionMarketSharePrice?: number | null;
+  predictionMarketExecution?: PredictionMarketExecution | null;
   matchedBetId: string | null;
   matchedBetStatus: "draft" | "matched" | "settled" | "needs_review" | null;
 };
@@ -2843,6 +2881,8 @@ export async function listAllBetsByUser({
           accountName: account.name,
           accountKind: account.kind,
           accountCommission: account.commission,
+          predictionMarketSharePrice: layBet.sharePrice,
+          predictionMarketExecution: layBet.predictionMarketExecution,
           matchedBetId: matchedBet.id,
           matchedBetStatus: matchedBet.status,
         })
@@ -2876,6 +2916,8 @@ export async function listAllBetsByUser({
         accountCommission: row.accountCommission
           ? Number.parseFloat(row.accountCommission)
           : null,
+        predictionMarketSharePrice: null,
+        predictionMarketExecution: null,
         matchedBetId: row.matchedBetId ?? null,
         matchedBetStatus: row.matchedBetStatus ?? null,
       })),
@@ -2900,6 +2942,11 @@ export async function listAllBetsByUser({
         accountCommission: row.accountCommission
           ? Number.parseFloat(row.accountCommission)
           : null,
+        predictionMarketSharePrice:
+          row.predictionMarketSharePrice === null
+            ? null
+            : Number.parseFloat(row.predictionMarketSharePrice),
+        predictionMarketExecution: row.predictionMarketExecution ?? null,
         matchedBetId: row.matchedBetId ?? null,
         matchedBetStatus: row.matchedBetStatus ?? null,
       })),
@@ -3157,6 +3204,8 @@ function calculateGroupMemberOutcomePreview(row: {
   layStakeNok: string | null;
   layOdds: string | null;
   layAccountCommission: string | null;
+  predictionMarketSharePrice: string | null;
+  predictionMarketExecution: PredictionMarketExecution | null;
   freeBetId: string | null;
   freeBetStakeReturned: boolean | null;
 }): MatchedOutcomePreview | null {
@@ -3182,6 +3231,8 @@ function calculateGroupMemberOutcomePreview(row: {
       layStakeNok: row.layStakeNok,
       layOdds: row.layOdds,
       layAccountCommission: row.layAccountCommission,
+      predictionMarketSharePrice: row.predictionMarketSharePrice,
+      predictionMarketExecution: row.predictionMarketExecution,
       freeBetId: row.freeBetId,
       freeBetStakeReturned: row.freeBetStakeReturned,
     });
@@ -3213,6 +3264,15 @@ function calculateGroupMemberOutcomePreview(row: {
       odds: layOddsValue,
       isFreeBet,
       commissionRate,
+      predictionMarketPosition:
+        parseNumeric(row.predictionMarketSharePrice) === null
+          ? null
+          : {
+              sharePrice: parseNumeric(
+                row.predictionMarketSharePrice
+              ) as number,
+              execution: row.predictionMarketExecution,
+            },
     });
     return {
       profitIfBackWins: roundCurrency(outcome.profitIfWins),
@@ -3262,6 +3322,8 @@ export async function getMatchedSetGroupMembers({
         layStake: layBet.stake,
         layStakeNok: layBet.stakeNok,
         layOdds: layBet.odds,
+        predictionMarketSharePrice: layBet.sharePrice,
+        predictionMarketExecution: layBet.predictionMarketExecution,
         layAccountCommission: layAccount.commission,
         freeBetId: freeBet.id,
         freeBetStakeReturned: freeBet.stakeReturned,
@@ -3668,6 +3730,8 @@ export async function getPendingSettlementBets({
         layStake: layBet.stake,
         layStakeNok: layBet.stakeNok,
         layOdds: layBet.odds,
+        laySharePrice: layBet.sharePrice,
+        layPredictionMarketExecution: layBet.predictionMarketExecution,
         layAccountCommission: layAccount.commission,
         freeBetId: freeBet.id,
         freeBetStakeReturned: freeBet.stakeReturned,
@@ -3713,6 +3777,8 @@ export async function getPendingSettlementBets({
         layStake: row.layStake,
         layStakeNok: row.layStakeNok,
         layOdds: row.layOdds,
+        predictionMarketSharePrice: row.laySharePrice,
+        predictionMarketExecution: row.layPredictionMarketExecution,
         layAccountCommission: row.layAccountCommission,
         freeBetId: row.freeBetId,
         freeBetStakeReturned: row.freeBetStakeReturned,
@@ -3797,6 +3863,8 @@ export type BetReadyForSettlement = {
   layBetId: string | null;
   layOdds: string | null;
   layStake: string | null;
+  laySharePrice?: string | null;
+  layPredictionMarketExecution?: PredictionMarketExecution | null;
   layAccountId: string | null;
   layCurrency: string | null;
   /** Exchange commission rate as a decimal (e.g., 0.05 for 5%). Null if no exchange account or commission not set. */
@@ -3865,6 +3933,8 @@ export async function findBetsReadyForAutoSettlement({
         layBetId: layBet.id,
         layOdds: layBet.odds,
         layStake: layBet.stake,
+        laySharePrice: layBet.sharePrice,
+        layPredictionMarketExecution: layBet.predictionMarketExecution,
         layAccountId: layBet.accountId,
         layCurrency: layBet.currency,
         // Exchange account commission
@@ -3928,6 +3998,8 @@ export async function findBetsReadyForAutoSettlement({
         layBetId: row.layBetId,
         layOdds: row.layOdds,
         layStake: row.layStake,
+        laySharePrice: row.laySharePrice,
+        layPredictionMarketExecution: row.layPredictionMarketExecution,
         layAccountId: row.layAccountId,
         layCurrency: row.layCurrency,
         layAccountCommission: row.layAccountCommission
@@ -3989,6 +4061,8 @@ export async function findUnlinkedBetsReadyForAutoSettlement({
         layBetId: layBet.id,
         layOdds: layBet.odds,
         layStake: layBet.stake,
+        laySharePrice: layBet.sharePrice,
+        layPredictionMarketExecution: layBet.predictionMarketExecution,
         layAccountId: layBet.accountId,
         layCurrency: layBet.currency,
         layAccountCommission: exchangeAccount.commission,
@@ -4034,6 +4108,8 @@ export async function findUnlinkedBetsReadyForAutoSettlement({
       layBetId: row.layBetId,
       layOdds: row.layOdds,
       layStake: row.layStake,
+      laySharePrice: row.laySharePrice,
+      layPredictionMarketExecution: row.layPredictionMarketExecution,
       layAccountId: row.layAccountId,
       layCurrency: row.layCurrency,
       layAccountCommission: row.layAccountCommission
@@ -4115,6 +4191,8 @@ export type ApplyAutoSettlementParams = {
   freeBetStakeReturned?: boolean;
   /** Exchange commission rate as a decimal, for splitting lay P&L per account. */
   layCommissionRate?: number;
+  /** Polymarket share position, when the lay leg is a prediction-market bet. */
+  predictionMarketPosition?: PredictionMarketPosition | null;
   /** Optional explanation of how the settlement result was determined */
   settlementReasoning?: Record<string, unknown>;
 };
@@ -4246,6 +4324,7 @@ export async function applyAutoSettlement(
         primaryAccountId: params.layAccountId,
         legs: layRow?.splitLegs ?? null,
         commissionRate: params.layCommissionRate ?? 0,
+        predictionMarketPosition: params.predictionMarketPosition,
       });
       for (const adjustment of layAdjustments) {
         if (adjustment.amount === 0) {
@@ -6422,6 +6501,8 @@ export async function getOpenExposure({ userId }: { userId: string }) {
         layStakeNok: layBet.stakeNok,
         layOdds: layBet.odds,
         layCurrency: layBet.currency,
+        laySharePrice: layBet.sharePrice,
+        layPredictionMarketExecution: layBet.predictionMarketExecution,
         layAccountCommission: account.commission,
         freeBetId: freeBet.id,
         freeBetStakeReturned: freeBet.stakeReturned,
@@ -6452,6 +6533,8 @@ export async function getOpenExposure({ userId }: { userId: string }) {
         layStake: bet.layStake,
         layStakeNok: bet.layStakeNok,
         layOdds: bet.layOdds,
+        predictionMarketSharePrice: bet.laySharePrice,
+        predictionMarketExecution: bet.layPredictionMarketExecution,
         layAccountCommission: bet.layAccountCommission,
         freeBetId: bet.freeBetId,
         freeBetStakeReturned: bet.freeBetStakeReturned,
@@ -6730,6 +6813,8 @@ export async function getExposureByEvent({
         layStake: layBet.stake,
         layStakeNok: layBet.stakeNok,
         layOdds: layBet.odds,
+        laySharePrice: layBet.sharePrice,
+        layPredictionMarketExecution: layBet.predictionMarketExecution,
         layAccountCommission: layAccount.commission,
         freeBetId: freeBet.id,
         freeBetStakeReturned: freeBet.stakeReturned,
@@ -6781,6 +6866,8 @@ export async function getExposureByEvent({
         layStake: bet.layStake,
         layStakeNok: bet.layStakeNok,
         layOdds: bet.layOdds,
+        predictionMarketSharePrice: bet.laySharePrice,
+        predictionMarketExecution: bet.layPredictionMarketExecution,
         layAccountCommission: bet.layAccountCommission,
         freeBetId: bet.freeBetId,
         freeBetStakeReturned: bet.freeBetStakeReturned,

@@ -226,6 +226,10 @@ export const predictionMarketShareSideEnum = ["no", "under", "over"] as const;
 export type PredictionMarketShareSide =
   (typeof predictionMarketShareSideEnum)[number];
 
+export const predictionMarketExecutionEnum = ["maker", "taker"] as const;
+export type PredictionMarketExecution =
+  (typeof predictionMarketExecutionEnum)[number];
+
 export const backBet = pgTable("BackBet", {
   id: uuid("id").primaryKey().notNull().defaultRandom(),
   createdAt: timestamp("createdAt").notNull(),
@@ -284,6 +288,9 @@ export const layBet = pgTable("LayBet", {
   sharePrice: numeric("sharePrice", { precision: 12, scale: 6 }),
   shares: numeric("shares", { precision: 14, scale: 4 }),
   shareSide: varchar("shareSide", { enum: predictionMarketShareSideEnum }),
+  predictionMarketExecution: varchar("predictionMarketExecution", {
+    enum: predictionMarketExecutionEnum,
+  }),
   stakeNok: numeric("stakeNok", { precision: 14, scale: 2 }),
   exchange: text("exchange").notNull(),
   currency: varchar("currency", { length: 3 }),

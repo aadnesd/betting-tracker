@@ -95,6 +95,7 @@ type FormData = {
   laySharePrice: string;
   layShares: string;
   layShareSide: "no" | "under" | "over";
+  predictionMarketExecution: "maker" | "taker";
   layExchange: string;
   layCurrency: string;
   notes: string;
@@ -204,6 +205,7 @@ export function QuickAddForm({
     laySharePrice: "",
     layShares: "",
     layShareSide: "no",
+    predictionMarketExecution: "taker",
     layExchange: defaultExchange,
     layCurrency: defaultLayCurrency,
     notes: "",
@@ -532,6 +534,9 @@ export function QuickAddForm({
             backCurrency: formData.backCurrency,
             layOdds: isPredictionMarket ? undefined : layOdds,
             sharePrice: isPredictionMarket ? sharePrice : undefined,
+            predictionMarketExecution: isPredictionMarket
+              ? formData.predictionMarketExecution
+              : undefined,
             layCurrency: formData.layCurrency,
             layExchange: formData.layExchange,
             promoType: formData.promoType || undefined,
@@ -603,6 +608,7 @@ export function QuickAddForm({
     formData.layCurrency,
     formData.layExchange,
     formData.laySharePrice,
+    formData.predictionMarketExecution,
     formData.promoType,
     layStakeBias,
     layStakeMode,
@@ -1014,6 +1020,9 @@ export function QuickAddForm({
             sharePrice,
             shares,
             shareSide: isPredictionMarket ? formData.layShareSide : undefined,
+            predictionMarketExecution: isPredictionMarket
+              ? formData.predictionMarketExecution
+              : undefined,
           },
           notes: combinedNotes,
           entryMode: hedgeMode,
@@ -2038,7 +2047,7 @@ export function QuickAddForm({
                     Buy the opposite outcome share: No for 1X2, or Under/Over
                     for the opposite totals side.
                   </p>
-                  <div className="grid gap-4 sm:grid-cols-3">
+                  <div className="grid gap-4 sm:grid-cols-4">
                     <div className="space-y-2">
                       <Label htmlFor="layShareSide">Hedge side</Label>
                       <Select
@@ -2098,6 +2107,25 @@ export function QuickAddForm({
                         value={formData.layShares}
                       />
                     </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="predictionMarketExecution">
+                        Execution
+                      </Label>
+                      <Select
+                        onValueChange={(value: "maker" | "taker") =>
+                          updateField("predictionMarketExecution", value)
+                        }
+                        value={formData.predictionMarketExecution}
+                      >
+                        <SelectTrigger id="predictionMarketExecution">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="taker">Taker (fee)</SelectItem>
+                          <SelectItem value="maker">Maker (no fee)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                   {(errors.laySharePrice || errors.layShares) && (
                     <p className="text-destructive text-xs">
@@ -2144,7 +2172,9 @@ export function QuickAddForm({
                       <span className="text-muted-foreground">Commission</span>
                       <div className="font-medium">
                         {layStakeCalculation
-                          ? `${(layStakeCalculation.commissionRate * 100).toFixed(1)}%`
+                          ? formData.predictionMarketExecution === "maker"
+                            ? "0% (maker)"
+                            : `${(layStakeCalculation.commissionRate * 100).toFixed(1)}% price-based fee`
                           : "—"}
                       </div>
                     </div>
@@ -2152,7 +2182,7 @@ export function QuickAddForm({
                   <p className="text-muted-foreground text-xs">
                     {isCalculatingLayStake
                       ? "Calculating optimal share amount..."
-                      : "Share amount includes currency conversion and exchange commission."}
+                      : "Share amount includes currency conversion and the selected maker/taker fee model."}
                   </p>
                 </div>
               )}

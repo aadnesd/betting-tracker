@@ -15,6 +15,7 @@ const calculateLayStakeSchema = z.object({
   backCurrency: z.string().length(3).default("NOK"),
   layOdds: z.number().gt(1).optional(),
   sharePrice: z.number().gt(0).lt(1).optional(),
+  predictionMarketExecution: z.enum(["maker", "taker"]).optional(),
   layCurrency: z.string().length(3).default("NOK"),
   layExchange: z.string().min(1),
   promoType: z.string().optional(),
@@ -61,6 +62,9 @@ export async function POST(request: Request) {
       ? Number.parseFloat(layAccount.commission)
       : 0;
     const isPredictionMarket = layAccount?.exchangeType === "prediction_market";
+    const predictionMarketExecution = isPredictionMarket
+      ? (body.predictionMarketExecution ?? "taker")
+      : null;
 
     if (isPredictionMarket && body.sharePrice === undefined) {
       return NextResponse.json(
@@ -91,6 +95,7 @@ export async function POST(request: Request) {
           isFreeBet: isFreeBetPromoType(body.promoType ?? null),
           freeBetStakeReturned: body.freeBetStakeReturned ?? false,
           commissionRate,
+          predictionMarketExecution,
           strategy: body.strategy,
           biasPercent: body.biasPercent,
         })
@@ -149,6 +154,7 @@ export async function POST(request: Request) {
       commissionRate,
       backRateToNok,
       layRateToNok,
+      predictionMarketExecution,
     });
   } catch (error) {
     console.error("Failed to calculate lay stake", error);

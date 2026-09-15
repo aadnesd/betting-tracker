@@ -152,18 +152,34 @@ describe("prediction-market share hedges", () => {
     expect(result?.layLiability).toBeCloseTo(40);
   });
 
-  it("sizes shares with exchange commission included", () => {
+  it("sizes taker shares with Polymarket's price-based fee", () => {
     const result = calculateOptimalPredictionMarketShares({
       backStake: 100,
       backOdds: 2,
       sharePrice: 0.5,
       commissionRate: 0.05,
+      predictionMarketExecution: "taker",
     });
 
     expect(result?.equivalentLayOdds).toBeCloseTo(2);
-    expect(result?.layStake).toBeCloseTo(200 / 1.95);
-    expect(result?.shares).toBeCloseTo(200 / 1.95 / 0.5);
+    expect(result?.shares).toBeCloseTo(200 / 0.9875);
+    expect(result?.layStake).toBeCloseTo((200 / 0.9875) * 0.5);
     expect(result?.profitIfBackWins).toBeCloseTo(result?.profitIfLayWins ?? 0);
+  });
+
+  it("does not charge maker fees", () => {
+    const result = calculateOptimalPredictionMarketShares({
+      backStake: 100,
+      backOdds: 2,
+      sharePrice: 0.5,
+      commissionRate: 0.05,
+      predictionMarketExecution: "maker",
+    });
+
+    expect(result?.shares).toBeCloseTo(200);
+    expect(result?.layStake).toBeCloseTo(100);
+    expect(result?.profitIfBackWins).toBeCloseTo(0);
+    expect(result?.profitIfLayWins).toBeCloseTo(0);
   });
 });
 
@@ -218,6 +234,22 @@ describe("computeSingleLegOutcome", () => {
     expect(result.profitIfWins).toBeCloseTo(-200);
     expect(result.profitIfLoses).toBeCloseTo(98);
     expect(result.netExposure).toBeCloseTo(-200);
+  });
+
+  it("uses the Polymarket taker fee instead of flat commission", () => {
+    const result = computeSingleLegOutcome({
+      kind: "lay",
+      stake: 13_629.87,
+      odds: 1 / 0.81,
+      commissionRate: 0.05,
+      predictionMarketPosition: {
+        sharePrice: 0.19,
+        execution: "taker",
+      },
+    });
+
+    expect(result.profitIfWins).toBeCloseTo(-3197.13);
+    expect(result.profitIfLoses).toBeCloseTo(13_500.386_235);
   });
 });
 

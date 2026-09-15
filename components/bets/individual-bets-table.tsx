@@ -130,6 +130,16 @@ export function IndividualBetsTable({ bets }: IndividualBetsTableProps) {
                       }
                       currency={bet.currency ?? "NOK"}
                       odds={bet.odds}
+                      predictionMarketExecution={
+                        bet.kind === "lay"
+                          ? bet.predictionMarketExecution
+                          : null
+                      }
+                      predictionMarketSharePrice={
+                        bet.kind === "lay"
+                          ? bet.predictionMarketSharePrice
+                          : null
+                      }
                       selection={bet.selection}
                       stake={bet.stake}
                     />

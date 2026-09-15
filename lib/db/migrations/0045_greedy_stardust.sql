@@ -1,0 +1,1 @@
+ALTER TABLE "LayBet" ADD COLUMN "predictionMarketExecution" varchar;
