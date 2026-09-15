@@ -57,6 +57,7 @@ const quickAddSchema = z.object({
     sharePrice: z.number().gt(0).lt(1).nullish(),
     shares: z.number().positive().nullish(),
     shareSide: z.enum(["no", "under", "over"]).optional(),
+    predictionMarketExecution: z.enum(["maker", "taker"]).optional(),
   }),
   notes: z.string().optional(),
 });
@@ -162,7 +163,12 @@ export async function POST(request: Request) {
     const hasSharePosition =
       body.lay.sharePrice != null ||
       body.lay.shares != null ||
-      body.lay.shareSide != null;
+      body.lay.shareSide != null ||
+      body.lay.predictionMarketExecution != null;
+    const predictionMarketExecution =
+      layAccount.exchangeType === "prediction_market"
+        ? (body.lay.predictionMarketExecution ?? "taker")
+        : null;
     if (layAccount.exchangeType === "prediction_market") {
       if (
         body.lay.sharePrice == null ||
@@ -328,6 +334,7 @@ export async function POST(request: Request) {
         sharePrice: body.lay.sharePrice ?? null,
         shares: body.lay.shares ?? null,
         shareSide: body.lay.shareSide ?? null,
+        predictionMarketExecution,
       }),
     ]);
 
@@ -371,6 +378,13 @@ export async function POST(request: Request) {
       commissionRate: layAccount.commission
         ? Number.parseFloat(layAccount.commission)
         : 0,
+      predictionMarketPosition:
+        body.lay.sharePrice != null
+          ? {
+              sharePrice: body.lay.sharePrice,
+              execution: predictionMarketExecution,
+            }
+          : null,
     });
 
     const splitNotes = [

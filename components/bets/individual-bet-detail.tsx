@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { calculateLayLiability } from "@/lib/bet-calculations";
 import type {
   Account,
   BackBet,
@@ -91,8 +92,30 @@ export function IndividualBetDetail({
   const currency = bet.currency ?? account?.currency ?? "NOK";
   const placedAt = bet.placedAt ?? bet.createdAt;
   const profitLoss = bet.profitLoss ? Number(bet.profitLoss) : null;
+  const predictionMarketExecution =
+    betKind === "lay" && "predictionMarketExecution" in bet
+      ? bet.predictionMarketExecution
+      : null;
+  const predictionMarketSharePrice =
+    betKind === "lay" && "sharePrice" in bet && bet.sharePrice !== null
+      ? Number(bet.sharePrice)
+      : null;
+  const predictionMarketPosition =
+    predictionMarketSharePrice === null
+      ? null
+      : {
+          sharePrice: predictionMarketSharePrice,
+          execution: predictionMarketExecution,
+        };
   const potentialWin = betKind === "back" ? stake * (odds - 1) : stake;
-  const layLiability = betKind === "lay" ? stake * (odds - 1) : null;
+  const layLiability =
+    betKind === "lay"
+      ? calculateLayLiability({
+          layStake: stake,
+          layOdds: odds,
+          predictionMarketPosition,
+        })
+      : null;
 
   return (
     <div className="space-y-6 p-4 md:p-8">
@@ -159,6 +182,12 @@ export function IndividualBetDetail({
                     <span className="text-muted-foreground">Shares</span>
                     <span className="font-medium">
                       {Number(bet.shares).toFixed(4)}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Execution</span>
+                    <span className="font-medium capitalize">
+                      {predictionMarketExecution ?? "taker (legacy default)"}
                     </span>
                   </div>
                 </>
@@ -362,6 +391,9 @@ export function IndividualBetDetail({
 
         <IndividualBetActions
           accountBalance={accountBalance}
+          accountCommission={
+            account?.commission ? Number(account.commission) : 0
+          }
           accountId={bet.accountId}
           betId={bet.id}
           betKind={betKind}
@@ -370,6 +402,8 @@ export function IndividualBetDetail({
           market={bet.market}
           matchedBetId={matchedBet?.id ?? null}
           odds={odds}
+          predictionMarketExecution={predictionMarketExecution}
+          predictionMarketSharePrice={predictionMarketSharePrice}
           selection={bet.selection}
           settlementInfo={settlementInfo}
           stake={stake}

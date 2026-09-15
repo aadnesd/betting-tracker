@@ -11,6 +11,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import type { PredictionMarketExecution } from "@/lib/db/schema";
+import { calculateLayProfitLoss, calculateProfitLoss } from "@/lib/settlement";
 
 type Outcome = "won" | "lost" | "push";
 
@@ -23,37 +25,42 @@ type BetSettlementDropdownProps = {
   selection: string;
   /** Exchange commission rate for lay bets (e.g., 0.05 for 5%). Defaults to 0. */
   commissionRate?: number;
+  predictionMarketSharePrice?: number | null;
+  predictionMarketExecution?: PredictionMarketExecution | null;
 };
 
 /**
  * Calculate potential P&L for display in dropdown.
- * For lay bets, commission is deducted from winning profits.
  */
 function calculatePotentialPL(
   kind: "back" | "lay",
   outcome: Outcome,
   stake: number,
   odds: number,
-  commissionRate = 0
+  commissionRate = 0,
+  predictionMarketSharePrice?: number | null,
+  predictionMarketExecution?: PredictionMarketExecution | null
 ): number {
-  switch (outcome) {
-    case "won": {
-      // For back bet: win = stake × (odds - 1)
-      // For lay bet: win = stake × (1 - commission) (backer loses stake, exchange takes commission)
-      if (kind === "back") {
-        return stake * (odds - 1);
-      }
-      // Lay bet win: profit minus commission
-      const grossProfit = stake;
-      return grossProfit * (1 - commissionRate);
-    }
-    case "lost":
-      // For back bet: lose stake
-      // For lay bet: lose = stake × (odds - 1) (pay out winnings, no commission on losses)
-      return kind === "back" ? -stake : -stake * (odds - 1);
-    case "push":
-      return 0;
+  const betOutcome =
+    outcome === "won" ? "win" : outcome === "lost" ? "loss" : "push";
+  if (kind === "lay") {
+    const layOutcome =
+      betOutcome === "win" ? "loss" : betOutcome === "loss" ? "win" : "push";
+    return calculateLayProfitLoss(
+      layOutcome,
+      stake,
+      odds,
+      commissionRate,
+      predictionMarketSharePrice == null
+        ? null
+        : {
+            sharePrice: predictionMarketSharePrice,
+            execution: predictionMarketExecution,
+          }
+    );
   }
+
+  return calculateProfitLoss(betOutcome, stake, odds);
 }
 
 function formatPL(amount: number, currency: string): string {
@@ -69,6 +76,8 @@ export function BetSettlementDropdown({
   currency,
   selection,
   commissionRate = 0,
+  predictionMarketSharePrice = null,
+  predictionMarketExecution = null,
 }: BetSettlementDropdownProps) {
   const router = useRouter();
   const [isSettling, setIsSettling] = useState(false);
@@ -115,14 +124,18 @@ export function BetSettlementDropdown({
     "won",
     stake,
     odds,
-    commissionRate
+    commissionRate,
+    predictionMarketSharePrice,
+    predictionMarketExecution
   );
   const lostPL = calculatePotentialPL(
     betKind,
     "lost",
     stake,
     odds,
-    commissionRate
+    commissionRate,
+    predictionMarketSharePrice,
+    predictionMarketExecution
   );
 
   return (

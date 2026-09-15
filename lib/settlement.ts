@@ -12,6 +12,12 @@
  * - Double Chance: Home or Draw, Away or Draw, Home or Away
  */
 
+import {
+  calculateLayLiability,
+  calculateLayWinProfit,
+  type PredictionMarketPosition,
+} from "./bet-calculations";
+
 /**
  * Bet outcome enumeration
  */
@@ -605,9 +611,10 @@ export function calculateProfitLoss(
 /**
  * Calculate lay bet profit/loss based on outcome
  *
- * Exchange commission is deducted from winning lay bets. For example, with 5% commission:
+ * Traditional exchange commission is deducted from winning lay bets. For example, with 5% commission:
  * - Lay wins (selection lost): profit = layStake × (1 - commission)
  * - Lay loses (selection won): loss = -layStake × (odds - 1) (no commission on losses)
+ * Prediction-market lays use their price-based maker/taker fee when supplied.
  *
  * @param outcome - The bet outcome from back bet perspective
  * @param layStake - The lay stake amount
@@ -619,23 +626,26 @@ export function calculateLayProfitLoss(
   outcome: BetOutcome,
   layStake: number,
   layOdds: number,
-  commissionRate = 0
+  commissionRate = 0,
+  predictionMarketPosition?: PredictionMarketPosition | null
 ): number {
-  // Lay liability = layStake * (layOdds - 1)
-  const liability = layStake * (layOdds - 1);
+  const liability = calculateLayLiability({
+    layStake,
+    layOdds,
+    predictionMarketPosition,
+  });
 
   switch (outcome) {
     case "win":
       // Selection won: layer loses liability (no commission on losses)
       return -liability;
 
-    case "loss": {
-      // Selection lost: layer wins the lay stake minus commission
-      // Commission is only applied to profits
-      const grossProfit = layStake;
-      const commission = grossProfit * commissionRate;
-      return grossProfit - commission;
-    }
+    case "loss":
+      return calculateLayWinProfit({
+        layStake,
+        commissionRate,
+        predictionMarketPosition,
+      });
 
     case "push":
       // Push: no profit/loss
@@ -668,7 +678,8 @@ export function calculateMatchedBetProfitLoss(
   layOdds: number,
   isFreeBet = false,
   freeBetStakeReturned = false,
-  exchangeCommission = 0
+  exchangeCommission = 0,
+  predictionMarketPosition?: PredictionMarketPosition | null
 ): { backProfitLoss: number; layProfitLoss: number; netProfitLoss: number } {
   const backProfitLoss = calculateProfitLoss(
     outcome,
@@ -681,7 +692,8 @@ export function calculateMatchedBetProfitLoss(
     outcome,
     layStake,
     layOdds,
-    exchangeCommission
+    exchangeCommission,
+    predictionMarketPosition
   );
 
   return {
@@ -741,6 +753,7 @@ export function computePerAccountAdjustments({
   isFreeBet = false,
   freeBetStakeReturned = false,
   commissionRate = 0,
+  predictionMarketPosition,
 }: {
   kind: "back" | "lay";
   outcome: BetOutcome;
@@ -750,6 +763,7 @@ export function computePerAccountAdjustments({
   isFreeBet?: boolean;
   freeBetStakeReturned?: boolean;
   commissionRate?: number;
+  predictionMarketPosition?: PredictionMarketPosition | null;
 }): AccountAdjustment[] {
   const usableLegs = (legs ?? []).filter(
     (leg): leg is SettlementSplitLeg & { accountId: string } =>
@@ -779,7 +793,13 @@ export function computePerAccountAdjustments({
             isFreeBet,
             freeBetStakeReturned
           )
-        : calculateLayProfitLoss(outcome, leg.stake, leg.odds, commissionRate);
+        : calculateLayProfitLoss(
+            outcome,
+            leg.stake,
+            leg.odds,
+            commissionRate,
+            predictionMarketPosition
+          );
     byAccount.set(leg.accountId, (byAccount.get(leg.accountId) ?? 0) + legPl);
   }
 

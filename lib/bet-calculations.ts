@@ -1,3 +1,5 @@
+import type { PredictionMarketExecution } from "./db/schema";
+
 export function computeNetExposureInputs({
   backStake,
   backOdds,
@@ -25,6 +27,83 @@ export type SplitBetLegInput = {
   stake: number;
   liability?: number | null;
 };
+
+export type PredictionMarketPosition = {
+  sharePrice: number;
+  execution?: PredictionMarketExecution | null;
+};
+
+function isPredictionMarketPosition(
+  position?: PredictionMarketPosition | null
+): position is PredictionMarketPosition {
+  return (
+    position !== null &&
+    position !== undefined &&
+    Number.isFinite(position.sharePrice) &&
+    position.sharePrice > 0 &&
+    position.sharePrice < 1
+  );
+}
+
+/** Polymarket taker fee expressed against the canonical lay stake. */
+export function calculatePredictionMarketFee({
+  layStake,
+  sharePrice,
+  commissionRate = 0,
+  execution,
+}: {
+  layStake: number;
+  sharePrice: number;
+  commissionRate?: number;
+  execution?: PredictionMarketExecution | null;
+}) {
+  if (execution === "maker") {
+    return 0;
+  }
+
+  const safeCommissionRate = Math.min(Math.max(commissionRate, 0), 1);
+  return layStake * safeCommissionRate * sharePrice;
+}
+
+export function calculateLayLiability({
+  layStake,
+  layOdds,
+  predictionMarketPosition,
+}: {
+  layStake: number;
+  layOdds: number;
+  predictionMarketPosition?: PredictionMarketPosition | null;
+}) {
+  return isPredictionMarketPosition(predictionMarketPosition)
+    ? (layStake * predictionMarketPosition.sharePrice) /
+        (1 - predictionMarketPosition.sharePrice)
+    : layStake * (layOdds - 1);
+}
+
+export function calculateLayWinProfit({
+  layStake,
+  commissionRate = 0,
+  predictionMarketPosition,
+}: {
+  layStake: number;
+  commissionRate?: number;
+  predictionMarketPosition?: PredictionMarketPosition | null;
+}) {
+  if (isPredictionMarketPosition(predictionMarketPosition)) {
+    return (
+      layStake -
+      calculatePredictionMarketFee({
+        layStake,
+        sharePrice: predictionMarketPosition.sharePrice,
+        commissionRate,
+        execution: predictionMarketPosition.execution,
+      })
+    );
+  }
+
+  const safeCommissionRate = Math.min(Math.max(commissionRate, 0), 1);
+  return layStake * (1 - safeCommissionRate);
+}
 
 export function combineSplitBetLegs(
   legs: SplitBetLegInput[],
@@ -70,6 +149,7 @@ export function computeMatchedNetExposure({
   isFreeBet = false,
   freeBetStakeReturned = false,
   commissionRate = 0,
+  predictionMarketPosition,
 }: {
   /** Back stake, already converted to the reporting currency. */
   backStake: number;
@@ -83,6 +163,8 @@ export function computeMatchedNetExposure({
   freeBetStakeReturned?: boolean;
   /** Exchange commission rate as a decimal (e.g. 0.025 for 2.5%). Defaults to 0. */
   commissionRate?: number;
+  /** Prediction-market share position, when this is a Polymarket lay. */
+  predictionMarketPosition?: PredictionMarketPosition | null;
 }) {
   const safeCommissionRate = Math.min(Math.max(commissionRate, 0), 1);
 
@@ -91,7 +173,11 @@ export function computeMatchedNetExposure({
       ? backProfit + backStake - layLiability
       : backProfit - layLiability;
 
-  const layWinNet = layStake * (1 - safeCommissionRate);
+  const layWinNet = calculateLayWinProfit({
+    layStake,
+    commissionRate: safeCommissionRate,
+    predictionMarketPosition,
+  });
   const profitIfLayWins = isFreeBet ? layWinNet : layWinNet - backStake;
   const netExposure = Math.min(profitIfBackWins, profitIfLayWins);
 
@@ -212,14 +298,19 @@ export function predictionMarketPositionToLay({
   };
 }
 
-/**
- * Calculate the optimal number of opposite-outcome shares for a prediction
- * market hedge. Commission is applied to the winning share profit through the
- * existing lay-stake calculation before converting that stake to shares.
- */
+/** Calculate the optimal number of opposite-outcome shares for a prediction-market hedge. */
 export function calculateOptimalPredictionMarketShares({
   sharePrice,
-  ...layStakeInput
+  backStake,
+  backOdds,
+  backRateToBase = 1,
+  layRateToBase = 1,
+  isFreeBet = false,
+  freeBetStakeReturned = false,
+  commissionRate = 0,
+  predictionMarketExecution,
+  strategy = "balanced",
+  biasPercent = 0,
 }: {
   sharePrice: number;
   backStake: number;
@@ -229,6 +320,7 @@ export function calculateOptimalPredictionMarketShares({
   isFreeBet?: boolean;
   freeBetStakeReturned?: boolean;
   commissionRate?: number;
+  predictionMarketExecution?: PredictionMarketExecution | null;
   strategy?: "balanced" | "underlay" | "overlay";
   biasPercent?: number;
 }) {
@@ -236,21 +328,61 @@ export function calculateOptimalPredictionMarketShares({
     return null;
   }
 
-  const equivalentLayOdds = 1 / (1 - sharePrice);
-  const calculated = calculateOptimalLayStake({
-    ...layStakeInput,
-    layOdds: equivalentLayOdds,
-  });
-
-  if (!calculated) {
+  if (
+    backStake <= 0 ||
+    backOdds <= 1 ||
+    backRateToBase <= 0 ||
+    layRateToBase <= 0
+  ) {
     return null;
   }
 
+  const safeCommissionRate = Math.min(Math.max(commissionRate, 0), 1);
+  const backStakeBase = backStake * backRateToBase;
+  const backWinBeforeLay =
+    isFreeBet && freeBetStakeReturned
+      ? backStakeBase * backOdds
+      : backStakeBase * (backOdds - 1);
+  const layWinBeforeBackLoss = isFreeBet ? 0 : -backStakeBase;
+  const feeMultiplier =
+    predictionMarketExecution === "maker" ? 0 : safeCommissionRate * sharePrice;
+  const balancedShares =
+    (backWinBeforeLay - layWinBeforeBackLoss) /
+    (layRateToBase * (sharePrice + (1 - sharePrice) * (1 - feeMultiplier)));
+  const balancedLayStake = balancedShares * (1 - sharePrice);
+  const safeBiasPercent = Math.min(Math.max(biasPercent, 0), 100);
+  const stakeShift = balancedShares * 0.5 * (safeBiasPercent / 100);
+  const shares =
+    strategy === "underlay"
+      ? Math.max(0, balancedShares - stakeShift)
+      : strategy === "overlay"
+        ? balancedShares + stakeShift
+        : balancedShares;
+  const layStake = shares * (1 - sharePrice);
+  const layLiability = shares * sharePrice;
+  const layStakeBase = layStake * layRateToBase;
+  const layLiabilityBase = layLiability * layRateToBase;
+  const profitIfBackWins = backWinBeforeLay - layLiabilityBase;
+  const profitIfLayWins =
+    layWinBeforeBackLoss +
+    calculateLayWinProfit({
+      layStake: layStakeBase,
+      commissionRate: safeCommissionRate,
+      predictionMarketPosition: {
+        sharePrice,
+        execution: predictionMarketExecution,
+      },
+    });
+
   return {
-    ...calculated,
-    equivalentLayOdds,
-    shares: calculated.layStake / (1 - sharePrice),
-    balancedShares: calculated.balancedLayStake / (1 - sharePrice),
+    layStake,
+    layLiability,
+    balancedLayStake,
+    profitIfBackWins,
+    profitIfLayWins,
+    equivalentLayOdds: 1 / (1 - sharePrice),
+    shares,
+    balancedShares,
   };
 }
 
@@ -271,7 +403,7 @@ export function calculateOptimalPredictionMarketShares({
  *
  * Lay leg:
  * - selection wins  -> lay loses: -liability = -stake * (odds - 1)
- * - selection loses -> lay wins:  stake * (1 - commission)
+ * - selection loses -> lay wins: stake net of the applicable exchange fee
  */
 export function computeSingleLegOutcome({
   kind,
@@ -280,6 +412,7 @@ export function computeSingleLegOutcome({
   isFreeBet = false,
   freeBetStakeReturned = false,
   commissionRate = 0,
+  predictionMarketPosition,
 }: {
   kind: "back" | "lay";
   stake: number;
@@ -288,6 +421,7 @@ export function computeSingleLegOutcome({
   freeBetStakeReturned?: boolean;
   /** Exchange commission rate as a decimal (e.g. 0.02 for 2%). Defaults to 0. */
   commissionRate?: number;
+  predictionMarketPosition?: PredictionMarketPosition | null;
 }) {
   if (kind === "back") {
     const profit = stake * (odds - 1);
@@ -301,10 +435,17 @@ export function computeSingleLegOutcome({
     };
   }
 
-  const safeCommissionRate = Math.min(Math.max(commissionRate, 0), 1);
-  const liability = stake * (odds - 1);
+  const liability = calculateLayLiability({
+    layStake: stake,
+    layOdds: odds,
+    predictionMarketPosition,
+  });
   const profitIfWins = -liability;
-  const profitIfLoses = stake * (1 - safeCommissionRate);
+  const profitIfLoses = calculateLayWinProfit({
+    layStake: stake,
+    commissionRate,
+    predictionMarketPosition,
+  });
   return {
     profitIfWins,
     profitIfLoses,

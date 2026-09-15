@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import type { PredictionMarketPosition } from "@/lib/bet-calculations";
 import { revalidateDashboard } from "@/lib/cache";
 import {
   activateFreeBetWageringOnWin,
@@ -98,6 +99,13 @@ async function processBet(
   const layStake = bet.layStake ? Number.parseFloat(bet.layStake) : 0;
   // Exchange commission (e.g., 0.05 for 5%) - defaults to 0 if not set
   const exchangeCommission = bet.layAccountCommission ?? 0;
+  const predictionMarketPosition: PredictionMarketPosition | null =
+    bet.laySharePrice === null || bet.laySharePrice === undefined
+      ? null
+      : {
+          sharePrice: Number.parseFloat(bet.laySharePrice),
+          execution: bet.layPredictionMarketExecution,
+        };
 
   const matchedFreeBet = await getFreeBetByMatchedBetId({
     matchedBetId: bet.id,
@@ -113,7 +121,8 @@ async function processBet(
     layOdds,
     freeBet,
     freeBetStakeReturned,
-    exchangeCommission
+    exchangeCommission,
+    predictionMarketPosition
   );
 
   // Apply the settlement
@@ -135,6 +144,7 @@ async function processBet(
     isFreeBet: freeBet,
     freeBetStakeReturned,
     layCommissionRate: exchangeCommission,
+    predictionMarketPosition,
   });
 
   // Process deposit bonus wagering progress for back bets
@@ -275,6 +285,13 @@ async function processUnlinkedBet(
   const layOdds = bet.layOdds ? Number.parseFloat(bet.layOdds) : 0;
   const layStake = bet.layStake ? Number.parseFloat(bet.layStake) : 0;
   const exchangeCommission = bet.layAccountCommission ?? 0;
+  const predictionMarketPosition: PredictionMarketPosition | null =
+    bet.laySharePrice === null || bet.laySharePrice === undefined
+      ? null
+      : {
+          sharePrice: Number.parseFloat(bet.laySharePrice),
+          execution: bet.layPredictionMarketExecution,
+        };
 
   const matchedFreeBet = await getFreeBetByMatchedBetId({
     matchedBetId: bet.id,
@@ -290,7 +307,8 @@ async function processUnlinkedBet(
     layOdds,
     freeBet,
     freeBetStakeReturned,
-    exchangeCommission
+    exchangeCommission,
+    predictionMarketPosition
   );
 
   const matchResult = `${lookup.homeTeam ?? "Home"} ${lookup.homeScore}-${lookup.awayScore} ${lookup.awayTeam ?? "Away"}`;
@@ -318,6 +336,7 @@ async function processUnlinkedBet(
     isFreeBet: freeBet,
     freeBetStakeReturned,
     layCommissionRate: exchangeCommission,
+    predictionMarketPosition,
     settlementReasoning: {
       source: "unlinked_web_lookup",
       lookupStatus: lookup.status,
@@ -410,7 +429,8 @@ export async function POST(request: Request) {
   };
 
   try {
-    const syncedContainers = await syncMatchedContainerStatusesFromSettledLegs();
+    const syncedContainers =
+      await syncMatchedContainerStatusesFromSettledLegs();
     if (syncedContainers > 0) {
       console.log(
         `[Auto-Settle] Synced ${syncedContainers} matched container status(es) from settled legs`

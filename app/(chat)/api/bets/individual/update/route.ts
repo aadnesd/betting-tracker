@@ -5,6 +5,7 @@ import {
   combineSplitBetLegs,
   computeMatchedNetExposure,
   computeNetExposureInputs,
+  type PredictionMarketPosition,
 } from "@/lib/bet-calculations";
 import { revalidateDashboard } from "@/lib/cache";
 import {
@@ -23,7 +24,7 @@ import {
   updateLayBetDetails,
   updateMatchedBetRecord,
 } from "@/lib/db/queries";
-import type { BetSplitLeg } from "@/lib/db/schema";
+import type { BetSplitLeg, LayBet } from "@/lib/db/schema";
 import { convertAmountToNok } from "@/lib/fx-rates";
 import {
   canUserEditSettledBets,
@@ -115,6 +116,9 @@ export async function POST(request: Request) {
     if (!bet) {
       return NextResponse.json({ error: "Bet not found" }, { status: 404 });
     }
+
+    const originalLayBet: LayBet | null =
+      payload.betKind === "lay" && "sharePrice" in bet ? (bet as LayBet) : null;
 
     const isSettled = bet.status === "settled";
     const canEditSettled = canUserEditSettledBets({
@@ -454,6 +458,7 @@ export async function POST(request: Request) {
         }
 
         let commissionRate = 0;
+        let predictionMarketPosition: PredictionMarketPosition | null = null;
         if (payload.betKind === "lay" && updated.accountId) {
           const exchangeAccount = await getAccountById({
             id: updated.accountId,
@@ -461,6 +466,12 @@ export async function POST(request: Request) {
           });
           if (exchangeAccount?.commission) {
             commissionRate = Number.parseFloat(exchangeAccount.commission);
+          }
+          if (originalLayBet?.sharePrice != null) {
+            predictionMarketPosition = {
+              sharePrice: Number(originalLayBet.sharePrice),
+              execution: originalLayBet.predictionMarketExecution,
+            };
           }
         }
 
@@ -487,7 +498,8 @@ export async function POST(request: Request) {
                     : "push",
                 stake,
                 odds,
-                commissionRate
+                commissionRate,
+                predictionMarketPosition
               );
 
         const deltaProfitLoss = Number(
@@ -605,6 +617,8 @@ export async function POST(request: Request) {
           : matchedBet.layBetId
             ? await getLayBetById({ id: matchedBet.layBetId, userId })
             : null;
+      const layPredictionMarketBet: LayBet | null =
+        lay && "sharePrice" in lay ? (lay as LayBet) : null;
 
       let nextNetExposure: number | null = null;
 
@@ -642,6 +656,13 @@ export async function POST(request: Request) {
           commissionRate: exchangeAccount?.commission
             ? Number.parseFloat(exchangeAccount.commission)
             : 0,
+          predictionMarketPosition:
+            layPredictionMarketBet?.sharePrice != null
+              ? {
+                  sharePrice: Number(layPredictionMarketBet.sharePrice),
+                  execution: layPredictionMarketBet.predictionMarketExecution,
+                }
+              : null,
         });
 
         nextNetExposure = Number(netExposure.toFixed(2));
