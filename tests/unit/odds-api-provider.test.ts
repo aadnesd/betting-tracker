@@ -114,8 +114,9 @@ describe("DEFAULT_ODDS_API_LEAGUES", () => {
     for (const slug of [
       "international-fifa-world-cup",
       "international-uefa-nations-league",
-      "uefa-europa-league",
-      "uefa-europa-conference-league",
+      "international-clubs-uefa-champions-league",
+      "international-clubs-uefa-europa-league",
+      "international-clubs-uefa-conference-league",
       "england-fa-cup",
       "england-efl-cup",
       "spain-copa-del-rey",
@@ -154,9 +155,11 @@ describe("oddsApiProvider.resolveCompetitions", () => {
     vi.stubEnv("ODDS_API_LEAGUES", "");
 
     await expect(
-      oddsApiProvider.resolveCompetitions(["CL", "PL"])
+      oddsApiProvider.resolveCompetitions(["CL", "EL", "EC", "PL"])
     ).resolves.toEqual([
       "international-clubs-uefa-champions-league",
+      "international-clubs-uefa-europa-league",
+      "international-clubs-uefa-conference-league",
       "england-premier-league",
     ]);
   });
