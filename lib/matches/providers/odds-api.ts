@@ -23,8 +23,8 @@ export const DEFAULT_ODDS_API_LEAGUES = [
   "international-uefa-nations-league",
   // UEFA club competitions
   "international-clubs-uefa-champions-league",
-  "uefa-europa-league",
-  "uefa-europa-conference-league",
+  "international-clubs-uefa-europa-league",
+  "international-clubs-uefa-conference-league",
   // England
   "england-premier-league",
   "england-championship",
@@ -198,10 +198,10 @@ const ODDS_API_LEAGUE_BY_CODE: Record<string, string> = {
   CLI: "south-america-copa-libertadores",
   CL: "international-clubs-uefa-champions-league",
   DED: "netherlands-eredivisie",
-  EC: "uefa-europa-conference-league",
+  EC: "international-clubs-uefa-conference-league",
   EFL: "england-efl-cup",
   ELC: "england-championship",
-  EL: "uefa-europa-league",
+  EL: "international-clubs-uefa-europa-league",
   FAC: "england-fa-cup",
   FL1: "france-ligue-1",
   PD: "spain-laliga",
