@@ -45,6 +45,22 @@ export const DEFAULT_ODDS_API_LEAGUES = [
   "usa-mls",
 ];
 
+const NATIONS_LEAGUE_PARENT_SLUG = "international-uefa-nations-league";
+const NATIONS_LEAGUE_GROUP_PATTERN =
+  /^international-uefa-nations-league-league-[a-d]-gr-\d+$/;
+const NATIONS_LEAGUE_FALLBACK_SLUGS = [
+  "international-uefa-nations-league-league-a-gr-2",
+  "international-uefa-nations-league-league-a-gr-3",
+  "international-uefa-nations-league-league-a-gr-4",
+  "international-uefa-nations-league-league-b-gr-3",
+  "international-uefa-nations-league-league-b-gr-4",
+  "international-uefa-nations-league-league-c-gr-2",
+  "international-uefa-nations-league-league-c-gr-3",
+  "international-uefa-nations-league-league-c-gr-4",
+  "international-uefa-nations-league-league-d-gr-1",
+  "international-uefa-nations-league-league-d-gr-2",
+];
+
 type OddsApiPeriodScore = {
   home: number | null;
   away: number | null;
@@ -62,6 +78,12 @@ type OddsApiEvent = {
     away?: number | null;
     periods?: Record<string, OddsApiPeriodScore>;
   };
+};
+
+type OddsApiLeague = {
+  name: string;
+  slug: string;
+  eventsCount?: number;
 };
 
 /**
@@ -169,6 +191,13 @@ async function oddsApiGet<T>(
   return (await response.json()) as T;
 }
 
+async function listLeagues(): Promise<OddsApiLeague[]> {
+  return await oddsApiGet<OddsApiLeague[]>("/leagues", {
+    sport: FOOTBALL_SPORT_SLUG,
+    all: "true",
+  });
+}
+
 /** Fetch events for a single league + status within a window. */
 async function fetchEventsForLeague({
   league,
@@ -209,6 +238,7 @@ const ODDS_API_LEAGUE_BY_CODE: Record<string, string> = {
   PPL: "portugal-primeira-liga",
   SA: "italy-serie-a",
   TIP: "norway-eliteserien",
+  UNL: NATIONS_LEAGUE_PARENT_SLUG,
   WC: "international-fifa-world-cup",
 };
 
@@ -230,6 +260,24 @@ function getTargetLeagues(userEnabled: string[]): string[] {
     .filter((slug): slug is string => Boolean(slug));
 
   return selected.length > 0 ? selected : [...DEFAULT_ODDS_API_LEAGUES];
+}
+
+async function resolveNationsLeagueGroups(): Promise<string[]> {
+  try {
+    const leagues = await listLeagues();
+    const groups = leagues
+      .map((league) => league.slug)
+      .filter((slug) => NATIONS_LEAGUE_GROUP_PATTERN.test(slug))
+      .sort();
+
+    return groups.length > 0 ? groups : NATIONS_LEAGUE_FALLBACK_SLUGS;
+  } catch (error) {
+    console.warn(
+      "[odds-api] Nations League discovery failed, using known group slugs:",
+      error instanceof Error ? error.message : error
+    );
+    return NATIONS_LEAGUE_FALLBACK_SLUGS;
+  }
 }
 
 /**
@@ -283,7 +331,15 @@ export const oddsApiProvider: MatchProvider = {
   },
 
   async resolveCompetitions(userEnabled: string[]) {
-    return getTargetLeagues(userEnabled);
+    const targets = getTargetLeagues(userEnabled);
+    if (!targets.includes(NATIONS_LEAGUE_PARENT_SLUG)) {
+      return targets;
+    }
+
+    const nationsLeagueGroups = await resolveNationsLeagueGroups();
+    return targets.flatMap((slug) =>
+      slug === NATIONS_LEAGUE_PARENT_SLUG ? nationsLeagueGroups : [slug]
+    );
   },
 
   async fetchUpcoming({ competitions, from, to }: FetchMatchesOptions) {

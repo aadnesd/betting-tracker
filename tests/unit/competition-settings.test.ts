@@ -159,6 +159,7 @@ describe("competition settings queries", () => {
       expect(DEFAULT_COMPETITION_CODES).toContain("ELC"); // Championship
       expect(DEFAULT_COMPETITION_CODES).toContain("CL"); // Champions League
       expect(DEFAULT_COMPETITION_CODES).toContain("EL"); // Europa League
+      expect(DEFAULT_COMPETITION_CODES).toContain("UNL"); // Nations League
       expect(DEFAULT_COMPETITION_CODES).toContain("BL1"); // Bundesliga
       expect(DEFAULT_COMPETITION_CODES).toContain("SA"); // Serie A
       expect(DEFAULT_COMPETITION_CODES).toContain("PD"); // La Liga
