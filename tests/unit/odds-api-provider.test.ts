@@ -163,6 +163,46 @@ describe("oddsApiProvider.resolveCompetitions", () => {
       "england-premier-league",
     ]);
   });
+
+  it("expands Nations League into the active group slugs", async () => {
+    vi.stubEnv("ODDS_API_API_KEY", "key");
+    vi.stubEnv("ODDS_API_LEAGUES", "");
+
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify([
+          {
+            name: "International - UEFA Nations League",
+            slug: "international-uefa-nations-league",
+            eventsCount: 0,
+          },
+          {
+            name: "International - UEFA Nations League, League A, Gr. 2",
+            slug: "international-uefa-nations-league-league-a-gr-2",
+            eventsCount: 2,
+          },
+          {
+            name: "International - UEFA Nations League, League B, Gr. 3",
+            slug: "international-uefa-nations-league-league-b-gr-3",
+            eventsCount: 1,
+          },
+          { name: "Irrelevant League", slug: "irrelevant-league" },
+        ]),
+        { status: 200 }
+      )
+    );
+
+    await expect(oddsApiProvider.resolveCompetitions(["UNL"])).resolves.toEqual(
+      [
+        "international-uefa-nations-league-league-a-gr-2",
+        "international-uefa-nations-league-league-b-gr-3",
+      ]
+    );
+
+    const requestUrl = new URL(fetchMock.mock.calls[0][0] as string);
+    expect(requestUrl.pathname).toBe("/v3/leagues");
+    expect(requestUrl.searchParams.get("all")).toBe("true");
+  });
 });
 
 describe("getActiveProvider", () => {
