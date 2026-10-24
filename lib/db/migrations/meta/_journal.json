@@ -323,6 +323,13 @@
       "when": 1789460636542,
       "tag": "0045_greedy_stardust",
       "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "7",
+      "when": 1792832049913,
+      "tag": "0046_email-offers",
+      "breakpoints": true
     }
   ]
 }

@@ -2,6 +2,8 @@
 
 A single-user matched betting tracker built with Next.js, Drizzle, and the Vercel AI SDK.
 
+Gmail offer discovery uses Nango. See [email offer requirements](specs/email-offers.md) and [Nango setup and deployment](nango-integrations/README.md). Configure `NANGO_API_KEY`, `AI_GATEWAY_API_KEY`, and `CRON_SECRET`; `NANGO_MAILBOX_INTEGRATION`, `NANGO_SERVER_URL`, and `EMAIL_OFFER_MODEL` are optional overrides. The generated migration adds `EmailOffer` and `EmailMailboxScan`.
+
 This project focuses on making matched betting workflows fast, transparent, and auditable: capture bets quickly, reconcile outcomes reliably, and track profitability over time.
 
 ## Product scope
