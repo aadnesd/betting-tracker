@@ -188,6 +188,9 @@ export default async function PromosSettingsPage({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button asChild variant="outline">
+            <Link href="/bets/email-offers">Email offers</Link>
+          </Button>
+          <Button asChild variant="outline">
             <Link href="/bets">← Back to dashboard</Link>
           </Button>
           {expiringCount > 0 && !filterExpiring && (

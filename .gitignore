@@ -44,3 +44,7 @@ yarn-error.log*
 /playwright/*
 .home
 .env.vercel
+*-env.env
+nango-integrations/.nango/*
+!nango-integrations/.nango/.gitkeep
+nango-integrations/google-mail/tests/

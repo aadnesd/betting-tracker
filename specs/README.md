@@ -3,6 +3,7 @@
 This folder contains product and technical specifications used by the Ralph loop.
 
 ## Files
+- `email-offers.md` — Nango Gmail connection, scanning, and offer review
 - `product.md` — overall product goals and scope
 - `data-model.md` — required entities and relations
 - `ai-autoparse.md` — screenshot intake, parsing, review, and save flow

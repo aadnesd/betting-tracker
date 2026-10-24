@@ -9,9 +9,11 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
   varchar,
 } from "drizzle-orm/pg-core";
+import type { OfferAssessment } from "@/lib/email-offers/types";
 
 export const user = pgTable("User", {
   id: uuid("id").primaryKey().notNull().defaultRandom(),
@@ -20,6 +22,112 @@ export const user = pgTable("User", {
 });
 
 export type User = InferSelectModel<typeof user>;
+
+export const emailOffer = pgTable(
+  "EmailOffer",
+  {
+    id: uuid("id").primaryKey().notNull().defaultRandom(),
+    userId: uuid("userId")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    mailboxEmail: text("mailboxEmail").notNull(),
+    messageId: text("messageId").notNull(),
+    threadId: text("threadId").notNull(),
+    sender: text("sender").notNull(),
+    subject: text("subject").notNull(),
+    receivedAt: timestamp("receivedAt", { withTimezone: true }).notNull(),
+    assessment: jsonb("assessment").$type<OfferAssessment>().notNull(),
+    status: varchar("status", { enum: ["new", "saved", "dismissed"] })
+      .notNull()
+      .default("new"),
+    createdAt: timestamp("createdAt", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    messageIdx: uniqueIndex("email_offer_message_idx").on(
+      table.userId,
+      table.mailboxEmail,
+      table.messageId
+    ),
+    inboxIdx: index("email_offer_inbox_idx").on(
+      table.userId,
+      table.status,
+      table.receivedAt
+    ),
+  })
+);
+
+export const emailMailboxScan = pgTable(
+  "EmailMailboxScan",
+  {
+    id: uuid("id").primaryKey().notNull().defaultRandom(),
+    userId: uuid("userId")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    mailboxEmail: text("mailboxEmail").notNull(),
+    checkedUntil: timestamp("checkedUntil", { withTimezone: true }),
+    kind: varchar("kind", { enum: ["history", "live"] })
+      .notNull()
+      .default("history"),
+    scanAfter: timestamp("scanAfter", { withTimezone: true }),
+    scanBefore: timestamp("scanBefore", { withTimezone: true }),
+    pageToken: text("pageToken"),
+    leaseToken: uuid("leaseToken"),
+    leaseUntil: timestamp("leaseUntil", { withTimezone: true }),
+    attemptedAt: timestamp("attemptedAt", { withTimezone: true }),
+  },
+  (table) => ({
+    mailboxIdx: uniqueIndex("email_mailbox_scan_idx").on(
+      table.userId,
+      table.mailboxEmail,
+      table.kind
+    ),
+  })
+);
+
+export const emailAlertSettings = pgTable("EmailAlertSettings", {
+  userId: uuid("userId")
+    .primaryKey()
+    .references(() => user.id, { onDelete: "cascade" }),
+  chatId: text("chatId"),
+  enabled: boolean("enabled").notNull().default(false),
+  enabledAt: timestamp("enabledAt", { withTimezone: true }),
+  bindingId: uuid("bindingId").notNull().defaultRandom(),
+  pendingChatId: text("pendingChatId"),
+  verificationHash: text("verificationHash"),
+  verificationExpiresAt: timestamp("verificationExpiresAt", {
+    withTimezone: true,
+  }),
+  verificationAttempts: integer("verificationAttempts").notNull().default(0),
+  requestedAt: timestamp("requestedAt", { withTimezone: true }),
+});
+
+export const emailOfferAlert = pgTable(
+  "EmailOfferAlert",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    offerId: uuid("offerId")
+      .notNull()
+      .references(() => emailOffer.id, { onDelete: "cascade" }),
+    userId: uuid("userId")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    bindingId: uuid("bindingId").notNull(),
+    attempts: integer("attempts").notNull().default(0),
+    dueAt: timestamp("dueAt", { withTimezone: true }).notNull().defaultNow(),
+    sentAt: timestamp("sentAt", { withTimezone: true }),
+    skippedAt: timestamp("skippedAt", { withTimezone: true }),
+    leaseToken: uuid("leaseToken"),
+    leaseUntil: timestamp("leaseUntil", { withTimezone: true }),
+    messageId: integer("messageId"),
+    lastError: text("lastError"),
+  },
+  (table) => ({
+    offerIdx: uniqueIndex("email_offer_alert_offer_idx").on(table.offerId),
+    dueIdx: index("email_offer_alert_due_idx").on(table.dueAt),
+  })
+);
 
 export const fxRate = pgTable(
   "FxRate",

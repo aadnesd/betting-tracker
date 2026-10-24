@@ -31,5 +31,10 @@
     "next.config.js",
     ".next/dev/types/**/*.ts"
   ],
-  "exclude": ["node_modules", "vitest.config.ts", "vitest.setup.ts"]
+  "exclude": [
+    "node_modules",
+    "nango-integrations",
+    "vitest.config.ts",
+    "vitest.setup.ts"
+  ]
 }

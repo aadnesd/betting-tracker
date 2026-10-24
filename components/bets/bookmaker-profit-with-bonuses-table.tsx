@@ -35,7 +35,8 @@ export function BookmakerProfitWithBonusesTable({
       <div className="border-b px-4 py-3">
         <h3 className="font-semibold text-lg">Bookmaker Performance</h3>
         <p className="text-muted-foreground text-sm">
-          Matched-set P/L, bookie-side bet P/L, standalone losses, and bonus impact
+          Matched-set P/L, bookie-side bet P/L, standalone losses, and bonus
+          impact
         </p>
       </div>
       {sorted.length === 0 ? (
