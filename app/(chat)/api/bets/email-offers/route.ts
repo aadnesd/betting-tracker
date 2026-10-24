@@ -18,11 +18,13 @@ export async function GET(request: Request) {
         ...offer,
         assessment: normalizeAssessment(offer.assessment, now),
       })),
-      scans: scans.map(({ mailboxEmail, checkedUntil, pageToken }) => ({
-        mailboxEmail,
-        checkedUntil,
-        more: Boolean(pageToken),
-      })),
+      scans: scans
+        .filter((state) => state.kind === "history")
+        .map(({ mailboxEmail, checkedUntil, pageToken }) => ({
+          mailboxEmail,
+          checkedUntil,
+          more: Boolean(pageToken),
+        })),
     });
   });
 }

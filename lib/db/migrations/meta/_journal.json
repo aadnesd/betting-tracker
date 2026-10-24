@@ -330,6 +330,13 @@
       "when": 1792832049913,
       "tag": "0046_email-offers",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1792855436675,
+      "tag": "0047_email-offer-alerts",
+      "breakpoints": true
     }
   ]
 }

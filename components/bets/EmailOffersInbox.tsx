@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/card";
 import type { EmailOfferView, Mailbox } from "@/lib/email-offers/types";
 import { gmailMessageUrl } from "@/lib/email-offers/types";
+import { EmailOfferAlerts } from "./EmailOfferAlerts";
 
 async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, init);
@@ -288,6 +289,7 @@ export function EmailOffersInbox() {
 
   return (
     <div className="space-y-6">
+      <EmailOfferAlerts />
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">

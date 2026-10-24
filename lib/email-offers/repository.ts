@@ -4,7 +4,14 @@ import { randomUUID } from "node:crypto";
 import { and, asc, desc, eq, inArray, isNull, lt, or } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/lib/db/connection";
-import { emailMailboxScan, emailOffer, user } from "@/lib/db/schema";
+import {
+  emailAlertSettings,
+  emailMailboxScan,
+  emailOffer,
+  emailOfferAlert,
+  user,
+} from "@/lib/db/schema";
+import { isAlertWorthy } from "./alert-content";
 import type { OfferAssessment, OfferEmail } from "./types";
 
 export async function existingMailboxUserIds(userIds: string[]) {
@@ -59,11 +66,12 @@ export function listMailboxScans(userId?: string) {
 export async function claimMailboxScan(
   userId: string,
   mailboxEmail: string,
-  now: Date
+  now: Date,
+  kind: "history" | "live" = "history"
 ) {
   await db
     .insert(emailMailboxScan)
-    .values({ userId, mailboxEmail })
+    .values({ userId, mailboxEmail, kind })
     .onConflictDoNothing();
   const [state] = await db
     .update(emailMailboxScan)
@@ -76,6 +84,7 @@ export async function claimMailboxScan(
       and(
         eq(emailMailboxScan.userId, userId),
         eq(emailMailboxScan.mailboxEmail, mailboxEmail),
+        eq(emailMailboxScan.kind, kind),
         or(
           isNull(emailMailboxScan.leaseUntil),
           lt(emailMailboxScan.leaseUntil, now)
@@ -113,7 +122,8 @@ export async function saveScanPage(
   after: Date,
   before: Date,
   nextCursor: string | undefined,
-  offers: AssessedEmail[]
+  offers: AssessedEmail[],
+  pageMessageIds: string[] = []
 ) {
   return db.transaction(async (tx) => {
     const [claimed] = await tx
@@ -152,6 +162,44 @@ export async function saveScanPage(
           }))
         )
         .onConflictDoNothing();
+    }
+    if (state.kind === "live" && pageMessageIds.length > 0) {
+      const [settings] = await tx
+        .select()
+        .from(emailAlertSettings)
+        .where(eq(emailAlertSettings.userId, state.userId));
+      if (settings?.enabled && settings.chatId && settings.enabledAt) {
+        // Include previously imported messages: the live lane may encounter an
+        // email that history already inserted. The unique offer key deduplicates.
+        const candidates = await tx
+          .select()
+          .from(emailOffer)
+          .where(
+            and(
+              eq(emailOffer.userId, state.userId),
+              eq(emailOffer.mailboxEmail, state.mailboxEmail),
+              inArray(emailOffer.messageId, pageMessageIds)
+            )
+          );
+        const worthy = candidates.filter(
+          (offer) =>
+            offer.status !== "dismissed" &&
+            offer.receivedAt >= settings.enabledAt! &&
+            isAlertWorthy(offer.assessment, new Date())
+        );
+        if (worthy.length > 0) {
+          await tx
+            .insert(emailOfferAlert)
+            .values(
+              worthy.map((offer) => ({
+                offerId: offer.id,
+                userId: state.userId,
+                bindingId: settings.bindingId,
+              }))
+            )
+            .onConflictDoNothing();
+        }
+      }
     }
   });
 }

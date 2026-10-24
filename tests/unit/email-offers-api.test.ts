@@ -8,6 +8,11 @@ import { updateEmailOfferStatus } from "@/lib/email-offers/repository";
 import { scanEmailOffers } from "@/lib/email-offers/scan";
 
 vi.mock("server-only", () => ({}));
+vi.mock("@/lib/email-offers/alerts", () => ({
+  deliverOfferAlerts: vi
+    .fn()
+    .mockResolvedValue({ sent: 0, failed: 0, skipped: 0 }),
+}));
 vi.mock("@/lib/auth", () => ({ getTestAwareSession: vi.fn() }));
 vi.mock("@/lib/email-offers/nango", async (original) => ({
   ...(await original<typeof import("@/lib/email-offers/nango")>()),

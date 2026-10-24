@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { getAlertSettings } from "@/lib/email-offers/alerts";
 import * as assessmentModule from "@/lib/email-offers/assess";
 import { emailText, normalizeAssessment } from "@/lib/email-offers/assess";
 import type { createMailClient } from "@/lib/email-offers/nango";
@@ -12,6 +13,9 @@ import {
 import type { OfferAssessment, OfferEmail } from "@/lib/email-offers/types";
 
 vi.mock("server-only", () => ({}));
+vi.mock("@/lib/email-offers/alerts", () => ({
+  getAlertSettings: vi.fn().mockResolvedValue(undefined),
+}));
 vi.mock("@/lib/db/queries", () => ({
   listAccountsByUser: vi
     .fn()
@@ -70,6 +74,7 @@ describe("offer assessment and incremental scanning", () => {
     vi.clearAllMocks();
     vi.mocked(repository.claimMailboxScan).mockResolvedValue({
       id: "scan",
+      kind: "history",
       userId: "user-1",
       mailboxEmail: "me@example.com",
       checkedUntil: null,
@@ -175,6 +180,43 @@ describe("offer assessment and incremental scanning", () => {
     ).toEqual({ after: now, before: new Date("2026-10-25T08:00:00Z") });
   });
 
+  it("uses the independent live lane while historical pagination is unfinished", async () => {
+    vi.mocked(repository.listMailboxScans).mockResolvedValue([
+      {
+        id: "history",
+        userId: "user-1",
+        mailboxEmail: "me@example.com",
+        kind: "history",
+        checkedUntil: null,
+        scanAfter: new Date("2026-09-24T08:00:00Z"),
+        scanBefore: now,
+        pageToken: "old-page",
+        leaseToken: null,
+        leaseUntil: null,
+        attemptedAt: now,
+      },
+    ]);
+    const readPage = vi.fn().mockResolvedValue({ messages: [] });
+    vi.spyOn(nangoModule, "createMailClient").mockReturnValue({
+      listConnections: vi.fn().mockResolvedValue([connection]),
+      mailbox: vi.fn().mockResolvedValue({ email: "me@example.com" }),
+      readPage,
+    } as unknown as ReturnType<typeof createMailClient>);
+    await scanEmailOffers();
+    expect(repository.claimMailboxScan).toHaveBeenCalledWith(
+      "user-1",
+      "me@example.com",
+      expect.any(Date),
+      "live"
+    );
+    expect(getAlertSettings).toHaveBeenCalledWith("user-1");
+    const window = readPage.mock.calls[0][1];
+    expect(new Date(window.after).getTime()).toBeGreaterThan(
+      Date.now() - 11 * 60_000
+    );
+    expect(window.cursor).toBeUndefined();
+  });
+
   it("cannot recommend an expired or incompletely specified offer", () => {
     expect(
       normalizeAssessment(
@@ -237,7 +279,8 @@ describe("offer assessment and incremental scanning", () => {
       expect.any(Date),
       expect.any(Date),
       "page-2",
-      [{ email, assessment }]
+      [{ email, assessment }],
+      ["m1", "ordinary", "known"]
     );
     expect(assessmentModule.assessOfferEmail).toHaveBeenCalledTimes(2);
     expect(repository.releaseMailboxScan).toHaveBeenCalledTimes(1);

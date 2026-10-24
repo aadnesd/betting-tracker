@@ -5,6 +5,19 @@ test.use({
     "x-test-user-id": "12345678-1234-4234-8234-123456789abc",
   },
 });
+test.beforeEach(async ({ page }) => {
+  await page.route("**/api/bets/email-offers/alerts", (route) =>
+    route.fulfill({
+      json: {
+        configured: false,
+        enabled: false,
+        chatId: null,
+        pending: false,
+        lastDelivery: null,
+      },
+    })
+  );
+});
 const offer = {
   id: "12345678-1234-4234-8234-123456789abc",
   mailboxEmail: "bettor@example.com",
@@ -141,4 +154,92 @@ test("shows a recoverable scan failure and reconnect state", async ({
   await expect(
     page.getByRole("button", { name: "Scan for offers", exact: true })
   ).toBeEnabled();
+});
+
+test("verifies Telegram, recovers from an incorrect code, and pauses alerts", async ({
+  page,
+}) => {
+  let pending = false;
+  let enabled = false;
+  let verified = false;
+  await page.route("**/api/bets/mailbox", (route) =>
+    route.fulfill({ json: { configured: true, connections: [] } })
+  );
+  await page.route("**/api/bets/email-offers", (route) =>
+    route.fulfill({ json: { offers: [], scans: [] } })
+  );
+  await page.route("**/api/bets/email-offers/alerts", (route) => {
+    const body =
+      route.request().method() === "POST" ? route.request().postDataJSON() : {};
+    if (body.action === "request_code") {
+      expect(body.chatId).toBe("123456789");
+      pending = true;
+    }
+    if (body.action === "verify") {
+      if (body.code !== "123456") {
+        return route.fulfill({
+          status: 400,
+          json: {
+            error:
+              "Invalid or expired code. Check Telegram or request a new code.",
+          },
+        });
+      }
+      verified = true;
+      enabled = true;
+      pending = false;
+    }
+    if (body.action === "set_enabled") {
+      enabled = body.enabled;
+    }
+    return route.fulfill({
+      json: {
+        configured: true,
+        enabled,
+        pending,
+        chatId: verified ? "123456789" : null,
+        lastDelivery: null,
+      },
+    });
+  });
+  await page.goto("/bets/email-offers");
+  await page.getByText("Set up Telegram alerts", { exact: true }).click();
+  await page.getByLabel("Telegram chat ID").fill("123456789");
+  await page
+    .getByRole("button", { name: "Send verification code", exact: true })
+    .click();
+  await page.getByLabel("Verification code", { exact: true }).fill("000000");
+  await page
+    .getByRole("button", { name: "Verify and enable alerts", exact: true })
+    .click();
+  await expect(
+    page.getByRole("alert").filter({ hasText: "Invalid or expired code" })
+  ).toContainText("Invalid or expired code");
+  await page.getByLabel("Verification code", { exact: true }).fill("123456");
+  await page
+    .getByRole("button", { name: "Verify and enable alerts", exact: true })
+    .click();
+  await expect(
+    page.getByText("Verified chat 123456789. Alerts are on.", { exact: true })
+  ).toBeVisible();
+  await page.screenshot({
+    path: "artifacts/email-alerts-desktop.png",
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({
+    path: "artifacts/email-alerts-mobile.png",
+    fullPage: true,
+  });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth
+    )
+  ).toBe(true);
+  await page.getByRole("button", { name: "Pause alerts", exact: true }).click();
+  await expect(
+    page.getByText("Verified chat 123456789. Alerts are paused.", {
+      exact: true,
+    })
+  ).toBeVisible();
 });

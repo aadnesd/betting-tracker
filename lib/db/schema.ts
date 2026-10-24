@@ -67,6 +67,9 @@ export const emailMailboxScan = pgTable(
       .references(() => user.id, { onDelete: "cascade" }),
     mailboxEmail: text("mailboxEmail").notNull(),
     checkedUntil: timestamp("checkedUntil", { withTimezone: true }),
+    kind: varchar("kind", { enum: ["history", "live"] })
+      .notNull()
+      .default("history"),
     scanAfter: timestamp("scanAfter", { withTimezone: true }),
     scanBefore: timestamp("scanBefore", { withTimezone: true }),
     pageToken: text("pageToken"),
@@ -77,8 +80,52 @@ export const emailMailboxScan = pgTable(
   (table) => ({
     mailboxIdx: uniqueIndex("email_mailbox_scan_idx").on(
       table.userId,
-      table.mailboxEmail
+      table.mailboxEmail,
+      table.kind
     ),
+  })
+);
+
+export const emailAlertSettings = pgTable("EmailAlertSettings", {
+  userId: uuid("userId")
+    .primaryKey()
+    .references(() => user.id, { onDelete: "cascade" }),
+  chatId: text("chatId"),
+  enabled: boolean("enabled").notNull().default(false),
+  enabledAt: timestamp("enabledAt", { withTimezone: true }),
+  bindingId: uuid("bindingId").notNull().defaultRandom(),
+  pendingChatId: text("pendingChatId"),
+  verificationHash: text("verificationHash"),
+  verificationExpiresAt: timestamp("verificationExpiresAt", {
+    withTimezone: true,
+  }),
+  verificationAttempts: integer("verificationAttempts").notNull().default(0),
+  requestedAt: timestamp("requestedAt", { withTimezone: true }),
+});
+
+export const emailOfferAlert = pgTable(
+  "EmailOfferAlert",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    offerId: uuid("offerId")
+      .notNull()
+      .references(() => emailOffer.id, { onDelete: "cascade" }),
+    userId: uuid("userId")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    bindingId: uuid("bindingId").notNull(),
+    attempts: integer("attempts").notNull().default(0),
+    dueAt: timestamp("dueAt", { withTimezone: true }).notNull().defaultNow(),
+    sentAt: timestamp("sentAt", { withTimezone: true }),
+    skippedAt: timestamp("skippedAt", { withTimezone: true }),
+    leaseToken: uuid("leaseToken"),
+    leaseUntil: timestamp("leaseUntil", { withTimezone: true }),
+    messageId: integer("messageId"),
+    lastError: text("lastError"),
+  },
+  (table) => ({
+    offerIdx: uniqueIndex("email_offer_alert_offer_idx").on(table.offerId),
+    dueIdx: index("email_offer_alert_due_idx").on(table.dueAt),
   })
 );
 

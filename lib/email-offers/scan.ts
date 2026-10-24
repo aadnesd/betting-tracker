@@ -1,6 +1,7 @@
 import "server-only";
 
 import { listAccountsByUser } from "@/lib/db/queries";
+import { getAlertSettings } from "./alerts";
 import { assessOfferEmail } from "./assess";
 import { createMailClient, MailboxError, type MailConnection } from "./nango";
 import {
@@ -20,14 +21,15 @@ export function scanWindow(
     scanBefore: Date | null;
     checkedUntil: Date | null;
   },
-  now: Date
+  now: Date,
+  lookbackMs = LOOKBACK_MS
 ) {
   const before =
     state.scanBefore ?? new Date(Math.floor(now.getTime() / 1000) * 1000);
   const after =
     state.scanAfter ??
     new Date(
-      (state.checkedUntil?.getTime() ?? before.getTime() - LOOKBACK_MS) - 1000
+      (state.checkedUntil?.getTime() ?? before.getTime() - lookbackMs) - 1000
     );
   return { after, before };
 }
@@ -35,16 +37,27 @@ export function scanWindow(
 export async function scanMailbox(
   client: ReturnType<typeof createMailClient>,
   connection: MailConnection,
-  email: string
+  email: string,
+  kind: "history" | "live" = "history"
 ) {
   const userId = connection.tags!.end_user_id;
   const now = new Date();
-  const state = await claimMailboxScan(userId, email, now);
+  const state = await claimMailboxScan(userId, email, now, kind);
   if (!state) {
     return { status: "busy" as const, scanned: 0, found: 0, more: false };
   }
   try {
-    const { after, before } = scanWindow(state, now);
+    const settings =
+      kind === "live" ? await getAlertSettings(userId) : undefined;
+    const liveStart =
+      settings?.enabledAt ?? new Date(now.getTime() - 10 * 60_000);
+    const { after, before } = scanWindow(
+      state,
+      now,
+      kind === "live"
+        ? Math.max(0, now.getTime() - liveStart.getTime())
+        : LOOKBACK_MS
+    );
     const [page, known, accounts] = await Promise.all([
       client.readPage(connection.connection_id, {
         after: after.toISOString(),
@@ -73,7 +86,14 @@ export async function scanMailbox(
         )
       );
     }
-    await saveScanPage(state, after, before, page.nextCursor, offers);
+    await saveScanPage(
+      state,
+      after,
+      before,
+      page.nextCursor,
+      offers,
+      page.messages.map((message) => message.id)
+    );
     return {
       status: "scanned" as const,
       scanned: messages.length,
@@ -89,6 +109,7 @@ export async function scanMailbox(
 // keeps large mailboxes and multiple users progressing within a bounded job.
 export async function scanEmailOffers(userId?: string) {
   const client = createMailClient();
+  const kind = userId ? "history" : "live";
   const [connections, states] = await Promise.all([
     client.listConnections(userId),
     listMailboxScans(userId),
@@ -133,7 +154,8 @@ export async function scanEmailOffers(userId?: string) {
     const state = states.find(
       (s) =>
         s.userId === connection.tags!.end_user_id &&
-        s.mailboxEmail === mailbox.email
+        s.mailboxEmail === mailbox.email &&
+        s.kind === kind
     );
     mailboxes.push({
       connection,
@@ -161,7 +183,7 @@ export async function scanEmailOffers(userId?: string) {
   for (const mailbox of mailboxes.slice(0, 1)) {
     try {
       results.push(
-        await scanMailbox(client, mailbox.connection, mailbox.email)
+        await scanMailbox(client, mailbox.connection, mailbox.email, kind)
       );
     } catch (error) {
       if (userId) {

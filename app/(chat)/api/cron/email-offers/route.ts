@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { deliverOfferAlerts } from "@/lib/email-offers/alerts";
 import { isEmailConfigured } from "@/lib/email-offers/nango";
 import { scanEmailOffers } from "@/lib/email-offers/scan";
 
@@ -11,18 +12,28 @@ export async function GET(request: Request) {
   ) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  // Retry queued delivery even if Gmail is unavailable or has no new emails.
+  const delivery = await deliverOfferAlerts().catch(() => ({
+    sent: 0,
+    failed: 1,
+    skipped: 0,
+  }));
   if (!isEmailConfigured()) {
     return NextResponse.json({
       skipped: true,
+      delivery,
       reason: "Email integration is not configured.",
     });
   }
   try {
     const result = await scanEmailOffers();
-    return NextResponse.json(result, { status: result.errors ? 503 : 200 });
+    return NextResponse.json(
+      { ...result, delivery },
+      { status: result.errors || delivery.failed ? 503 : 200 }
+    );
   } catch {
     return NextResponse.json(
-      { error: "Email scan failed. Progress has been preserved." },
+      { error: "Email scan failed. Progress has been preserved.", delivery },
       { status: 503 }
     );
   }
